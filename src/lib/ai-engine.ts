@@ -2,6 +2,7 @@
 import OpenAI from 'openai'
 import type { Debt, Customer, AIFactor } from '@/types'
 import { createLogger, captureError } from '@/lib/logger'
+import { logOpenAICost } from '@/lib/cost-tracker'
 
 const log = createLogger('ai-engine')
 
@@ -259,7 +260,19 @@ Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","col
     const content = response.choices[0]?.message?.content
     if (!content) throw new Error('Empty response from OpenAI')
     const result = safeParseScore(content)
+    const tokensIn  = response.usage?.prompt_tokens     ?? 0
+    const tokensOut = response.usage?.completion_tokens ?? 0
     log.info('Debt scored via AI', { debt_id: input.debt.id, score: result.score })
+    // Non-blocking cost log
+    logOpenAICost({
+      company_id:   (input.debt as { company_id?: string }).company_id ?? '',
+      action_type:  'score_debt',
+      model:        'gpt-4o-mini',
+      input_tokens:  tokensIn,
+      output_tokens: tokensOut,
+      debt_id:       input.debt.id,
+      success:       true,
+    }).catch(() => {})
     return result
   } catch (err) {
     captureError(err, 'openai_error', { debt_id: input.debt.id })
@@ -318,7 +331,17 @@ Return exactly this JSON shape:
     if (!content) throw new Error('Empty response from OpenAI')
 
     const actions = safeParseActions(content, debtById, debtList)
+    const tokensIn2  = response.usage?.prompt_tokens     ?? 0
+    const tokensOut2 = response.usage?.completion_tokens ?? 0
     log.info('Action plan generated via AI', { count: actions.length, date: input.date })
+    logOpenAICost({
+      company_id:   '',   // set by caller who knows company_id
+      action_type:  'generate_action_plan',
+      model:        'gpt-4o-mini',
+      input_tokens:  tokensIn2,
+      output_tokens: tokensOut2,
+      success:       true,
+    }).catch(() => {})
     if (actions.length > 0) return actions
 
     // If AI returned nothing valid, use fallback rather than empty

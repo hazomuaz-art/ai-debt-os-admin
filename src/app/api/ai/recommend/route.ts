@@ -51,7 +51,7 @@ export async function POST(_request: NextRequest) {
 
       // Generate action plan — AI or rule-based fallback, never throws
       let actions = await generateDailyActionPlan({
-        debts:        debtsWithScore as Parameters<typeof generateDailyActionPlan>[0]['debts'],
+        debts:        debtsWithScore as unknown as Parameters<typeof generateDailyActionPlan>[0]['debts'],
         date:         today,
         company_name: (company?.name as string) ?? 'Unknown',
       })

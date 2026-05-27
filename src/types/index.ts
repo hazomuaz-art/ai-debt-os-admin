@@ -229,3 +229,101 @@ export interface IntegrationSetting {
   created_at:       string
   updated_at:       string
 }
+
+// ── Portfolios / Projects ─────────────────────────────────────────────────
+
+export type PortfolioCategory = 'telecom' | 'insurance' | 'utility' | 'recruitment' | 'government' | 'finance' | 'agriculture' | 'other'
+
+export interface Portfolio {
+  id:             string
+  company_id:     string
+  name:           string
+  name_ar?:       string
+  code:           string
+  category:       PortfolioCategory
+  external_id?:   string
+  source_system:  'manual' | 'debit_collect' | 'tamiuzz' | 'api'
+  color:          string
+  is_active:      boolean
+  notes?:         string
+  metadata:       Record<string, unknown>
+  created_at:     string
+  updated_at:     string
+}
+
+// ── Debit Collect / Tamiuzz Sync ─────────────────────────────────────────
+
+export interface DebitCollectRecord {
+  external_customer_id:  string
+  external_debt_id:      string
+  portfolio_name:        string
+  portfolio_code:        string
+  customer_name:         string
+  customer_phone:        string
+  customer_national_id?: string
+  debt_amount:           number
+  remaining_amount:      number
+  payment_status:        string
+  contact_status:        string
+  collector_name:        string
+  last_contact_result:   string
+  last_contact_date?:    string
+  notes?:                string
+}
+
+export interface SyncResult {
+  id:                string
+  company_id:        string
+  source_system:     string
+  sync_type:         string
+  status:            string
+  records_total:     number
+  records_processed: number
+  records_failed:    number
+  error_log:         unknown[]
+  started_at:        string
+  completed_at?:     string
+}
+
+// ── AI Cost Log ───────────────────────────────────────────────────────────
+
+export type CostProvider = 'openai' | 'whatsapp' | 'tameez' | 'rasf' | 'storage' | 'external' | 'other'
+
+export interface AICostEntry {
+  id:                string
+  company_id:        string
+  provider:          CostProvider
+  model?:            string
+  action_type:       string
+  input_tokens:      number
+  output_tokens:     number
+  total_tokens:      number
+  estimated_cost:    number
+  portfolio_id?:     string
+  portfolio_name?:   string
+  customer_id?:      string
+  customer_reference?: string
+  debt_id?:          string
+  collector_id?:     string
+  collector_name?:   string
+  duration_ms?:      number
+  success:           boolean
+  error_message?:    string
+  metadata:          Record<string, unknown>
+  created_at:        string
+}
+
+// ── Cost Settings ─────────────────────────────────────────────────────────
+
+export interface CostSettings {
+  id:                      string
+  company_id:              string
+  openai_input_per_1m:     number
+  openai_output_per_1m:    number
+  whatsapp_outbound:       number
+  whatsapp_inbound:        number
+  call_analysis_per_min:   number
+  storage_per_gb:          number
+  external_api_per_call:   number
+  updated_at:              string
+}
