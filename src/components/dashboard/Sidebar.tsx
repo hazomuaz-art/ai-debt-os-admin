@@ -1,5 +1,3 @@
-'use client'
-
 import Link from 'next/link'
 import { logoutAction } from '@/lib/actions/auth'
 import type { Profile } from '@/types'
@@ -10,32 +8,43 @@ interface SidebarProps {
 }
 
 const adminNav = [
-  { href: '/dashboard/admin',              label: 'Overview',     icon: '⊞' },
-  { href: '/dashboard/admin/debts',        label: 'Debts',        icon: '◈' },
-  { href: '/dashboard/admin/customers',    label: 'Customers',    icon: '◉' },
-  { href: '/dashboard/admin/ai-actions',   label: 'AI Actions',   icon: '◆' },
-  { href: '/dashboard/admin/team',         label: 'Team',         icon: '◎' },
-  { href: '/dashboard/admin/messages',     label: 'Messages',     icon: '◇' },
-  { href: '/dashboard/admin/analytics',    label: 'Analytics',    icon: '◐' },
-  { href: '/dashboard/admin/activity',     label: 'Activity',     icon: '◌' },
-  { href: '/dashboard/admin/integrations', label: 'Integrations', icon: '⬡' },
-  { href: '/dashboard/admin/portfolios',   label: 'Portfolios',   icon: '◫' },
-  { href: '/dashboard/admin/cost-center',  label: 'Cost Center',  icon: '◈' },
+  { href: '/dashboard/admin',              label: 'Overview',      icon: '?' },
+  { href: '/dashboard/admin/debts',        label: 'Debts',         icon: '?' },
+  { href: '/dashboard/admin/customers',    label: 'Customers',     icon: '?' },
+  { href: '/dashboard/admin/ai-actions',   label: 'AI Actions',    icon: '?' },
+  { href: '/dashboard/admin/team',         label: 'Team',          icon: '?' },
+  { href: '/dashboard/admin/messages',     label: 'Messages',      icon: '?' },
+  { href: '/dashboard/admin/analytics',    label: 'Analytics',     icon: '?' },
+  { href: '/dashboard/admin/activity',     label: 'Activity',      icon: '?' },
+  { href: '/dashboard/admin/integrations', label: 'Integrations',  icon: '?' },
+  { href: '/dashboard/admin/portfolios',   label: 'Portfolios',    icon: '?' },
+  { href: '/dashboard/admin/cost-center',  label: 'Cost Center',   icon: '?' },
+
+  { href: '/dashboard/admin/automation',   label: 'Automation',    icon: '?' },
+  { href: '/dashboard/admin/rules',        label: 'Rules',         icon: '?' },
+  { href: '/dashboard/admin/memory',       label: 'AI Memory',     icon: '?' },
+  { href: '/dashboard/admin/voice',        label: 'AI Voice',      icon: '?' },
+  { href: '/dashboard/admin/campaigns',    label: 'Campaigns',     icon: '?' },
+  { href: '/dashboard/admin/approvals',    label: 'Approvals',     icon: '?' },
+  { href: '/dashboard/admin/promises',     label: 'Promises',      icon: '?' },
+  { href: '/dashboard/admin/alerts',       label: 'Alerts',        icon: '!' },
+  { href: '/dashboard/admin/knowledge-base', label: 'Knowledge',   icon: '?' },
+  { href: '/dashboard/admin/platform',     label: 'Platform',      icon: '?' },
 ]
 
 const managerNav = [
-  { href: '/dashboard/manager',            label: 'Overview',     icon: '⊞' },
-  { href: '/dashboard/manager/debts',      label: 'Debts',        icon: '◈' },
-  { href: '/dashboard/manager/customers',  label: 'Customers',    icon: '◉' },
-  { href: '/dashboard/manager/ai-actions', label: 'AI Actions',   icon: '◆' },
-  { href: '/dashboard/manager/team',       label: 'Team',         icon: '◎' },
+  { href: '/dashboard/manager',            label: 'Overview',     icon: '?' },
+  { href: '/dashboard/manager/debts',      label: 'Debts',        icon: '?' },
+  { href: '/dashboard/manager/customers',  label: 'Customers',    icon: '?' },
+  { href: '/dashboard/manager/ai-actions', label: 'AI Actions',   icon: '?' },
+  { href: '/dashboard/manager/team',       label: 'Team',         icon: '?' },
 ]
 
 const collectorNav = [
-  { href: '/dashboard/collector',          label: 'My Queue',     icon: '⊞' },
-  { href: '/dashboard/collector/debts',    label: 'My Debts',     icon: '◈' },
-  { href: '/dashboard/collector/actions',  label: 'Actions',      icon: '◆' },
-  { href: '/dashboard/collector/messages', label: 'Messages',     icon: '◇' },
+  { href: '/dashboard/collector',          label: 'My Queue',     icon: '?' },
+  { href: '/dashboard/collector/debts',    label: 'My Debts',     icon: '?' },
+  { href: '/dashboard/collector/actions',  label: 'Actions',      icon: '?' },
+  { href: '/dashboard/collector/messages', label: 'Messages',     icon: '?' },
 ]
 
 const roleColors = {
@@ -56,11 +65,10 @@ export function Sidebar({ profile }: SidebarProps) {
 
   return (
     <aside className="w-64 bg-surface-900 border-r border-white/5 flex flex-col h-screen sticky top-0">
-      {/* Logo */}
       <div className="p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center font-display font-bold text-sm">
-            Ω
+            O
           </div>
           <div>
             <div className="font-display font-semibold text-sm leading-tight">AI Debt OS</div>
@@ -71,7 +79,6 @@ export function Sidebar({ profile }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation — fully static, no pathname logic */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {nav.map(item => (
           <Link
@@ -85,7 +92,6 @@ export function Sidebar({ profile }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User info */}
       <div className="p-3 border-t border-white/5">
         <div className="flex items-center gap-3 p-2 rounded-lg mb-1">
           <div className="w-8 h-8 bg-brand-800 rounded-full flex items-center justify-center text-sm font-semibold">
@@ -106,11 +112,10 @@ export function Sidebar({ profile }: SidebarProps) {
             type="submit"
             className="sidebar-link w-full justify-start text-red-400/60 hover:text-red-400 hover:bg-red-500/5"
           >
-            <span>↩</span> Sign out
+            <span>?</span> Sign out
           </button>
         </form>
       </div>
     </aside>
   )
 }
-
