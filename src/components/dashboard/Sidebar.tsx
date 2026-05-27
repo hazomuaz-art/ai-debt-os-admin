@@ -27,6 +27,9 @@ const adminNav = [
   { href: '/dashboard/admin/alerts',         label: 'Alerts',        icon: 'bell',       group: 'system' },
   { href: '/dashboard/admin/memory',         label: 'AI Memory',     icon: 'brain',      group: 'system' },
   { href: '/dashboard/admin/knowledge-base', label: 'Knowledge Base',icon: 'book',       group: 'system' },
+  { href: '/dashboard/admin/rules',          label: 'Rules',         icon: 'shield',     group: 'system' },
+  { href: '/dashboard/admin/voice',          label: 'Voice',         icon: 'message',    group: 'system' },
+  { href: '/dashboard/admin/platform',       label: 'Platform',      icon: 'grid',       group: 'system' },
 ]
 
 const managerNav = [
@@ -199,3 +202,4 @@ export function Sidebar({ profile }: SidebarProps) {
     </aside>
   )
 }
+
