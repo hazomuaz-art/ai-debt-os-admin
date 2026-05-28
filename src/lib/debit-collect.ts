@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Debit Collect / Tamiuzz Integration Layer
  *
  * Handles:
@@ -14,7 +14,7 @@ import type { DebitCollectRecord, SyncResult } from '@/types'
 
 const log = createLogger('debit-collect')
 
-// ── Fetch records from external system ───────────────────────────────────
+// â”€â”€ Fetch records from external system â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface FetchOptions {
   api_url:      string
@@ -82,7 +82,7 @@ export async function fetchRecords(opts: FetchOptions): Promise<{
   }
 }
 
-// ── Process and map a batch of records ───────────────────────────────────
+// â”€â”€ Process and map a batch of records â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface ProcessOptions {
   company_id:  string
@@ -122,7 +122,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
     }
   }
 
-  // Load portfolio map: code → id
+  // Load portfolio map: code â†’ id
   const { data: portfolios } = await supabase
     .from('portfolios')
     .select('id, code, name')
@@ -137,10 +137,24 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
 
   let processed = 0
   let failed    = 0
+  let skipped   = 0
   const errorLog: string[] = []
+
+  const SKIP_STATUSES = new Set(['settled', 'paid', 'closed', 'written_off', 'cancelled'])
 
   for (const rec of opts.records) {
     try {
+      const rawStatus = (rec.payment_status ?? '').toLowerCase()
+      const isSettled = SKIP_STATUSES.has(rawStatus) ||
+        rawStatus.includes('paid') ||
+        rawStatus.includes('settled') ||
+        rawStatus.includes('closed') ||
+        rawStatus.includes('مسدد') ||
+        rawStatus.includes('مغلق') ||
+        rawStatus.includes('منتهي')
+
+      if (isSettled) skipped++
+
       // Resolve portfolio
       const portfolioCode = rec.portfolio_code?.toUpperCase()
       const portfolio = portfolioByCode.get(portfolioCode ?? '') ??
@@ -230,7 +244,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
               current_balance:     rec.remaining_amount,
               currency:            'SAR',
               status:              mapPaymentStatus(rec.payment_status),
-              priority:            'medium',
+              priority:            isSettled ? 'low' : 'medium',
               portfolio_id:        portfolio?.id ?? null,
               collector_name:      rec.collector_name || null,
               last_contact_result: rec.last_contact_result || null,
@@ -268,6 +282,15 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
         mapped_debt_id:         debtId,
         mapped_portfolio_id:    portfolio?.id ?? null,
         raw_payload:            rec as unknown as Record<string, unknown>,
+        raw_remarks:            (rec.remarks ?? []) as unknown as Record<string, unknown>[],
+        raw_payments:           (rec.payments ?? []) as unknown as Record<string, unknown>[],
+        raw_promises:           (rec.promises ?? []) as unknown as Record<string, unknown>[],
+        remarks_count:          rec.remarks?.length ?? 0,
+        payments_count:         rec.payments?.length ?? 0,
+        promises_count:         rec.promises?.length ?? 0,
+        skipped_count:          isSettled ? 1 : 0,
+        skip_reason:            isSettled ? 'Settled or closed case' : null,
+        ai_memory_imported:     false,
         started_at:             new Date().toISOString(),
         completed_at:           new Date().toISOString(),
       })
@@ -287,6 +310,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
     status:            finalStatus,
     records_processed: processed,
     records_failed:    failed,
+    skipped_count:     skipped,
     error_log:         errorLog,
     completed_at:      new Date().toISOString(),
   }).eq('id', syncRecord.id)
@@ -296,12 +320,13 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
     status:            finalStatus,
     records_processed: processed,
     records_failed:    failed,
+    skipped_count:     skipped,
     error_log:         errorLog,
     completed_at:      new Date().toISOString(),
   }
 }
 
-// ── Map external payment status to internal DebtStatus ───────────────────
+// â”€â”€ Map external payment status to internal DebtStatus â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function mapPaymentStatus(externalStatus: string): string {
   const s = externalStatus?.toLowerCase() ?? ''
@@ -312,3 +337,5 @@ function mapPaymentStatus(externalStatus: string): string {
   if (s.includes('negoti'))                            return 'in_negotiation'
   return 'active'
 }
+
+
