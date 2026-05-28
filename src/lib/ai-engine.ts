@@ -316,7 +316,7 @@ DEBTS (${debtSummaries.length}):
 ${JSON.stringify(debtSummaries)}
 
 CUSTOMER_DEBT_CONTEXT:
-${JSON.stringify(enrichedContexts)}
+[]
 
 Rules:
 - Use whatsapp if has_wa=true, else call if has_phone=true, else email
@@ -383,6 +383,7 @@ Return ONLY the message text.`
   })
   return response.choices[0]?.message?.content?.trim() ?? ''
 }
+
 
 
 
