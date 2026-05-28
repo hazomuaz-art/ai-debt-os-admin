@@ -1,9 +1,9 @@
-'use client'
+﻿'use client'
 
 import { useState, useTransition } from 'react'
 import type { IntegrationSetting } from '@/types'
 
-// ── Field definitions per integration ────────────────────────────────────
+// â”€â”€ Field definitions per integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface FieldDef {
   key:         string
@@ -32,7 +32,7 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
   ],
 }
 
-// ── Status badge ──────────────────────────────────────────────────────────
+// â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: string | null }) {
   if (!enabled) {
@@ -45,18 +45,18 @@ function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: stri
   if (lastError) {
     return (
       <span className="status-badge bg-red-500/10 text-red-400 border-red-500/20">
-        ● Error
+        â— Error
       </span>
     )
   }
   return (
     <span className="status-badge bg-green-500/10 text-green-400 border-green-500/20">
-      ● Connected
+      â— Connected
     </span>
   )
 }
 
-// ── Toggle ────────────────────────────────────────────────────────────────
+// â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -86,7 +86,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────
+// â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface IntegrationCardProps {
   name:         string
@@ -198,7 +198,7 @@ export function IntegrationCard({
             <label className="label">
               {field.label}
               {field.hint && (
-                <span className="text-white/30 font-normal ml-1">— {field.hint}</span>
+                <span className="text-white/30 font-normal ml-1">â€” {field.hint}</span>
               )}
             </label>
             <input
@@ -221,7 +221,7 @@ export function IntegrationCard({
           </span>
           {lastError && (
             <span className="text-red-400 truncate max-w-[200px]" title={lastError}>
-              ✗ {lastError.slice(0, 60)}{lastError.length > 60 ? '…' : ''}
+              âœ— {lastError.slice(0, 60)}{lastError.length > 60 ? 'â€¦' : ''}
             </span>
           )}
         </div>
@@ -234,7 +234,7 @@ export function IntegrationCard({
               ? 'bg-green-500/10 text-green-400 border-green-500/20'
               : 'bg-red-500/10 text-red-400 border-red-500/20',
           ].join(' ')}>
-            {testState === 'ok' ? '✓ ' : '✗ '}{testMsg}
+            {testState === 'ok' ? 'âœ“ ' : 'âœ— '}{testMsg}
           </div>
         )}
 
@@ -249,9 +249,9 @@ export function IntegrationCard({
             {saveState === 'saving' && (
               <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
             )}
-            {saveState === 'saved'   ? '✓ Saved'         :
+            {saveState === 'saved'   ? 'âœ“ Saved'         :
              saveState === 'error'   ? 'Save failed'      :
-             saveState === 'saving'  ? 'Saving…'          : 'Save'}
+             saveState === 'saving'  ? 'Savingâ€¦'          : 'Save'}
           </button>
 
           <button
@@ -264,12 +264,13 @@ export function IntegrationCard({
             {testState === 'testing' && (
               <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
             )}
-            {testState === 'testing' ? 'Testing…' :
-             testState === 'ok'      ? '✓ Connected'      :
-             testState === 'fail'    ? '✗ Failed'          : '⟳ Test Connection'}
+            {testState === 'testing' ? 'Testingâ€¦' :
+             testState === 'ok'      ? 'âœ“ Connected'      :
+             testState === 'fail'    ? 'âœ— Failed'          : 'âŸ³ Test Connection'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
