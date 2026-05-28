@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'collector'
+﻿export type UserRole = 'admin' | 'manager' | 'collector'
 export type DebtStatus = 'active' | 'in_progress' | 'promised' | 'partial' | 'in_negotiation' | 'payment_plan' | 'settled' | 'written_off' | 'legal' | 'disputed'
 export type DebtPriority = 'low' | 'medium' | 'high' | 'critical'
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical'
@@ -214,7 +214,7 @@ export interface RecommendRequest {
   limit?: number
 }
 
-// ── Integration Settings ──────────────────────────────────────────────────
+// â”€â”€ Integration Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type IntegrationName = 'rasf_whatsapp' | 'tameez_calls' | 'collection_api'
 
@@ -230,7 +230,7 @@ export interface IntegrationSetting {
   updated_at:       string
 }
 
-// ── Portfolios / Projects ─────────────────────────────────────────────────
+// â”€â”€ Portfolios / Projects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type PortfolioCategory = 'telecom' | 'insurance' | 'utility' | 'recruitment' | 'government' | 'finance' | 'agriculture' | 'other'
 
@@ -251,7 +251,7 @@ export interface Portfolio {
   updated_at:     string
 }
 
-// ── Debit Collect / Tamiuzz Sync ─────────────────────────────────────────
+// â”€â”€ Debit Collect / Tamiuzz Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface DebitCollectRecord {
   external_customer_id:  string
@@ -269,6 +269,25 @@ export interface DebitCollectRecord {
   last_contact_result:   string
   last_contact_date?:    string
   notes?:                string
+
+  remarks?: Array<{
+    date: string
+    text: string
+    collector?: string
+  }>
+
+  payments?: Array<{
+    date: string
+    amount: number
+    method?: string
+    reference?: string
+  }>
+
+  promises?: Array<{
+    date: string
+    promised_amount: number
+    promised_date: string
+  }>
 }
 
 export interface SyncResult {
@@ -285,7 +304,7 @@ export interface SyncResult {
   completed_at?:     string
 }
 
-// ── AI Cost Log ───────────────────────────────────────────────────────────
+// â”€â”€ AI Cost Log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type CostProvider = 'openai' | 'whatsapp' | 'tameez' | 'rasf' | 'storage' | 'external' | 'other'
 
@@ -313,7 +332,7 @@ export interface AICostEntry {
   created_at:        string
 }
 
-// ── Cost Settings ─────────────────────────────────────────────────────────
+// â”€â”€ Cost Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CostSettings {
   id:                      string
@@ -327,3 +346,4 @@ export interface CostSettings {
   external_api_per_call:   number
   updated_at:              string
 }
+
