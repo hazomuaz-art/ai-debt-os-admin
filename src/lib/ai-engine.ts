@@ -1,12 +1,14 @@
-/* eslint-disable no-console */
+﻿/* eslint-disable no-console */
 import OpenAI from 'openai'
 import type { Debt, Customer, AIFactor } from '@/types'
 import { createLogger, captureError } from '@/lib/logger'
 import { logOpenAICost } from '@/lib/cost-tracker'
+import { generateNegotiationResponse } from '@/lib/negotiation-response'
+import { resolveResponse } from '@/lib/smart-response'
 
 const log = createLogger('ai-engine')
 
-// ── OpenAI singleton ──────────────────────────────────────────────────────
+// â”€â”€ OpenAI singleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let _client: OpenAI | null = null
 
@@ -18,7 +20,7 @@ function getClient(): OpenAI {
   return _client
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface DebtScoringInput {
   debt:                Debt
@@ -52,7 +54,7 @@ export interface ActionPlanInput {
   company_name: string
 }
 
-// ── Rule-based fallback scorer ────────────────────────────────────────────
+// â”€â”€ Rule-based fallback scorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function scoringFallback(input: DebtScoringInput): ScoreResult {
   const daysOverdue  = input.days_overdue
@@ -105,7 +107,7 @@ export function scoringFallback(input: DebtScoringInput): ScoreResult {
   }
 }
 
-// ── Safe score parser ─────────────────────────────────────────────────────
+// â”€â”€ Safe score parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function safeParseScore(content: string): ScoreResult {
   let parsed: Record<string, unknown>
@@ -135,7 +137,7 @@ function safeParseScore(content: string): ScoreResult {
   }
 }
 
-// ── Safe action plan parser ───────────────────────────────────────────────
+// â”€â”€ Safe action plan parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Handles all GPT response shapes:
 //   - bare array: [{...}, {...}]
 //   - wrapped:    {"actions": [{...}]}
@@ -197,7 +199,7 @@ function safeParseActions(
   }).filter(a => a.debt_id && a.customer_id)
 }
 
-// ── Rule-based action plan fallback ───────────────────────────────────────
+// â”€â”€ Rule-based action plan fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ruleBasedActionPlan(
   debts:    ActionPlanInput['debts'],
@@ -234,7 +236,7 @@ function ruleBasedActionPlan(
   })
 }
 
-// ── scoreDebt (public) ────────────────────────────────────────────────────
+// â”€â”€ scoreDebt (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function scoreDebt(input: DebtScoringInput): Promise<ScoreResult> {
   const client = getClient()
@@ -276,17 +278,17 @@ Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","col
     return result
   } catch (err) {
     captureError(err, 'openai_error', { debt_id: input.debt.id })
-    log.warn('OpenAI scoring failed — using fallback', { debt_id: input.debt.id })
+    log.warn('OpenAI scoring failed â€” using fallback', { debt_id: input.debt.id })
     return scoringFallback(input)
   }
 }
 
-// ── generateDailyActionPlan (public) ────────────────────────────────────
+// â”€â”€ generateDailyActionPlan (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function generateDailyActionPlan(input: ActionPlanInput): Promise<ActionPlanItem[]> {
   const client = getClient()
 
-  // Build lookup maps upfront — used by both AI path and fallback
+  // Build lookup maps upfront â€” used by both AI path and fallback
   const debtById = new Map(input.debts.map(d => [d.id, { id: d.id, customer_id: d.customer_id }]))
   const debtList = Array.from(debtById.values())
 
@@ -345,16 +347,16 @@ Return exactly this JSON shape:
     if (actions.length > 0) return actions
 
     // If AI returned nothing valid, use fallback rather than empty
-    log.warn('AI returned 0 valid actions — using rule-based fallback')
+    log.warn('AI returned 0 valid actions â€” using rule-based fallback')
     return ruleBasedActionPlan(input.debts, debtList)
   } catch (err) {
     captureError(err, 'openai_error', { context: 'generate_action_plan', date: input.date })
-    log.warn('OpenAI action plan failed — using rule-based fallback')
+    log.warn('OpenAI action plan failed â€” using rule-based fallback')
     return ruleBasedActionPlan(input.debts, debtList)
   }
 }
 
-// ── generateCollectionMessage (public) ───────────────────────────────────
+// â”€â”€ generateCollectionMessage (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function generateCollectionMessage(
   customerName: string, debtAmount: number, currency: string,
@@ -366,7 +368,7 @@ export async function generateCollectionMessage(
 
   const prompt = `Write a debt collection message (${urgency}).
 Customer: ${customerName}, Amount: ${debtAmount} ${currency}, ${daysOverdue} days overdue
-Channel: ${channel} — ${channelHint}
+Channel: ${channel} â€” ${channelHint}
 Language: ${language === 'both' ? 'bilingual English and Arabic' : language}
 Tone: professional, respectful, FDCPA-compliant. No threats. Clear call to action.
 Return ONLY the message text.`
@@ -376,3 +378,5 @@ Return ONLY the message text.`
   })
   return response.choices[0]?.message?.content?.trim() ?? ''
 }
+
+
