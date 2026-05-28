@@ -1,4 +1,5 @@
-﻿/* eslint-disable no-console */
+/* eslint-disable no-console */
+import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 import OpenAI from 'openai'
 import type { Debt, Customer, AIFactor } from '@/types'
 import { createLogger, captureError } from '@/lib/logger'
@@ -8,7 +9,7 @@ import { resolveResponse } from '@/lib/smart-response'
 
 const log = createLogger('ai-engine')
 
-// â”€â”€ OpenAI singleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── OpenAI singleton ──────────────────────────────────────────────────────
 
 let _client: OpenAI | null = null
 
@@ -20,7 +21,7 @@ function getClient(): OpenAI {
   return _client
 }
 
-// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Types ─────────────────────────────────────────────────────────────────
 
 export interface DebtScoringInput {
   debt:                Debt
@@ -52,9 +53,10 @@ export interface ActionPlanInput {
   debts:        Array<Record<string, unknown> & { id: string; customer_id: string; customer?: Record<string, unknown> | null }>
   date:         string
   company_name: string
+  company_id?:  string
 }
 
-// â”€â”€ Rule-based fallback scorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Rule-based fallback scorer ────────────────────────────────────────────
 
 export function scoringFallback(input: DebtScoringInput): ScoreResult {
   const daysOverdue  = input.days_overdue
@@ -107,7 +109,7 @@ export function scoringFallback(input: DebtScoringInput): ScoreResult {
   }
 }
 
-// â”€â”€ Safe score parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Safe score parser ─────────────────────────────────────────────────────
 
 function safeParseScore(content: string): ScoreResult {
   let parsed: Record<string, unknown>
@@ -137,7 +139,7 @@ function safeParseScore(content: string): ScoreResult {
   }
 }
 
-// â”€â”€ Safe action plan parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Safe action plan parser ───────────────────────────────────────────────
 // Handles all GPT response shapes:
 //   - bare array: [{...}, {...}]
 //   - wrapped:    {"actions": [{...}]}
@@ -199,7 +201,7 @@ function safeParseActions(
   }).filter(a => a.debt_id && a.customer_id)
 }
 
-// â”€â”€ Rule-based action plan fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Rule-based action plan fallback ───────────────────────────────────────
 
 function ruleBasedActionPlan(
   debts:    ActionPlanInput['debts'],
@@ -236,7 +238,7 @@ function ruleBasedActionPlan(
   })
 }
 
-// â”€â”€ scoreDebt (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── scoreDebt (public) ────────────────────────────────────────────────────
 
 export async function scoreDebt(input: DebtScoringInput): Promise<ScoreResult> {
   const client = getClient()
@@ -278,17 +280,17 @@ Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","col
     return result
   } catch (err) {
     captureError(err, 'openai_error', { debt_id: input.debt.id })
-    log.warn('OpenAI scoring failed â€” using fallback', { debt_id: input.debt.id })
+    log.warn('OpenAI scoring failed — using fallback', { debt_id: input.debt.id })
     return scoringFallback(input)
   }
 }
 
-// â”€â”€ generateDailyActionPlan (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── generateDailyActionPlan (public) ────────────────────────────────────
 
 export async function generateDailyActionPlan(input: ActionPlanInput): Promise<ActionPlanItem[]> {
   const client = getClient()
 
-  // Build lookup maps upfront â€” used by both AI path and fallback
+  // Build lookup maps upfront — used by both AI path and fallback
   const debtById = new Map(input.debts.map(d => [d.id, { id: d.id, customer_id: d.customer_id }]))
   const debtList = Array.from(debtById.values())
 
@@ -313,11 +315,14 @@ Generate a prioritized daily action plan. Return a JSON object with key "actions
 DEBTS (${debtSummaries.length}):
 ${JSON.stringify(debtSummaries)}
 
+CUSTOMER_DEBT_CONTEXT:
+${JSON.stringify(enrichedContexts)}
+
 Rules:
 - Use whatsapp if has_wa=true, else call if has_phone=true, else email
 - legal if overdue>180; escalate if overdue>90; settle if high score+low balance
 - critical priority: balance>50000 or overdue>90
-- suggested_message must be professional, specific, non-threatening, under 200 chars
+- suggested_message must be in natural Saudi Arabic unless customer used another language. It must be respectful, human, specific, non-threatening, under 200 chars. If customer claimed payment, ask politely for receipt. If customer asks installments, suggest a payment plan.
 
 Return exactly this JSON shape:
 {"actions":[{"debt_id":"<exact debt_id from input>","customer_id":"<exact cust_id from input>","action_type":"<call|whatsapp|email|visit|legal|escalate|settle>","priority":"<low|medium|high|critical>","reason":"<50 chars>","suggested_message":"<200 chars>","best_time_to_contact":"<time range>"}]}`
@@ -337,7 +342,7 @@ Return exactly this JSON shape:
     const tokensOut2 = response.usage?.completion_tokens ?? 0
     log.info('Action plan generated via AI', { count: actions.length, date: input.date })
     logOpenAICost({
-      company_id:   '',   // set by caller who knows company_id
+      company_id:   input.company_id ?? '',
       action_type:  'generate_action_plan',
       model:        'gpt-4o-mini',
       input_tokens:  tokensIn2,
@@ -347,16 +352,16 @@ Return exactly this JSON shape:
     if (actions.length > 0) return actions
 
     // If AI returned nothing valid, use fallback rather than empty
-    log.warn('AI returned 0 valid actions â€” using rule-based fallback')
+    log.warn('AI returned 0 valid actions — using rule-based fallback')
     return ruleBasedActionPlan(input.debts, debtList)
   } catch (err) {
     captureError(err, 'openai_error', { context: 'generate_action_plan', date: input.date })
-    log.warn('OpenAI action plan failed â€” using rule-based fallback')
+    log.warn('OpenAI action plan failed — using rule-based fallback')
     return ruleBasedActionPlan(input.debts, debtList)
   }
 }
 
-// â”€â”€ generateCollectionMessage (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── generateCollectionMessage (public) ───────────────────────────────────
 
 export async function generateCollectionMessage(
   customerName: string, debtAmount: number, currency: string,
@@ -368,7 +373,7 @@ export async function generateCollectionMessage(
 
   const prompt = `Write a debt collection message (${urgency}).
 Customer: ${customerName}, Amount: ${debtAmount} ${currency}, ${daysOverdue} days overdue
-Channel: ${channel} â€” ${channelHint}
+Channel: ${channel} — ${channelHint}
 Language: ${language === 'both' ? 'bilingual English and Arabic' : language}
 Tone: professional, respectful, FDCPA-compliant. No threats. Clear call to action.
 Return ONLY the message text.`
@@ -378,5 +383,9 @@ Return ONLY the message text.`
   })
   return response.choices[0]?.message?.content?.trim() ?? ''
 }
+
+
+
+
 
 
