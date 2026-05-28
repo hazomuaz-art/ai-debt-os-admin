@@ -29,11 +29,27 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
   if (!debt) notFound()
 
+
+  const { data: timelineEvents } = await supabase
+    .from('timeline_events')
+    .select('*')
+    .eq('customer_id', debt.customer_id)
+    .order('occurred_at', { ascending: false })
+    .limit(20)
+
   const { data: collectors } = await supabase
     .from('profiles')
     .select('id, full_name, email')
     .in('role', ['collector', 'manager'])
     .order('full_name')
+
+
+  const { data: memoryItems } = await supabase
+    .from('ai_memories')
+    .select('*')
+    .eq('customer_id', debt.customer_id)
+    .order('created_at', { ascending: false })
+    .limit(10)
 
   const latestScore = debt.ai_scores?.sort((a: any, b: any) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -124,6 +140,82 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
+          {/* AI Memory */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">
+              AI Memory
+            </h2>
+
+            <div className="space-y-3">
+              {memoryItems?.length ? (
+                memoryItems.map((memory: any) => (
+                  <div
+                    key={memory.id}
+                    className="border border-white/10 rounded-xl p-4 bg-white/[0.02]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-white">
+                          {memory.title || 'AI Memory'}
+                        </p>
+
+                        <p className="text-sm text-slate-400 mt-1">
+                          {memory.content || memory.note || 'No details'}
+                        </p>
+                      </div>
+
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-500/10 text-purple-300">
+                        memory
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-400 text-sm">
+                  No AI memory yet
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">
+              Unified Timeline
+            </h2>
+
+            <div className="space-y-3">
+              {timelineEvents?.length ? (
+                timelineEvents.map((event: any) => (
+                  <div
+                    key={event.id}
+                    className="border border-white/10 rounded-xl p-4 bg-white/[0.02]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-white">
+                          {event.title || event.event_type}
+                        </p>
+
+                        <p className="text-sm text-slate-400 mt-1">
+                          {event.description || 'No description'}
+                        </p>
+                      </div>
+
+                      <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-300">
+                        {event.event_type}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-400 text-sm">
+                  No timeline events yet
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Debt Overview */}
           <div className="card">
             <h2 className="text-lg font-semibold font-syne mb-4">Debt Overview</h2>
@@ -329,6 +421,10 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     </div>
   )
 }
+
+
+
+
 
 
 
