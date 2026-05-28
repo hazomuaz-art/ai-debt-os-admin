@@ -1,7 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import AnalyticsCharts from '@/components/dashboard/AnalyticsCharts'
+import { calculateExecutiveMetrics } from '@/lib/executive-metrics'
+import { generateExecutiveInsights } from '@/lib/executive-insights'
 
 export default async function AnalyticsPage() {
   const supabase = createClient()
@@ -115,6 +117,20 @@ export default async function AnalyticsPage() {
   const priorityChartData = Object.entries(priorityCounts).map(([name, value]) => ({ name, value }))
   const riskChartData = Object.entries(riskCounts).map(([name, value]) => ({ name, value }))
 
+  const executiveMetrics = calculateExecutiveMetrics({
+    total_debts: totalDebts,
+    recovered_debts: statusCounts.paid ?? 0,
+    total_amount: totalOriginal,
+    recovered_amount: totalCollectedAll,
+    high_risk_cases: riskCounts.high ?? riskCounts.high_risk ?? 0
+  })
+
+  const executiveInsights = generateExecutiveInsights({
+    collection_rate: executiveMetrics.collection_rate,
+    ai_recovery_rate: executiveMetrics.ai_recovery_rate,
+    high_risk_cases: executiveMetrics.high_risk_cases
+  })
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -139,12 +155,61 @@ export default async function AnalyticsPage() {
         <div className="stat-card">
           <p className="text-slate-400 text-sm">Avg AI Score</p>
           <p className={`text-2xl font-bold font-syne ${avgScore >= 60 ? 'text-green-400' : avgScore >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
-            {avgScore || '—'}
+            {avgScore || 'â€”'}
           </p>
         </div>
       </div>
 
-      {/* Charts — client component with Recharts */}
+      {/* Executive AI Dashboard */}
+      <div className="card border border-cyan-500/20 bg-cyan-500/5">
+        <h2 className="text-lg font-semibold font-syne mb-4">
+          Executive AI Dashboard
+        </h2>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+          <div className="stat-card">
+            <p className="text-slate-400 text-sm">AI Recovery Rate</p>
+            <p className="text-2xl font-bold font-syne text-cyan-400">
+              {executiveMetrics.ai_recovery_rate}%
+            </p>
+          </div>
+
+          <div className="stat-card">
+            <p className="text-slate-400 text-sm">Active Cases</p>
+            <p className="text-2xl font-bold font-syne">
+              {executiveMetrics.active_cases.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="stat-card">
+            <p className="text-slate-400 text-sm">Recovered Amount</p>
+            <p className="text-2xl font-bold font-syne text-green-400">
+              {formatCurrency(executiveMetrics.recovered_amount, 'SAR')}
+            </p>
+          </div>
+
+          <div className="stat-card">
+            <p className="text-slate-400 text-sm">High Risk Cases</p>
+            <p className="text-2xl font-bold font-syne text-red-400">
+              {executiveMetrics.high_risk_cases.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-slate-400 text-sm">Executive Insights</p>
+          {executiveInsights.map((insight: string, index: number) => (
+            <div
+              key={index}
+              className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white"
+            >
+              {insight}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Charts â€” client component with Recharts */}
       <AnalyticsCharts
         monthlyData={monthlyData}
         statusChartData={statusChartData}
@@ -155,3 +220,6 @@ export default async function AnalyticsPage() {
     </div>
   )
 }
+
+
+
