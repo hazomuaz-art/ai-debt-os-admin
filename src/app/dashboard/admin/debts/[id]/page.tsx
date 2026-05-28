@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
 import RecordPaymentModal from '@/components/debt/RecordPaymentModal'
@@ -8,6 +8,8 @@ import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import AssignDebtSelect from '@/components/debt/AssignDebtSelect'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { buildCustomerContext } from '@/lib/ai-context'
+import { determineAutomationAction } from '@/lib/automation-engine'
 
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -39,6 +41,19 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
+  const aiContext = await buildCustomerContext({
+    company_id: debt.company_id,
+    customer_id: debt.customer_id
+  })
+
+  const automationDecision = determineAutomationAction({
+    customer_status: aiContext.customer_status,
+    engagement_score: aiContext.engagement_score,
+    has_promise: !!aiContext.last_promise,
+    has_recent_payment: !!aiContext.last_payment
+  })
+
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
@@ -56,6 +71,53 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             phone={debt.customer?.whatsapp || debt.customer?.phone}
             customerName={debt.customer?.full_name}
           />
+        </div>
+      </div>
+
+      <div className="card border border-cyan-500/20 bg-cyan-500/5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold font-syne">AI Intelligence</h2>
+
+          <span className="px-3 py-1 rounded-full text-xs bg-cyan-500/20 text-cyan-300">
+            {aiContext.customer_status}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <p className="text-slate-400 text-sm">Engagement</p>
+            <p className="text-2xl font-bold text-cyan-400">
+              {aiContext.engagement_score}%
+            </p>
+          </div>
+
+          <div>
+            <p className="text-slate-400 text-sm">AI Action</p>
+            <p className="text-lg font-semibold text-white">
+              {automationDecision.action}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-slate-400 text-sm">Priority</p>
+            <p className="text-lg font-semibold text-yellow-400">
+              {automationDecision.priority}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-slate-400 text-sm">Recent Events</p>
+            <p className="text-lg font-semibold text-green-400">
+              {aiContext.recent_events?.length ?? 0}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 p-4 rounded-xl bg-black/20 border border-white/5">
+          <p className="text-slate-400 text-sm mb-1">AI Recommendation</p>
+          <p className="text-white">
+            {automationDecision.reason}
+          </p>
         </div>
       </div>
 
@@ -132,9 +194,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     <tr key={p.id} className="border-b border-surface-100 text-sm">
                       <td className="py-2 text-slate-300">{formatDate(p.payment_date)}</td>
                       <td className="py-2 font-medium text-green-400">{formatCurrency(p.amount, debt.currency)}</td>
-                      <td className="py-2 text-slate-300">{p.payment_method || '—'}</td>
-                      <td className="py-2 text-slate-300 font-mono text-xs">{p.reference_number || '—'}</td>
-                      <td className="py-2 text-slate-400">{p.notes || '—'}</td>
+                      <td className="py-2 text-slate-300">{p.payment_method || 'â€”'}</td>
+                      <td className="py-2 text-slate-300 font-mono text-xs">{p.reference_number || 'â€”'}</td>
+                      <td className="py-2 text-slate-400">{p.notes || 'â€”'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -158,7 +220,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     }`}>
                       <p>{msg.content}</p>
                       <p className={`text-xs mt-1 ${msg.direction === 'outbound' ? 'text-brand-200' : 'text-slate-400'}`}>
-                        {formatDate(msg.sent_at || msg.created_at)} • {msg.channel}
+                        {formatDate(msg.sent_at || msg.created_at)} â€¢ {msg.channel}
                       </p>
                     </div>
                   </div>
@@ -182,23 +244,23 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               </div>
               <div>
                 <p className="text-slate-400">Phone</p>
-                <p className="font-medium">{debt.customer?.phone || '—'}</p>
+                <p className="font-medium">{debt.customer?.phone || 'â€”'}</p>
               </div>
               <div>
                 <p className="text-slate-400">WhatsApp</p>
-                <p className="font-medium">{debt.customer?.whatsapp || '—'}</p>
+                <p className="font-medium">{debt.customer?.whatsapp || 'â€”'}</p>
               </div>
               <div>
                 <p className="text-slate-400">National ID</p>
-                <p className="font-medium font-mono">{debt.customer?.national_id || '—'}</p>
+                <p className="font-medium font-mono">{debt.customer?.national_id || 'â€”'}</p>
               </div>
               <div>
                 <p className="text-slate-400">City</p>
-                <p className="font-medium">{debt.customer?.city || '—'}</p>
+                <p className="font-medium">{debt.customer?.city || 'â€”'}</p>
               </div>
               <div>
                 <p className="text-slate-400">Employer</p>
-                <p className="font-medium">{debt.customer?.employer || '—'}</p>
+                <p className="font-medium">{debt.customer?.employer || 'â€”'}</p>
               </div>
               {debt.customer?.monthly_income && (
                 <div>
@@ -249,7 +311,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                         <div key={i} className="flex items-center justify-between text-xs">
                           <span className="text-slate-300">{f.name}</span>
                           <span className={f.impact === 'positive' ? 'text-green-400' : 'text-red-400'}>
-                            {f.impact === 'positive' ? '+' : '−'}{f.weight}
+                            {f.impact === 'positive' ? '+' : 'âˆ’'}{f.weight}
                           </span>
                         </div>
                       ))}
@@ -267,3 +329,6 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     </div>
   )
 }
+
+
+
