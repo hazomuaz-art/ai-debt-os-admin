@@ -268,9 +268,23 @@ export function IntegrationCard({
              testState === 'ok'      ? 'âœ“ Connected'      :
              testState === 'fail'    ? 'âœ— Failed'          : 'âŸ³ Test Connection'}
           </button>
+
+          {integrationKey === 'collection_api' && (
+            <button
+              type="button"
+              onClick={async () => {
+                await fetch('/api/sync/collection', { method: 'POST' })
+                alert('Collection sync started')
+              }}
+              className="btn-primary text-sm px-4 py-1.5"
+            >
+              Sync Now
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 }
+
 
