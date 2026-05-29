@@ -35,7 +35,7 @@
     raw.includes('not customer') ||
     raw.includes('لا يخص العميل') ||
     raw.includes('رقم خطأ')
-  ) return 'pending'
+  ) return 'disputed'
 
   if (
     raw.includes('legal') ||
@@ -56,7 +56,7 @@
     raw.includes('وثيقة') ||
     raw.includes('dispute') ||
     raw.includes('اعتراض')
-  ) return 'pending'
+  ) return 'disputed'
 
   return 'active'
 }
@@ -70,3 +70,4 @@ export function calculateImportRisk(status?: string | null, amount?: number) {
 
   return 'medium'
 }
+
