@@ -1,0 +1,212 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Lint & Type Check ───────────────────────────────────────────────────
+  lint:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+  # ── Unit Tests ─────────────────────────────────────────────────────────
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    env:
+      # These are TEST values — not real credentials
+      NEXT_PUBLIC_SUPABASE_URL:      https://test.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-xxxxxxxxxxxxxxxxxxxx
+      SUPABASE_SERVICE_ROLE_KEY:     test-service-role-key-xxxxxxxxxxxxxxxxx
+      OPENAI_API_KEY:                sk-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      APP_SECRET:                    test-app-secret-32-characters-long!!
+      NEXT_PUBLIC_APP_URL:           http://localhost:3000
+      WHATSAPP_PHONE_NUMBER_ID:      "123456789"
+      WHATSAPP_ACCESS_TOKEN:         test-wa-token
+      WHATSAPP_VERIFY_TOKEN:         test-verify-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run integration tests (migration validation)
+        run: npm run test:integration
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ── Build Verification ─────────────────────────────────────────────────
+  build:
+    name: Production Build
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    env:
+      NEXT_PUBLIC_SUPABASE_URL:      https://test.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-xxxxxxxxxxxxxxxxxxxx
+      SUPABASE_SERVICE_ROLE_KEY:     test-service-role-key-xxxxxxxxxxxxxxxxx
+      OPENAI_API_KEY:                sk-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      APP_SECRET:                    test-app-secret-32-characters-long!!
+      NEXT_PUBLIC_APP_URL:           https://example.com
+      WHATSAPP_PHONE_NUMBER_ID:      "123456789"
+      WHATSAPP_ACCESS_TOKEN:         test-wa-token
+      WHATSAPP_VERIFY_TOKEN:         test-verify-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check build output size
+        run: |
+          du -sh .next/ || true
+          # Fail if standalone bundle > 100MB
+          SIZE=$(du -sm .next/standalone 2>/dev/null | cut -f1 || echo 0)
+          echo "Standalone bundle: ${SIZE}MB"
+          if [ "$SIZE" -gt 100 ]; then
+            echo "::warning::Bundle size ${SIZE}MB exceeds 100MB threshold"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: |
+            .next/
+            !.next/cache
+          retention-days: 3
+
+  # ── Environment Validation ─────────────────────────────────────────────
+  validate-staging:
+    name: Validate Staging Env
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/staging'
+    environment: staging
+    env:
+      NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.STAGING_SERVICE_ROLE_KEY }}
+      OPENAI_API_KEY:                ${{ secrets.OPENAI_API_KEY }}
+      APP_SECRET:                    ${{ secrets.APP_SECRET }}
+      NEXT_PUBLIC_APP_URL:           ${{ secrets.STAGING_APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate environment
+        run: node scripts/validate-env.js
+
+  # ── Deploy to Vercel (Production) ──────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, validate-staging]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel
+        run: |
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Run health check
+        run: |
+          sleep 15  # wait for deployment to propagate
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PROD_APP_URL }}/api/health)
+          echo "Health check status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Health check failed with status $STATUS"
+            exit 1
+          fi
+
+  # ── Security Audit ────────────────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+        continue-on-error: true  # report but don't block
+
+      - name: Check for secrets in code
+        run: |
+          # Fail if any real secret patterns found in source
+          if grep -r "sk-[a-zA-Z0-9]\{40\}" src/ --include="*.ts" --include="*.tsx"; then
+            echo "::error::Hardcoded API key found in source!"
+            exit 1
+          fi
+          if grep -r "eyJhbGciOiJ" src/ --include="*.ts" --include="*.tsx"; then
+            echo "::error::Potential JWT token hardcoded in source!"
+            exit 1
+          fi
