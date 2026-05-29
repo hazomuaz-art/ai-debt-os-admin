@@ -1,4 +1,6 @@
-﻿export function IntegrationControlCenter() {
+﻿import { AISchemaTest } from './AISchemaTest'
+
+export function IntegrationControlCenter() {
   const health = [
     { label: 'Collection API', status: 'Ready', tone: 'text-green-400' },
     { label: 'WhatsApp Gateway', status: 'Pending setup', tone: 'text-yellow-400' },
@@ -104,6 +106,8 @@
           The system can analyze incoming collection tables, detect fields, classify statuses, and prepare mappings before live sync.
         </p>
       </div>
+      <AISchemaTest />
     </div>
   )
 }
+
