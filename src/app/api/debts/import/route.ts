@@ -1,10 +1,11 @@
-import { createLogger } from '@/lib/logger'
+﻿import { createLogger } from '@/lib/logger'
 const logger = createLogger('api/debts/import')
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
 import { z } from 'zod'
+import { mapImportedStatus, calculateImportRisk } from '@/lib/import-mapping'
 
 // Expected CSV columns (case-insensitive header matching)
 const COLUMN_MAP: Record<string, string> = {
@@ -36,6 +37,11 @@ const COLUMN_MAP: Record<string, string> = {
   'account': 'account_number',
   'notes': 'notes',
   'description': 'description',
+  'company': 'creditor_name',
+  'project': 'product_type',
+  'claim number': 'claim_number',
+  'claim reason': 'claim_reason',
+  'customer status': 'status',
 }
 
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -194,7 +200,7 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (custErr || !newCustomer) {
-            results.errors.push(`Row ${rowIdx + 2}: failed to create customer — ${custErr?.message}`)
+            results.errors.push(`Row ${rowIdx + 2}: failed to create customer â€” ${custErr?.message}`)
             results.skipped++
             continue
           }
@@ -202,10 +208,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate status/priority
-        const validStatuses = ['active', 'pending', 'in_negotiation', 'payment_plan', 'settled', 'legal', 'written_off']
         const validPriorities = ['low', 'medium', 'high', 'critical']
-        const status = validStatuses.includes(fields.status) ? fields.status : 'active'
-        const priority = validPriorities.includes(fields.priority) ? fields.priority : 'medium'
+        const status = mapImportedStatus(fields.status)
+        const priority = validPriorities.includes(fields.priority) ? fields.priority : calculateImportRisk(fields.status, amount)
 
         // Parse due_date
         let dueDate: string | null = null
@@ -214,7 +219,7 @@ export async function POST(request: NextRequest) {
           if (!isNaN(d.getTime())) dueDate = d.toISOString().split('T')[0]
         }
 
-        const currentBalance = fields.current_balance ? parseFloat(fields.current_balance) : amount
+        const currentBalance = fields.current_balance ? parseFloat(fields.current_balance) : (status === 'settled' ? 0 : amount)
 
         const { error: debtErr } = await supabase
           .from('debts')
@@ -229,13 +234,13 @@ export async function POST(request: NextRequest) {
             status,
             priority,
             due_date: dueDate,
-            product_type: fields.product_type || null,
+            product_type: fields.product_type || fields.creditor_name || null,
             account_number: fields.account_number || null,
-            notes: fields.notes || fields.description || null,
+            notes: fields.notes || fields.description || fields.claim_reason || fields.claim_number || null,
           })
 
         if (debtErr) {
-          results.errors.push(`Row ${rowIdx + 2}: failed to create debt — ${debtErr.message}`)
+          results.errors.push(`Row ${rowIdx + 2}: failed to create debt â€” ${debtErr.message}`)
           results.skipped++
         } else {
           results.imported++
@@ -258,3 +263,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
