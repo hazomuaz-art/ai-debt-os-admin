@@ -6,6 +6,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
 import { z } from 'zod'
 import { mapImportedStatus, calculateImportRisk } from '@/lib/import-mapping'
+import { processDebtAutomation } from '@/lib/automation-core'
 
 // Expected CSV columns (case-insensitive header matching)
 const COLUMN_MAP: Record<string, string> = {
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
 
         const currentBalance = fields.current_balance ? parseFloat(fields.current_balance) : (status === 'settled' ? 0 : amount)
 
-        const { error: debtErr } = await supabase
+        const { data: newDebt, error: debtErr } = await supabase
           .from('debts')
           .insert({
             company_id: profile.company_id,
@@ -238,12 +239,24 @@ export async function POST(request: NextRequest) {
             account_number: fields.account_number || null,
             notes: fields.notes || fields.description || fields.claim_reason || fields.claim_number || null,
           })
+          .select('id')
+          .single()
 
         if (debtErr) {
           results.errors.push(`Row ${rowIdx + 2}: failed to create debt â€” ${debtErr.message}`)
           results.skipped++
         } else {
           results.imported++
+          if (newDebt?.id) {
+            await processDebtAutomation({
+              supabase,
+              company_id: profile.company_id,
+              debt_id: newDebt.id,
+              customer_id: customerId,
+              user_id: user.id,
+              source: 'csv_import',
+            }).catch((e) => logger.warn('Post import automation failed', e))
+          }
         }
       } catch (e: any) {
         results.errors.push(`Row ${rowIdx + 2}: ${e.message}`)
@@ -263,4 +276,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
 
