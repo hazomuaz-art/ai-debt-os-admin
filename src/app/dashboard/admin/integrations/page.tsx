@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { IntegrationCard } from '@/components/integrations/IntegrationCard'
+import { IntegrationControlCenter } from '@/components/integrations/IntegrationControlCenter'
 import type { IntegrationSetting, IntegrationName } from '@/types'
 
-// ── Integration catalogue ─────────────────────────────────────────────────
+// â”€â”€ Integration catalogue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const INTEGRATIONS: Array<{
   key:         IntegrationName
@@ -15,23 +16,23 @@ const INTEGRATIONS: Array<{
     key:         'rasf_whatsapp',
     label:       'Rasf WhatsApp',
     description: 'Send and receive WhatsApp messages via the Rasf gateway',
-    icon:        '💬',
+    icon:        'ðŸ’¬',
   },
   {
     key:         'tameez_calls',
     label:       'Tameez Calls',
     description: 'Sync call recordings and AI-powered call analysis from Tameez',
-    icon:        '📞',
+    icon:        'ðŸ“ž',
   },
   {
     key:         'collection_api',
     label:       'Collection System API',
     description: 'Bi-directional sync of debts and customers with your collection system',
-    icon:        '🔗',
+    icon:        'ðŸ”—',
   },
 ]
 
-// ── Page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default async function IntegrationsPage() {
   const supabase = createClient()
@@ -46,7 +47,7 @@ export default async function IntegrationsPage() {
 
   if (!profile?.company_id || profile.role !== 'admin') redirect('/dashboard/admin')
 
-  // Load existing integration settings (table may not exist yet — handle gracefully)
+  // Load existing integration settings (table may not exist yet â€” handle gracefully)
   const { data: settings, error: settingsErr } = await supabase
     .from('integration_settings')
     .select('*')
@@ -90,7 +91,7 @@ export default async function IntegrationsPage() {
       {tableNotReady && (
         <div className="card p-4 border-yellow-500/20 bg-yellow-500/5">
           <div className="flex items-start gap-3">
-            <span className="text-yellow-400 text-lg">⚠</span>
+            <span className="text-yellow-400 text-lg">âš </span>
             <div>
               <div className="font-medium text-yellow-400 text-sm">Database migration required</div>
               <p className="text-white/50 text-xs mt-1">
@@ -124,6 +125,8 @@ export default async function IntegrationsPage() {
         </div>
       </div>
 
+      <IntegrationControlCenter />
+
       {/* Integration cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
         {INTEGRATIONS.map(integration => (
@@ -153,9 +156,10 @@ export default async function IntegrationsPage() {
           rel="noopener noreferrer"
           className="btn-secondary text-sm px-4 py-1.5 shrink-0"
         >
-          View Docs ↗
+          View Docs â†—
         </a>
       </div>
     </div>
   )
 }
+
