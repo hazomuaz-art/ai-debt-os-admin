@@ -5,7 +5,7 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('api/ai/recommend')
 const RATE_LIMIT_KEY = 'ai_recommend'
-const HOURLY_LIMIT   = 10
+const HOURLY_LIMIT   = 500  // Raised — pipeline generates per-debt, not bulk
 
 export async function POST(_request: NextRequest) {
   return withAuth(
@@ -29,7 +29,7 @@ export async function POST(_request: NextRequest) {
         .eq('company_id', ctx.profile.company_id)
         .not('status', 'in', '("settled","written_off")')
         .order('current_balance', { ascending: false })
-        .limit(50)
+        .limit(500)  // All active debts — no artificial cap
 
       if (debtsErr) {
         log.error('Failed to fetch debts', debtsErr)

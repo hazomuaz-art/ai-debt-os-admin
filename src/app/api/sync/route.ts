@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         })
         if (fetched.error) fetchError = fetched.error
         else {
-          records = fetched.records as Record<string, unknown>[]
+          records = fetched.records as unknown as Record<string, unknown>[]
           total   = fetched.total
         }
       }
@@ -80,7 +80,9 @@ export async function POST(req: NextRequest) {
             _debt_id:     (d as Record<string,string>).id,
             data:         { status: (d as Record<string,string>).status, notes: (d as Record<string,string>).notes },
           }))
-          processEventBatch(pipelineEvents, 2).catch(() => {})
+          try {
+          await processEventBatch(pipelineEvents, 4)
+        } catch { /* non-critical */ }
         }
       }
 

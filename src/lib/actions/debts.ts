@@ -181,15 +181,17 @@ export async function createDebtAction(formData: FormData) {
     // Track usage (non-blocking)
     if (data) {
       trackDebtCreated({ company_id: profile.company_id, user_id: user.id, debt_id: data.id }).catch(() => {})
-      // Trigger automation pipeline for new debt
-      processEvent({
-        source:       'debt_update',
-        company_id:   profile.company_id,
-        actor_id:     user.id,
-        _customer_id: data.customer_id,
-        _debt_id:     data.id,
-        data:         { action: 'created' },
-      }).catch(() => {})
+      // Trigger automation pipeline for new debt (awaited - server actions are not affected by Vercel timeout)
+      try {
+        await processEvent({
+          source:       'debt_update',
+          company_id:   profile.company_id,
+          actor_id:     user.id,
+          _customer_id: data.customer_id,
+          _debt_id:     data.id,
+          data:         { action: 'created' },
+        })
+      } catch { /* non-critical */ }
     }
 
     revalidatePath('/dashboard/admin/debts')

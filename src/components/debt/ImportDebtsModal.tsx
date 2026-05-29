@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -20,7 +20,7 @@ export default function ImportDebtsModal() {
   const router = useRouter()
 
   function handleFile(f: File) {
-    if (!f.name.toLowerCase().endsWith('.csv') && !f.name.toLowerCase().endsWith('.xlsx')) {
+    if (!f.name.endsWith('.csv,.xlsx')) {
       setError('Only CSV or Excel files are supported')
       return
     }
@@ -211,4 +211,3 @@ export default function ImportDebtsModal() {
     </>
   )
 }
-

@@ -110,10 +110,10 @@ async function getStats(companyId: string) {
     supabase.from('ai_actions').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
     supabase.from('ai_actions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'completed'),
     supabase.from('messages').select('*', { count: 'exact', head: true }).eq('company_id', companyId).gte('created_at', `${today}T00:00:00`),
-    supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'running'),
+    supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('status', 'running').catch(() => ({ count: 0 })),
     supabase.from('debts').select('id, reference_number, current_balance, currency, status, created_at, customer:customers(full_name)').eq('company_id', companyId).order('created_at', { ascending: false }).limit(5),
     supabase.from('ai_actions').select('id, action_type, status, created_at, customer:customers(full_name), debt:debts(reference_number)').eq('company_id', companyId).order('created_at', { ascending: false }).limit(5),
-    supabase.from('system_alerts').select('id, title, severity, created_at').or(`company_id.eq.${companyId},company_id.is.null`).eq('is_resolved', false).order('created_at', { ascending: false }).limit(5),
+    supabase.from('system_alerts').select('id, title, severity, created_at').or(`company_id.eq.${companyId},company_id.is.null`).eq('is_resolved', false).order('created_at', { ascending: false }).limit(5).catch(() => ({ data: [] })),
     supabase.from('debts').select('status').eq('company_id', companyId),
   ])
 

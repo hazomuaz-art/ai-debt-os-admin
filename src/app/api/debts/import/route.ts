@@ -66,6 +66,17 @@ const COLUMN_MAP: Record<string, string> = {
   'ملاحظات': 'notes', 'ملاحظة': 'notes', 'التعليق': 'notes', 'وصف': 'notes',
   'المحصل': 'collector_name', 'اسم المحصل': 'collector_name',
   'المحفظة': 'portfolio_name', 'المشروع': 'portfolio_name', 'الجهة الممولة': 'portfolio_name',
+  // Extra aliases
+  'customer': 'full_name', 'debtor': 'full_name', 'debtor name': 'full_name',
+  'client full name': 'full_name',
+  'debt': 'original_amount', 'loan': 'original_amount', 'principal amount': 'original_amount',
+  'total debt': 'original_amount', 'claim amount': 'original_amount',
+  'مبلغ': 'original_amount', 'القيمة': 'original_amount',
+  'remaining amount': 'current_balance', 'remaining debt': 'current_balance',
+  'unpaid': 'current_balance', 'unpaid amount': 'current_balance',
+  'رصيد': 'current_balance', 'المبلغ الباقي': 'current_balance',
+  'case status': 'status', 'collection status': 'status', 'loan status': 'status',
+  'contract number': 'account_number', 'case ref': 'reference_number',
 }
 
 // Arabic status mapping
@@ -252,8 +263,8 @@ export async function POST(request: NextRequest) {
     const fields = Object.values(fieldMap)
     if (!fields.includes('full_name'))
       return NextResponse.json({ error: 'Missing required column: customer name (or اسم العميل)' }, { status: 400 })
-    if (!fields.includes('original_amount'))
-      return NextResponse.json({ error: 'Missing required column: amount (or المبلغ)' }, { status: 400 })
+    if (!fields.includes('original_amount') && !fields.includes('current_balance'))
+      return NextResponse.json({ error: 'Missing required amount column. Expected: amount, balance, current balance, المبلغ, or الرصيد' }, { status: 400 })
 
     const portfolioCache = new Map<string, string>()
     const results = { imported: 0, skipped: 0, errors: [] as string[] }
@@ -275,7 +286,8 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const amount = parseFloat(f.original_amount?.replace(/[,، ]/g, '') ?? '')
+      const rawAmount = f.original_amount ?? f.current_balance ?? ''
+      const amount = parseFloat(String(rawAmount).replace(/[,،، ]/g, ''))
       if (isNaN(amount) || amount <= 0) {
         results.errors.push(`Row ${rowIdx + 2}: invalid amount "${f.original_amount}"`)
         results.skipped++
@@ -394,25 +406,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Trigger automation pipeline for all imported records
-    // Process in background — don't block the response
+    // Run automation pipeline SYNCHRONOUSLY before returning response.
+    // Fire-and-forget is NOT used because Vercel terminates the process
+    // immediately after the HTTP response is sent.
+    let pipelineResult = { succeeded: 0, failed: 0, skipped: 0, total_alerts: 0, total_actions: 0 }
     if (pipelineEvents.length > 0) {
-      processEventBatch(pipelineEvents, 3)
-        .then(batchResult => {
-          logger.info('Import pipeline complete', {
-            imported:  results.imported,
-            pipeline:  batchResult,
-          })
-        })
-        .catch(err => {
-          logger.warn('Import pipeline batch error', err)
-        })
+      try {
+        pipelineResult = await processEventBatch(pipelineEvents, 4)
+        logger.info('Pipeline complete', { imported: results.imported, pipeline: pipelineResult })
+      } catch (pipelineErr) {
+        logger.warn('Pipeline batch error', pipelineErr)
+      }
     }
 
     return NextResponse.json({
       data:    results,
-      message: `Imported ${results.imported} records${results.skipped > 0 ? `, skipped ${results.skipped}` : ''}. Automation pipeline triggered.`,
-      pipeline_queued: pipelineEvents.length,
+      pipeline: pipelineResult,
+      message: `Imported ${results.imported} records. Pipeline: ${pipelineResult.succeeded} processed, ${pipelineResult.total_alerts} alerts, ${pipelineResult.total_actions} actions.`,
     })
   } catch (error) {
     logger.error('Import failed', error)
