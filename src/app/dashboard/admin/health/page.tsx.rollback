@@ -1,11 +1,11 @@
 ﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import TriggerBatchButton from './TriggerBatchButton'
 import { runAudit, type AuditStatus, type AuditItem } from '@/lib/auditor'
 import { getRecentRuns, getRunStats } from '@/lib/orchestrator'
-import TriggerBatchButton from './TriggerBatchButton'
 
-// ── Status badge ──────────────────────────────────────────────────────────────
+// â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBadge({ status }: { status: AuditStatus }) {
   const cfg: Record<AuditStatus, { label: string; bg: string; text: string }> = {
@@ -27,7 +27,7 @@ function StatusBadge({ status }: { status: AuditStatus }) {
   )
 }
 
-// ── Health score ring ─────────────────────────────────────────────────────────
+// â”€â”€ Health score ring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function HealthRing({ score }: { score: number }) {
   const r     = 42
@@ -52,7 +52,7 @@ function HealthRing({ score }: { score: number }) {
   )
 }
 
-// ── Module card ───────────────────────────────────────────────────────────────
+// â”€â”€ Module card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ModuleRow({ item }: { item: AuditItem }) {
   return (
@@ -71,7 +71,7 @@ function ModuleRow({ item }: { item: AuditItem }) {
         <p className="text-xs text-white/40 leading-relaxed">{item.detail}</p>
         {item.fix && (
           <p className="text-xs mt-1" style={{ color: '#818cf8' }}>
-            💡 {item.fix}
+            ðŸ’¡ {item.fix}
           </p>
         )}
       </div>
@@ -85,7 +85,7 @@ function ModuleRow({ item }: { item: AuditItem }) {
   )
 }
 
-// ── Section ───────────────────────────────────────────────────────────────────
+// â”€â”€ Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Section({ title, items, emoji }: { title: string; items: AuditItem[]; emoji: string }) {
   if (!items.length) return null
@@ -103,7 +103,7 @@ function Section({ title, items, emoji }: { title: string; items: AuditItem[]; e
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default async function SystemHealthPage() {
   const supabase = createClient()
@@ -134,15 +134,15 @@ export default async function SystemHealthPage() {
         <div>
           <h1 className="font-display font-bold text-2xl text-white">System Health</h1>
           <p className="text-white/40 text-sm mt-0.5">
-            AI System Orchestrator &amp; Auditor — {report.generated_at.slice(0, 19).replace('T', ' ')} UTC
+            AI System Orchestrator &amp; Auditor â€” {report.generated_at.slice(0, 19).replace('T', ' ')} UTC
           </p>
         </div>
         <div className="flex gap-2">
           <Link href="/api/auditor?safe_fix=true">
-            <button className="btn-secondary text-xs px-3 py-2">🔧 Apply Safe Fixes</button>
+            <button className="btn-secondary text-xs px-3 py-2">ðŸ”§ Apply Safe Fixes</button>
           </Link>
           <Link href="/api/orchestrator">
-            <button className="btn-secondary text-xs px-3 py-2">📊 Run History JSON</button>
+            <button className="btn-secondary text-xs px-3 py-2">ðŸ“Š Run History JSON</button>
           </Link>
           <TriggerBatchButton />
         </div>
@@ -156,11 +156,11 @@ export default async function SystemHealthPage() {
         </div>
 
         {([
-          { label: 'Working',           value: report.working,           color: '#34d399' },
-          { label: 'Partial',           value: report.partial,           color: '#fbbf24' },
-          { label: 'Broken',            value: report.broken,            color: '#f87171' },
-          { label: 'Not Connected',     value: report.not_connected,     color: '#818cf8' },
-          { label: 'Needs Credentials', value: report.needs_credentials, color: '#a78bfa' },
+          { label: 'âœ… Working',           value: report.working,           color: '#34d399' },
+          { label: 'âš¡ Partial',           value: report.partial,           color: '#fbbf24' },
+          { label: 'âŒ Broken',            value: report.broken,            color: '#f87171' },
+          { label: 'ðŸ”— Not Connected',     value: report.not_connected,     color: '#818cf8' },
+          { label: 'ðŸ”‘ Needs Credentials', value: report.needs_credentials, color: '#a78bfa' },
         ] as Array<{ label: string; value: number; color: string }>).map(({ label, value, color }) => (
           <div key={label} className="stat-card flex flex-col justify-center">
             <div className="font-display font-bold text-2xl" style={{ color }}>{value}</div>
@@ -171,7 +171,7 @@ export default async function SystemHealthPage() {
 
       {/* Orchestrator stats */}
       <div className="card p-5">
-        <h2 className="section-title mb-4">Orchestrator Activity</h2>
+        <h2 className="section-title mb-4">ðŸ¤– Orchestrator Activity</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
           {([
             { label: 'Total Runs',    value: stats.total,        color: '#818cf8' },
@@ -206,8 +206,8 @@ export default async function SystemHealthPage() {
                 {(runs as Array<Record<string, unknown>>).map(run => (
                   <tr key={String(run.id)} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
                     <td className="py-2 pr-4 font-mono text-white/60">{String(run.event_source ?? '').replace('_',' ')}</td>
-                    <td className="py-2 pr-4 text-white/40">{String(run.mode ?? '—')}</td>
-                    <td className="py-2 pr-4" style={{ color: '#818cf8' }}>{run.ai_score != null ? String(run.ai_score) : '—'}</td>
+                    <td className="py-2 pr-4 text-white/40">{String(run.mode ?? 'â€”')}</td>
+                    <td className="py-2 pr-4" style={{ color: '#818cf8' }}>{run.ai_score != null ? String(run.ai_score) : 'â€”'}</td>
                     <td className="py-2 pr-4 text-white/60">{String(run.ai_actions_count ?? 0)}</td>
                     <td className="py-2 pr-4 text-white/60">{String(run.alerts_count ?? 0)}</td>
                     <td className="py-2 pr-4">
@@ -216,10 +216,10 @@ export default async function SystemHealthPage() {
                           ? 'bg-green-500/10 text-green-400'
                           : 'bg-red-500/10 text-red-400'
                       }`}>
-                        {run.success ? '✓' : '✗'} {run.success ? 'OK' : String(run.error_message ?? 'Error').slice(0, 25)}
+                        {run.success ? 'âœ“' : 'âœ—'} {run.success ? 'OK' : String(run.error_message ?? 'Error').slice(0, 25)}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-white/30 font-mono">{run.duration_ms != null ? `${run.duration_ms}ms` : '—'}</td>
+                    <td className="py-2 pr-4 text-white/30 font-mono">{run.duration_ms != null ? `${run.duration_ms}ms` : 'â€”'}</td>
                     <td className="py-2 text-white/30">{String(run.created_at ?? '').slice(11, 19)}</td>
                   </tr>
                 ))}
@@ -230,28 +230,28 @@ export default async function SystemHealthPage() {
           <div className="text-center py-8 text-white/25 text-sm">
             No orchestrator runs yet. Import a CSV or click{' '}
             <Link href="/dashboard/admin/automation" className="text-brand-400 hover:text-brand-300">
-              Automation → Trigger Batch
+              Automation â†’ Trigger Batch
             </Link>
           </div>
         )}
       </div>
 
       {/* Audit sections */}
-      <Section title="Pipeline Modules"   items={report.summary.pipeline}     emoji="⚡" />
-      <Section title="Module Connections" items={report.summary.modules}      emoji="🔗" />
-      <Section title="Integrations"       items={report.summary.integrations}  emoji="🔌" />
-      <Section title="Database Tables"    items={report.summary.tables}       emoji="🗄️" />
-      <Section title="API Routes"         items={report.summary.api_routes}   emoji="🛣" />
-      <Section title="Dashboard Pages"    items={report.summary.pages}        emoji="📄" />
+      <Section title="Pipeline Modules"    items={report.summary.pipeline}     emoji="âš¡" />
+      <Section title="Module Connections"  items={report.summary.modules}      emoji="ðŸ”—" />
+      <Section title="Integrations"        items={report.summary.integrations}  emoji="ðŸ”Œ" />
+      <Section title="Database Tables"     items={report.summary.tables}       emoji="ðŸ—„" />
+      <Section title="API Routes"          items={report.summary.api_routes}   emoji="ðŸ›£" />
+      <Section title="Dashboard Pages"     items={report.summary.pages}        emoji="ðŸ“„" />
 
       {/* Safe fixes applied */}
       {report.safe_fixes_applied?.length && (
         <div className="card p-5" style={{ borderColor: 'rgba(16,185,129,0.2)' }}>
-          <h2 className="section-title mb-3" style={{ color: '#34d399' }}>Safe Fixes Applied</h2>
+          <h2 className="section-title mb-3" style={{ color: '#34d399' }}>âœ… Safe Fixes Applied</h2>
           <ul className="space-y-1">
             {report.safe_fixes_applied.map((fix: string, i: number) => (
               <li key={i} className="text-sm text-white/70 flex items-start gap-2">
-                <span className="text-green-400 mt-0.5">✓</span>{fix}
+                <span className="text-green-400 mt-0.5">âœ“</span>{fix}
               </li>
             ))}
           </ul>
@@ -261,16 +261,13 @@ export default async function SystemHealthPage() {
       {/* Footer note */}
       <div className="text-center pb-4">
         <p className="text-xs text-white/20">
-          Auditor reads data only — no changes unless you click "Apply Safe Fixes".
-          Health score: {report.total_checks} checks · {report.working} working · {report.broken} broken.
+          Auditor reads data only â€” no changes unless you click "Apply Safe Fixes".
+          Health score: {report.total_checks} checks Â· {report.working} working Â· {report.broken} broken.
         </p>
       </div>
     </div>
   )
 }
-
-
-
 
 
 

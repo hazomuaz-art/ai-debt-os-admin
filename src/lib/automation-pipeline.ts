@@ -1,14 +1,14 @@
 ﻿/**
- * Automation Pipeline â€” Production Orchestrator
+ * Automation Pipeline — Production Orchestrator
  *
  * Single source of truth for all module orchestration.
  * Called synchronously from import, sync, webhook, and manual triggers.
  *
  * Mode contract:
- *   ALL modes  â†’ load context, timeline, ai_memory, ai_score, rules, alerts, promises, approvals, campaigns
- *   test+live  â†’ also create ai_actions (status='pending')
- *   live only  â†’ also queue WhatsApp messages
- *   emergency_stop â†’ skip everything, return immediately
+ *   ALL modes  → load context, timeline, ai_memory, ai_score, rules, alerts, promises, approvals, campaigns
+ *   test+live  → also create ai_actions (status='pending')
+ *   live only  → also queue WhatsApp messages
+ *   emergency_stop → skip everything, return immediately
  *
  * Skip criteria (hard skip, not soft):
  *   - status in: settled, paid, closed, written_off, cancelled + Arabic equivalents
@@ -25,9 +25,9 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('automation-pipeline')
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Public types
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type EventSource =
   | 'csv_import' | 'excel_import' | 'api_sync'
@@ -64,9 +64,9 @@ export interface PipelineResult {
   error?:           string
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Internal types
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface Cfg {
   mode:          'off' | 'test' | 'live'
@@ -106,13 +106,13 @@ interface Ctx {
   payments: Array<{ amount: number; date: string; status: string }>
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Terminal status check
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TERMINAL = new Set([
   'settled', 'paid', 'closed', 'written_off', 'cancelled',
-  'Ù…Ø³Ø¯Ø¯', 'Ù…ØºÙ„Ù‚', 'Ù…Ù†ØªÙ‡ÙŠ',
+  'مسدد', 'مغلق', 'منتهي',
 ])
 
 function isTerminal(status: string, balance: number): boolean {
@@ -122,9 +122,9 @@ function isTerminal(status: string, balance: number): boolean {
          s.includes('closed') || s.includes('written')
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Config loader (60-second cache)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 const _cfgCache = new Map<string, { v: Cfg; exp: number }>()
 
@@ -158,9 +158,9 @@ async function getConfig(companyId: string): Promise<Cfg> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Context loader
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function loadCtx(debtId: string, companyId: string): Promise<Ctx | null> {
   try {
@@ -214,9 +214,9 @@ async function loadCtx(debtId: string, companyId: string): Promise<Ctx | null> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: Timeline event
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 const EVENT_TYPE_MAP: Record<EventSource, string> = {
   csv_import: 'status_change', excel_import: 'status_change', api_sync: 'status_change',
@@ -242,26 +242,26 @@ async function stepTimeline(
 ): Promise<boolean> {
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
   const summaries: Record<EventSource, string> = {
-    csv_import:       `Ù…Ø³ØªÙˆØ±Ø¯: ${ctx.customer.full_name} â€” ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
-    excel_import:     `Ù…Ø³ØªÙˆØ±Ø¯ (Excel): ${ctx.customer.full_name} â€” ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
-    api_sync:         `Ù…ØªØ²Ø§Ù…Ù† Ù…Ù† Ø§Ù„Ù†Ø¸Ø§Ù… â€” Ù…Ø±Ø¬Ø¹: ${ctx.debt.reference_number}`,
-    webhook_whatsapp: `Ø±Ø³Ø§Ù„Ø© ÙˆØ§Ø±Ø¯Ø© Ù…Ù† ${ctx.customer.full_name}`,
-    webhook_call:     `Ù†ØªÙŠØ¬Ø© Ù…ÙƒØ§Ù„Ù…Ø©: ${ctx.debt.last_contact_result ?? 'Ù…Ø³Ø¬Ù„Ø©'}`,
-    payment_update:   `Ø¯ÙØ¹Ø© Ù…Ø³Ø¬Ù„Ø© â€” Ù…Ø±Ø¬Ø¹: ${ctx.debt.reference_number}`,
-    promise_update:   `ÙˆØ¹Ø¯ Ø³Ø¯Ø§Ø¯ Ù…Ø­Ø¯Ù‘Ø«`,
-    collector_note:   `Ù…Ù„Ø§Ø­Ø¸Ø© Ù…Ø­ØµÙ‘Ù„: ${(ctx.debt.notes ?? '').slice(0, 60)}`,
-    debt_update:      `ØªØ­Ø¯ÙŠØ« Ø¯ÙŠÙ† â€” Ø§Ù„Ø­Ø§Ù„Ø©: ${ctx.debt.status}`,
-    customer_update:  `ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„`,
-    manual:           `Ù…Ø¹Ø§Ù„Ø¬Ø© ÙŠØ¯ÙˆÙŠØ© â€” Ø§Ù„Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
+    csv_import:       `مستورد: ${ctx.customer.full_name} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
+    excel_import:     `مستورد (Excel): ${ctx.customer.full_name} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
+    api_sync:         `متزامن من النظام — مرجع: ${ctx.debt.reference_number}`,
+    webhook_whatsapp: `رسالة واردة من ${ctx.customer.full_name}`,
+    webhook_call:     `نتيجة مكالمة: ${ctx.debt.last_contact_result ?? 'مسجلة'}`,
+    payment_update:   `دفعة مسجلة — مرجع: ${ctx.debt.reference_number}`,
+    promise_update:   `وعد سداد محدّث`,
+    collector_note:   `ملاحظة محصّل: ${(ctx.debt.notes ?? '').slice(0, 60)}`,
+    debt_update:      `تحديث دين — الحالة: ${ctx.debt.status}`,
+    customer_update:  `تحديث بيانات العميل`,
+    manual:           `معالجة يدوية — الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
   }
   try {
     await createServiceClient().from('timeline_events').insert({
       company_id:  ctx.debt.company_id,
       customer_id: ctx.debt.customer_id,
       debt_id:     ctx.debt.id,
-      event_type:  'ai_analysis',
+      event_type:  EVENT_TYPE_MAP[source] ?? 'ai_analysis',
       channel:     CHANNEL_MAP[source] ?? 'system',
-      summary:     summaries[source] ?? `Ø­Ø¯Ø«: ${source}`,
+      summary:     summaries[source] ?? `حدث: ${source}`,
       detail:      JSON.stringify({
         source,
         status:      ctx.debt.status,
@@ -285,9 +285,9 @@ async function stepTimeline(
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: AI Memory
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepMemory(ctx: Ctx): Promise<number> {
   const sb = createServiceClient()
@@ -301,23 +301,23 @@ async function stepMemory(ctx: Ctx): Promise<number> {
     const note  = raw.trim()
     const lower = note.toLowerCase()
     const cat =
-      lower.includes('Ø¨Ø³Ø¯Ø¯') || lower.includes('will pay') || lower.includes('Ø³ÙˆÙ') ? 'payment_promise' :
-      lower.includes('ØºØ§Ø¶Ø¨') || lower.includes('angry') || lower.includes('ÙŠØ´ØªÙƒÙŠ') ? 'angry' :
-      lower.includes('Ù…Ùˆ Ø¹Ù†Ø¯ÙŠ') || lower.includes('no money') || lower.includes('Ø¸Ø±ÙˆÙ') ? 'objection' :
-      lower.includes('ØªØµØ¹ÙŠØ¯') || lower.includes('legal') || lower.includes('Ù…Ø­ÙƒÙ…Ø©') ? 'escalation' :
+      lower.includes('بسدد') || lower.includes('will pay') || lower.includes('سوف') ? 'payment_promise' :
+      lower.includes('غاضب') || lower.includes('angry') || lower.includes('يشتكي') ? 'angry' :
+      lower.includes('مو عندي') || lower.includes('no money') || lower.includes('ظروف') ? 'objection' :
+      lower.includes('تصعيد') || lower.includes('legal') || lower.includes('محكمة') ? 'escalation' :
       'general'
     entries.push({ pattern: note.slice(0, 200), text: note, cat })
   }
 
   // 2. Customer + debt profile (always useful for AI context)
   if (ctx.customer.full_name && ctx.debt.current_balance > 0) {
-    const profile = `Ø¹Ù…ÙŠÙ„: ${ctx.customer.full_name} | Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} | Ø­Ø§Ù„Ø©: ${ctx.debt.status} | Ù…Ø±Ø¬Ø¹: ${ctx.debt.reference_number}`
+    const profile = `عميل: ${ctx.customer.full_name} | رصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} | حالة: ${ctx.debt.status} | مرجع: ${ctx.debt.reference_number}`
     entries.push({ pattern: profile.slice(0, 200), text: profile, cat: 'general' })
   }
 
   // 3. Payment behaviour
   if (ctx.payments.length > 0) {
-    const txt = `Ø³Ø¬Ù„ Ù…Ø¯ÙÙˆØ¹Ø§Øª: ${ctx.payments.length} Ø¯ÙØ¹Ø© â€” Ø¢Ø®Ø± Ø¯ÙØ¹Ø©: ${ctx.payments[0]?.date ?? 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯'}`
+    const txt = `سجل مدفوعات: ${ctx.payments.length} دفعة — آخر دفعة: ${ctx.payments[0]?.date ?? 'غير محدد'}`
     entries.push({ pattern: txt.slice(0, 200), text: txt, cat: 'payment_promise' })
   }
 
@@ -347,9 +347,9 @@ async function stepMemory(ctx: Ctx): Promise<number> {
   return added
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: AI Score (always runs, falls back to rule-based)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepScore(ctx: Ctx): Promise<ScoreResult> {
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
@@ -396,9 +396,9 @@ async function stepScore(ctx: Ctx): Promise<ScoreResult> {
   return result
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: AI Action (TEST + LIVE only, one per debt per day)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<boolean> {
   const sb = createServiceClient()
@@ -431,17 +431,30 @@ async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<
     daysOverdue > 0                                                             ? 'medium'   : 'low'
 
   const reason = [
-    daysOverdue > 0 ? `${daysOverdue} ÙŠÙˆÙ… ØªØ£Ø®Ø±` : 'Ù…ØªØ§Ø¨Ø¹Ø© Ø¯ÙˆØ±ÙŠØ©',
-    `Ø§Ù„Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
-    `Ø§Ù„Ù…Ø®Ø§Ø·Ø±Ø©: ${score.risk_classification}`,
+    daysOverdue > 0 ? `${daysOverdue} يوم تأخر` : 'متابعة دورية',
+    `الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
+    `المخاطرة: ${score.risk_classification}`,
   ].join(' | ').slice(0, 300)
 
-  const msg =
-    ctx.debt.status === 'legal'
-      ? `Ø¹Ø²ÙŠØ²Ù†Ø§ ${ctx.customer.full_name}ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªÙˆØ§ØµÙ„ ÙÙˆØ±Ø§Ù‹ Ù„ØªØ³ÙˆÙŠØ© Ø§Ù„Ø¯ÙŠÙ† Ø±Ù‚Ù… ${ctx.debt.reference_number} ØªÙØ§Ø¯ÙŠØ§Ù‹ Ù„Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª Ø§Ù„Ù‚Ø§Ù†ÙˆÙ†ÙŠØ©.`
+  // Detect language from customer name for natural dialect selection
+  const nameIsArabic = /[\u0600-\u06FF]/.test(ctx.customer.full_name ?? '')
+  const name = ctx.customer.full_name ?? (nameIsArabic ? 'أستاذ' : 'Customer')
+  const bal  = ctx.debt.current_balance.toLocaleString('en-SA')
+  const cur  = ctx.debt.currency
+
+  const msg = nameIsArabic
+    ? ctx.debt.status === 'legal'
+      ? `${name}، المبلغ ${bal} ${cur} وصل للمرحلة القانونية. تواصل معنا على طول لنرتب وضعك قبل ما الأمور تتعقد. رقم المرجع: ${ctx.debt.reference_number}`
+      : daysOverdue > 90
+        ? `هلا ${name}، المبلغ ${bal} ${cur} متأخر ${daysOverdue} يوم. نحتاج نحل الموضوع. لو في ظروف، نقدر نرتب دفعات. كلمنا.`
+        : daysOverdue > 30
+          ? `هلا ${name}، عندك مبلغ ${bal} ${cur} متأخر. نقدر نرتب معك دفعات تناسبك. علمني وش الأنسب.`
+          : `هلا ${name}، تذكير بمبلغ ${bal} ${cur}. إذا يناسبك تسدد، أو نرتب طريقة ثانية، قولي.`
+    : ctx.debt.status === 'legal'
+      ? `Hi ${name}, ref ${ctx.debt.reference_number} has progressed to legal status. Please contact us today to discuss resolution options for your ${cur} ${bal} balance.`
       : daysOverdue > 30
-        ? `Ù…Ø±Ø­Ø¨Ø§Ù‹ ${ctx.customer.full_name}ØŒ Ù„Ø¯ÙŠÙƒ Ù…Ø¯ÙŠÙˆÙ†ÙŠØ© Ø¨Ù‚ÙŠÙ…Ø© ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}. ÙŠØ³Ø¹Ø¯Ù†Ø§ Ù…Ø³Ø§Ø¹Ø¯ØªÙƒ ÙÙŠ ØªØ±ØªÙŠØ¨ Ø®Ø·Ø© Ø³Ø¯Ø§Ø¯.`
-        : `Ù…Ø±Ø­Ø¨Ø§Ù‹ ${ctx.customer.full_name}ØŒ ØªÙˆØ§ØµÙ„Ù†Ø§ Ø¨Ø®ØµÙˆØµ Ø§Ù„Ø¯ÙŠÙ† Ø±Ù‚Ù… ${ctx.debt.reference_number}. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªÙˆØ§ØµÙ„ Ù„Ù…Ù†Ø§Ù‚Ø´Ø© Ø®ÙŠØ§Ø±Ø§Øª Ø§Ù„Ø³Ø¯Ø§Ø¯.`
+        ? `Hi ${name}, your ${cur} ${bal} balance is ${daysOverdue} days overdue. We can arrange a payment plan — just reach out and we will work something out.`
+        : `Hi ${name}, quick reminder about your ${cur} ${bal} balance. Happy to arrange a payment option that works for you.`
 
   try {
     await createServiceClient().from('ai_actions').insert({
@@ -466,9 +479,9 @@ async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: Rules engine (all matching rules)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepRules(ctx: Ctx, score: ScoreResult): Promise<string[]> {
   const matched: string[] = []
@@ -522,7 +535,7 @@ async function stepRules(ctx: Ctx, score: ScoreResult): Promise<string[]> {
             debt_id:     ctx.debt.id,
             event_type:  'rule_triggered',
             channel:     'system',
-            summary:     `Ù‚Ø§Ø¹Ø¯Ø©: ${String(rule.name)} â† ${String(rule.action)}`,
+            summary:     `قاعدة: ${String(rule.name)} ← ${String(rule.action)}`,
             actor_type:  'system',
             occurred_at: new Date().toISOString(),
           })
@@ -535,9 +548,9 @@ async function stepRules(ctx: Ctx, score: ScoreResult): Promise<string[]> {
   return matched
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: Alerts
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
@@ -545,47 +558,53 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
   const rows: AlertRow[] = []
 
   if (ctx.debt.status === 'legal')
-    rows.push({ title: `Ù‚Ø¶ÙŠØ© Ù‚Ø§Ù†ÙˆÙ†ÙŠØ©: ${ctx.customer.full_name}`, severity: 'critical', alert_type: 'legal_case',
-      message: `${ctx.debt.reference_number} â€” ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
+    rows.push({ title: `[قانوني] ${ctx.customer.full_name} - ${ctx.debt.reference_number}`, severity: 'critical', alert_type: 'legal_case',
+      message: `${ctx.debt.reference_number} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
 
   if (ctx.debt.status === 'disputed')
-    rows.push({ title: `Ù…ØªÙ†Ø§Ø²Ø¹ Ø¹Ù„ÙŠÙ‡: ${ctx.customer.full_name}`, severity: 'error', alert_type: 'disputed',
-      message: `${ctx.debt.reference_number} â€” ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
+    rows.push({ title: `[متنازع] ${ctx.customer.full_name} - ${ctx.debt.reference_number}`, severity: 'error', alert_type: 'disputed',
+      message: `${ctx.debt.reference_number} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
 
   if (daysOverdue > 180)
-    rows.push({ title: `ØªØ£Ø®Ø± Ø´Ø¯ÙŠØ¯ ${daysOverdue}ÙŠ: ${ctx.customer.full_name}`, severity: 'critical', alert_type: 'overdue_180',
-      message: `Ø§Ù„Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} â€” ${daysOverdue} ÙŠÙˆÙ… ØªØ£Ø®Ø±` })
+    rows.push({ title: `تأخر شديد ${daysOverdue}ي: ${ctx.customer.full_name}`, severity: 'critical', alert_type: 'overdue_180',
+      message: `الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} — ${daysOverdue} يوم تأخر` })
   else if (daysOverdue > 90)
-    rows.push({ title: `ØªØ£Ø®Ø± Ø¹Ø§Ù„Ù ${daysOverdue}ÙŠ: ${ctx.customer.full_name}`, severity: 'error', alert_type: 'overdue_90',
-      message: `Ø§Ù„Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
+    rows.push({ title: `تأخر عالٍ ${daysOverdue}ي: ${ctx.customer.full_name}`, severity: 'error', alert_type: 'overdue_90',
+      message: `الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
   else if (daysOverdue > 30)
-    rows.push({ title: `ØªØ£Ø®Ø± Ù…ØªÙˆØ³Ø· ${daysOverdue}ÙŠ: ${ctx.customer.full_name}`, severity: 'warning', alert_type: 'overdue_30',
-      message: `Ø§Ù„Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
+    rows.push({ title: `تأخر متوسط ${daysOverdue}ي: ${ctx.customer.full_name}`, severity: 'warning', alert_type: 'overdue_30',
+      message: `الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
 
   if (ctx.debt.current_balance >= 8000 && daysOverdue > 0)
-    rows.push({ title: `Ø±ØµÙŠØ¯ Ù…Ø±ØªÙØ¹: ${ctx.customer.full_name}`, severity: 'warning', alert_type: 'high_balance',
-      message: `${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} â€” ${daysOverdue} ÙŠÙˆÙ… ØªØ£Ø®Ø±` })
+    rows.push({ title: `رصيد مرتفع: ${ctx.customer.full_name}`, severity: 'warning', alert_type: 'high_balance',
+      message: `${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} — ${daysOverdue} يوم تأخر` })
 
   if (score.risk_classification === 'critical')
-    rows.push({ title: `Ø®Ø·Ø± Ø´Ø¯ÙŠØ¯ (AI ${score.score}): ${ctx.customer.full_name}`, severity: 'critical', alert_type: 'ai_critical',
+    rows.push({ title: `خطر شديد (AI ${score.score}): ${ctx.customer.full_name}`, severity: 'critical', alert_type: 'ai_critical',
       message: score.recommended_strategy?.slice(0, 100) ?? '' })
   else if (score.risk_classification === 'high' && ctx.debt.current_balance > 5000)
-    rows.push({ title: `Ø®Ø·Ø± Ø¹Ø§Ù„Ù (AI ${score.score}): ${ctx.customer.full_name}`, severity: 'error', alert_type: 'ai_high',
-      message: `Ø§Ù„Ø±ØµÙŠØ¯: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
+    rows.push({ title: `خطر عالٍ (AI ${score.score}): ${ctx.customer.full_name}`, severity: 'error', alert_type: 'ai_high',
+      message: `الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}` })
 
   if (!rows.length) return 0
 
   try {
     const sb = createServiceClient()
-    // Dedup: skip alert_types already fired in last 24h for this debt
+    // Dedup: skip same alert_type already fired in last 24h for this same debt
     const since = new Date(Date.now() - 86400000).toISOString()
     const { data: recent } = await sb.from('system_alerts')
-      .select('alert_type')
+      .select('alert_type, metadata')
       .eq('company_id', ctx.debt.company_id)
       .gte('created_at', since)
 
-    const seen = new Set((recent ?? []).map((r: {alert_type?: string}) => r.alert_type ?? ''))
-    const fresh = rows.filter(r => !seen.has(r.alert_type) || r.severity === 'critical')
+    const seen = new Set(
+      (recent ?? [])
+        .filter((r: { alert_type?: string; metadata?: Record<string, unknown> }) =>
+          String(r.metadata?.debt_id ?? '') === String(ctx.debt.id)
+        )
+        .map((r: { alert_type?: string }) => r.alert_type ?? '')
+    )
+    const fresh = rows.filter(r => !seen.has(r.alert_type))
     if (!fresh.length) return 0
 
     await sb.from('system_alerts').insert(fresh.map(r => ({
@@ -607,9 +626,9 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: Promises
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepPromises(ctx: Ctx): Promise<void> {
   const today   = new Date().toISOString().split('T')[0]
@@ -642,7 +661,7 @@ async function stepPromises(ctx: Ctx): Promise<void> {
         debt_id:     ctx.debt.id,
         event_type:  'promise_to_pay',
         channel:     'system',
-        summary:     `ÙˆØ¹Ø¯ Ø³Ø¯Ø§Ø¯ Ù‚Ø§Ø¯Ù…: ${u.promised_amount} ${ctx.debt.currency} ÙÙŠ ${u.promised_date}`,
+        summary:     `وعد سداد قادم: ${u.promised_amount} ${ctx.debt.currency} في ${u.promised_date}`,
         actor_type:  'system',
         occurred_at: new Date().toISOString(),
       })
@@ -652,9 +671,9 @@ async function stepPromises(ctx: Ctx): Promise<void> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: Approvals
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepApprovals(ctx: Ctx): Promise<void> {
   const needsApproval =
@@ -676,8 +695,8 @@ async function stepApprovals(ctx: Ctx): Promise<void> {
     await sb.from('approvals').insert({
       company_id:    ctx.debt.company_id,
       approval_type,
-      title:         `${approval_type === 'legal_escalation' ? 'ØªØµØ¹ÙŠØ¯ Ù‚Ø§Ù†ÙˆÙ†ÙŠ' : approval_type === 'large_settlement' ? 'ØªØ³ÙˆÙŠØ© ÙƒØ¨ÙŠØ±Ø©' : 'Ù…Ø±Ø§Ø¬Ø¹Ø©'}: ${ctx.customer.full_name}`,
-      description:   `${ctx.debt.reference_number} â€” ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} â€” ${ctx.debt.status}`,
+      title:         `${approval_type === 'legal_escalation' ? 'تصعيد قانوني' : approval_type === 'large_settlement' ? 'تسوية كبيرة' : 'مراجعة'}: ${ctx.customer.full_name}`,
+      description:   `${ctx.debt.reference_number} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} — ${ctx.debt.status}`,
       entity_type:   'debt',
       entity_id:     ctx.debt.id,
       requested_data: { debt_id: ctx.debt.id, customer: ctx.customer.full_name,
@@ -692,9 +711,9 @@ async function stepApprovals(ctx: Ctx): Promise<void> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: Campaign eligibility
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepCampaigns(ctx: Ctx): Promise<void> {
   try {
@@ -730,9 +749,9 @@ async function stepCampaigns(ctx: Ctx): Promise<void> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Step: WhatsApp queue (LIVE only)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
   const phone = ctx.customer.whatsapp ?? ctx.customer.phone
@@ -740,7 +759,11 @@ async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
   if (daysOverdue <= 0) return false
 
-  const msg = `Ù…Ø±Ø­Ø¨Ø§Ù‹ ${ctx.customer.full_name}ØŒ ØªØ°ÙƒÙŠØ± Ø¨Ù…Ø¯ÙŠÙˆÙ†ÙŠØ© ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} â€” Ù…Ø±Ø¬Ø¹: ${ctx.debt.reference_number}. ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªÙˆØ§ØµÙ„ Ù„ØªØ±ØªÙŠØ¨ Ø§Ù„Ø³Ø¯Ø§Ø¯.`
+  const nameIsArabicWA = /[\u0600-\u06FF]/.test(ctx.customer.full_name ?? '')
+  const waBal = ctx.debt.current_balance.toLocaleString('en-SA')
+  const msg = nameIsArabicWA
+    ? `هلا ${ctx.customer.full_name}، عندك مبلغ ${waBal} ${ctx.debt.currency} (مرجع: ${ctx.debt.reference_number}). نقدر نرتب طريقة سداد تناسبك.`
+    : `Hi ${ctx.customer.full_name}, reminder about your ${ctx.debt.currency} ${waBal} balance (ref: ${ctx.debt.reference_number}). We can arrange a payment plan for you.`
   try {
     await createServiceClient().from('job_queue').insert({
       company_id:   ctx.debt.company_id,
@@ -760,9 +783,9 @@ async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Main: processEvent
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function processEvent(event: PipelineEvent): Promise<PipelineResult> {
   const R: PipelineResult = {
@@ -802,13 +825,13 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
 
     const today = new Date().toISOString().split('T')[0]
 
-    // â”€â”€ AI Memory (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── AI Memory (always) ──────────────────────────────────────────
     try {
       R.memory_count = await stepMemory(ctx)
       R.steps_completed.push(`memory:${R.memory_count}`)
     } catch { R.steps_failed.push('memory') }
 
-    // â”€â”€ AI Score (always â€” OFF/TEST/LIVE) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── AI Score (always — OFF/TEST/LIVE) ───────────────────────────
     let score: ScoreResult
     try {
       score = await stepScore(ctx)
@@ -828,13 +851,13 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
       R.steps_failed.push('score:used_fallback')
     }
 
-    // â”€â”€ Timeline (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Timeline (always) ───────────────────────────────────────────
     try {
       const ok = await stepTimeline(ctx, event.source, score, event.data)
       ok ? R.steps_completed.push('timeline') : R.steps_failed.push('timeline')
     } catch { R.steps_failed.push('timeline') }
 
-    // â”€â”€ AI Action (TEST + LIVE only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── AI Action (TEST + LIVE only) ─────────────────────────────────
     if (cfg.mode !== 'off') {
       try {
         const created = await stepAction(ctx, score, today)
@@ -845,37 +868,37 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
       R.steps_skipped.push('action:mode_off')
     }
 
-    // â”€â”€ Rules (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Rules (always) ──────────────────────────────────────────────
     try {
       const matches = await stepRules(ctx, score)
       R.steps_completed.push(`rules:${matches.length ? matches.join(',') : 'none'}`)
     } catch { R.steps_failed.push('rules') }
 
-    // â”€â”€ Alerts (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Alerts (always) ─────────────────────────────────────────────
     try {
       R.alerts_count = await stepAlerts(ctx, score)
       R.steps_completed.push(`alerts:${R.alerts_count}`)
     } catch { R.steps_failed.push('alerts') }
 
-    // â”€â”€ Promises (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Promises (always) ───────────────────────────────────────────
     try {
       await stepPromises(ctx)
       R.steps_completed.push('promises')
     } catch { R.steps_failed.push('promises') }
 
-    // â”€â”€ Approvals (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Approvals (always) ──────────────────────────────────────────
     try {
       await stepApprovals(ctx)
       R.steps_completed.push('approvals')
     } catch { R.steps_failed.push('approvals') }
 
-    // â”€â”€ Campaigns (always) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Campaigns (always) ──────────────────────────────────────────
     try {
       await stepCampaigns(ctx)
       R.steps_completed.push('campaigns')
     } catch { R.steps_failed.push('campaigns') }
 
-    // â”€â”€ WhatsApp (LIVE only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── WhatsApp (LIVE only) ─────────────────────────────────────────
     if (cfg.mode === 'live' && !cfg.emergency_wa) {
       try {
         const queued = await stepWhatsApp(ctx)
@@ -901,9 +924,9 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
   return R
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Batch processor
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function processEventBatch(
   events:      PipelineEvent[],

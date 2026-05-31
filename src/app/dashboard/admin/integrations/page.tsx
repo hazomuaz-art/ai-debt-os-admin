@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { IntegrationCard } from '@/components/integrations/IntegrationCard'
+import { IntegrationControlCenter } from '@/components/integrations/IntegrationControlCenter'
 import type { IntegrationSetting, IntegrationName } from '@/types'
 
 // ── Integration catalogue ─────────────────────────────────────────────────
@@ -138,6 +139,7 @@ export default async function IntegrationsPage() {
           />
         ))}
       </div>
+      <IntegrationControlCenter />
 
       {/* Docs footer */}
       <div className="card p-4 flex items-center justify-between">
@@ -159,3 +161,5 @@ export default async function IntegrationsPage() {
     </div>
   )
 }
+
+

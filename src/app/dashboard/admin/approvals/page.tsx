@@ -40,14 +40,14 @@ export default function ApprovalsPage() {
     await load()
   }
 
-  const pending  = items.filter(i => i.status === 'pending')
-  const filtered = filter === 'all' ? items : items.filter(i => i.status === filter)
+  const pending  = items.filter((i: Record<string,unknown>) => i.status === 'pending')
+  const filtered = filter === 'all' ? items : items.filter((i: Record<string,unknown>) => i.status === filter)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Pending Approvals</h1>
-        <p className="text-white/40 text-sm mt-0.5">عمليات تحتاج موافقة يدوية قبل التنفيذ</p>
+        <p className="text-white/40 text-sm mt-0.5 ar-text" dir="rtl">عمليات تحتاج موافقة يدوية قبل التنفيذ</p>
       </div>
 
       {pending.length > 0 && (
@@ -58,7 +58,7 @@ export default function ApprovalsPage() {
       )}
 
       <div className="flex gap-2">
-        {['all','pending','approved','rejected'].map(s => (
+        {['all','pending','approved','rejected'].map((s: string) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1 rounded-lg text-xs border transition-colors ${filter === s ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-white/5 text-white/30 border-white/10'}`}>
             {s === 'all' ? 'الكل' : s === 'pending' ? `انتظار (${pending.length})` : s === 'approved' ? 'موافق' : 'مرفوض'}
@@ -69,21 +69,21 @@ export default function ApprovalsPage() {
       {loading ? <div className="text-center text-white/40 py-12">جارٍ التحميل…</div> : (
         <div className="space-y-3">
           {filtered.length === 0 && <div className="card p-10 text-center text-white/40">لا توجد طلبات في هذه الفئة</div>}
-          {filtered.map(item => (
+          {filtered.map((item: Approval) => (
             <div key={item.id} className="card p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-medium text-sm">{item.title}</span>
-                    <span className={`status-badge text-[10px] ${PRIORITY_STYLES[item.priority]}`}>{item.priority}</span>
+                    <span className={`status-badge text-[10px] ${PRIORITY_STYLES[String(item.priority ?? '')]}`}>{item.priority}</span>
                     <span className="bg-white/5 text-white/40 text-[10px] px-1.5 py-0.5 rounded border border-white/10">
-                      {TYPE_LABELS[item.approval_type] ?? item.approval_type}
+                      {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
                     </span>
                   </div>
                   {item.description && <p className="text-white/50 text-xs mb-1">{item.description}</p>}
                   <p className="text-white/30 text-[10px]">
-                    {new Date(item.created_at).toLocaleString('ar-SA')}
-                    {item.expires_at && ` · تنتهي: ${new Date(item.expires_at).toLocaleDateString('ar-SA')}`}
+                    {new Date(String(item.created_at ?? '')).toLocaleString('ar-SA')}
+                    {item.expires_at && ` · تنتهي: ${new Date(String(item.expires_at ?? '')).toLocaleDateString('ar-SA')}`}
                   </p>
                 </div>
                 {item.status === 'pending' && (

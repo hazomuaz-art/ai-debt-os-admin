@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { logoutAction } from '@/lib/actions/auth'
@@ -27,7 +27,9 @@ const adminNav = [
   { href: '/dashboard/admin/alerts',         label: 'Alerts',        icon: 'bell',       group: 'system' },
   { href: '/dashboard/admin/memory',         label: 'AI Memory',     icon: 'brain',      group: 'system' },
   { href: '/dashboard/admin/knowledge-base', label: 'Knowledge Base',icon: 'book',       group: 'system' },
-  { href: '/dashboard/admin/platform',       label: 'Plans & Usage', icon: 'package',    group: 'system' },
+  { href: '/dashboard/admin/rules',          label: 'Rules',          icon: 'cpu',        group: 'system' },
+{ href: '/dashboard/admin/health',         label: 'Health',         icon: 'shield',     group: 'system' },
+{ href: '/dashboard/admin/platform',       label: 'Plans & Usage',  icon: 'package',    group: 'system' },
 ]
 
 const managerNav = [
@@ -52,7 +54,7 @@ const GROUP_LABELS: Record<string, string> = {
   system: 'System',
 }
 
-// Icon paths at module level — never re-created on re-render
+// Icon paths at module level â€” never re-created on re-render
 const NAV_ICONS: Record<string, string> = {
   grid:      'M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z',
   layers:    'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
@@ -102,7 +104,7 @@ export function Sidebar({ profile }: SidebarProps) {
         borderRight: '1px solid rgba(255,255,255,0.05)',
       }}
     >
-      {/* ── Logo ── */}
+      {/* â”€â”€ Logo â”€â”€ */}
       <div className="px-4 py-4 border-b border-white/[0.05]">
         <div className="flex items-center gap-3">
           {/* Shield logo matching concept */}
@@ -129,7 +131,7 @@ export function Sidebar({ profile }: SidebarProps) {
         </div>
       </div>
 
-      {/* ── Navigation ── */}
+      {/* â”€â”€ Navigation â”€â”€ */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-none space-y-4">
         {isAdmin ? (
           Object.entries(GROUP_LABELS).map(([group, label]) => {
@@ -165,7 +167,7 @@ export function Sidebar({ profile }: SidebarProps) {
         )}
       </nav>
 
-      {/* ── Secure Session indicator ── */}
+      {/* â”€â”€ Secure Session indicator â”€â”€ */}
       <div className="px-3 py-2 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)' }}>
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -174,7 +176,7 @@ export function Sidebar({ profile }: SidebarProps) {
         <div className="text-[9px] text-white/25 mt-0.5 pl-3.5">All systems operational</div>
       </div>
 
-      {/* ── User ── */}
+      {/* â”€â”€ User â”€â”€ */}
       <div className="px-3 pb-3 border-t border-white/[0.05] pt-3">
         <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
           <div
@@ -203,3 +205,4 @@ export function Sidebar({ profile }: SidebarProps) {
     </aside>
   )
 }
+
