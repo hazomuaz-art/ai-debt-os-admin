@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
 import RecordPaymentModal from '@/components/debt/RecordPaymentModal'
@@ -36,6 +36,48 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   const latestScore = debt.ai_scores?.sort((a: any, b: any) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )[0]
+
+  const { data: aiActions } = await supabase
+    .from('ai_actions')
+    .select('id, action_type, priority, reason, suggested_message, status, created_at')
+    .eq('debt_id', debt.id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const { data: debtAlerts } = await supabase
+    .from('system_alerts')
+    .select('id, severity, alert_type, title, message, is_resolved, created_at')
+    .eq('is_resolved', false)
+    .contains('metadata', { debt_id: debt.id })
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const { data: timelineEvents } = await supabase
+    .from('timeline_events')
+    .select('id, event_type, channel, summary, detail, occurred_at')
+    .eq('debt_id', debt.id)
+    .order('occurred_at', { ascending: false })
+    .limit(8)
+
+  const { data: promises } = await supabase
+    .from('promises')
+    .select('id, promised_amount, promised_date, status, channel, notes, created_at')
+    .eq('debt_id', debt.id)
+    .order('promised_date', { ascending: false })
+    .limit(5)
+
+  const { data: approvals } = await supabase
+    .from('approvals')
+    .select('id, approval_type, status, priority, reason, created_at')
+    .eq('entity_id', debt.id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const { data: memoryEntries } = await supabase
+    .from('ai_memory')
+    .select('id, trigger_pattern, response_text, category, success_rate, use_count, created_at')
+    .order('created_at', { ascending: false })
+    .limit(5)
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
@@ -261,9 +303,136 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             ) : (
               <p className="text-slate-400 text-sm">No AI score yet. Click "Score Debt" to analyze.</p>
             )}
+
+          {/* Customer 360: AI Actions */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">Recent AI Actions</h2>
+            {aiActions?.length ? (
+              <div className="space-y-3">
+                {aiActions.map((a: any) => (
+                  <div key={a.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{a.action_type}</span>
+                      <span className="text-xs text-slate-400">{a.priority}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{a.reason}</p>
+                    {a.suggested_message && <p className="text-xs text-slate-300 mt-2">{a.suggested_message}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No AI actions yet.</p>
+            )}
+          </div>
+
+          {/* Customer 360: Alerts */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">Active Alerts</h2>
+            {debtAlerts?.length ? (
+              <div className="space-y-3">
+                {debtAlerts.map((al: any) => (
+                  <div key={al.id} className="border border-red-500/20 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{al.title}</span>
+                      <span className="text-xs text-red-400">{al.severity}</span>
+                    </div>
+                    {al.message && <p className="text-xs text-slate-400 mt-1">{al.message}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No active alerts.</p>
+            )}
+          </div>
+
+          {/* Customer 360: Promises */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">Promises</h2>
+            {promises?.length ? (
+              <div className="space-y-3">
+                {promises.map((pr: any) => (
+                  <div key={pr.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{formatCurrency(pr.promised_amount, debt.currency)}</span>
+                      <span className="text-xs text-slate-400">{pr.status}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{formatDate(pr.promised_date)} • {pr.channel}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No promises yet.</p>
+            )}
+          </div>
+
+          {/* Customer 360: Approvals */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">Approvals</h2>
+            {approvals?.length ? (
+              <div className="space-y-3">
+                {approvals.map((ap: any) => (
+                  <div key={ap.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{ap.approval_type}</span>
+                      <span className="text-xs text-slate-400">{ap.status}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{ap.reason}</p>
+                    <p className="text-xs text-slate-500 mt-1">{formatDate(ap.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No approvals yet.</p>
+            )}
+          </div>
+
+          {/* Customer 360: AI Memory */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">AI Memory</h2>
+            {memoryEntries?.length ? (
+              <div className="space-y-3">
+                {memoryEntries.map((m: any) => (
+                  <div key={m.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{m.trigger_pattern}</span>
+                      <span className="text-xs text-slate-400">{m.category}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-2">{m.response_text}</p>
+                    <p className="text-xs text-slate-500 mt-1">Used {m.use_count ?? 0} times</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No memory entries yet.</p>
+            )}
+          </div>
+
+          {/* Customer 360: Timeline */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">Recent Timeline</h2>
+            {timelineEvents?.length ? (
+              <div className="space-y-3">
+                {timelineEvents.map((ev: any) => (
+                  <div key={ev.id} className="border-l-2 border-brand-500/40 pl-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{ev.summary}</span>
+                      <span className="text-xs text-slate-500">{ev.channel || 'system'}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{formatDate(ev.occurred_at)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No timeline events yet.</p>
+            )}
+          </div>
+
           </div>
         </div>
       </div>
     </div>
   )
 }
+
+
+
