@@ -630,11 +630,33 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
 // Step: Promises
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function stepPromises(ctx: Ctx): Promise<void> {
+async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
   const today   = new Date().toISOString().split('T')[0]
   const in2days = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0]
   const sb = createServiceClient()
   try {
+    // Auto-create promise only from explicit promise_update events
+    if (event?.source === 'promise_update') {
+      const { data: existingPromise } = await sb.from('promises')
+        .select('id')
+        .eq('company_id', ctx.debt.company_id)
+        .eq('debt_id', ctx.debt.id)
+        .eq('status', 'pending')
+        .limit(1)
+
+      if (!(existingPromise?.length)) {
+        await sb.from('promises').insert({
+          company_id: ctx.debt.company_id,
+          customer_id: ctx.debt.customer_id,
+          debt_id: ctx.debt.id,
+          promised_amount: ctx.debt.current_balance,
+          promised_date: in2days,
+          channel: 'system',
+          status: 'pending',
+          notes: 'Auto-created from promise_update event'
+        })
+      }
+    }
     // Mark overdue promises as broken
     await sb.from('promises')
       .update({ status: 'broken' })
@@ -882,7 +904,7 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
 
     // ── Promises (always) ───────────────────────────────────────────
     try {
-      await stepPromises(ctx)
+      await stepPromises(ctx, event)
       R.steps_completed.push('promises')
     } catch { R.steps_failed.push('promises') }
 
@@ -957,4 +979,6 @@ export async function processEventBatch(
   log.info('batch done', R)
   return R
 }
+
+
 
