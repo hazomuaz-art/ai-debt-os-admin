@@ -26,7 +26,7 @@ export default function Page() {
       const res = await fetch('/api/ai/reply-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: 'ar', message: text }),
+        body: JSON.stringify({ language: 'ar', message: text, conversation_history: chat.slice(-12) }),
       })
 
       const data = await res.json()

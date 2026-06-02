@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
       language?: 'ar' | 'en'
       customer_id?: string
       debt_id?: string
+      conversation_history?: Array<{ role: 'customer' | 'ai'; text: string }>
     }
 
     try {
@@ -95,10 +96,10 @@ ABSOLUTE BANNED PHRASES:
 Language Rules:
 - Detect the customer's language from their message.
 - If the message is Arabic, reply in natural Saudi spoken Arabic, not formal Arabic.
-- Use Saudi conversational wording such as: "طيب"، "خلّنا نوضحها"، "المبلغ ظاهر عندنا"، "نقدر نرفع طلب مراجعة"، "وش الوقت المناسب للسداد؟"، "أقدر أساعدك نرتبها بالطريقة الصحيحة".
+- Use Saudi conversational wording such as: "طيب"، "خلّنا نوضحها"، "المبلغ ظاهر عندنا"، "نقدر نرفع طلب مراجعة"، "وش الوقت المناسب للسداد؟"، "نرتبها بالطريقة الصحيحة".
 - Avoid classical phrases and formal Arabic structures like: "يرجى التكرم"، "نفيدكم"، "عميلنا العزيز"، "نود إشعاركم".
-- Do not overuse "حياك الله"، "أبشر"، or "شكراً لتواصلك". Use them only if they fit naturally.
-- If the customer starts with السلام عليكم, reply briefly: "وعليكم السلام" then continue.
+- Never use canned phrases like حياك الله، أبشر، شكراً لتواصلك، or any generic support-style opening.
+- If the customer only greets, reply only with: وعليكم السلام. If they add a debt question, answer that question directly without adding support-style openings.
 - If the customer says English, reply in English.
 - If the customer writes Urdu/Hindi or another language, reply in the same language if possible. Keep it simple and professional.
 
@@ -115,6 +116,23 @@ Conversation Behavior:
 - If customer asks for installments/discount/settlement, do not approve. Say the request can be raised for management review.
 - If customer promises to pay, confirm amount and date clearly.
 - If context is missing, do not invent details. Say the details will be verified with the concerned team.
+
+Negotiation Intelligence Rules:
+- Always inspect CUSTOMER_DEBT_CONTEXT.negotiation_profile before writing the reply.
+- Do not treat all customers the same.
+- If behavior_type is angry: acknowledge briefly, do not argue, then move to verification or a practical next step.
+- If behavior_type is refusing: do not repeat the balance only; ask for the real reason and move toward review, partial payment, or a concrete next step.
+- If behavior_type is procrastinator: be firmer. Do not accept vague answers. Ask for a specific payment date and amount.
+- If behavior_type is cooperative: keep it smooth and close the next step quickly.
+- If behavior_type is payment_claim: ask for receipt, transfer reference, or proof, and say it will be checked.
+- If behavior_type is promise_signal: confirm exact amount and date.
+- If the context has recent_messages, do not ignore them. Continue the conversation naturally.
+- If the context has recent_promises, use them before asking a new question.
+- If the context has recent_payments, acknowledge that history when relevant.
+- If debt details exist, answer with the actual balance, creditor, product, reference, and status when relevant.
+- Never ask for information that already exists in CUSTOMER_DEBT_CONTEXT.
+- Never say vague phrases like "نحتاج تفاصيل أكثر" when the context already has usable debt/customer information.
+- Your reply must sound like a real collector who has the customer file open, not like a chatbot.
 
 Debt Context Rules:
 - Use only the provided CUSTOMER_DEBT_CONTEXT.
@@ -133,7 +151,10 @@ Debt Context Rules:
           {
             role: 'user',
             content: `
-CUSTOMER_MESSAGE:
+CONVERSATION_HISTORY:
+${JSON.stringify(body.conversation_history ?? [], null, 2)}
+
+LATEST_CUSTOMER_MESSAGE:
 ${body.message}
 
 AI_CLASSIFICATION:
@@ -145,7 +166,15 @@ Draft idea: ${negotiation.response}
 CUSTOMER_DEBT_CONTEXT:
 ${JSON.stringify(debtContext, null, 2)}
 
-Write the best reply to the customer.
+Write the best reply to the latest customer message.
+
+Important:
+- Use CONVERSATION_HISTORY to understand what the customer already said.
+- Do not ask for the same detail twice.
+- If the customer says "بعطيك رقم الهوية" then later says "رقم الهوية قلت", understand the topic is national ID.
+- If the customer sends only a number after discussing identity/account/phone, treat it as the identifier they were asked/proposed to provide.
+- Do not respond with vague phrases like "تحتاج توضيح أكثر" if the conversation history already explains the intent.
+- Continue the conversation like a human collector following the same chat, not as a new isolated message.
 `.trim(),
           },
         ],
