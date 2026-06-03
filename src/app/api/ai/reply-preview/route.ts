@@ -27,12 +27,68 @@ export async function POST(req: NextRequest) {
     const companyId = ctx.profile.company_id
 
     let debtContext: Awaited<ReturnType<typeof buildCustomerDebtContext>> | null = null
+    let matchedCustomerId = body.customer_id ?? null
+    let matchedDebtId = body.debt_id ?? null
 
-    if (body.customer_id) {
+    if (!matchedCustomerId && body.message) {
+      const rawText = String(body.message)
+      const digits = rawText.replace(/\D/g, '')
+      const tokens = rawText
+        .split(/\s+/)
+        .map(t => t.trim())
+        .filter(Boolean)
+        .slice(0, 8)
+
+      if (digits.length >= 6) {
+        const { data: customerMatch } = await ctx.supabase
+          .from('customers')
+          .select('id')
+          .eq('company_id', companyId)
+          .or(`phone.ilike.%${digits}%,whatsapp.ilike.%${digits}%,national_id.ilike.%${digits}%`)
+          .limit(1)
+          .maybeSingle()
+
+        if (customerMatch?.id) {
+          matchedCustomerId = customerMatch.id
+        }
+
+        if (!matchedCustomerId) {
+          const { data: debtMatch } = await ctx.supabase
+            .from('debts')
+            .select('id, customer_id')
+            .eq('company_id', companyId)
+            .or(`account_number.ilike.%${digits}%,reference_number.ilike.%${digits}%`)
+            .limit(1)
+            .maybeSingle()
+
+          if (debtMatch?.customer_id) {
+            matchedCustomerId = debtMatch.customer_id
+            matchedDebtId = debtMatch.id
+          }
+        }
+      }
+
+      if (!matchedCustomerId && tokens.length) {
+        const nameQuery = tokens.join(' ')
+        const { data: customerByName } = await ctx.supabase
+          .from('customers')
+          .select('id')
+          .eq('company_id', companyId)
+          .ilike('full_name', `%${nameQuery}%`)
+          .limit(1)
+          .maybeSingle()
+
+        if (customerByName?.id) {
+          matchedCustomerId = customerByName.id
+        }
+      }
+    }
+
+    if (matchedCustomerId) {
       debtContext = await buildCustomerDebtContext({
         company_id: companyId,
-        customer_id: body.customer_id,
-        debt_id: body.debt_id ?? null,
+        customer_id: matchedCustomerId,
+        debt_id: matchedDebtId ?? null,
       })
     }
 
@@ -261,6 +317,8 @@ Important:
         tone: negotiation.tone,
         used_openai: !!process.env.OPENAI_API_KEY,
         used_context: hasContext,
+        matched_customer_id: matchedCustomerId,
+        matched_debt_id: matchedDebtId,
         context_summary: debtContext?.summary ?? null,
       },
     })
