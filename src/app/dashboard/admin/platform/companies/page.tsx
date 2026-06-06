@@ -1,4 +1,5 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
@@ -110,7 +111,7 @@ export default async function PlatformCompaniesPage() {
                 return (
                   <tr key={c.id} className="border-b border-white/5 text-white/70">
                     <td className="p-3">
-                      <div className="text-white font-medium">{c.name}</div>
+                      <Link href={`/dashboard/admin/platform/companies/${c.id}`} className="text-white font-medium hover:text-brand-400">{c.name}</Link>
                       <div className="text-white/30 text-xs">{c.slug}</div>
                     </td>
                     <td className="p-3">{sub?.plan_name ?? c.plan ?? 'starter'}</td>
