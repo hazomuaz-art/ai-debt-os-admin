@@ -30,6 +30,7 @@ const adminNav = [
   { href: '/dashboard/admin/rules',          label: 'Rules',          icon: 'cpu',        group: 'system' },
 { href: '/dashboard/admin/health',         label: 'Health',         icon: 'shield',     group: 'system' },
 { href: '/dashboard/admin/platform',       label: 'Plans & Usage',  icon: 'package',    group: 'system' },
+{ href: '/dashboard/admin/platform/companies', label: 'Companies', icon: 'briefcase', group: 'system' },
 ]
 
 const managerNav = [
@@ -205,4 +206,5 @@ export function Sidebar({ profile }: SidebarProps) {
     </aside>
   )
 }
+
 
