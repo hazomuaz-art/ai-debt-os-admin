@@ -1,4 +1,4 @@
-'use server'
+﻿'use server'
 
 import { createClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
@@ -8,6 +8,7 @@ import type { DebtStatus, DebtPriority } from '@/types'
 import { createLogger } from '@/lib/logger'
 import { trackDebtCreated, trackCustomerCreated } from '@/lib/usage-tracker'
 import { processEvent } from '@/lib/automation-pipeline'
+import { recordAttribution } from '@/lib/revenue-attribution'
 const log = createLogger('actions/debts')
 
 // ============================================================
@@ -160,11 +161,11 @@ export async function createDebtAction(formData: FormData) {
       .single()
 
     if (error) {
-      if (error.code === '23505') return { error: 'Reference number conflict — please try again' }
+      if (error.code === '23505') return { error: 'Reference number conflict â€” please try again' }
       return { error: error.message }
     }
 
-    // Enqueue background AI scoring (non-fatal — function may not exist yet)
+    // Enqueue background AI scoring (non-fatal â€” function may not exist yet)
     try {
       await supabase.rpc('enqueue_job', {
         p_company_id: profile.company_id,
@@ -297,7 +298,7 @@ export async function recordPaymentAction(input: {
     if (!input.debt_id) return { error: 'debt_id is required' }
     if (!input.amount || input.amount <= 0) return { error: 'Amount must be positive' }
 
-    // Fetch debt — RLS ensures it belongs to the user's company
+    // Fetch debt â€” RLS ensures it belongs to the user's company
     const { data: debt } = await supabase
       .from('debts')
       .select('id, current_balance, customer_id, currency, company_id, status')
@@ -333,6 +334,20 @@ export async function recordPaymentAction(input: {
       .single()
 
     if (payErr) return { error: payErr.message }
+
+    await recordAttribution({
+      company_id: profile.company_id,
+      payment_id: payment.id,
+      customer_id: debt.customer_id,
+      debt_id: input.debt_id,
+      amount: input.amount,
+      currency: debt.currency,
+      attribution_channel: 'collector',
+      attribution_actor: 'collector',
+      ai_assisted: false,
+      collector_id: user.id,
+      cost_of_collection: 0,
+    })
 
     // Update debt balance and status
     const { error: debtErr } = await supabase
@@ -389,3 +404,5 @@ export async function getDebtsWithFilters(filters: {
   if (error) return { error: error.message, data: [] }
   return { data: data ?? [], count }
 }
+
+
