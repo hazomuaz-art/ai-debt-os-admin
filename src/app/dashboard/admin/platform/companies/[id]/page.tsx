@@ -1,6 +1,7 @@
 ﻿import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
@@ -104,7 +105,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
 
       <div className="card overflow-hidden">
         <div className="p-4 border-b border-white/10">
-          <h2 className="text-white font-semibold">Users</h2>
+          <div className="flex items-center justify-between gap-3"><h2 className="text-white font-semibold">Users</h2><InviteUserModal companyId={company.id} /></div>
         </div>
 
         <table className="w-full text-sm">

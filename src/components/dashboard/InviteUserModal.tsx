@@ -1,15 +1,20 @@
-'use client'
+﻿'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 
 export function InviteUserModal({ companyId }: { companyId: string }) {
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const router = useRouter()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -23,9 +28,6 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
     const role = formData.get('role') as string
     const password = formData.get('password') as string
 
-    const supabase = createClient()
-
-    // For demo: create auth user via API route
     const res = await fetch('/api/auth/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,42 +35,60 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
     })
 
     const data = await res.json()
-    if (data.error) {
-      setError(data.error)
+
+    if (!res.ok || data.error) {
+      setError(data.error || 'Failed to create user')
     } else {
       setSuccess(`${role} account created for ${email}`)
       router.refresh()
-      setTimeout(() => { setOpen(false); setSuccess('') }, 2000)
+      setTimeout(() => {
+        setOpen(false)
+        setSuccess('')
+      }, 1500)
     }
+
     setLoading(false)
   }
 
   if (!open) {
-    return <button onClick={() => setOpen(true)} className="btn-primary text-sm">+ Invite Member</button>
+    return (
+      <button onClick={() => setOpen(true)} className="btn-primary text-sm">
+        + Invite Member
+      </button>
+    )
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-surface-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
+  if (!mounted) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-surface-900 border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-white/5">
-          <h2 className="font-display font-semibold">Invite Team Member</h2>
-          <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white text-xl">×</button>
+          <h2 className="font-display font-semibold text-white">Invite Team Member</h2>
+          <button type="button" onClick={() => setOpen(false)} className="text-white/40 hover:text-white text-xl">
+            x
+          </button>
         </div>
+
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
           {success && <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm">{success}</div>}
+
           <div>
             <label className="label">Full Name</label>
             <input name="full_name" type="text" required className="input" />
           </div>
+
           <div>
             <label className="label">Email</label>
             <input name="email" type="email" required className="input" />
           </div>
+
           <div>
             <label className="label">Temporary Password</label>
             <input name="password" type="password" required minLength={8} className="input" />
           </div>
+
           <div>
             <label className="label">Role</label>
             <select name="role" className="input">
@@ -76,14 +96,18 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
               <option value="manager">Manager</option>
             </select>
           </div>
+
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)} className="btn-secondary flex-1">Cancel</button>
+            <button type="button" onClick={() => setOpen(false)} className="btn-secondary flex-1">
+              Cancel
+            </button>
             <button type="submit" disabled={loading} className="btn-primary flex-1">
               {loading ? 'Creating...' : 'Create Account'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
