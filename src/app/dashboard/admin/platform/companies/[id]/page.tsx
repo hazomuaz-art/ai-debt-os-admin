@@ -2,6 +2,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
+import UserStatusButton from '@/components/dashboard/UserStatusButton'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
@@ -114,7 +115,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
               <th className="text-left p-3">Name</th>
               <th className="text-left p-3">Email</th>
               <th className="text-left p-3">Role</th>
-              <th className="text-left p-3">Status</th>
+              <th className="text-left p-3">Status</th><th className="text-left p-3">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -122,11 +123,14 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
               <tr key={u.id} className="border-b border-white/5 text-white/70">
                 <td className="p-3">{u.full_name ?? '-'}</td>
                 <td className="p-3">{u.email ?? '-'}</td>
-                <td className="p-3">{u.role ?? '-'}</td>
+                <td className="p-3 font-semibold">{u.role ?? '-'}</td>
                 <td className="p-3">
                   <span className={u.is_active ? 'text-green-400' : 'text-red-400'}>
                     {u.is_active ? 'active' : 'disabled'}
                   </span>
+                </td>
+                <td className="p-3">
+                  <UserStatusButton userId={u.id} isActive={Boolean(u.is_active)} />
                 </td>
               </tr>
             ))}
@@ -165,4 +169,8 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
     </div>
   )
 }
+
+
+
+
 
