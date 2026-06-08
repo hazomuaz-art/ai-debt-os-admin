@@ -46,12 +46,12 @@ export async function POST(request: NextRequest) {
     const rawBody   = await request.text()
     const signature = request.headers.get('x-hub-signature-256')
 
-    if (process.env.NODE_ENV === 'production' && !verifySignature(rawBody, signature)) {
+    const evo = JSON.parse(rawBody)
+
+    if (!evo?.event && process.env.NODE_ENV === 'production' && !verifySignature(rawBody, signature)) {
       log.error('Webhook signature verification failed')
       return NextResponse.json({ status: 'ok' })
     }
-
-    const evo = JSON.parse(rawBody)
 
     if (evo?.event && evo?.instance) {
       const supabase = createServiceClient()
@@ -198,5 +198,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
 
 
