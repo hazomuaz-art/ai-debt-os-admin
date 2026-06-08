@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { IntegrationCard } from '@/components/integrations/IntegrationCard'
 import { IntegrationControlCenter } from '@/components/integrations/IntegrationControlCenter'
@@ -29,6 +29,12 @@ const INTEGRATIONS: Array<{
     label:       'Collection System API',
     description: 'Bi-directional sync of debts and customers with your collection system',
     icon:        '🔗',
+  },
+  {
+    key:         'evolution_whatsapp',
+    label:       'Evolution WhatsApp',
+    description: 'Connect Evolution API instances and manage WhatsApp messaging',
+    icon:        '🟢',
   },
 ]
 
