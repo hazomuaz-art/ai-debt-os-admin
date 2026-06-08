@@ -56,12 +56,21 @@ export async function POST(request: NextRequest) {
     if (evo?.event && evo?.instance) {
       const supabase = createServiceClient()
 
-      await supabase.from('webhook_events').insert({
+      const { error: evoError } = await supabase.from('webhook_events').insert({
         provider: 'evolution',
         event_id: `${evo.instance}:${evo.event}:${Date.now()}`,
         event_type: evo.event,
         payload: evo,
       })
+
+      if (evoError) {
+        return NextResponse.json({
+          status: 'error',
+          step: 'evolution_insert_failed',
+          message: evoError.message,
+          code: evoError.code,
+        }, { status: 500 })
+      }
 
       log.info('Evolution webhook received', {
         event: evo.event,
@@ -189,4 +198,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
 
