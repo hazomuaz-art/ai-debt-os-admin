@@ -1,4 +1,4 @@
-import { createLogger, captureError } from '@/lib/logger'
+﻿import { createLogger, captureError } from '@/lib/logger'
 
 const log = createLogger('whatsapp')
 
@@ -55,16 +55,46 @@ export function normalizePhone(raw: string): string {
 function truncateMessage(message: string): string {
   if (Buffer.byteLength(message, 'utf8') <= MAX_MESSAGE_BYTES) return message
   let t = message
-  while (Buffer.byteLength(t + '…', 'utf8') > MAX_MESSAGE_BYTES) t = t.slice(0, -10)
-  return t + '…'
+  while (Buffer.byteLength(t + 'â€¦', 'utf8') > MAX_MESSAGE_BYTES) t = t.slice(0, -10)
+  return t + 'â€¦'
 }
 
 export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<SendResult> {
+  const evolutionUrl = process.env.EVOLUTION_API_URL
+  const evolutionKey = process.env.EVOLUTION_API_KEY
+  const evolutionInstance = process.env.EVOLUTION_INSTANCE_NAME
+
+  if (evolutionUrl && evolutionKey && evolutionInstance) {
+    const to = normalizePhone(options.to)
+    const message = truncateMessage(options.message)
+
+    try {
+      const response = await fetch(`${evolutionUrl.replace(/\/$/, '')}/message/sendText/${evolutionInstance}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: evolutionKey },
+        body: JSON.stringify({ number: to, text: message }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        return { message_id: null, status: 'failed', error: data?.message ?? `Evolution HTTP ${response.status}` }
+      }
+
+      return {
+        message_id: data?.key?.id ?? data?.messageId ?? null,
+        status: 'sent',
+      }
+    } catch (err) {
+      return { message_id: null, status: 'failed', error: err instanceof Error ? err.message : 'Evolution send failed' }
+    }
+  }
+
   const phoneNumberId = options.phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID
   const accessToken   = process.env.WHATSAPP_ACCESS_TOKEN
 
   if (!phoneNumberId || !accessToken) {
-    log.warn('WhatsApp not configured — message not sent')
+    log.warn('WhatsApp not configured - message not sent')
     return { message_id: null, status: 'failed', error: 'WhatsApp credentials not configured' }
   }
 
@@ -174,3 +204,4 @@ export function isValidWhatsAppNumber(phone: string): boolean {
   const n = normalizePhone(phone)
   return /^\d{10,15}$/.test(n) && !n.startsWith('0')
 }
+
