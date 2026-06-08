@@ -18,6 +18,7 @@ const adminNav = [
   { href: '/dashboard/admin/portfolios',     label: 'Portfolios',    icon: 'briefcase',  group: 'data' },
   { href: '/dashboard/admin/cost-center',    label: 'Cost Centers',  icon: 'dollar',     group: 'data' },
   { href: '/dashboard/admin/analytics',      label: 'Analytics',     icon: 'chart',      group: 'data' },
+  { href: '/dashboard/admin/ai-revenue',     label: 'AI Revenue',    icon: 'dollar',     group: 'data' },
   { href: '/dashboard/admin/team',           label: 'Team',          icon: 'shield',     group: 'data' },
   { href: '/dashboard/admin/automation',     label: 'Automation',    icon: 'cpu',        group: 'ai' },
   { href: '/dashboard/admin/campaigns',      label: 'Campaigns',     icon: 'megaphone',  group: 'ai' },
@@ -206,5 +207,6 @@ export function Sidebar({ profile }: SidebarProps) {
     </aside>
   )
 }
+
 
 
