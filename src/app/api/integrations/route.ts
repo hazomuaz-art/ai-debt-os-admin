@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { z } from 'zod'
 
 const saveSchema = z.object({
-  integration_name: z.enum(['rasf_whatsapp', 'tameez_calls', 'collection_api']),
+  integration_name: z.string().min(1),
   enabled:          z.boolean(),
-  config:           z.record(z.string()),
+  config: z.record(z.any()),
 })
 
 export async function GET(_req: NextRequest) {
@@ -50,3 +50,5 @@ export async function POST(req: NextRequest) {
     { requiredRoles: ['admin'] }
   )
 }
+
+
