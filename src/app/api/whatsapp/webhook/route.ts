@@ -77,6 +77,61 @@ export async function POST(request: NextRequest) {
         instance: evo.instance,
       })
 
+      if (evo.event === 'messages.upsert' && evo.data?.key?.fromMe === false) {
+        const remoteJid = String(evo.data.key.remoteJid ?? '')
+        const phoneRaw = normalizePhone(remoteJid.split('@')[0] ?? '')
+        const text =
+          evo.data.message?.conversation ??
+          evo.data.message?.extendedTextMessage?.text ??
+          ''
+
+        if (phoneRaw && text) {
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('id, company_id, full_name')
+            .or([
+              `whatsapp.eq.${phoneRaw}`,
+              `whatsapp.eq.+${phoneRaw}`,
+              `phone.eq.${phoneRaw}`,
+              `phone.eq.+${phoneRaw}`,
+            ].join(','))
+            .limit(1)
+            .maybeSingle()
+
+          if (customer) {
+            const { data: latestDebt } = await supabase
+              .from('debts')
+              .select('id')
+              .eq('customer_id', (customer as { id: string }).id)
+              .not('status', 'in', '("settled","written_off")')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            await supabase.from('messages').insert({
+              company_id: (customer as { company_id: string }).company_id,
+              customer_id: (customer as { id: string }).id,
+              debt_id: (latestDebt as { id: string } | null)?.id ?? null,
+              channel: 'whatsapp',
+              direction: 'inbound',
+              content: text,
+              status: 'delivered',
+              whatsapp_message_id: String(evo.data.key.id ?? ''),
+              sent_at: new Date(Number(evo.data.messageTimestamp ?? Date.now() / 1000) * 1000).toISOString(),
+              metadata: { provider: 'evolution', from: phoneRaw, remoteJid },
+            })
+
+            processEvent({
+              source: 'webhook_evolution',
+              company_id: (customer as { company_id: string }).company_id,
+              _customer_id: (customer as { id: string }).id,
+              _debt_id: (latestDebt as { id: string } | null)?.id,
+              data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
+            }).catch(() => {})
+          }
+        }
+      }
+
       return NextResponse.json({ status: 'ok' })
     }
     let body: { object: string; entry: WhatsAppWebhookEntry[] }
@@ -198,6 +253,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
 
 
 
