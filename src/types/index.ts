@@ -216,7 +216,7 @@ export interface RecommendRequest {
 
 // ── Integration Settings ──────────────────────────────────────────────────
 
-export type IntegrationName = 'rasf_whatsapp' | 'tameez_calls' | 'collection_api'
+export type IntegrationName = 'rasf_whatsapp' | 'tameez_calls' | 'collection_api' | 'evolution_whatsapp'
 
 export interface IntegrationSetting {
   id:               string

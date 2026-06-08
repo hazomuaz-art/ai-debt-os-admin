@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import type { IntegrationSetting } from '@/types'
 
-// ── Field definitions per integration ────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Field definitions per integration Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 interface FieldDef {
   key:         string
@@ -30,9 +30,15 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
     { key: 'username',  label: 'Username',     type: 'text',     placeholder: 'Service account username' },
     { key: 'token',     label: 'Password / Token', type: 'password', placeholder: 'Password or API token' },
   ],
+  evolution_whatsapp: [
+    { key: 'api_url', label: 'Evolution URL', type: 'url', placeholder: 'https://evolution.yourdomain.com' },
+    { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'Evolution API Key' },
+    { key: 'instance_name', label: 'Instance Name', type: 'text', placeholder: 'instance-1' },
+    { key: 'webhook_url', label: 'Webhook URL', type: 'url', placeholder: 'https://yourapp.com/api/whatsapp/webhook' },
+  ],
 }
 
-// ── Status badge ──────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Status badge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: string | null }) {
   if (!enabled) {
@@ -45,18 +51,18 @@ function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: stri
   if (lastError) {
     return (
       <span className="status-badge bg-red-500/10 text-red-400 border-red-500/20">
-        ● Error
+        Ã¢â€”Â Error
       </span>
     )
   }
   return (
     <span className="status-badge bg-green-500/10 text-green-400 border-green-500/20">
-      ● Connected
+      Ã¢â€”Â Connected
     </span>
   )
 }
 
-// ── Toggle ────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Toggle Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -86,14 +92,14 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Main component Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 interface IntegrationCardProps {
   name:         string
   label:        string
   description:  string
   icon:         string
-  integrationKey: 'rasf_whatsapp' | 'tameez_calls' | 'collection_api'
+  integrationKey: 'rasf_whatsapp' | 'tameez_calls' | 'collection_api' | 'evolution_whatsapp'
   initial?:     IntegrationSetting | null
 }
 
@@ -198,7 +204,7 @@ export function IntegrationCard({
             <label className="label">
               {field.label}
               {field.hint && (
-                <span className="text-white/30 font-normal ml-1">— {field.hint}</span>
+                <span className="text-white/30 font-normal ml-1">Ã¢â‚¬â€ {field.hint}</span>
               )}
             </label>
             <input
@@ -221,7 +227,7 @@ export function IntegrationCard({
           </span>
           {lastError && (
             <span className="text-red-400 truncate max-w-[200px]" title={lastError}>
-              ✗ {lastError.slice(0, 60)}{lastError.length > 60 ? '…' : ''}
+              Ã¢Å“â€” {lastError.slice(0, 60)}{lastError.length > 60 ? 'Ã¢â‚¬Â¦' : ''}
             </span>
           )}
         </div>
@@ -234,7 +240,7 @@ export function IntegrationCard({
               ? 'bg-green-500/10 text-green-400 border-green-500/20'
               : 'bg-red-500/10 text-red-400 border-red-500/20',
           ].join(' ')}>
-            {testState === 'ok' ? '✓ ' : '✗ '}{testMsg}
+            {testState === 'ok' ? 'Ã¢Å“â€œ ' : 'Ã¢Å“â€” '}{testMsg}
           </div>
         )}
 
@@ -249,9 +255,9 @@ export function IntegrationCard({
             {saveState === 'saving' && (
               <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
             )}
-            {saveState === 'saved'   ? '✓ Saved'         :
+            {saveState === 'saved'   ? 'Ã¢Å“â€œ Saved'         :
              saveState === 'error'   ? 'Save failed'      :
-             saveState === 'saving'  ? 'Saving…'          : 'Save'}
+             saveState === 'saving'  ? 'SavingÃ¢â‚¬Â¦'          : 'Save'}
           </button>
 
           <button
@@ -264,12 +270,13 @@ export function IntegrationCard({
             {testState === 'testing' && (
               <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
             )}
-            {testState === 'testing' ? 'Testing…' :
-             testState === 'ok'      ? '✓ Connected'      :
-             testState === 'fail'    ? '✗ Failed'          : '⟳ Test Connection'}
+            {testState === 'testing' ? 'TestingÃ¢â‚¬Â¦' :
+             testState === 'ok'      ? 'Ã¢Å“â€œ Connected'      :
+             testState === 'fail'    ? 'Ã¢Å“â€” Failed'          : 'Ã¢Å¸Â³ Test Connection'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
