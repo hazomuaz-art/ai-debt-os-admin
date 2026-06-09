@@ -130,11 +130,20 @@ export async function POST(request: NextRequest) {
               data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
             }).catch(() => {})
 
+            const { data: recentMessages } = await supabase
+              .from('messages')
+              .select('direction, content')
+              .eq('customer_id', (customer as { id: string }).id)
+              .eq('channel', 'whatsapp')
+              .order('sent_at', { ascending: false })
+              .limit(12)
+
             const autoReply = await generateWhatsappAutoReply({
               company_id: (customer as { company_id: string }).company_id,
               customer_id: (customer as { id: string }).id,
               debt_id: (latestDebt as { id: string } | null)?.id ?? null,
               message: text,
+              conversation_history: (recentMessages ?? []).reverse(),
             })
 
             const sendResult = await sendWhatsAppMessage({ to: phoneRaw, message: autoReply })
@@ -276,6 +285,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
 
 
 

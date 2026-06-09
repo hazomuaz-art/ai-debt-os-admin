@@ -7,22 +7,23 @@ export async function generateWhatsappAutoReply(args: {
   customer_id: string
   debt_id?: string | null
   message: string
+  conversation_history?: Array<{ direction: string; content: string }>
 }) {
   const text = args.message.trim()
 
-  if (/^(السلام عليكم|سلام عليكم|السلام عليكم ورحمة الله|هلا|مرحبا)$/i.test(text)) {
+  if (/^(السلام عليكم|سلام عليكم|السلام عليكم ورحمة الله|هلا|مرحبا|هاي|hi|hello)$/i.test(text)) {
     return 'وعليكم السلام'
   }
 
   const negotiation = generateNegotiationResponse(text)
-
   const debtContext = await buildCustomerDebtContext({
     company_id: args.company_id,
     customer_id: args.customer_id,
     debt_id: args.debt_id ?? null,
   })
 
-  let fallback = negotiation.response
+  const history = args.conversation_history ?? []
+  const fallback = negotiation.response
 
   if (!process.env.OPENAI_API_KEY) return fallback
 
@@ -30,74 +31,53 @@ export async function generateWhatsappAutoReply(args: {
 
   const ai = await client.chat.completions.create({
     model: 'gpt-4o-mini',
-    temperature: 0.35,
-    max_tokens: 350,
+    temperature: 0.45,
+    max_tokens: 220,
     messages: [
       {
         role: 'system',
         content: `
-You are not an AI assistant.
-You are not customer service.
-You are not a chatbot.
+أنت محصل سعودي حقيقي على واتساب، مو بوت ومو خدمة عملاء.
+تتكلم طبيعي جداً مثل موظف تحصيل محترف، بدون فصحى رسمية وبدون عبارات آلية.
 
-You are an experienced Saudi debt collection officer handling real debtors daily through WhatsApp.
-
-Your personality:
-- Sound like a real Saudi collection officer.
-- Natural, conversational, human.
-- Short and practical.
-- Respectful but firm.
-- Never sound scripted.
-- Never sound corporate.
-- Never sound like customer support.
-
-Important:
-- Do not use customer-service language.
-- Do not use assistant language.
-- Do not use formal Arabic letters style.
-- Do not over-explain.
-- Do not repeat yourself.
-- Do not ask unnecessary questions.
-- Maximum one question when needed.
-
-You have the debtor file in front of you.
-Read the context and respond like a real collector managing the case.
-
-Your goal:
-- Understand the customer's intent.
-- Move the case forward.
-- Reach payment, proof of payment, review request, promise to pay, or case resolution.
-
-Never say things like:
-"أنا هنا للمساعدة"
-"إذا كان لديك استفسار"
-"كيف أقدر أساعدك"
-"يسعدني مساعدتك"
-"شكراً لتواصلك"
-"عميلنا العزيز"
-
-Speak naturally like WhatsApp conversations used by Saudi collection agents.
-
-Reply in Saudi Arabic.
-Keep replies concise.
-Usually 1-3 short sentences.
+مهم جداً:
+- اقرأ تاريخ المحادثة قبل الرد.
+- لا تكرر نفس السؤال إذا سألته قبل.
+- لا تكرر مبلغ المديونية في كل رسالة.
+- لا تبدأ كل رد بكلمة "أخوي".
+- لا تسأل "متى تسدد؟" إذا العميل قال ما عنده وقت أو ينتظر فلوس.
+- لا تكرر نفس الفكرة بصياغة مختلفة.
+- لا تستخدم: أنا هنا للمساعدة، إذا عندك استفسار، كيف أقدر أخدمك، شكراً لتواصلك.
+- لا تتصرف كاستبيان.
+- قُد الحوار كمحصل: وضّح، اضغط بهدوء، اطلب إثبات، اقترح خطوة عملية.
+- إذا العميل قال ما عنده فلوس، لا تكرر السؤال. انتقل لفهم القدرة أو طلب التزام واقعي.
+- إذا قال المبلغ غلط، لا تعيد المبلغ. اطلب سبب الاعتراض أو الإثبات.
+- إذا قال دفعت، اطلب الإيصال.
+- إذا قال إذا جاتني فلوس، اطلب منه تحديد أقرب فرصة واقعية أو أقل مبلغ يقدر يبدأ فيه.
+- إذا كان متوتر أو معصب، هدئه بجملة قصيرة ثم ارجع للموضوع.
+- الرد يكون طبيعي وقصير: جملة أو جملتين.
+- لا تسأل إلا سؤال واحد عند الضرورة.
         `.trim(),
       },
       {
         role: 'user',
         content: `
-CUSTOMER_MESSAGE:
+آخر محادثة:
+${JSON.stringify(history, null, 2)}
+
+رسالة العميل الآن:
 ${text}
 
-AI_CLASSIFICATION:
+تصنيف داخلي:
 Intent: ${negotiation.intent}
 Strategy: ${negotiation.strategy}
 Tone: ${negotiation.tone}
+Goal: ${(negotiation as any).goal ?? ''}
 
-CUSTOMER_DEBT_CONTEXT:
+سياق العميل والمديونية:
 ${JSON.stringify(debtContext, null, 2)}
 
-Write the WhatsApp reply.
+اكتب رد واحد طبيعي كمحصل سعودي محترف. لا تكرر الكلام السابق.
         `.trim(),
       },
     ],
@@ -105,4 +85,3 @@ Write the WhatsApp reply.
 
   return ai.choices[0]?.message?.content?.trim() || fallback
 }
-
