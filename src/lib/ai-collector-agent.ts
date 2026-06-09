@@ -43,12 +43,20 @@ function previousOutboundTexts(history: HistoryItem[]) {
   return history.filter(m => m.direction === 'outbound').slice(-6).map(m => String(m.content ?? ''))
 }
 
-function isEnglishGreeting(text: string) {
-  return /^(hi|hello|hey|good morning|good evening)$/i.test(text.trim())
+function isGreeting(text: string) {
+  const value = normalize(text)
+  return (
+    /^(hi|hello|hey|good morning|good evening)$/i.test(text.trim()) ||
+    includesAny(value, ['السلام', 'سلام', 'هلا', 'مرحبا', 'مساء الخير', 'صباح الخير'])
+  )
 }
 
-function isEnglishCloser(text: string) {
-  return /^(ok|okay|thanks|thank you|done)$/i.test(text.trim())
+function isCloser(text: string) {
+  const value = normalize(text)
+  return (
+    /^(ok|okay|thanks|thank you|done)$/i.test(text.trim()) ||
+    includesAny(value, ['تمام', 'تم', 'اوكي', 'أوكي', 'خلاص', 'ماشي', 'طيب', 'شكرا', 'شكراً', 'يعطيك العافية'])
+  )
 }
 
 function isRepeated(reply: string, history: HistoryItem[]) {
@@ -93,12 +101,12 @@ export async function runCollectorAgent(args: {
 
   const customerBrain = buildCustomerBrain(debtContext)
 
-  if (isEnglishCloser(text)) {
+  if (isCloser(text)) {
     return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
   }
 
-  if (isEnglishGreeting(text) && history.length <= 2) {
-    return { shouldReply: true, action: 'reply', reason: 'fresh_greeting', message: 'Hello' }
+  if (isGreeting(text) && history.length <= 2) {
+    return { shouldReply: true, action: 'reply', reason: 'fresh_greeting', message: 'وعليكم السلام' }
   }
 
   if (!process.env.OPENAI_API_KEY) {
@@ -106,7 +114,7 @@ export async function runCollectorAgent(args: {
       shouldReply: true,
       action: 'human_review',
       reason: 'fallback_no_openai',
-      message: 'تم استلام رسالتك، وبنراجع الملف ونرد عليك بالإجراء المناسب.',
+      message: 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø±Ø³Ø§Ù„ØªÙƒØŒ ÙˆØ¨Ù†Ø±Ø§Ø¬Ø¹ Ø§Ù„Ù…Ù„Ù ÙˆÙ†Ø±Ø¯ Ø¹Ù„ÙŠÙƒ Ø¨Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ù…Ù†Ø§Ø³Ø¨.',
     }
   }
 
@@ -208,7 +216,7 @@ If the customer says something like "what amount?", "debt for what?", "from wher
       shouldReply: true,
       action: 'human_review',
       reason: 'invalid_ai_json',
-      message: 'تم استلام رسالتك، وبنراجع الملف ونرد عليك بالإجراء المناسب.',
+      message: 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø±Ø³Ø§Ù„ØªÙƒØŒ ÙˆØ¨Ù†Ø±Ø§Ø¬Ø¹ Ø§Ù„Ù…Ù„Ù ÙˆÙ†Ø±Ø¯ Ø¹Ù„ÙŠÙƒ Ø¨Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ù…Ù†Ø§Ø³Ø¨.',
     }
   }
 
