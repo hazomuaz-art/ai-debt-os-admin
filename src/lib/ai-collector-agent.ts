@@ -9,7 +9,6 @@ export type CollectorDecision = {
     | 'silent'
     | 'request_proof'
     | 'request_clarification'
-    | 'explain_debt'
     | 'negotiate'
     | 'pressure'
     | 'close_conversation'
@@ -26,13 +25,41 @@ type HistoryItem = {
   content: string
 }
 
-function normalize(text: string) {
+function norm(text: string) {
   return String(text ?? '').trim().toLowerCase()
 }
 
-function includesAny(text: string, words: string[]) {
-  const value = normalize(text)
-  return words.some(word => value.includes(word.toLowerCase()))
+function hasAny(text: string, words: string[]) {
+  const v = norm(text)
+  return words.some(w => v.includes(w.toLowerCase()))
+}
+
+function isCloser(text: string) {
+  return /^(تمام|تم|اوكي|أوكي|ok|okay|خلاص|ماشي|طيب|يعطيك العافية|شكرا|شكراً|thanks|thank you)$/i.test(text.trim())
+}
+
+function isGreeting(text: string) {
+  return /^(السلام عليكم|سلام عليكم|السلام عليكم ورحمة الله|هلا|مرحبا|هاي|hi|hello)$/i.test(text.trim())
+}
+
+function cleanReply(reply: string) {
+  return String(reply ?? '')
+    .replace(/أخوي[،,\s]*/g, '')
+    .replace(/عزيزي العميل[،,\s]*/g, '')
+    .replace(/عميلنا العزيز[،,\s]*/g, '')
+    .trim()
+}
+
+function detectSignals(text: string) {
+  return {
+    paymentClaim: hasAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']),
+    dispute: hasAny(text, ['غلط', 'اعتراض', 'مو صحيح', 'ما اعرف', 'ما أعرف', 'not mine', 'wrong amount']),
+    installment: hasAny(text, ['تقسيط', 'اقساط', 'أقساط', 'installment', 'installments']),
+    promise: hasAny(text, ['بسدد', 'اسدد', 'بسددها', 'نهاية الشهر', 'بكرة', 'بكره', 'الخميس', 'الراتب', 'salary', 'tomorrow']),
+    hardship: hasAny(text, ['ما عندي', 'ظروف', 'فلوس', 'راتب', 'متعسر', 'ما اقدر', 'ما أقدر']),
+    angry: hasAny(text, ['ازعاج', 'ازعجتونا', 'شكوى', 'محامي', 'بلاغ', 'court', 'lawyer', 'complaint']),
+    wrongNumber: hasAny(text, ['الرقم غلط', 'ما يخصني', 'مو رقمي', 'wrong number']),
+  }
 }
 
 function lastOutbound(history: HistoryItem[]) {
@@ -40,46 +67,34 @@ function lastOutbound(history: HistoryItem[]) {
 }
 
 function previousOutboundTexts(history: HistoryItem[]) {
-  return history.filter(m => m.direction === 'outbound').slice(-6).map(m => String(m.content ?? ''))
-}
-
-function isGreeting(text: string) {
-  const value = normalize(text)
-  return (
-    /^(hi|hello|hey|good morning|good evening)$/i.test(text.trim()) ||
-    includesAny(value, ['السلام', 'سلام', 'هلا', 'مرحبا', 'مساء الخير', 'صباح الخير'])
-  )
-}
-
-function isCloser(text: string) {
-  const value = normalize(text)
-  return (
-    /^(ok|okay|thanks|thank you|done)$/i.test(text.trim()) ||
-    includesAny(value, ['تمام', 'تم', 'اوكي', 'أوكي', 'خلاص', 'ماشي', 'طيب', 'شكرا', 'شكراً', 'يعطيك العافية'])
-  )
-}
-
-function isRepeated(reply: string, history: HistoryItem[]) {
-  const next = reply.replace(/\s+/g, ' ').trim()
-  if (!next) return false
-
-  return previousOutboundTexts(history).some(previous => {
-    const old = previous.replace(/\s+/g, ' ').trim()
-    if (!old) return false
-    return old.includes(next.slice(0, 35)) || next.includes(old.slice(0, 35))
-  })
+  return history.filter(m => m.direction === 'outbound').slice(-5).map(m => String(m.content ?? ''))
 }
 
 function isRobotic(reply: string) {
-  return includesAny(reply, [
-    'dear customer',
-    'how can i help',
-    'i am here to help',
-    'thank you for contacting',
-    'customer service',
-    'payment plan',
-    'installment plan',
+  return hasAny(reply, [
+    'أنا هنا للمساعدة',
+    'كيف أقدر أساعدك',
+    'كيف أقدر أخدمك',
+    'إذا عندك أي استفسار',
+    'شكراً لتواصلك',
+    'عميلنا العزيز',
+    'عزيزي العميل',
+    'يرجى التكرم',
+    'نود إشعاركم',
+    'نفيدكم',
+    'خطة سداد',
+    'نرتب لك',
+    'نقدر نرتب',
   ])
+}
+
+function isRepeated(reply: string, history: HistoryItem[]) {
+  const r = reply.replace(/\s+/g, ' ').trim()
+  if (!r) return false
+  return previousOutboundTexts(history).some(p => {
+    const old = p.replace(/\s+/g, ' ').trim()
+    return old && (old.includes(r.slice(0, 35)) || r.includes(old.slice(0, 35)))
+  })
 }
 
 export async function runCollectorAgent(args: {
@@ -92,14 +107,7 @@ export async function runCollectorAgent(args: {
   const text = args.message.trim()
   const history = args.conversation_history ?? []
   const lastAgentMessage = lastOutbound(history)
-
-  const debtContext = await buildCustomerDebtContext({
-    company_id: args.company_id,
-    customer_id: args.customer_id,
-    debt_id: args.debt_id ?? null,
-  })
-
-  const customerBrain = buildCustomerBrain(debtContext)
+  const signals = detectSignals(text)
 
   if (isCloser(text)) {
     return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
@@ -109,71 +117,60 @@ export async function runCollectorAgent(args: {
     return { shouldReply: true, action: 'reply', reason: 'fresh_greeting', message: 'وعليكم السلام' }
   }
 
+  const debtContext = await buildCustomerDebtContext({
+    company_id: args.company_id,
+    customer_id: args.customer_id,
+    debt_id: args.debt_id ?? null,
+  })
+
+  const customerBrain = buildCustomerBrain(debtContext)
+
   if (!process.env.OPENAI_API_KEY) {
-    return {
-      shouldReply: true,
-      action: 'human_review',
-      reason: 'fallback_no_openai',
-      message: 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø±Ø³Ø§Ù„ØªÙƒØŒ ÙˆØ¨Ù†Ø±Ø§Ø¬Ø¹ Ø§Ù„Ù…Ù„Ù ÙˆÙ†Ø±Ø¯ Ø¹Ù„ÙŠÙƒ Ø¨Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ù…Ù†Ø§Ø³Ø¨.',
-    }
+    return { shouldReply: true, action: 'reply', reason: 'fallback_no_openai', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const ai = await client.chat.completions.create({
     model: 'gpt-4o',
-    temperature: 0.22,
-    max_tokens: 280,
+    temperature: 0.28,
+    max_tokens: 260,
     response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
         content: `
-You are a senior Saudi debt collector on WhatsApp.
+You are a senior Saudi debt collector on WhatsApp with strong conversation skills.
 
-Main rule:
-Do not ask for payment before explaining the debt if the customer asks what the debt is, why they owe it, what amount, what company, or where the claim came from.
+You are NOT a bot and NOT customer service.
 
-Conversation order:
-1. If customer asks about debt reason/source/details:
-   Explain using available debt context: creditor, product_type, account_number, reference_number, balance.
-   If some details are missing, say only what is available and offer review.
-   Do NOT ask "when can you pay" in this reply.
-2. If customer answers a previous question:
-   Do not repeat the same question.
-   Move forward based on their answer.
-3. If customer says paid:
-   Ask for receipt if not already received.
-   If receipt was already mentioned, say it will be reviewed.
-4. If customer disputes:
-   Handle the specific reason.
-   Do not keep asking "what is the reason" after they already gave a reason.
-5. If customer promises a date:
-   Confirm the promise once.
-   Do not ask the same date question again.
-6. If customer asks for installments:
-   Record request for review only. Do not approve, reject, or offer a plan.
-7. If customer is just closing the chat or acknowledging:
-   shouldReply=false.
-8. If customer is angry:
-   Calm briefly, then return to the file.
-
-Style:
-- If Arabic, reply in natural Saudi Arabic.
-- Short: one or two sentences.
-- No formal Arabic.
-- No customer-service language.
-- No robotic phrases.
-- No "dear customer".
-- No "how can I help".
-- No "I am here to help".
+Your job:
+- Understand the entire conversation before replying.
+- Never restart from zero.
+- Never repeat the same question.
+- Never repeat the same answer.
+- If the customer answered your previous question, move forward.
+- If the customer gives a reason, acknowledge it and decide the next useful step.
+- Do not keep asking for "reason or proof" after the customer already gave a reason.
 - Do not mention the amount every time.
-- Ask only one useful question when needed.
+- Do not ask multiple questions.
+- Reply in the customer's language.
+- If Arabic, use natural Saudi Arabic, not formal Arabic.
+- Keep it short: one or two human sentences.
+- Be firm, calm, persuasive, and professional.
+- No robotic phrases.
+- No "dear customer", no "how can I help", no "I am here to help".
+- Never offer installments or payment plans yourself.
+- If customer requests installments: record it for review only, no approval and no rejection.
+- If customer says paid: ask for receipt unless receipt was already discussed.
+- If customer disputes: handle the specific objection, do not repeat generic dispute wording.
+- If customer is angry: calm briefly then move to the file.
+- If conversation is done, stay silent.
 
 Return JSON only:
 {
   "shouldReply": true,
-  "action": "reply|silent|request_proof|request_clarification|explain_debt|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
+  "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
   "reason": "short reason",
   "message": "WhatsApp reply or empty"
 }
@@ -185,6 +182,9 @@ Return JSON only:
 Current customer message:
 ${text}
 
+Detected signals:
+${JSON.stringify(signals, null, 2)}
+
 Last agent message:
 ${lastAgentMessage}
 
@@ -194,14 +194,11 @@ ${JSON.stringify(history, null, 2)}
 Customer Brain:
 ${JSON.stringify(customerBrain, null, 2)}
 
-Debt Context:
-${JSON.stringify(debtContext?.summary ?? {}, null, 2)}
-
-Full Context:
+Full customer/debt context:
 ${JSON.stringify(debtContext, null, 2)}
 
 Important:
-If the customer says something like "what amount?", "debt for what?", "from where?", "why do I owe this?", explain the debt first. Do not ask when they will pay.
+If the last agent message was a question and the customer just answered it, do not ask the same question again. Move the conversation forward naturally.
         `.trim(),
       },
     ],
@@ -212,27 +209,19 @@ If the customer says something like "what amount?", "debt for what?", "from wher
   try {
     parsed = JSON.parse(ai.choices[0]?.message?.content ?? '{}')
   } catch {
-    parsed = {
-      shouldReply: true,
-      action: 'human_review',
-      reason: 'invalid_ai_json',
-      message: 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø±Ø³Ø§Ù„ØªÙƒØŒ ÙˆØ¨Ù†Ø±Ø§Ø¬Ø¹ Ø§Ù„Ù…Ù„Ù ÙˆÙ†Ø±Ø¯ Ø¹Ù„ÙŠÙƒ Ø¨Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ù…Ù†Ø§Ø³Ø¨.',
-    }
+    parsed = { shouldReply: true, action: 'reply', reason: 'invalid_json', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
-  parsed.message = String(parsed.message ?? '').trim()
+  parsed.message = cleanReply(parsed.message)
 
-  if (!parsed.shouldReply || !parsed.message) {
+  if (!parsed.shouldReply || !parsed.message.trim()) {
     return { ...parsed, shouldReply: false, message: '' }
   }
 
-  if (isRepeated(parsed.message, history) || isRobotic(parsed.message)) {
-    return {
-      shouldReply: false,
-      action: 'silent',
-      reason: 'blocked_repeated_or_robotic_reply',
-      message: '',
-    }
+  if (isRobotic(parsed.message) || isRepeated(parsed.message, history)) {
+    parsed.message = 'وصلت النقطة، بنثبتها على الملف ونمشي بالإجراء المناسب بدل تكرار نفس الكلام.'
+    parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+    parsed.reason = 'anti_repetition_guard'
   }
 
   return parsed
