@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
