@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
 import { processEvent } from '@/lib/automation-pipeline'
-import { generateWhatsappAutoReply } from '@/lib/ai-whatsapp-reply'
+import { runCollectorAgent } from '@/lib/ai-collector-agent'
 import { createHash } from 'crypto'
 
 const log = createLogger('webhook/whatsapp')
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
               .order('sent_at', { ascending: false })
               .limit(12)
 
-            const autoReply = await generateWhatsappAutoReply({
+            const decision = await runCollectorAgent({
               company_id: (customer as { company_id: string }).company_id,
               customer_id: (customer as { id: string }).id,
               debt_id: (latestDebt as { id: string } | null)?.id ?? null,
@@ -146,6 +146,15 @@ export async function POST(request: NextRequest) {
               conversation_history: (recentMessages ?? []).reverse(),
             })
 
+            if (!decision.shouldReply || !decision.message.trim()) {
+              return NextResponse.json({
+                status: 'ok',
+                skipped_auto_reply: true,
+                decision,
+              })
+            }
+
+            const autoReply = decision.message
             const sendResult = await sendWhatsAppMessage({ to: phoneRaw, message: autoReply })
 
             await supabase.from('messages').insert({
@@ -158,7 +167,7 @@ export async function POST(request: NextRequest) {
               status: sendResult.status === 'sent' ? 'sent' : 'failed',
               whatsapp_message_id: sendResult.message_id ?? null,
               sent_at: new Date().toISOString(),
-              metadata: { provider: 'evolution_ai_auto_reply', error: sendResult.error ?? null },
+              metadata: { provider: 'evolution_collector_agent', decision, error: sendResult.error ?? null },
             })
           }
         }
@@ -285,6 +294,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
+
 
 
 

@@ -17,6 +17,10 @@ export async function generateWhatsappAutoReply(args: {
     return 'وعليكم السلام'
   }
 
+  if (/^(تمام|تم|اوكي|أوكي|ok|okay|خلاص|ماشي|طيب|يعطيك العافية|شكرا|شكراً)$/i.test(text)) {
+    return ''
+  }
+
   const negotiation = generateNegotiationResponse(text)
   const debtContext = await buildCustomerDebtContext({
     company_id: args.company_id,
@@ -113,4 +117,5 @@ ${JSON.stringify(debtContext, null, 2)}
 
   return reply
 }
+
 
