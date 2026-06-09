@@ -1,5 +1,6 @@
-﻿import OpenAI from 'openai'
+import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
+import { buildCustomerBrain } from '@/lib/customer-brain'
 
 export type CollectorDecision = {
   shouldReply: boolean
@@ -11,6 +12,9 @@ export type CollectorDecision = {
     | 'negotiate'
     | 'pressure'
     | 'close_conversation'
+    | 'record_installment_request'
+    | 'record_promise'
+    | 'record_dispute'
     | 'human_review'
   reason: string
   message: string
@@ -21,8 +25,17 @@ type HistoryItem = {
   content: string
 }
 
+function normalize(text: string) {
+  return String(text ?? '').trim().toLowerCase()
+}
+
+function includesAny(text: string, words: string[]) {
+  const value = normalize(text)
+  return words.some(word => value.includes(word.toLowerCase()))
+}
+
 function isConversationCloser(text: string) {
-  return /^(تمام|تم|اوكي|أوكي|ok|okay|خلاص|ماشي|طيب|يعطيك العافية|شكرا|شكراً|اشكرك)$/i.test(text.trim())
+  return /^(تمام|تم|اوكي|أوكي|ok|okay|خلاص|ماشي|طيب|يعطيك العافية|شكرا|شكراً|thanks|thank you)$/i.test(text.trim())
 }
 
 function isGreeting(text: string) {
@@ -30,7 +43,7 @@ function isGreeting(text: string) {
 }
 
 function cleanReply(reply: string) {
-  return reply
+  return String(reply ?? '')
     .replace(/أخوي[،,\s]*/g, '')
     .replace(/عزيزي العميل[،,\s]*/g, '')
     .replace(/عميلنا العزيز[،,\s]*/g, '')
@@ -65,12 +78,46 @@ function tooSimilar(reply: string, history: HistoryItem[]) {
   const previous = history
     .filter(m => m.direction === 'outbound')
     .slice(-4)
-    .map(m => m.content)
+    .map(m => String(m.content ?? '').replace(/\s+/g, ' ').trim())
 
-  const core = reply.replace(/\s+/g, ' ').slice(0, 35)
+  const core = reply.replace(/\s+/g, ' ').trim().slice(0, 35)
   if (!core) return false
 
-  return previous.some(p => p.includes(core) || core.includes(p.replace(/\s+/g, ' ').slice(0, 35)))
+  return previous.some(p => {
+    const previousCore = p.slice(0, 35)
+    return previousCore && (p.includes(core) || core.includes(previousCore))
+  })
+}
+
+function detectLocalSignal(text: string): CollectorDecision | null {
+  if (includesAny(text, ['تقسيط', 'اقساط', 'أقساط', 'installment', 'installments'])) {
+    return {
+      shouldReply: true,
+      action: 'record_installment_request',
+      reason: 'customer_requested_installment',
+      message: 'تم تسجيل طلبك ورفعه للمراجعة حسب سياسة الجهة.',
+    }
+  }
+
+  if (includesAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'receipt', 'paid', 'transfer'])) {
+    return {
+      shouldReply: true,
+      action: 'request_proof',
+      reason: 'customer_claimed_payment',
+      message: 'أرسل الإيصال هنا، وبنراجع السداد على الملف.',
+    }
+  }
+
+  if (includesAny(text, ['غلط', 'اعتراض', 'مو صحيح', 'ما اعرف', 'ما أعرف', 'not mine', 'wrong amount'])) {
+    return {
+      shouldReply: true,
+      action: 'record_dispute',
+      reason: 'customer_disputed_debt',
+      message: 'وضح لي سبب الاعتراض أو أرسل الإثبات عشان نرفعه للمراجعة.',
+    }
+  }
+
+  return null
 }
 
 export async function runCollectorAgent(args: {
@@ -107,12 +154,19 @@ export async function runCollectorAgent(args: {
     debt_id: args.debt_id ?? null,
   })
 
+  const customerBrain = buildCustomerBrain(debtContext)
+  const localSignal = detectLocalSignal(text)
+
+  if (localSignal) {
+    return localSignal
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return {
       shouldReply: true,
       action: 'reply',
       reason: 'fallback_no_openai',
-      message: 'وصلتني ملاحظتك، بنمشي فيها بخطوة واضحة حسب الملف.',
+      message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.',
     }
   }
 
@@ -120,43 +174,40 @@ export async function runCollectorAgent(args: {
 
   const ai = await client.chat.completions.create({
     model: 'gpt-4o',
-    temperature: 0.42,
+    temperature: 0.35,
     max_tokens: 260,
     response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
         content: `
-أنت عقل محصل ديون سعودي محترف، تدير حوار واتساب حقيقي.
-مهمتك ليست الرد فقط، بل اتخاذ قرار: هل ترد؟ هل تسكت؟ هل تطلب إثبات؟ هل تضغط؟ هل تطلب توضيح؟ هل تنهي الحوار؟
+You are an expert Saudi debt collection agent speaking on WhatsApp.
 
-تصرف كشخص حقيقي:
-- لا تكرر نفس السؤال.
-- لا تكرر نفس المعنى.
-- لا تعيد ذكر المبلغ في كل رد.
-- لا تبدأ كل مرة من الصفر.
-- لا تسأل سؤال جديد إذا آخر رد منك كان سؤال والعميل ما جاوب بوضوح.
-- لا تعرض تقسيط أو خطة سداد من نفسك نهائياً.
-- إذا طلب العميل تقسيط: قل إن الطلب ينرفع للمراجعة حسب سياسة الجهة، بدون موافقة.
-- إذا العميل قال تمام/اوكي/خلاص/يعطيك العافية: لا ترد.
-- إذا العميل قال ما عندي/إذا جاتني فلوس/ظروفي: لا تكرر "متى تسدد". حوّل الكلام لخطوة عملية أو التزام واقعي.
-- إذا العميل قال المبلغ غلط/ما أعرفها: اطلب سبب الاعتراض أو الإثبات.
-- إذا العميل قال سددت/دفعت: اطلب الإيصال.
-- إذا العميل يتهرب: وضح أن الملف يحتاج إجراء واضح.
-- إذا العميل غاضب: هدّئه بجملة قصيرة ثم رجع للملف.
-- لا تستخدم فصحى رسمية.
-- لا تستخدم لغة خدمة عملاء.
-- لا تستخدم عبارات: أنا هنا للمساعدة، إذا عندك استفسار، كيف أقدر أخدمك، شكراً لتواصلك، عميلنا العزيز.
-- لا تستخدم كلمة "أخوي" نهائياً.
+Core behavior:
+- Act like a real professional collector, not a chatbot.
+- Understand the full customer history before replying.
+- Do not restart the conversation from zero.
+- Do not repeat the same question.
+- Do not repeat the same answer.
+- Do not mention the debt amount in every reply.
+- Ask only one useful question when needed.
+- Reply in the customer's language.
+- If the customer writes Arabic, reply in natural Saudi Arabic, not formal Arabic.
+- If the customer writes English, Urdu, or another language, reply in that language.
+- Keep the reply short: one or two sentences.
+- Do not use customer-service phrases.
+- Do not say: I am here to help, how can I help you, dear customer, thank you for contacting us.
+- Never offer installments, payment plans, or discounts by yourself.
+- If the customer requests installments, do not approve or reject; say the request is recorded for review according to policy.
+- If the customer says they paid, ask for the receipt.
+- If the customer disputes the debt, ask for the reason or proof.
+- If the customer only acknowledges or closes the chat, do not reply.
+- If enough context exists, move the conversation forward instead of asking basic questions again.
 
-اكتب كسعودي طبيعي، مختصر، محترف.
-الرد جملة أو جملتين فقط.
-إذا الأفضل عدم الرد، أرجع shouldReply=false.
-
-أرجع JSON فقط بهذا الشكل:
+Return JSON only:
 {
   "shouldReply": true,
-  "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|human_review",
+  "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
   "reason": "short reason",
   "message": "WhatsApp reply or empty"
 }
@@ -165,16 +216,19 @@ export async function runCollectorAgent(args: {
       {
         role: 'user',
         content: `
-تاريخ المحادثة:
+Conversation history:
 ${JSON.stringify(history, null, 2)}
 
-رسالة العميل الحالية:
+Current customer message:
 ${text}
 
-سياق العميل والمديونية:
+Customer Brain:
+${JSON.stringify(customerBrain, null, 2)}
+
+Customer and debt context:
 ${JSON.stringify(debtContext, null, 2)}
 
-اتخذ قرار محصل محترف، ثم اكتب الرد المناسب إذا كان لازم ترد.
+Make the best collector decision and write the WhatsApp reply only if a reply is needed.
         `.trim(),
       },
     ],
@@ -187,9 +241,9 @@ ${JSON.stringify(debtContext, null, 2)}
   } catch {
     parsed = {
       shouldReply: true,
-      action: 'human_review',
+      action: 'reply',
       reason: 'invalid_ai_json',
-      message: 'وصلتني ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.',
+      message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.',
     }
   }
 
@@ -200,36 +254,11 @@ ${JSON.stringify(debtContext, null, 2)}
   }
 
   if (looksRobotic(parsed.message) || tooSimilar(parsed.message, history)) {
-    const lower = text.toLowerCase()
-
-    if (lower.includes('سددت') || lower.includes('دفعت') || lower.includes('ايصال') || lower.includes('إيصال')) {
-      parsed = {
-        shouldReply: true,
-        action: 'request_proof',
-        reason: 'guardrail_payment_claim',
-        message: 'أرسل الإيصال هنا، وبنراجع السداد على الملف.',
-      }
-    } else if (lower.includes('غلط') || lower.includes('اعتراض') || lower.includes('ما اعرف') || lower.includes('ما أعرف')) {
-      parsed = {
-        shouldReply: true,
-        action: 'request_proof',
-        reason: 'guardrail_dispute',
-        message: 'وضّح لي سبب الاعتراض أو أرسل الإثبات عشان نرفعه للمراجعة.',
-      }
-    } else if (lower.includes('ما عندي') || lower.includes('فلوس') || lower.includes('ظروف') || lower.includes('اذا جاتني') || lower.includes('إذا جاتني')) {
-      parsed = {
-        shouldReply: true,
-        action: 'negotiate',
-        reason: 'guardrail_hardship',
-        message: 'فاهم إن عندك ظرف، لكن الملف يحتاج خطوة واضحة. وش أقرب إجراء جاد تقدر تلتزم فيه؟',
-      }
-    } else {
-      parsed = {
-        shouldReply: true,
-        action: 'pressure',
-        reason: 'guardrail_generic',
-        message: 'خلنا نمشيها بخطوة واضحة بدل ما يظل الملف مفتوح.',
-      }
+    return {
+      shouldReply: true,
+      action: 'pressure',
+      reason: 'guardrail_rewrite_needed',
+      message: 'خلنا نمشيها بخطوة واضحة بدل ما يظل الملف مفتوح.',
     }
   }
 
