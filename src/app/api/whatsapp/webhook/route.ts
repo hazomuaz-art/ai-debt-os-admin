@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
@@ -147,6 +147,13 @@ export async function POST(request: NextRequest) {
             })
 
             if (!decision.shouldReply || !decision.message.trim()) {
+              await supabase.from('webhook_events').insert({
+                provider: 'evolution',
+                event_id: `auto_reply_skipped:${Date.now()}`,
+                event_type: 'auto_reply_skipped',
+                payload: { decision, text, customer_id: (customer as { id: string }).id },
+              })
+
               return NextResponse.json({
                 status: 'ok',
                 skipped_auto_reply: true,
