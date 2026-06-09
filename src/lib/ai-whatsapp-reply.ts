@@ -11,6 +11,7 @@ export async function generateWhatsappAutoReply(args: {
 }) {
   const text = args.message.trim()
   const history = args.conversation_history ?? []
+  const lastOutbound = history.filter(m => m.direction === 'outbound').slice(-3).map(m => m.content).join(' | ')
 
   if (/^(السلام عليكم|سلام عليكم|السلام عليكم ورحمة الله|هلا|مرحبا|هاي|hi|hello)$/i.test(text)) {
     return 'وعليكم السلام'
@@ -96,7 +97,9 @@ ${JSON.stringify(debtContext, null, 2)}
     'متى تقدر',
   ]
 
-  if (!reply || robotic.some(x => reply.includes(x))) {
+  const repeated = lastOutbound && reply && lastOutbound.includes(reply.slice(0, 25))
+
+  if (!reply || repeated || robotic.some(x => reply.includes(x))) {
     if (text.includes('غلط') || text.includes('مو صحيح')) {
       reply = 'تمام، وضّح لي سبب الاعتراض أو أرسل الإثبات عشان نرفعه للمراجعة.'
     } else if (text.includes('ما عندي') || text.includes('فلوس') || text.includes('مشغول')) {
@@ -110,3 +113,4 @@ ${JSON.stringify(debtContext, null, 2)}
 
   return reply
 }
+
