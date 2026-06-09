@@ -1,8 +1,9 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { parseWebhookPayload, normalizePhone, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
+import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
 import { processEvent } from '@/lib/automation-pipeline'
+import { generateWhatsappAutoReply } from '@/lib/ai-whatsapp-reply'
 import { createHash } from 'crypto'
 
 const log = createLogger('webhook/whatsapp')
@@ -128,6 +129,28 @@ export async function POST(request: NextRequest) {
               _debt_id: (latestDebt as { id: string } | null)?.id,
               data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
             }).catch(() => {})
+
+            const autoReply = await generateWhatsappAutoReply({
+              company_id: (customer as { company_id: string }).company_id,
+              customer_id: (customer as { id: string }).id,
+              debt_id: (latestDebt as { id: string } | null)?.id ?? null,
+              message: text,
+            })
+
+            const sendResult = await sendWhatsAppMessage({ to: phoneRaw, message: autoReply })
+
+            await supabase.from('messages').insert({
+              company_id: (customer as { company_id: string }).company_id,
+              customer_id: (customer as { id: string }).id,
+              debt_id: (latestDebt as { id: string } | null)?.id ?? null,
+              channel: 'whatsapp',
+              direction: 'outbound',
+              content: autoReply,
+              status: sendResult.status === 'sent' ? 'sent' : 'failed',
+              whatsapp_message_id: sendResult.message_id ?? null,
+              sent_at: new Date().toISOString(),
+              metadata: { provider: 'evolution_ai_auto_reply', error: sendResult.error ?? null },
+            })
           }
         }
       }
@@ -253,6 +276,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
 
 
 
