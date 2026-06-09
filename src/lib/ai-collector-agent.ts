@@ -25,16 +25,16 @@ type HistoryItem = {
   content: string
 }
 
-function normalize(text: string) {
+function norm(text: string) {
   return String(text ?? '').trim().toLowerCase()
 }
 
-function includesAny(text: string, words: string[]) {
-  const value = normalize(text)
-  return words.some(word => value.includes(word.toLowerCase()))
+function hasAny(text: string, words: string[]) {
+  const v = norm(text)
+  return words.some(w => v.includes(w.toLowerCase()))
 }
 
-function isConversationCloser(text: string) {
+function isCloser(text: string) {
   return /^(تمام|تم|اوكي|أوكي|ok|okay|خلاص|ماشي|طيب|يعطيك العافية|شكرا|شكراً|thanks|thank you)$/i.test(text.trim())
 }
 
@@ -50,74 +50,51 @@ function cleanReply(reply: string) {
     .trim()
 }
 
-function looksRobotic(reply: string) {
-  const bad = [
+function detectSignals(text: string) {
+  return {
+    paymentClaim: hasAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']),
+    dispute: hasAny(text, ['غلط', 'اعتراض', 'مو صحيح', 'ما اعرف', 'ما أعرف', 'not mine', 'wrong amount']),
+    installment: hasAny(text, ['تقسيط', 'اقساط', 'أقساط', 'installment', 'installments']),
+    promise: hasAny(text, ['بسدد', 'اسدد', 'بسددها', 'نهاية الشهر', 'بكرة', 'بكره', 'الخميس', 'الراتب', 'salary', 'tomorrow']),
+    hardship: hasAny(text, ['ما عندي', 'ظروف', 'فلوس', 'راتب', 'متعسر', 'ما اقدر', 'ما أقدر']),
+    angry: hasAny(text, ['ازعاج', 'ازعجتونا', 'شكوى', 'محامي', 'بلاغ', 'court', 'lawyer', 'complaint']),
+    wrongNumber: hasAny(text, ['الرقم غلط', 'ما يخصني', 'مو رقمي', 'wrong number']),
+  }
+}
+
+function lastOutbound(history: HistoryItem[]) {
+  return [...history].reverse().find(m => m.direction === 'outbound')?.content ?? ''
+}
+
+function previousOutboundTexts(history: HistoryItem[]) {
+  return history.filter(m => m.direction === 'outbound').slice(-5).map(m => String(m.content ?? ''))
+}
+
+function isRobotic(reply: string) {
+  return hasAny(reply, [
     'أنا هنا للمساعدة',
-    'إذا كان لديك أي استفسار',
-    'إذا عندك أي استفسار',
     'كيف أقدر أساعدك',
     'كيف أقدر أخدمك',
-    'يسعدني مساعدتك',
+    'إذا عندك أي استفسار',
     'شكراً لتواصلك',
     'عميلنا العزيز',
     'عزيزي العميل',
     'يرجى التكرم',
     'نود إشعاركم',
     'نفيدكم',
-    'تم استلام رسالتك',
-    'سيتم التعامل معها',
     'خطة سداد',
-    'نرتب لك خطة',
+    'نرتب لك',
     'نقدر نرتب',
-  ]
-
-  return bad.some(x => reply.includes(x))
+  ])
 }
 
-function tooSimilar(reply: string, history: HistoryItem[]) {
-  const previous = history
-    .filter(m => m.direction === 'outbound')
-    .slice(-4)
-    .map(m => String(m.content ?? '').replace(/\s+/g, ' ').trim())
-
-  const core = reply.replace(/\s+/g, ' ').trim().slice(0, 35)
-  if (!core) return false
-
-  return previous.some(p => {
-    const previousCore = p.slice(0, 35)
-    return previousCore && (p.includes(core) || core.includes(previousCore))
+function isRepeated(reply: string, history: HistoryItem[]) {
+  const r = reply.replace(/\s+/g, ' ').trim()
+  if (!r) return false
+  return previousOutboundTexts(history).some(p => {
+    const old = p.replace(/\s+/g, ' ').trim()
+    return old && (old.includes(r.slice(0, 35)) || r.includes(old.slice(0, 35)))
   })
-}
-
-function detectLocalSignal(text: string): CollectorDecision | null {
-  if (includesAny(text, ['تقسيط', 'اقساط', 'أقساط', 'installment', 'installments'])) {
-    return {
-      shouldReply: true,
-      action: 'record_installment_request',
-      reason: 'customer_requested_installment',
-      message: 'تم تسجيل طلبك ورفعه للمراجعة حسب سياسة الجهة.',
-    }
-  }
-
-  if (includesAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'receipt', 'paid', 'transfer'])) {
-    return {
-      shouldReply: true,
-      action: 'request_proof',
-      reason: 'customer_claimed_payment',
-      message: 'أرسل الإيصال هنا، وبنراجع السداد على الملف.',
-    }
-  }
-
-  if (includesAny(text, ['غلط', 'اعتراض', 'مو صحيح', 'ما اعرف', 'ما أعرف', 'not mine', 'wrong amount'])) {
-    return {
-      shouldReply: true,
-      action: 'record_dispute',
-      reason: 'customer_disputed_debt',
-      message: 'وضح لي سبب الاعتراض أو أرسل الإثبات عشان نرفعه للمراجعة.',
-    }
-  }
-
-  return null
 }
 
 export async function runCollectorAgent(args: {
@@ -129,23 +106,15 @@ export async function runCollectorAgent(args: {
 }): Promise<CollectorDecision> {
   const text = args.message.trim()
   const history = args.conversation_history ?? []
+  const lastAgentMessage = lastOutbound(history)
+  const signals = detectSignals(text)
 
-  if (isConversationCloser(text)) {
-    return {
-      shouldReply: false,
-      action: 'close_conversation',
-      reason: 'customer_closed_or_acknowledged',
-      message: '',
-    }
+  if (isCloser(text)) {
+    return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
   }
 
-  if (isGreeting(text)) {
-    return {
-      shouldReply: true,
-      action: 'reply',
-      reason: 'greeting',
-      message: 'وعليكم السلام',
-    }
+  if (isGreeting(text) && history.length <= 2) {
+    return { shouldReply: true, action: 'reply', reason: 'fresh_greeting', message: 'وعليكم السلام' }
   }
 
   const debtContext = await buildCustomerDebtContext({
@@ -155,54 +124,48 @@ export async function runCollectorAgent(args: {
   })
 
   const customerBrain = buildCustomerBrain(debtContext)
-  const localSignal = detectLocalSignal(text)
-
-  if (localSignal) {
-    return localSignal
-  }
 
   if (!process.env.OPENAI_API_KEY) {
-    return {
-      shouldReply: true,
-      action: 'reply',
-      reason: 'fallback_no_openai',
-      message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.',
-    }
+    return { shouldReply: true, action: 'reply', reason: 'fallback_no_openai', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const ai = await client.chat.completions.create({
     model: 'gpt-4o',
-    temperature: 0.35,
+    temperature: 0.28,
     max_tokens: 260,
     response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
         content: `
-You are an expert Saudi debt collection agent speaking on WhatsApp.
+You are a senior Saudi debt collector on WhatsApp with strong conversation skills.
 
-Core behavior:
-- Act like a real professional collector, not a chatbot.
-- Understand the full customer history before replying.
-- Do not restart the conversation from zero.
-- Do not repeat the same question.
-- Do not repeat the same answer.
-- Do not mention the debt amount in every reply.
-- Ask only one useful question when needed.
+You are NOT a bot and NOT customer service.
+
+Your job:
+- Understand the entire conversation before replying.
+- Never restart from zero.
+- Never repeat the same question.
+- Never repeat the same answer.
+- If the customer answered your previous question, move forward.
+- If the customer gives a reason, acknowledge it and decide the next useful step.
+- Do not keep asking for "reason or proof" after the customer already gave a reason.
+- Do not mention the amount every time.
+- Do not ask multiple questions.
 - Reply in the customer's language.
-- If the customer writes Arabic, reply in natural Saudi Arabic, not formal Arabic.
-- If the customer writes English, Urdu, or another language, reply in that language.
-- Keep the reply short: one or two sentences.
-- Do not use customer-service phrases.
-- Do not say: I am here to help, how can I help you, dear customer, thank you for contacting us.
-- Never offer installments, payment plans, or discounts by yourself.
-- If the customer requests installments, do not approve or reject; say the request is recorded for review according to policy.
-- If the customer says they paid, ask for the receipt.
-- If the customer disputes the debt, ask for the reason or proof.
-- If the customer only acknowledges or closes the chat, do not reply.
-- If enough context exists, move the conversation forward instead of asking basic questions again.
+- If Arabic, use natural Saudi Arabic, not formal Arabic.
+- Keep it short: one or two human sentences.
+- Be firm, calm, persuasive, and professional.
+- No robotic phrases.
+- No "dear customer", no "how can I help", no "I am here to help".
+- Never offer installments or payment plans yourself.
+- If customer requests installments: record it for review only, no approval and no rejection.
+- If customer says paid: ask for receipt unless receipt was already discussed.
+- If customer disputes: handle the specific objection, do not repeat generic dispute wording.
+- If customer is angry: calm briefly then move to the file.
+- If conversation is done, stay silent.
 
 Return JSON only:
 {
@@ -216,19 +179,26 @@ Return JSON only:
       {
         role: 'user',
         content: `
-Conversation history:
-${JSON.stringify(history, null, 2)}
-
 Current customer message:
 ${text}
+
+Detected signals:
+${JSON.stringify(signals, null, 2)}
+
+Last agent message:
+${lastAgentMessage}
+
+Conversation history:
+${JSON.stringify(history, null, 2)}
 
 Customer Brain:
 ${JSON.stringify(customerBrain, null, 2)}
 
-Customer and debt context:
+Full customer/debt context:
 ${JSON.stringify(debtContext, null, 2)}
 
-Make the best collector decision and write the WhatsApp reply only if a reply is needed.
+Important:
+If the last agent message was a question and the customer just answered it, do not ask the same question again. Move the conversation forward naturally.
         `.trim(),
       },
     ],
@@ -239,27 +209,19 @@ Make the best collector decision and write the WhatsApp reply only if a reply is
   try {
     parsed = JSON.parse(ai.choices[0]?.message?.content ?? '{}')
   } catch {
-    parsed = {
-      shouldReply: true,
-      action: 'reply',
-      reason: 'invalid_ai_json',
-      message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.',
-    }
+    parsed = { shouldReply: true, action: 'reply', reason: 'invalid_json', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
-  parsed.message = cleanReply(String(parsed.message ?? ''))
+  parsed.message = cleanReply(parsed.message)
 
   if (!parsed.shouldReply || !parsed.message.trim()) {
     return { ...parsed, shouldReply: false, message: '' }
   }
 
-  if (looksRobotic(parsed.message) || tooSimilar(parsed.message, history)) {
-    return {
-      shouldReply: true,
-      action: 'pressure',
-      reason: 'guardrail_rewrite_needed',
-      message: 'خلنا نمشيها بخطوة واضحة بدل ما يظل الملف مفتوح.',
-    }
+  if (isRobotic(parsed.message) || isRepeated(parsed.message, history)) {
+    parsed.message = 'وصلت النقطة، بنثبتها على الملف ونمشي بالإجراء المناسب بدل تكرار نفس الكلام.'
+    parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+    parsed.reason = 'anti_repetition_guard'
   }
 
   return parsed
