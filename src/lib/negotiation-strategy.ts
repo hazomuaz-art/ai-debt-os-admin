@@ -1,55 +1,111 @@
 ﻿import type { CustomerIntent } from './negotiation-intent'
 
 export type NegotiationStrategy =
+  | "greet"
   | "close_payment"
-  | "offer_installment"
-  | "calm_and_resolve"
-  | "persuade_and_reframe"
-  | "answer_and_redirect"
+  | "verify_payment"
+  | "review_installment"
+  | "handle_hardship"
+  | "handle_delay"
+  | "handle_dispute"
+  | "handle_wrong_number"
+  | "deescalate"
+  | "persuade"
+  | "inform_and_progress"
+  | "secure_commitment"
   | "human_review"
 
 export function chooseNegotiationStrategy(intent: CustomerIntent) {
   switch (intent) {
+    case "greeting":
+      return {
+        strategy: "greet" as NegotiationStrategy,
+        tone: "friendly",
+        goal: "Start conversation naturally"
+      }
+
     case "payment_intent":
       return {
         strategy: "close_payment" as NegotiationStrategy,
         tone: "confident",
-        goal: "Move customer to immediate payment confirmation"
+        goal: "Move directly toward payment completion"
+      }
+
+    case "paid_claim":
+      return {
+        strategy: "verify_payment" as NegotiationStrategy,
+        tone: "professional",
+        goal: "Obtain proof of payment"
       }
 
     case "installment_request":
       return {
-        strategy: "offer_installment" as NegotiationStrategy,
-        tone: "cooperative",
-        goal: "Offer structured payment plan and secure promise date"
+        strategy: "review_installment" as NegotiationStrategy,
+        tone: "practical",
+        goal: "Collect information for installment review"
       }
 
-    case "complaint":
+    case "hardship":
       return {
-        strategy: "calm_and_resolve" as NegotiationStrategy,
-        tone: "empathetic",
-        goal: "Acknowledge complaint and reduce tension"
+        strategy: "handle_hardship" as NegotiationStrategy,
+        tone: "understanding",
+        goal: "Understand capacity and secure realistic commitment"
+      }
+
+    case "delay":
+      return {
+        strategy: "handle_delay" as NegotiationStrategy,
+        tone: "firm",
+        goal: "Convert delay into a concrete date or action"
+      }
+
+    case "dispute":
+      return {
+        strategy: "handle_dispute" as NegotiationStrategy,
+        tone: "objective",
+        goal: "Review claim and request supporting information"
+      }
+
+    case "wrong_number":
+      return {
+        strategy: "handle_wrong_number" as NegotiationStrategy,
+        tone: "professional",
+        goal: "Verify and update contact details"
+      }
+
+    case "angry":
+      return {
+        strategy: "deescalate" as NegotiationStrategy,
+        tone: "calm",
+        goal: "Reduce tension and move conversation forward"
       }
 
     case "refusal":
       return {
-        strategy: "persuade_and_reframe" as NegotiationStrategy,
+        strategy: "persuade" as NegotiationStrategy,
         tone: "firm_but_respectful",
-        goal: "Reframe consequences and offer realistic settlement path"
+        goal: "Understand objection and progress toward resolution"
       }
 
     case "information_request":
       return {
-        strategy: "answer_and_redirect" as NegotiationStrategy,
+        strategy: "inform_and_progress" as NegotiationStrategy,
         tone: "clear",
-        goal: "Answer question then guide customer to payment action"
+        goal: "Answer question and advance the case"
+      }
+
+    case "promise":
+      return {
+        strategy: "secure_commitment" as NegotiationStrategy,
+        tone: "focused",
+        goal: "Capture exact promise details"
       }
 
     default:
       return {
         strategy: "human_review" as NegotiationStrategy,
         tone: "careful",
-        goal: "Avoid wrong response and ask for clarification"
+        goal: "Gather more context safely"
       }
   }
 }
