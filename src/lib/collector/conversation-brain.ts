@@ -8,6 +8,8 @@ export type ConversationTurn = {
 export type CollectorBrainInput = {
   message: string
   history: ConversationTurn[]
+  customerContext?: unknown
+  debtContext?: unknown
 }
 
 export type CollectorBrainOutput = {
@@ -16,150 +18,6 @@ export type CollectorBrainOutput = {
   intent: string
   action: string
   confidence: number
-}
-
-function isCloser(text: string) {
-  const value = text.trim().toLowerCase()
-
-  return [
-    'تمام',
-    'تم',
-    'خلاص',
-    'اوكي',
-    'أوكي',
-    'ok',
-    'okay',
-    'شكرا',
-    'شكراً',
-    'thanks',
-  ].includes(value)
-}
-
-function isGreeting(text: string) {
-  const value = text.trim().toLowerCase()
-
-  return (
-    value.includes('السلام') ||
-    value.includes('سلام') ||
-    value.includes('مرحبا') ||
-    value.includes('هلا') ||
-    value.includes('مساء الخير') ||
-    value.includes('صباح الخير') ||
-    value === 'hi' ||
-    value === 'hello'
-  )
-}
-
-function detectIntent(text: string) {
-  const value = text.toLowerCase()
-
-  if (isGreeting(text)) return 'greeting'
-  if (isCloser(text)) return 'close'
-
-  if (
-    value.includes('سددت') ||
-    value.includes('دفعت') ||
-    value.includes('حولت') ||
-    value.includes('إيصال') ||
-    value.includes('ايصال')
-  ) {
-    return 'payment_claim'
-  }
-
-  if (
-    value.includes('تقسيط') ||
-    value.includes('أقساط') ||
-    value.includes('اقساط')
-  ) {
-    return 'installment_request'
-  }
-
-  if (
-    value.includes('حقت شنو') ||
-    value.includes('وش المديونية') ||
-    value.includes('سبب المديونية') ||
-    value.includes('المبلغ وش')
-  ) {
-    return 'debt_explanation'
-  }
-
-  if (
-    value.includes('بسدد') ||
-    value.includes('نهاية الشهر') ||
-    value.includes('بكرة') ||
-    value.includes('الراتب')
-  ) {
-    return 'promise_to_pay'
-  }
-
-  return 'general'
-}
-
-function buildDecision(intent: string): CollectorBrainOutput {
-  switch (intent) {
-    case 'greeting':
-      return {
-        shouldReply: true,
-        reply: 'هلا، وصلتني رسالتك.',
-        intent,
-        action: 'reply',
-        confidence: 0.9,
-      }
-
-    case 'close':
-      return {
-        shouldReply: false,
-        reply: '',
-        intent,
-        action: 'silent',
-        confidence: 1,
-      }
-
-    case 'payment_claim':
-      return {
-        shouldReply: true,
-        reply: 'أرسل الإيصال وبنراجعه على الملف.',
-        intent,
-        action: 'request_receipt',
-        confidence: 0.9,
-      }
-
-    case 'installment_request':
-      return {
-        shouldReply: true,
-        reply: 'طلب التقسيط بنرفعه للمراجعة ونفيدك بالنتيجة.',
-        intent,
-        action: 'record_installment_request',
-        confidence: 0.9,
-      }
-
-    case 'debt_explanation':
-      return {
-        shouldReply: true,
-        reply: 'بنعرض لك تفاصيل المديونية من الملف ونوضح سبب المطالبة.',
-        intent,
-        action: 'explain_debt',
-        confidence: 0.9,
-      }
-
-    case 'promise_to_pay':
-      return {
-        shouldReply: true,
-        reply: 'تم تسجيل الوعد بالسداد.',
-        intent,
-        action: 'record_promise',
-        confidence: 0.9,
-      }
-
-    default:
-      return {
-        shouldReply: true,
-        reply: 'وصلت رسالتك وبنراجع الملف.',
-        intent,
-        action: 'reply',
-        confidence: 0.5,
-      }
-  }
 }
 
 export async function runCollectorConversationBrain(
@@ -177,7 +35,90 @@ export async function runCollectorConversationBrain(
     }
   }
 
-  const intent = detectIntent(message)
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      shouldReply: true,
+      reply: 'وصلت رسالتك، بنراجع الملف ونرد عليك.',
+      intent: 'fallback',
+      action: 'human_review',
+      confidence: 0.4,
+    }
+  }
 
-  return buildDecision(intent)
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+  const ai = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    temperature: 0.18,
+    max_tokens: 350,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: `
+You are a senior Saudi debt collector, not a chatbot and not customer service.
+
+Understand the full conversation before replying.
+Do not restart from zero.
+Do not repeat the same question.
+Do not repeat the same answer.
+Do not use formal Arabic.
+Reply only in natural spoken Saudi Arabic.
+Do not use robotic phrases.
+Do not use "dear customer", "how can I help", "I am here to help", or similar.
+Do not ask for payment before explaining the debt if the customer asks about the amount, source, or reason.
+Use only the provided customer and debt context. Never invent details.
+If details are missing, say the file needs review.
+If customer promises a payment date, record it and do not ask the same question again.
+If customer says paid, ask for receipt only if not already provided.
+If receipt is mentioned, say it will be reviewed and do not mark the debt as closed.
+If customer asks for installments, record it for review only.
+If customer is angry, calm briefly and return to the file.
+If customer closes the conversation, do not reply.
+
+Return JSON only:
+{
+  "shouldReply": true,
+  "reply": "short WhatsApp reply or empty",
+  "intent": "short_intent",
+  "action": "reply|silent|explain_debt|record_promise|request_receipt|record_dispute|record_installment_request|human_review",
+  "confidence": 0.9
+}
+        `.trim(),
+      },
+      {
+        role: 'user',
+        content: JSON.stringify(
+          {
+            currentMessage: input.message,
+            conversationHistory: input.history,
+            customerContext: input.customerContext ?? null,
+            debtContext: input.debtContext ?? null,
+          },
+          null,
+          2
+        ),
+      },
+    ],
+  })
+
+  try {
+    const parsed = JSON.parse(ai.choices[0]?.message?.content ?? '{}') as Partial<CollectorBrainOutput>
+
+    return {
+      shouldReply: Boolean(parsed.shouldReply),
+      reply: String(parsed.reply ?? '').trim(),
+      intent: String(parsed.intent ?? 'unknown'),
+      action: String(parsed.action ?? 'reply'),
+      confidence: Number(parsed.confidence ?? 0.5),
+    }
+  } catch {
+    return {
+      shouldReply: true,
+      reply: 'وصلت رسالتك، بنراجع الملف ونرد عليك.',
+      intent: 'invalid_json',
+      action: 'human_review',
+      confidence: 0.3,
+    }
+  }
 }
