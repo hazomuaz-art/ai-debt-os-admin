@@ -79,6 +79,27 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .order('created_at', { ascending: false })
     .limit(5)
 
+  const { data: collectionFollowups } = await supabase
+    .from('collection_followups')
+    .select('id, original_status, original_sub_status, normalized_status, collector_name, customer_statement, collector_note, result_summary, occurred_at')
+    .eq('debt_id', debt.id)
+    .order('occurred_at', { ascending: false })
+    .limit(8)
+
+  const { data: collectionStatusHistory } = await supabase
+    .from('collection_status_history')
+    .select('id, old_status, old_sub_status, new_status, new_sub_status, normalized_status, changed_by_name, changed_at')
+    .eq('debt_id', debt.id)
+    .order('changed_at', { ascending: false })
+    .limit(8)
+
+  const { data: collectionAssignments } = await supabase
+    .from('collection_assignments')
+    .select('id, assigned_to_name, assigned_by_name, assignment_status, assigned_at, released_at')
+    .eq('debt_id', debt.id)
+    .order('assigned_at', { ascending: false })
+    .limit(5)
+
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
   return (
@@ -407,6 +428,66 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             )}
           </div>
 
+          {/* Collection Intelligence */}
+          <div className="card">
+            <h2 className="text-lg font-semibold font-syne mb-4">Collection Intelligence</h2>
+
+            {collectionFollowups?.length ? (
+              <div className="space-y-3 mb-5">
+                <p className="text-xs text-slate-400">Latest Followups</p>
+                {collectionFollowups.map((f: any) => (
+                  <div key={f.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{f.original_status || f.normalized_status || 'Followup'}</span>
+                      <span className="text-xs text-slate-500">{formatDate(f.occurred_at)}</span>
+                    </div>
+                    {f.original_sub_status && <p className="text-xs text-slate-400 mt-1">{f.original_sub_status}</p>}
+                    {f.customer_statement && <p className="text-xs text-slate-300 mt-2">Customer: {f.customer_statement}</p>}
+                    {f.collector_note && <p className="text-xs text-slate-400 mt-1">Note: {f.collector_note}</p>}
+                    {f.result_summary && <p className="text-xs text-brand-300 mt-1">{f.result_summary}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm mb-4">No collection followups yet.</p>
+            )}
+
+            {collectionStatusHistory?.length ? (
+              <div className="space-y-3 mb-5">
+                <p className="text-xs text-slate-400">Status History</p>
+                {collectionStatusHistory.map((s: any) => (
+                  <div key={s.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{s.new_status}</span>
+                      <span className="text-xs text-slate-500">{formatDate(s.changed_at)}</span>
+                    </div>
+                    {s.new_sub_status && <p className="text-xs text-slate-400 mt-1">{s.new_sub_status}</p>}
+                    {s.old_status && <p className="text-xs text-slate-500 mt-1">From: {s.old_status}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm mb-4">No status history yet.</p>
+            )}
+
+            {collectionAssignments?.length ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400">Assignments</p>
+                {collectionAssignments.map((a: any) => (
+                  <div key={a.id} className="border border-surface-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{a.assigned_to_name || 'Unassigned'}</span>
+                      <span className="text-xs text-slate-500">{a.assignment_status || 'assignment'}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{formatDate(a.assigned_at)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">No assignment history yet.</p>
+            )}
+          </div>
+
           {/* Customer 360: Timeline */}
           <div className="card">
             <h2 className="text-lg font-semibold font-syne mb-4">Recent Timeline</h2>
@@ -433,6 +514,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     </div>
   )
 }
+
 
 
 
