@@ -58,6 +58,12 @@ export async function generateWhatsappAutoReply(args: {
   if (!text) return ''
   if (isClose(text)) return ''
 
+  if (/^(السلام عليكم|سلام عليكم|السلام عليكم ورحمة الله|هلا|مرحبا|hi|hello)$/i.test(text)) {
+    return text.toLowerCase() === 'hi' || text.toLowerCase() === 'hello'
+      ? 'Hello'
+      : 'وعليكم السلام'
+  }
+
   const debtContext = await buildCustomerDebtContext({
     company_id: args.company_id,
     customer_id: args.customer_id,
@@ -160,3 +166,4 @@ Write the best next WhatsApp reply.
 
   return reply
 }
+
