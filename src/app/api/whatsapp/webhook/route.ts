@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
@@ -11,7 +11,7 @@ const log = createLogger('webhook/whatsapp')
 function verifySignature(body: string, signature: string | null): boolean {
   const appSecret = process.env.APP_SECRET
   if (!appSecret) {
-    log.warn('APP_SECRET not set Ã¢â‚¬â€ skipping signature verification')
+    log.warn('APP_SECRET not set â€” skipping signature verification')
     return true
   }
   if (!signature) return false
@@ -37,12 +37,12 @@ export async function GET(request: NextRequest) {
     return new NextResponse(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } })
   }
 
-  log.warn('Webhook verification failed Ã¢â‚¬â€ token mismatch')
+  log.warn('Webhook verification failed â€” token mismatch')
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 }
 
 export async function POST(request: NextRequest) {
-  // Always return 200 Ã¢â‚¬â€ Meta retries on non-200 responses
+  // Always return 200 â€” Meta retries on non-200 responses
   try {
     const rawBody   = await request.text()
     const signature = request.headers.get('x-hub-signature-256')
@@ -122,6 +122,21 @@ export async function POST(request: NextRequest) {
               metadata: { provider: 'evolution', from: phoneRaw, remoteJid },
             })
 
+            await supabase.from('collection_followups').upsert({
+              company_id: (customer as { company_id: string }).company_id,
+              customer_id: (customer as { id: string }).id,
+              debt_id: (latestDebt as { id: string } | null)?.id ?? null,
+              source_system: 'whatsapp_evolution',
+              external_followup_id: String(evo.data.key.id ?? ''),
+              followup_type: 'customer_message',
+              followup_channel: 'whatsapp',
+              customer_statement: text,
+              result_summary: 'Inbound WhatsApp message received',
+              occurred_at: new Date(Number(evo.data.messageTimestamp ?? Date.now() / 1000) * 1000).toISOString(),
+              raw_payload: { provider: 'evolution', from: phoneRaw, remoteJid, message_id: String(evo.data.key.id ?? ''), message: text },
+            }, { onConflict: 'company_id,source_system,external_followup_id' })
+
+
             processEvent({
               source: 'webhook_evolution',
               company_id: (customer as { company_id: string }).company_id,
@@ -175,7 +190,7 @@ export async function POST(request: NextRequest) {
     // Process inbound messages
     for (const msg of messages) {
       try {
-        // Idempotency Ã¢â‚¬â€ skip if already processed
+        // Idempotency â€” skip if already processed
         const { error: dupErr } = await supabase
           .from('webhook_events')
           .insert({ provider: 'whatsapp', event_id: msg.id, event_type: 'message', payload: msg as unknown as Record<string, unknown> })
@@ -276,6 +291,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
 
 
 
