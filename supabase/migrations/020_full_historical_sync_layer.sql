@@ -1,4 +1,4 @@
-﻿-- MIGRATION 020: Full Historical Sync Layer + Dynamic Status Mapping
+-- MIGRATION 020: Full Historical Sync Layer + Dynamic Status Mapping
 
 -- 1) Store original statuses from any collection system without losing them
 CREATE TABLE IF NOT EXISTS public.collection_status_mappings (

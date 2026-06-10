@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { processEvent } from '@/lib/automation-pipeline'
+// import { processEvent } from '@/lib/automation-pipeline'
 
 type IncomingPayload = {
   event_type?: string
@@ -509,14 +509,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (debtId) {
-      await processEvent({
-        company_id: companyId,
-        debt_id: debtId,
-        source: 'api_sync',
-        event_type: payload.event_type || 'collection_sync',
-      } as any)
-    }
+    // processEvent disabled during sync endpoint test
 
     return NextResponse.json({
       success: true,
@@ -547,3 +540,4 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
