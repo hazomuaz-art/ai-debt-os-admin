@@ -54,6 +54,38 @@ function saysNoProof(text: string) {
   return hasAny(text, ['ما عندي', 'ماعندي', 'ما عندي شي', 'ما عندي اثبات', 'ما عندي إثبات', 'قلت ما عندي'])
 }
 
+
+function refusesToPay(text: string) {
+  const patterns = [
+    '\u0645\u0627 \u0631\u0627\u062d \u0627\u0633\u062f\u062f',
+    '\u0645\u0627\u0631\u0627\u062d \u0627\u0633\u062f\u062f',
+    '\u0645\u0631\u0627\u062d \u0627\u0633\u062f\u062f',
+    '\u0645\u0627 \u0628\u0633\u062f\u062f',
+    '\u0645\u0627 \u0627\u062f\u0641\u0639',
+    '\u0645\u0627 \u0631\u0627\u062d \u0627\u062f\u0641\u0639',
+    '\u0644\u0646 \u0627\u0633\u062f\u062f',
+    '\u0645\u0627\u0646\u064a \u0645\u0633\u062f\u062f',
+    '\u0645\u0648 \u0645\u0633\u062f\u062f',
+    '\u0645\u0627 \u0628\u0633\u0648\u064a \u0633\u062f\u0627\u062f',
+    '\u0642\u0644\u062a \u0644\u0643\u0645',
+    '\u0642\u0628\u0644 \u0634\u0648\u064a',
+  ]
+  return hasAny(text, patterns)
+}
+
+function courtEscalation(text: string) {
+  const patterns = [
+    '\u0645\u062d\u0643\u0645\u0647',
+    '\u0645\u062d\u0643\u0645\u0629',
+    '\u062d\u0648\u0644\u0647\u0627 \u0644\u0644\u0645\u062d\u0643\u0645\u0647',
+    '\u062d\u0648\u0644\u0648\u0647\u0627 \u0644\u0644\u0645\u062d\u0643\u0645\u0647',
+    '\u0627\u0631\u0641\u0639\u0648\u0647\u0627 \u0644\u0644\u0645\u062d\u0643\u0645\u0647',
+    '\u0642\u0636\u064a\u0647',
+    '\u0642\u0636\u064a\u0629',
+    '\u0633\u0648\u0648\u0627 \u0627\u0644\u0644\u064a \u062a\u0628\u0648\u0646',
+  ]
+  return hasAny(text, patterns)
+}
 function askedProofBefore(history: HistoryItem[]) {
   return outboundTexts(history).some(t => hasAny(t, ['أرسل', 'ارسل', 'إثبات', 'اثبات', 'مستند', 'دليل']))
 }
@@ -66,10 +98,12 @@ function repeatedMeaning(current: string, history: HistoryItem[]) {
   const inbounds = inboundTexts(history).slice(-6)
   const disputeCount = inbounds.filter(disputes).length + (disputes(current) ? 1 : 0)
   const noProofCount = inbounds.filter(saysNoProof).length + (saysNoProof(current) ? 1 : 0)
+  const refusalCount = inbounds.filter(t => refusesToPay(t) || courtEscalation(t)).length + ((refusesToPay(current) || courtEscalation(current)) ? 1 : 0)
 
   return {
     repeatedDispute: disputeCount >= 2,
     repeatedNoProof: noProofCount >= 2,
+    repeatedRefusal: refusalCount >= 2,
   }
 }
 
@@ -143,6 +177,10 @@ function finalGuard(args: {
 
   if (!reply) return ''
   if (robotic(reply)) return ''
+
+  if ((refusesToPay(args.current) || courtEscalation(args.current) || repeated.repeatedRefusal)) {
+    return 'واضح إنك رافض السداد حالياً. بنسجل موقفك على الملف ونحوّله للمراجعة بدل ما نكرر نفس الرد عليك.'
+  }
 
   if (asksDebtDetails(args.current)) {
     const alreadyExplainedDebt = outboundTexts(args.history).some(t =>
@@ -284,4 +322,6 @@ Return JSON only:
     debtContext,
   })
 }
+
+
 
