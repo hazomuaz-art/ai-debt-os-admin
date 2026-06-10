@@ -1,5 +1,6 @@
-import OpenAI from 'openai'
+﻿import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
+import { generateNegotiationResponse } from '@/lib/negotiation-response'
 
 type HistoryItem = {
   direction: string
@@ -10,59 +11,38 @@ function normalize(text: string) {
   return String(text ?? '').trim().toLowerCase()
 }
 
-function hasAny(text: string, words: string[]) {
+function isClose(text: string) {
   const value = normalize(text)
-  return words.some(word => value.includes(word.toLowerCase()))
+  return ['تمام', 'تم', 'خلاص', 'اوكي', 'أوكي', 'ok', 'okay', 'شكرا', 'شكراً', 'thanks'].includes(value)
 }
 
-function isGreeting(text: string) {
-  return hasAny(text, ['السلام', 'سلام', 'هلا', 'مرحبا', 'مساء الخير', 'صباح الخير', 'hi', 'hello'])
-}
-
-function isCloser(text: string) {
-  const value = normalize(text)
-  return ['تمام', 'تم', 'اوكي', 'أوكي', 'ok', 'okay', 'خلاص', 'شكرا', 'شكراً', 'thanks'].includes(value)
-}
-
-function asksDebtDetails(text: string) {
-  return hasAny(text, [
-    'مبلغ وش',
-    'مديونية وش',
-    'حقت شنو',
-    'حقت ايش',
-    'من وين',
-    'وش المبلغ',
-    'ايش المبلغ',
-    'سبب المديونية',
-    'ما اعرف الجهة',
-    'ما أعرف الجهة',
-  ])
-}
-
-function lastOutbound(history: HistoryItem[]) {
-  return [...history].reverse().find(m => m.direction === 'outbound')?.content ?? ''
-}
-
-function previousOutbound(history: HistoryItem[]) {
-  return history.filter(m => m.direction === 'outbound').slice(-6).map(m => String(m.content ?? ''))
-}
-
-function repeated(reply: string, history: HistoryItem[]) {
-  const r = reply.replace(/\s+/g, ' ').trim()
-  if (!r) return false
-
-  return previousOutbound(history).some(oldText => {
-    const old = oldText.replace(/\s+/g, ' ').trim()
-    return old && (old.includes(r.slice(0, 35)) || r.includes(old.slice(0, 35)))
-  })
-}
-
-function clean(reply: string) {
+function cleanReply(reply: string) {
   return String(reply ?? '')
-    .replace(/أخوي[،,\s]*/g, '')
     .replace(/عزيزي العميل[،,\s]*/g, '')
     .replace(/عميلنا العزيز[،,\s]*/g, '')
+    .replace(/أخوي[،,\s]*/g, '')
+    .replace(/نفهم موقفك/g, 'واضح كلامك')
+    .replace(/لا تزال قائمة/g, 'لسه ظاهرة عندنا')
+    .replace(/سنقوم/g, 'بنقوم')
+    .replace(/سيتم/g, 'بنتم')
+    .replace(/سوف/g, '')
+    .replace(/يرجى/g, '')
+    .replace(/نفيدكم/g, '')
+    .replace(/نود/g, '')
     .trim()
+}
+
+function isRepeated(reply: string, history: HistoryItem[]) {
+  const current = reply.replace(/\s+/g, ' ').trim()
+  if (!current) return false
+
+  return history
+    .filter(m => m.direction === 'outbound')
+    .slice(-8)
+    .some(m => {
+      const old = String(m.content ?? '').replace(/\s+/g, ' ').trim()
+      return old && (old.includes(current.slice(0, 40)) || current.includes(old.slice(0, 40)))
+    })
 }
 
 export async function generateWhatsappAutoReply(args: {
@@ -74,13 +54,9 @@ export async function generateWhatsappAutoReply(args: {
 }) {
   const text = args.message.trim()
   const history = args.conversation_history ?? []
-  const lastAgentMessage = lastOutbound(history)
 
-  if (isCloser(text)) return ''
-
-  if (isGreeting(text) && history.length <= 2) {
-    return 'وعليكم السلام'
-  }
+  if (!text) return ''
+  if (isClose(text)) return ''
 
   const debtContext = await buildCustomerDebtContext({
     company_id: args.company_id,
@@ -88,79 +64,99 @@ export async function generateWhatsappAutoReply(args: {
     debt_id: args.debt_id ?? null,
   })
 
+  const negotiation = generateNegotiationResponse(text)
+
   if (!process.env.OPENAI_API_KEY) {
-    return 'وصلت رسالتك، بنراجع الملف ونرد عليك بالإجراء المناسب.'
+    return negotiation.response
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const ai = await client.chat.completions.create({
     model: 'gpt-4o-mini',
-    temperature: 0.22,
-    max_tokens: 280,
+    temperature: 0.18,
+    max_tokens: 380,
     messages: [
       {
         role: 'system',
         content: `
-You are a senior Saudi WhatsApp debt collector.
+You are the only WhatsApp AI reply engine for a Saudi debt collection system.
 
-Core rules:
-- Understand the full conversation before replying.
+Identity:
+- You are not a customer service bot.
+- You are an experienced Saudi WhatsApp debt collector.
+- You read the customer file and continue the same conversation.
+- You understand before replying.
+- You are short, practical, firm, respectful, and human.
+
+Language:
+- If customer writes Arabic, reply only in natural Saudi spoken Arabic.
+- Never use formal Arabic.
+- Never use robotic or customer-service wording.
+- Never write: يرجى, نفيدكم, نود, سيتم, سوف يتم, عزيزي العميل, عميلنا العزيز, شكراً لتواصلك, كيف أقدر أساعدك, يسعدني مساعدتك.
+- Never write: نفهم موقفك, لا تزال قائمة, وفقاً, بناءً عليه.
+- Use simple Saudi WhatsApp wording like: طيب, واضح, خلّنا نوضحها, المبلغ ظاهر عندنا, بنراجعها, أرسل الإيصال, بنرفعها للمراجعة.
+
+Conversation intelligence:
+- Read conversation history before replying.
 - Never restart from zero.
 - Never repeat the same question.
 - Never repeat the same answer.
-- If customer answered your previous question, move forward.
-- Do not ask for payment before explaining the debt when customer asks about the amount/source/reason.
-- If customer asks "what amount / debt for what / from where", explain using available debt context first.
-- If context is missing, say the available file details are limited and it will be reviewed.
-- Never invent creditor, amount, account number, reference, due date, payment link, or bank details.
-- If customer says paid, ask for receipt unless already mentioned.
-- If receipt is mentioned or sent, say it will be reviewed. Do not close the debt automatically.
-- If customer says paid partial amount, treat it as partial payment claim, not full settlement.
-- If customer disputes, respond to the exact objection, not generic words.
-- If customer says account was closed years ago, ask for proof of closure.
-- If customer says amount is wrong, ask for supporting proof or reason.
-- If customer says no money/hardship, acknowledge and ask for one realistic next step without offering installments.
-- Never offer installments or a payment plan yourself.
-- If customer requests installments, say the request can be raised for review only.
-- If customer promises date like end of month/salary/tomorrow, confirm once and do not ask the same date again.
-- If customer is angry or threatens complaint, calm briefly and return to file review.
-- If customer says ok/thanks/done/تمام/خلاص, reply empty.
-- One useful question maximum.
-- Reply in natural Saudi Arabic.
-- One or two short sentences.
-- No robotic phrases.
-- Do not use: "أخوي", "عزيزي العميل", "كيف أقدر أساعدك", "أنا هنا للمساعدة".
+- If the customer already answered your previous question, move forward.
+- If the customer only greets, reply only: وعليكم السلام.
+- If the customer closes the conversation, return empty text.
+- Ask at most one useful question.
+- If no useful reply is needed, return empty text.
+
+Debt handling:
+- Use only CUSTOMER_DEBT_CONTEXT.
+- Never invent creditor, product, balance, reference, account number, payment link, bank account, or due date.
+- If customer asks what the debt is, explain from the available context before asking for payment.
+- If context has debt summary, use it naturally.
+- If details are missing, say: نراجع تفاصيل الملف ونوضحها لك.
+- If customer says paid, ask for receipt only if not already provided.
+- If receipt is mentioned or sent, say it will be reviewed.
+- If customer says partial payment, treat it as partial claim.
+- If customer disputes, respond to the exact objection and ask for proof only when needed.
+- If customer asks installments, say it can be raised for review only, do not approve.
+- If customer promises payment date, confirm it once and do not ask the same date again.
+- If customer is angry, calm briefly and return to file review.
+
+Output:
+- Reply with one or two short WhatsApp sentences only.
+- No bullet points.
+- No explanations about what you are doing.
+- Return only the message text or empty text.
         `.trim(),
       },
       {
         role: 'user',
         content: `
-Current customer message:
-${text}
-
-Last agent message:
-${lastAgentMessage}
-
-Conversation history:
+CONVERSATION_HISTORY:
 ${JSON.stringify(history, null, 2)}
 
-Debt context:
+LATEST_CUSTOMER_MESSAGE:
+${text}
+
+AI_CLASSIFICATION:
+Intent: ${negotiation.intent}
+Strategy: ${negotiation.strategy}
+Tone: ${negotiation.tone}
+Draft idea: ${negotiation.response}
+
+CUSTOMER_DEBT_CONTEXT:
 ${JSON.stringify(debtContext, null, 2)}
 
-Special check:
-Customer is asking debt details: ${asksDebtDetails(text) ? 'YES' : 'NO'}
-
-Write only the WhatsApp reply. If no reply is needed, return empty text.
+Write the best next WhatsApp reply.
         `.trim(),
       },
     ],
   })
 
-  const reply = clean(ai.choices[0]?.message?.content?.trim() ?? '')
+  const reply = cleanReply(ai.choices[0]?.message?.content?.trim() ?? negotiation.response)
 
   if (!reply) return ''
-  if (repeated(reply, history)) return ''
+  if (isRepeated(reply, history)) return ''
 
   return reply
 }
