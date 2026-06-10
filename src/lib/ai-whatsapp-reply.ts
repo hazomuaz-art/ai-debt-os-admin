@@ -63,6 +63,91 @@ function cleanReply(reply: string) {
     .replace(/نود/g, '')
     .trim()
 }
+function customerSaidNoProof(history: HistoryItem[], current: string) {
+  const text = [...history.map(m => m.content), current].join(' ').toLowerCase()
+  return (
+    text.includes('ما عندي') ||
+    text.includes('ماعندي') ||
+    text.includes('ما عندي شي') ||
+    text.includes('قلت ما عندي') ||
+    text.includes('ما عندي إثبات') ||
+    text.includes('ما عندي اثبات')
+  )
+}
+
+function replyAsksForProof(reply: string) {
+  const r = normalize(reply)
+  return (
+    r.includes('إثبات') ||
+    r.includes('اثبات') ||
+    r.includes('أرسل') ||
+    r.includes('ارسل') ||
+    r.includes('مستند') ||
+    r.includes('دليل')
+  )
+}
+
+function roboticReply(reply: string) {
+  return [
+    'نفهم موقفك',
+    'لا تزال قائمة',
+    'كيف أقدر أساعدك',
+    'كيف نقدر نساعدك',
+    'يرجى',
+    'نفيدكم',
+    'نود',
+    'سيتم',
+    'سوف',
+    'عميلنا العزيز',
+    'عزيزي العميل',
+  ].some(x => reply.includes(x))
+}
+
+function forceGuardReply(args: {
+  current: string
+  history: HistoryItem[]
+  reply: string
+  debtContext: any
+}) {
+  const current = normalize(args.current)
+  const reply = args.reply.trim()
+
+  if (!reply) return ''
+
+  if (looksRepeated(reply, args.history)) return ''
+
+  if (roboticReply(reply)) return ''
+
+  if (customerSaidNoProof(args.history, args.current) && replyAsksForProof(reply)) {
+    return 'طيب واضح إن ما عندك إثبات حالياً، بنرفع ملاحظتك للمراجعة ونوضح لك نتيجة الملف.'
+  }
+
+  const customerAskedDebtReason =
+    current.includes('حقت') ||
+    current.includes('سبب') ||
+    current.includes('وش') ||
+    current.includes('ايش') ||
+    current.includes('تفاصيل') ||
+    current.includes('وضح')
+
+  if (customerAskedDebtReason) {
+    const summary = args.debtContext?.summary
+    const creditor = summary?.creditor_name && summary.creditor_name !== 'Unknown' ? summary.creditor_name : null
+    const product = summary?.product_type && summary.product_type !== 'Unknown' ? summary.product_type : null
+    const balance = summary?.current_balance
+    const currency = summary?.currency ?? 'ريال'
+
+    if (creditor || product || balance) {
+      const parts = []
+      if (creditor) parts.push(`الجهة ${creditor}`)
+      if (product) parts.push(`نوعها ${product}`)
+      if (balance) parts.push(`والمبلغ الظاهر ${balance} ${currency}`)
+      return `${parts.join('، ')}. إذا فيه نقطة محددة معترض عليها قل لي عليها ونراجعها.`
+    }
+  }
+
+  return reply
+}
 
 export async function generateWhatsappAutoReply(args: {
   company_id: string
@@ -194,10 +279,15 @@ Return JSON only:
 
   if (!decision.shouldReply) return ''
 
-  const reply = cleanReply(decision.reply)
+  const reply = forceGuardReply({
+    current: text,
+    history,
+    reply: cleanReply(decision.reply),
+    debtContext,
+  })
 
   if (!reply) return ''
-  if (looksRepeated(reply, history)) return ''
 
   return reply
 }
+
