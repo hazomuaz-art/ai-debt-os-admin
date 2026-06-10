@@ -76,7 +76,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   const { data: memoryEntries } = await supabase
     .from('ai_memory')
     .select('id, trigger_pattern, response_text, category, success_rate, use_count, created_at')
-    .order('created_at', { ascending: false })
+    .eq('is_active', true)
+    .neq('source', 'imported')
+    .order('use_count', { ascending: false })
     .limit(5)
 
   const { data: collectionFollowups } = await supabase
@@ -514,6 +516,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     </div>
   )
 }
+
 
 
 
