@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+﻿import { createServiceClient } from '@/lib/supabase/server'
 
 export async function buildCustomerDebtContext(params: {
   company_id: string
@@ -38,6 +38,10 @@ export async function buildCustomerDebtContext(params: {
     { data: memory },
     { data: approvals },
     { data: alerts },
+    { data: collectionFollowups },
+    { data: statusHistory },
+    { data: assignments },
+    { data: attachments },
   ] = await Promise.all([
     supabase
       .from('payments')
@@ -110,6 +114,74 @@ export async function buildCustomerDebtContext(params: {
       .eq('is_resolved', false)
       .order('created_at', { ascending: false })
       .limit(5),
+
+    debtId
+      ? supabase
+          .from('collection_followups')
+          .select('followup_type, followup_channel, original_status, original_sub_status, normalized_status, collector_name, customer_statement, collector_note, result_summary, next_follow_up_at, occurred_at, raw_payload')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .eq('debt_id', debtId)
+          .order('occurred_at', { ascending: false })
+          .limit(30)
+      : supabase
+          .from('collection_followups')
+          .select('followup_type, followup_channel, original_status, original_sub_status, normalized_status, collector_name, customer_statement, collector_note, result_summary, next_follow_up_at, occurred_at, raw_payload')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .order('occurred_at', { ascending: false })
+          .limit(30),
+
+    debtId
+      ? supabase
+          .from('collection_status_history')
+          .select('old_status, old_sub_status, new_status, new_sub_status, normalized_status, changed_by_name, changed_at, raw_payload')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .eq('debt_id', debtId)
+          .order('changed_at', { ascending: false })
+          .limit(30)
+      : supabase
+          .from('collection_status_history')
+          .select('old_status, old_sub_status, new_status, new_sub_status, normalized_status, changed_by_name, changed_at, raw_payload')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .order('changed_at', { ascending: false })
+          .limit(30),
+
+    debtId
+      ? supabase
+          .from('collection_assignments')
+          .select('assigned_to_name, assigned_by_name, assignment_status, assigned_at, released_at, raw_payload')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .eq('debt_id', debtId)
+          .order('assigned_at', { ascending: false })
+          .limit(20)
+      : supabase
+          .from('collection_assignments')
+          .select('assigned_to_name, assigned_by_name, assignment_status, assigned_at, released_at, raw_payload')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .order('assigned_at', { ascending: false })
+          .limit(20),
+
+    debtId
+      ? supabase
+          .from('collection_attachments')
+          .select('attachment_type, file_name, file_url, mime_type, uploaded_by_name, uploaded_at, description')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .eq('debt_id', debtId)
+          .order('uploaded_at', { ascending: false })
+          .limit(20)
+      : supabase
+          .from('collection_attachments')
+          .select('attachment_type, file_name, file_url, mime_type, uploaded_by_name, uploaded_at, description')
+          .eq('company_id', params.company_id)
+          .eq('customer_id', params.customer_id)
+          .order('uploaded_at', { ascending: false })
+          .limit(20),
   ])
 
   const openPromises = (promises ?? []).filter((p: any) => p.status === 'pending')
@@ -120,10 +192,10 @@ export async function buildCustomerDebtContext(params: {
   const lastOutbound = (messages ?? []).find((m: any) => m.direction === 'outbound') ?? null
 
   const allCustomerText = inboundMessages.map((m: any) => String(m.content ?? '')).join(' ').toLowerCase()
-  const angryWords = ['غصب', 'ازعاج', 'ازعجتوني', 'طفشتوني', 'بلاغ', 'محامي', 'شكوى', 'court', 'lawyer', 'complaint']
-  const refusalWords = ['ما بسدد', 'ماراح اسدد', 'ما راح اسدد', 'لن اسدد', 'رفض', 'not paying', "won't pay"]
-  const paidWords = ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']
-  const promiseWords = ['بسدد', 'اسدد', 'الخميس', 'بكرة', 'بكره', 'نهاية الشهر', 'راتب', 'salary', 'tomorrow']
+  const angryWords = ['ØºØµØ¨', 'Ø§Ø²Ø¹Ø§Ø¬', 'Ø§Ø²Ø¹Ø¬ØªÙˆÙ†ÙŠ', 'Ø·ÙØ´ØªÙˆÙ†ÙŠ', 'Ø¨Ù„Ø§Øº', 'Ù…Ø­Ø§Ù…ÙŠ', 'Ø´ÙƒÙˆÙ‰', 'court', 'lawyer', 'complaint']
+  const refusalWords = ['Ù…Ø§ Ø¨Ø³Ø¯Ø¯', 'Ù…Ø§Ø±Ø§Ø­ Ø§Ø³Ø¯Ø¯', 'Ù…Ø§ Ø±Ø§Ø­ Ø§Ø³Ø¯Ø¯', 'Ù„Ù† Ø§Ø³Ø¯Ø¯', 'Ø±ÙØ¶', 'not paying', "won't pay"]
+  const paidWords = ['Ø³Ø¯Ø¯Øª', 'Ø¯ÙØ¹Øª', 'Ø­ÙˆÙ„Øª', 'Ø§ÙŠØµØ§Ù„', 'Ø¥ÙŠØµØ§Ù„', 'paid', 'receipt', 'transfer']
+  const promiseWords = ['Ø¨Ø³Ø¯Ø¯', 'Ø§Ø³Ø¯Ø¯', 'Ø§Ù„Ø®Ù…ÙŠØ³', 'Ø¨ÙƒØ±Ø©', 'Ø¨ÙƒØ±Ù‡', 'Ù†Ù‡Ø§ÙŠØ© Ø§Ù„Ø´Ù‡Ø±', 'Ø±Ø§ØªØ¨', 'salary', 'tomorrow']
 
   const isAngry = angryWords.some(w => allCustomerText.includes(w))
   const isRefusing = refusalWords.some(w => allCustomerText.includes(w))
@@ -179,6 +251,18 @@ export async function buildCustomerDebtContext(params: {
     ai_memory: memory ?? [],
     recent_approvals: approvals ?? [],
     active_alerts: alerts ?? [],
+    collection_history: {
+      followups: collectionFollowups ?? [],
+      status_history: statusHistory ?? [],
+      assignments: assignments ?? [],
+      attachments: attachments ?? [],
+    },
+    latest_collection_context: {
+      last_followup: collectionFollowups?.[0] ?? null,
+      last_status_change: statusHistory?.[0] ?? null,
+      current_assignment: assignments?.[0] ?? null,
+      attachments_count: attachments?.length ?? 0,
+    },
     conversation_profile: {
       has_history: (messages?.length ?? 0) > 0,
       last_customer_message: lastInbound?.content ?? null,
@@ -214,3 +298,4 @@ export async function buildCustomerDebtContext(params: {
     }
   }
 }
+
