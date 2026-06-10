@@ -145,6 +145,17 @@ function finalGuard(args: {
   if (robotic(reply)) return ''
 
   if (asksDebtDetails(args.current)) {
+    const alreadyExplainedDebt = outboundTexts(args.history).some(t =>
+      t.includes('المبلغ الظاهر') ||
+      t.includes('المرجع') ||
+      t.includes('الجهة') ||
+      t.includes('نوعها')
+    )
+
+    if (alreadyExplainedDebt) {
+      return 'سبق وضحت لك البيانات الظاهرة عندنا. إذا الاعتراض على أصل المطالبة بنرفعها للمراجعة بدل ما نكرر نفس الكلام.'
+    }
+
     return debtAnswer(args.debtContext)
   }
 
@@ -273,3 +284,4 @@ Return JSON only:
     debtContext,
   })
 }
+
