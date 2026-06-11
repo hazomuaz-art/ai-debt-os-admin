@@ -642,7 +642,13 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
   const today = new Date().toISOString().split('T')[0]
   const in2days = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0]
   const eventText = String(event?.data?.message ?? event?.data?.customer_statement ?? event?.data?.note ?? '').trim()
-  const detectedIntent = eventText ? detectCustomerIntent(eventText) : 'unknown'
+  const rawIntent = eventText ? detectCustomerIntent(eventText) : 'unknown'
+  const hasPromiseTime =
+    eventText.includes('بكرة') || eventText.includes('بكره') ||
+    eventText.includes('نهاية الشهر') || eventText.includes('اخر الشهر') || eventText.includes('آخر الشهر') ||
+    eventText.includes('يوم') || eventText.includes('تاريخ') ||
+    eventText.toLowerCase().includes('tomorrow')
+  const detectedIntent = rawIntent === 'payment_intent' && hasPromiseTime ? 'promise' : rawIntent
   const promiseDate =
     eventText.includes('بكرة') || eventText.includes('بكره') || eventText.toLowerCase().includes('tomorrow')
       ? new Date(Date.now() + 86400000).toISOString().split('T')[0]
@@ -756,7 +762,13 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   const text = String(event?.data?.message ?? event?.data?.customer_statement ?? event?.data?.note ?? '').trim()
   if (!text) return 0
 
-  const intent = detectCustomerIntent(text)
+  const rawIntent = detectCustomerIntent(text)
+  const hasPromiseTime =
+    text.includes('بكرة') || text.includes('بكره') ||
+    text.includes('نهاية الشهر') || text.includes('اخر الشهر') || text.includes('آخر الشهر') ||
+    text.includes('يوم') || text.includes('تاريخ') ||
+    text.toLowerCase().includes('tomorrow')
+  const intent = rawIntent === 'payment_intent' && hasPromiseTime ? 'promise' : rawIntent
   if (!intent || intent === 'unknown') return 0
 
   const sb = createServiceClient()
@@ -1115,6 +1127,7 @@ export async function processEventBatch(
   log.info('batch done', R)
   return R
 }
+
 
 
 
