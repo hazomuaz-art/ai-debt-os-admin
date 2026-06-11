@@ -395,19 +395,19 @@ export async function generateWhatsappOperationalDecision(args: {
     summary,
   }
 
-  if (isPromise) {
-    nextAction = 'record_promise'
-    systemImpact.promise = true
-    systemImpact.risk_impact = 'decrease'
-    systemImpact.summary = 'Customer gave a payment promise.'
-  }
-
   if (isRefusal) {
     nextAction = 'human_review'
     systemImpact.alert = true
     systemImpact.debt_update = true
     systemImpact.risk_impact = 'increase'
     systemImpact.summary = 'Customer refused payment; debt risk should increase.'
+  }
+
+  else if (isPromise) {
+    nextAction = 'record_promise'
+    systemImpact.promise = true
+    systemImpact.risk_impact = 'decrease'
+    systemImpact.summary = 'Customer gave a payment promise.'
   }
 
   if (isDispute) {
@@ -436,3 +436,4 @@ export async function generateWhatsappOperationalDecision(args: {
     systemImpact,
   }
 }
+
