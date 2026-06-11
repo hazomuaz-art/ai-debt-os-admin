@@ -325,3 +325,114 @@ Return JSON only:
 
 
 
+
+export type WhatsappSystemImpact = {
+  timeline: boolean
+  memory: boolean
+  promise: boolean
+  alert: boolean
+  approval: boolean
+  score: boolean
+  ai_action: boolean
+  dashboard: boolean
+  debt_update: boolean
+  customer_update: boolean
+  risk_impact: 'decrease' | 'neutral' | 'increase' | 'critical'
+  summary: string
+}
+
+export type WhatsappOperationalDecision = {
+  shouldReply: boolean
+  reply: string
+  nextAction: string
+  confidence: number
+  systemImpact: WhatsappSystemImpact
+}
+
+export async function generateWhatsappOperationalDecision(args: {
+  company_id: string
+  customer_id: string
+  debt_id?: string | null
+  message: string
+  conversation_history?: HistoryItem[]
+}): Promise<WhatsappOperationalDecision> {
+  const reply = await generateWhatsappAutoReply(args)
+  const text = args.message.trim().toLowerCase()
+
+  const isPromise =
+    text.includes('بسدد') || text.includes('بسدده') || text.includes('اسدد') ||
+    text.includes('بكرة') || text.includes('بكره') ||
+    text.includes('نهاية الشهر') || text.includes('اخر الشهر') || text.includes('آخر الشهر')
+
+  const isRefusal =
+    text.includes('ما بسدد') || text.includes('ما راح اسدد') ||
+    text.includes('ماني مسدد') || text.includes('ارفض') || text.includes('رفض')
+
+  const isDispute =
+    text.includes('ما يخصني') || text.includes('مو صحيح') || text.includes('غير صحيح') ||
+    text.includes('غلط') || text.includes('اعتراض') || text.includes('رقم غلط')
+
+  const isPaid =
+    text.includes('دفعت') || text.includes('سددت') || text.includes('حولت') ||
+    text.includes('حوالة') || text.includes('ايصال') || text.includes('إيصال')
+
+  let nextAction = 'reply'
+  let risk_impact: WhatsappSystemImpact['risk_impact'] = 'neutral'
+  let summary = 'Inbound WhatsApp message requires system-wide update.'
+
+  const systemImpact: WhatsappSystemImpact = {
+    timeline: true,
+    memory: true,
+    promise: false,
+    alert: false,
+    approval: false,
+    score: true,
+    ai_action: true,
+    dashboard: true,
+    debt_update: false,
+    customer_update: false,
+    risk_impact,
+    summary,
+  }
+
+  if (isPromise) {
+    nextAction = 'record_promise'
+    systemImpact.promise = true
+    systemImpact.risk_impact = 'decrease'
+    systemImpact.summary = 'Customer gave a payment promise.'
+  }
+
+  if (isRefusal) {
+    nextAction = 'human_review'
+    systemImpact.alert = true
+    systemImpact.debt_update = true
+    systemImpact.risk_impact = 'increase'
+    systemImpact.summary = 'Customer refused payment; debt risk should increase.'
+  }
+
+  if (isDispute) {
+    nextAction = 'record_dispute'
+    systemImpact.alert = true
+    systemImpact.approval = true
+    systemImpact.debt_update = true
+    systemImpact.risk_impact = 'critical'
+    systemImpact.summary = 'Customer disputed the debt or identity; review required.'
+  }
+
+  if (isPaid) {
+    nextAction = 'request_receipt'
+    systemImpact.approval = true
+    systemImpact.memory = true
+    systemImpact.timeline = true
+    systemImpact.dashboard = true
+    systemImpact.summary = 'Customer claimed payment; receipt/review required.'
+  }
+
+  return {
+    shouldReply: Boolean(reply),
+    reply,
+    nextAction,
+    confidence: 0.9,
+    systemImpact,
+  }
+}

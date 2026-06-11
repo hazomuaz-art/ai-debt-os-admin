@@ -874,6 +874,169 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
 
   return changed
 }
+
+async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreResult): Promise<string[]> {
+  const impact = event.data?.ai_system_impact as Record<string, unknown> | undefined
+  if (!impact) return ['ai_impact:none']
+
+  const sb = createServiceClient()
+  const done: string[] = []
+  const message = String(event.data?.message ?? event.data?.customer_statement ?? event.data?.note ?? '').trim()
+  const summary = String(impact.summary ?? 'AI system impact processed')
+  const riskImpact = String(impact.risk_impact ?? 'neutral')
+  const isWebhook = String(event.source ?? '').includes('webhook')
+
+  if (impact.timeline) {
+    await sb.from('timeline_events').insert({
+      company_id: ctx.debt.company_id,
+      customer_id: ctx.debt.customer_id,
+      debt_id: ctx.debt.id,
+      event_type: 'ai_system_impact',
+      channel: isWebhook ? 'whatsapp' : 'system',
+      summary,
+      detail: JSON.stringify({ message, impact, source: event.source }).slice(0, 1000),
+      actor_type: 'ai',
+      ai_used: true,
+      metadata: { source: event.source, debt_id: ctx.debt.id, ai_system_impact: true },
+      occurred_at: new Date().toISOString(),
+    })
+    done.push('ai_impact:timeline')
+  }
+
+  if (impact.memory && message) {
+    const triggerPattern = message.slice(0, 120)
+    const { data: existing } = await sb.from('ai_memory')
+      .select('id')
+      .eq('company_id', ctx.debt.company_id)
+      .eq('trigger_pattern', triggerPattern)
+      .maybeSingle()
+
+    if (!existing) {
+      await sb.from('ai_memory').insert({
+        company_id: ctx.debt.company_id,
+        trigger_pattern: triggerPattern,
+        response_text: summary,
+        category: 'ai_system_impact',
+        language: /[\u0600-\u06FF]/.test(triggerPattern) ? 'ar' : 'en',
+        status: 'approved',
+        is_active: true,
+        source: 'ai_system_operator',
+        success_rate: 1,
+        use_count: 1,
+      })
+      done.push('ai_impact:memory')
+    } else {
+      done.push('ai_impact:memory_exists')
+    }
+  }
+
+  if (impact.promise) {
+    const today = new Date().toISOString().split('T')[0]
+    const promisedDate =
+      message.includes('بكرة') || message.includes('بكره') || message.toLowerCase().includes('tomorrow')
+        ? new Date(Date.now() + 86400000).toISOString().split('T')[0]
+        : new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0]
+
+    const { data: existingPromise } = await sb.from('promises')
+      .select('id')
+      .eq('company_id', ctx.debt.company_id)
+      .eq('debt_id', ctx.debt.id)
+      .eq('status', 'pending')
+      .gte('promised_date', today)
+      .limit(1)
+
+    if (!(existingPromise?.length)) {
+      await sb.from('promises').insert({
+        company_id: ctx.debt.company_id,
+        customer_id: ctx.debt.customer_id,
+        debt_id: ctx.debt.id,
+        promised_amount: ctx.debt.current_balance,
+        promised_date: promisedDate,
+        channel: isWebhook ? 'whatsapp' : 'system',
+        status: 'pending',
+        notes: message ? `AI system impact promise: ${message}` : summary,
+      })
+      done.push('ai_impact:promise')
+    } else {
+      done.push('ai_impact:promise_exists')
+    }
+  }
+
+  if (impact.alert) {
+    await sb.from('system_alerts').insert({
+      company_id: ctx.debt.company_id,
+      severity: riskImpact === 'critical' ? 'error' : 'warning',
+      alert_type: riskImpact === 'critical' ? 'ai_critical_event' : 'ai_risk_event',
+      title: `AI Alert: ${ctx.customer.full_name}`,
+      message: summary.slice(0, 500),
+      metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, source: event.source, impact, message },
+      is_resolved: false,
+    })
+    done.push('ai_impact:alert')
+  }
+
+  if (impact.approval) {
+    const { data: existingApproval } = await sb.from('approvals')
+      .select('id')
+      .eq('company_id', ctx.debt.company_id)
+      .eq('entity_id', ctx.debt.id)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (!existingApproval) {
+      await sb.from('approvals').insert({
+        company_id: ctx.debt.company_id,
+        approval_type: 'stop_followup',
+        title: `AI Review: ${ctx.customer.full_name}`,
+        description: summary.slice(0, 1000),
+        entity_type: 'debt',
+        entity_id: ctx.debt.id,
+        requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message, impact },
+        status: 'pending',
+        priority: riskImpact === 'critical' ? 'urgent' : 'high',
+        expires_at: new Date(Date.now() + 48 * 3600000).toISOString(),
+      })
+      done.push('ai_impact:approval')
+    } else {
+      done.push('ai_impact:approval_exists')
+    }
+  }
+
+  if (impact.debt_update) {
+    const patch: Record<string, unknown> = {}
+    if (riskImpact === 'critical' || riskImpact === 'increase') patch.priority = 'high'
+    if (riskImpact === 'critical') patch.status = 'disputed'
+    patch.last_contact_result = summary.slice(0, 250)
+
+    await sb.from('debts')
+      .update(patch)
+      .eq('company_id', ctx.debt.company_id)
+      .eq('id', ctx.debt.id)
+
+    done.push('ai_impact:debt_update')
+  }
+
+  if (impact.ai_action) {
+    await sb.from('ai_actions').insert({
+      company_id: ctx.debt.company_id,
+      debt_id: ctx.debt.id,
+      customer_id: ctx.debt.customer_id,
+      assigned_to: null,
+      action_type: isWebhook ? 'whatsapp' : 'call',
+      priority: riskImpact === 'critical' ? 'critical' : riskImpact === 'increase' ? 'high' : 'medium',
+      priority_score: score.score,
+      reason: summary.slice(0, 300),
+      suggested_message: message.slice(0, 300),
+      status: 'pending',
+      scheduled_for: new Date().toISOString().split('T')[0],
+      metadata: { source: event.source, ai_system_impact: impact },
+    })
+    done.push('ai_impact:ai_action')
+  }
+
+  done.push('ai_impact:dashboard_ready')
+  return done
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Step: Campaign eligibility
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1014,6 +1177,14 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
       R.steps_failed.push('score:used_fallback')
     }
 
+    // ── AI System Impact Executor (always, when provided by AI) ──────
+    try {
+      const impactSteps = await stepAISystemImpact(ctx, event, score)
+      for (const s of impactSteps) {
+        if (s === 'ai_impact:none') R.steps_skipped.push(s)
+        else R.steps_completed.push(s)
+      }
+    } catch { R.steps_failed.push('ai_system_impact') }
     // ── Timeline (always) ───────────────────────────────────────────
     try {
       const ok = await stepTimeline(ctx, event.source, score, event.data)
@@ -1127,6 +1298,8 @@ export async function processEventBatch(
   log.info('batch done', R)
   return R
 }
+
+
 
 
 
