@@ -22,6 +22,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { scoreDebt, scoringFallback, type ScoreResult } from '@/lib/ai-engine'
 import { calculateDaysOverdue } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
+import { detectCustomerIntent } from '@/lib/negotiation-intent'
 
 const log = createLogger('automation-pipeline')
 
@@ -31,8 +32,8 @@ const log = createLogger('automation-pipeline')
 
 export type EventSource =
   | 'csv_import' | 'excel_import' | 'api_sync'
-  | 'webhook_whatsapp' | 'webhook_call'
-  | 'payment_update' | 'promise_update' | 'collector_note'
+  | 'webhook_whatsapp' | 'webhook_evolution' | 'webhook_call'
+  | 'payment_update' | 'promise_update' | 'refusal_detected' | 'dispute_detected' | 'payment_claim_detected' | 'legal_escalation_detected' | 'collector_note'
   | 'debt_update' | 'customer_update' | 'manual'
 
 export interface PipelineEvent {
@@ -220,16 +221,18 @@ async function loadCtx(debtId: string, companyId: string): Promise<Ctx | null> {
 
 const EVENT_TYPE_MAP: Record<EventSource, string> = {
   csv_import: 'status_change', excel_import: 'status_change', api_sync: 'status_change',
-  webhook_whatsapp: 'whatsapp_in', webhook_call: 'call_in',
-  payment_update: 'payment', promise_update: 'status_change',
+  webhook_whatsapp: 'whatsapp_in', webhook_evolution: 'whatsapp_in', webhook_call: 'call_in',
+  payment_update: 'payment', promise_update: 'promise_to_pay',
+  refusal_detected: 'refusal', dispute_detected: 'dispute', payment_claim_detected: 'payment_claim', legal_escalation_detected: 'legal_escalation',
   collector_note: 'collector_note', debt_update: 'status_change',
   customer_update: 'status_change', manual: 'ai_analysis',
 }
 
 const CHANNEL_MAP: Record<EventSource, string> = {
   csv_import: 'system', excel_import: 'system', api_sync: 'system',
-  webhook_whatsapp: 'whatsapp', webhook_call: 'call',
-  payment_update: 'system', promise_update: 'system',
+  webhook_whatsapp: 'whatsapp', webhook_evolution: 'whatsapp', webhook_call: 'call',
+  payment_update: 'system', promise_update: 'whatsapp',
+  refusal_detected: 'whatsapp', dispute_detected: 'whatsapp', payment_claim_detected: 'whatsapp', legal_escalation_detected: 'whatsapp',
   collector_note: 'manual', debt_update: 'system',
   customer_update: 'system', manual: 'system',
 }
@@ -246,9 +249,14 @@ async function stepTimeline(
     excel_import:     `مستورد (Excel): ${ctx.customer.full_name} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
     api_sync:         `متزامن من النظام — مرجع: ${ctx.debt.reference_number}`,
     webhook_whatsapp: `رسالة واردة من ${ctx.customer.full_name}`,
+    webhook_evolution: `رسالة واتساب واردة من ${ctx.customer.full_name}`,
     webhook_call:     `نتيجة مكالمة: ${ctx.debt.last_contact_result ?? 'مسجلة'}`,
     payment_update:   `دفعة مسجلة — مرجع: ${ctx.debt.reference_number}`,
     promise_update:   `وعد سداد محدّث`,
+    refusal_detected: `رفض سداد من العميل`,
+    dispute_detected: `اعتراض من العميل`,
+    payment_claim_detected: `العميل أفاد بالسداد أو التحويل`,
+    legal_escalation_detected: `طلب أو تهديد بتصعيد قانوني`,
     collector_note:   `ملاحظة محصّل: ${(ctx.debt.notes ?? '').slice(0, 60)}`,
     debt_update:      `تحديث دين — الحالة: ${ctx.debt.status}`,
     customer_update:  `تحديث بيانات العميل`,
@@ -631,12 +639,19 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
-  const today   = new Date().toISOString().split('T')[0]
+  const today = new Date().toISOString().split('T')[0]
   const in2days = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0]
+  const eventText = String(event?.data?.message ?? event?.data?.customer_statement ?? event?.data?.note ?? '').trim()
+  const detectedIntent = eventText ? detectCustomerIntent(eventText) : 'unknown'
+  const promiseDate =
+    eventText.includes('بكرة') || eventText.includes('بكره') || eventText.toLowerCase().includes('tomorrow')
+      ? new Date(Date.now() + 86400000).toISOString().split('T')[0]
+      : in2days
+
   const sb = createServiceClient()
+
   try {
-    // Auto-create promise only from explicit promise_update events
-    if (event?.source === 'promise_update') {
+    if (event?.source === 'promise_update' || detectedIntent === 'promise') {
       const { data: existingPromise } = await sb.from('promises')
         .select('id')
         .eq('company_id', ctx.debt.company_id)
@@ -650,14 +665,14 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
           customer_id: ctx.debt.customer_id,
           debt_id: ctx.debt.id,
           promised_amount: ctx.debt.current_balance,
-          promised_date: in2days,
-          channel: 'system',
+          promised_date: promiseDate,
+          channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
           status: 'pending',
-          notes: 'Auto-created from promise_update event'
+          notes: eventText ? `Auto-created from inbound intent: ${eventText}` : 'Auto-created from promise_update event',
         })
       }
     }
-    // Mark overdue promises as broken
+
     await sb.from('promises')
       .update({ status: 'broken' })
       .eq('company_id', ctx.debt.company_id)
@@ -665,7 +680,6 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
       .eq('status', 'pending')
       .lt('promised_date', today)
 
-    // Flag upcoming promises in timeline
     const { data: upcoming } = await sb.from('promises')
       .select('promised_date,promised_amount')
       .eq('company_id', ctx.debt.company_id)
@@ -678,13 +692,13 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
     if (upcoming) {
       const u = upcoming as Record<string, unknown>
       await sb.from('timeline_events').insert({
-        company_id:  ctx.debt.company_id,
+        company_id: ctx.debt.company_id,
         customer_id: ctx.debt.customer_id,
-        debt_id:     ctx.debt.id,
-        event_type:  'promise_to_pay',
-        channel:     'system',
-        summary:     `وعد سداد قادم: ${u.promised_amount} ${ctx.debt.currency} في ${u.promised_date}`,
-        actor_type:  'system',
+        debt_id: ctx.debt.id,
+        event_type: 'promise_to_pay',
+        channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
+        summary: `وعد سداد قادم: ${u.promised_amount} ${ctx.debt.currency} في ${u.promised_date}`,
+        actor_type: 'system',
         occurred_at: new Date().toISOString(),
       })
     }
@@ -696,7 +710,6 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Step: Approvals
 // ─────────────────────────────────────────────────────────────────────────────
-
 async function stepApprovals(ctx: Ctx): Promise<void> {
   const needsApproval =
     (ctx.debt.status === 'legal' && ctx.debt.current_balance > 10000) ||
@@ -733,6 +746,122 @@ async function stepApprovals(ctx: Ctx): Promise<void> {
   }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step: Unified Live Event Reactor
+// Converts any inbound meaning into real system updates.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number> {
+  const text = String(event?.data?.message ?? event?.data?.customer_statement ?? event?.data?.note ?? '').trim()
+  if (!text) return 0
+
+  const intent = detectCustomerIntent(text)
+  if (!intent || intent === 'unknown') return 0
+
+  const sb = createServiceClient()
+  let changed = 0
+
+  async function addTimeline(event_type: string, summary: string, detail?: Record<string, unknown>) {
+    await sb.from('timeline_events').insert({
+      company_id: ctx.debt.company_id,
+      customer_id: ctx.debt.customer_id,
+      debt_id: ctx.debt.id,
+      event_type,
+      channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
+      summary,
+      detail: JSON.stringify({ intent, text, ...(detail ?? {}) }).slice(0, 1000),
+      actor_type: 'customer',
+      ai_used: true,
+      metadata: { source: event?.source ?? 'unknown', intent, debt_id: ctx.debt.id },
+      occurred_at: new Date().toISOString(),
+    })
+    changed++
+  }
+
+  if (intent === 'promise') {
+    await addTimeline('promise_detected', `وعد سداد من العميل: ${ctx.customer.full_name}`)
+  }
+
+  if (intent === 'refusal') {
+    await sb.from('debts').update({
+      priority: 'high',
+      last_contact_result: 'Customer refused to pay via inbound message',
+    }).eq('id', ctx.debt.id).eq('company_id', ctx.debt.company_id)
+
+    await sb.from('system_alerts').insert({
+      company_id: ctx.debt.company_id,
+      severity: 'error',
+      alert_type: 'customer_refusal',
+      title: `رفض سداد: ${ctx.customer.full_name}`,
+      message: text.slice(0, 500),
+      metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, intent, source: event?.source ?? 'unknown' },
+      is_resolved: false,
+    })
+
+    await addTimeline('refusal_detected', `رفض سداد من العميل: ${ctx.customer.full_name}`)
+    changed++
+  }
+
+  if (intent === 'dispute' || intent === 'wrong_number') {
+    await sb.from('debts').update({
+      status: 'disputed',
+      priority: 'high',
+      last_contact_result: 'Customer dispute detected from inbound message',
+    }).eq('id', ctx.debt.id).eq('company_id', ctx.debt.company_id)
+
+    await sb.from('approvals').insert({
+      company_id: ctx.debt.company_id,
+      approval_type: 'stop_followup',
+      title: `مراجعة اعتراض: ${ctx.customer.full_name}`,
+      description: text.slice(0, 1000),
+      entity_type: 'debt',
+      entity_id: ctx.debt.id,
+      requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message: text, intent },
+      status: 'pending',
+      priority: 'high',
+      expires_at: new Date(Date.now() + 48 * 3600000).toISOString(),
+    })
+
+    await addTimeline('dispute_detected', `اعتراض يحتاج مراجعة: ${ctx.customer.full_name}`)
+    changed++
+  }
+
+  if (intent === 'paid_claim') {
+    await sb.from('approvals').insert({
+      company_id: ctx.debt.company_id,
+      approval_type: 'stop_followup',
+      title: `مراجعة إفادة سداد: ${ctx.customer.full_name}`,
+      description: text.slice(0, 1000),
+      entity_type: 'debt',
+      entity_id: ctx.debt.id,
+      requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message: text, intent },
+      status: 'pending',
+      priority: 'urgent',
+      expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
+    })
+
+    await addTimeline('payment_claim_detected', `العميل أفاد بالسداد/التحويل: ${ctx.customer.full_name}`)
+    changed++
+  }
+
+  if (intent === 'legal_threat' || intent === 'angry') {
+    await sb.from('system_alerts').insert({
+      company_id: ctx.debt.company_id,
+      severity: 'warning',
+      alert_type: intent === 'legal_threat' ? 'legal_escalation' : 'angry_customer',
+      title: `${intent === 'legal_threat' ? 'تصعيد قانوني' : 'عميل غاضب'}: ${ctx.customer.full_name}`,
+      message: text.slice(0, 500),
+      metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, intent, source: event?.source ?? 'unknown' },
+      is_resolved: false,
+    })
+
+    await addTimeline(intent === 'legal_threat' ? 'legal_escalation_detected' : 'angry_customer_detected', text.slice(0, 120))
+    changed++
+  }
+
+  return changed
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Step: Campaign eligibility
 // ─────────────────────────────────────────────────────────────────────────────
@@ -879,6 +1008,13 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
       ok ? R.steps_completed.push('timeline') : R.steps_failed.push('timeline')
     } catch { R.steps_failed.push('timeline') }
 
+    // ── Unified Live Event Reactor (always) ──────────────────────────
+    try {
+      const reactions = await stepLiveReactor(ctx, event)
+      if (reactions > 0) R.steps_completed.push('reactor:changed')
+      else R.steps_skipped.push('reactor:no_intent')
+    } catch { R.steps_failed.push('reactor') }
+
     // ── AI Action (TEST + LIVE only) ─────────────────────────────────
     if (cfg.mode !== 'off') {
       try {
@@ -979,6 +1115,11 @@ export async function processEventBatch(
   log.info('batch done', R)
   return R
 }
+
+
+
+
+
 
 
 
