@@ -137,12 +137,19 @@ export async function POST(request: NextRequest) {
             }, { onConflict: 'company_id,source_system,external_followup_id' })
 
 
-            processEvent({
+            const pipelineResult = await processEvent({
               source: 'webhook_evolution',
               company_id: (customer as { company_id: string }).company_id,
               _customer_id: (customer as { id: string }).id,
               _debt_id: (latestDebt as { id: string } | null)?.id,
               data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
+            })
+
+            await supabase.from('webhook_events').insert({
+              provider: 'ai_debt_os',
+              event_id: `pipeline:${evo.data.key.id ?? Date.now()}`,
+              event_type: 'pipeline_result',
+              payload: pipelineResult as unknown as Record<string, unknown>,
             }).catch(() => {})
 
             const autoReply = await generateWhatsappAutoReply({
@@ -247,13 +254,20 @@ export async function POST(request: NextRequest) {
         })
 
         // Trigger automation pipeline for inbound message
-        processEvent({
+            const pipelineResult = await processEvent({
           source:       'webhook_whatsapp',
           company_id:   (customer as { company_id: string }).company_id,
           _customer_id: (customer as { id: string }).id,
           _debt_id:     (latestDebt as { id: string } | null)?.id,
           data: { message: msg.text, from: msg.from, message_id: msg.id },
-        }).catch(() => {})
+            })
+
+            await supabase.from('webhook_events').insert({
+              provider: 'ai_debt_os',
+              event_id: `pipeline:${evo.data.key.id ?? Date.now()}`,
+              event_type: 'pipeline_result',
+              payload: pipelineResult as unknown as Record<string, unknown>,
+            }).catch(() => {})
       } catch (msgErr) {
         log.error('Error processing inbound message', msgErr, { message_id: msg.id })
       }
@@ -291,6 +305,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ok' })
   }
 }
+
+
 
 
 
