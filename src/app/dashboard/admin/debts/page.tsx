@@ -1,10 +1,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { CreateDebtModal } from '@/components/debt/CreateDebtModal'
 import ImportDebtsModal from '@/components/debt/ImportDebtsModal'
 import ExportDebtsButton from '@/components/debt/ExportDebtsButton'
 import Link from 'next/link'
+import { WalletCards } from 'lucide-react'
+
+// Helper function for Light Theme Status Colors
+function getLightStatusColor(status: string) {
+  switch (status?.toLowerCase()) {
+    case 'active':         return 'bg-blue-50 text-blue-600 border-blue-200'
+    case 'in_progress':    return 'bg-yellow-50 text-yellow-600 border-yellow-200'
+    case 'in_negotiation': return 'bg-yellow-50 text-yellow-600 border-yellow-200'
+    case 'payment_plan':   return 'bg-cyan-50 text-cyan-600 border-cyan-200'
+    case 'promised':       return 'bg-purple-50 text-purple-600 border-purple-200'
+    case 'partial':        return 'bg-orange-50 text-orange-600 border-orange-200'
+    case 'settled':        return 'bg-emerald-50 text-emerald-600 border-emerald-200'
+    case 'legal':          return 'bg-red-50 text-red-600 border-red-200'
+    case 'disputed':       return 'bg-rose-50 text-rose-600 border-rose-200'
+    case 'written_off':    return 'bg-slate-100 text-slate-600 border-slate-200'
+    default:               return 'bg-slate-50 text-slate-500 border-slate-200'
+  }
+}
 
 export default async function AdminDebtsPage({
   searchParams,
@@ -49,112 +67,113 @@ export default async function AdminDebtsPage({
   const statuses = ['active', 'in_progress', 'promised', 'partial', 'settled', 'legal', 'disputed', 'written_off']
 
   const statusLabels: Record<string, string> = {
-    active: 'Active', in_progress: 'In Progress', promised: 'Promised',
-    partial: 'Partial', settled: 'Settled', written_off: 'Written Off',
-    legal: 'Legal', disputed: 'Disputed',
+    active: 'نشط', in_progress: 'قيد التنفيذ', promised: 'وعود سداد',
+    partial: 'سداد جزئي', settled: 'مُسدد', written_off: 'معدوم',
+    legal: 'إجراء قانوني', disputed: 'متنازع عليه',
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold">Debts</h1>
-          <p className="text-slate-500 text-sm">{count ?? 0} total debts</p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+            <WalletCards size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">الديون والمطالبات</h1>
+            <p className="text-slate-500 text-sm">إجمالي الديون المسجلة: <span className="font-bold text-[#1e3e50]">{count ?? 0}</span></p>
+          </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
           <ExportDebtsButton status={searchParams.status} />
           <ImportDebtsModal />
           <CreateDebtModal />
         </div>
       </div>
 
-      {/* Status filter */}
-      <div className="flex gap-2 flex-wrap">
-        <Link href="/dashboard/admin/debts" className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${!searchParams.status ? 'bg-brand-600/20 text-brand-400 border-brand-600/30' : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-900'}`}>
-          All
+      {/* Status Filter Tabs */}
+      <div className="flex gap-2 flex-wrap items-center bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+        <Link 
+          href="/dashboard/admin/debts" 
+          className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors ${!searchParams.status ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-slate-50'}`}
+        >
+          الكل
         </Link>
         {statuses.map(status => (
-          <Link key={status} href={`/dashboard/admin/debts?status=${status}`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${searchParams.status === status ? 'bg-brand-600/20 text-brand-400 border-brand-600/30' : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-900'}`}>
+          <Link 
+            key={status} 
+            href={`/dashboard/admin/debts?status=${status}`}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${searchParams.status === status ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-slate-50'}`}
+          >
             {statusLabels[status]}
           </Link>
         ))}
       </div>
 
-      {/* Debts table */}
-      <div className="card overflow-hidden">
+      {/* Debts Table */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="table-header px-4 py-3 text-left">Reference</th>
-                <th className="table-header px-4 py-3 text-left">Customer</th>
-                <th className="table-header px-4 py-3 text-right">Balance</th>
-                <th className="table-header px-4 py-3 text-center">Status</th>
-                <th className="table-header px-4 py-3 text-center">AI Score</th>
-                <th className="table-header px-4 py-3 text-left">Collector</th>
-                <th className="table-header px-4 py-3 text-left">Due Date</th>
-                <th className="table-header px-4 py-3 text-center">Actions</th>
+          <table className="w-full text-sm">
+            <thead className="bg-[#fbfdfd] border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">رقم المرجع</th>
+                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">العميل</th>
+                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">المبلغ المستحق</th>
+                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">الحالة</th>
+                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">تقييم الذكاء الاصطناعي</th>
+                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">المسؤول (المحصل)</th>
+                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">تاريخ الاستحقاق</th>
+                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">الإجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-slate-50">
               {(debts ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
-                    No debts found. Create your first debt to get started.
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                    لا توجد ديون. قم بإضافة الدين الأول للبدء.
                   </td>
                 </tr>
-              ) : (debts ?? []).map((debt: {
-                id: string
-                reference_number: string
-                current_balance: number
-                original_amount: number
-                currency: string
-                status: string
-                priority: string
-                due_date?: string
-                customer?: { id?: string; full_name?: string; phone?: string } | null
-                assigned_collector?: { id?: string; full_name?: string } | null
-                ai_scores?: Array<{ score?: number; risk_classification?: string }> | null
-              }) => {
+              ) : (debts ?? []).map((debt: any) => {
                 const latestScore = debt.ai_scores?.[0]
                 return (
-                  <tr key={debt.id} className="hover:bg-white/2 transition-colors">
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-brand-400">{debt.reference_number}</span>
+                  <tr key={debt.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">{debt.reference_number}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium">{(debt.customer as {full_name?: string} | null)?.full_name ?? '—'}</div>
-                      <div className="text-slate-400 text-xs">{(debt.customer as {phone?: string} | null)?.phone ?? ''}</div>
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-[#1e3e50]">{debt.customer?.full_name ?? '—'}</div>
+                      <div className="text-slate-400 text-xs mt-0.5">{debt.customer?.phone ?? ''}</div>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="text-sm font-semibold">{formatCurrency(debt.current_balance, debt.currency)}</div>
-                      <div className="text-slate-400 text-xs">of {formatCurrency(debt.original_amount, debt.currency)}</div>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold text-rose-600">{formatCurrency(debt.current_balance, debt.currency)}</div>
+                      <div className="text-slate-400 text-xs mt-0.5">من {formatCurrency(debt.original_amount, debt.currency)}</div>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`status-badge text-[11px] ${getStatusColor(debt.status)}`}>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getLightStatusColor(debt.status)}`}>
                         {statusLabels[debt.status] ?? debt.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       {latestScore ? (
                         <div className="flex items-center justify-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full ${latestScore.score! >= 70 ? 'bg-green-400' : latestScore.score! >= 40 ? 'bg-yellow-400' : 'bg-red-400'}`} />
-                          <span className="font-mono text-sm">{latestScore.score}</span>
+                          <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${latestScore.score! >= 70 ? 'bg-emerald-400' : latestScore.score! >= 40 ? 'bg-amber-400' : 'bg-rose-400'}`} />
+                          <span className="font-mono font-bold text-[#1e3e50]">{latestScore.score}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 text-xs">—</span>
+                        <span className="text-slate-300 font-bold">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-slate-500">{(debt.assigned_collector as {full_name?: string} | null)?.full_name ?? 'Unassigned'}</span>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded-md">{debt.assigned_collector?.full_name ?? 'غير معين'}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-slate-500">{debt.due_date ? formatDate(debt.due_date) : '—'}</span>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-500 font-mono">{debt.due_date ? formatDate(debt.due_date) : '—'}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="text-brand-400 hover:text-brand-300 text-xs font-medium">
-                        View
+                    <td className="px-6 py-4 text-center">
+                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-4 py-1.5 bg-white border border-slate-200 text-[#1e3e50] hover:bg-slate-50 font-bold rounded-lg text-xs transition-colors shadow-sm">
+                        عرض التفاصيل
                       </Link>
                     </td>
                   </tr>
@@ -166,19 +185,19 @@ export default async function AdminDebtsPage({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-            <span className="text-slate-500 text-sm">
-              Page {page} of {totalPages}
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-[#fbfdfd]">
+            <span className="text-slate-500 text-sm font-medium">
+              صفحة <span className="font-bold text-[#1e3e50]">{page}</span> من <span className="font-bold text-[#1e3e50]">{totalPages}</span>
             </span>
             <div className="flex gap-2">
-              {page > 1 && (
-                <Link href={`/dashboard/admin/debts?page=${page - 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="btn-secondary text-xs py-1.5 px-3">
-                  Previous
+              {page < totalPages && (
+                <Link href={`/dashboard/admin/debts?page=${page + 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-white border border-slate-200 text-[#1e3e50] hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors shadow-sm">
+                  التالي ←
                 </Link>
               )}
-              {page < totalPages && (
-                <Link href={`/dashboard/admin/debts?page=${page + 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="btn-secondary text-xs py-1.5 px-3">
-                  Next
+              {page > 1 && (
+                <Link href={`/dashboard/admin/debts?page=${page - 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-white border border-slate-200 text-[#1e3e50] hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors shadow-sm">
+                  → السابق
                 </Link>
               )}
             </div>

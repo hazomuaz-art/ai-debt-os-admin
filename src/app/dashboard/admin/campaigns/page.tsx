@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Campaign } from '@/types'
-import { useLocale } from '@/lib/i18n'
+import { Megaphone, MessageSquare, PlayCircle, Smartphone, Activity, Link as LinkIcon, Plus, QrCode } from 'lucide-react'
 
 type Portfolio = {
   id: string
@@ -27,24 +27,32 @@ type PortfolioWhatsappNumber = {
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-50 text-slate-500 border-slate-200',
-  scheduled: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  running: 'bg-green-500/10 text-green-400 border-green-500/20',
-  paused: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  completed: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
-  cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
+  scheduled: 'bg-blue-50 text-blue-600 border-blue-200',
+  running: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  paused: 'bg-amber-50 text-amber-600 border-amber-200',
+  completed: 'bg-purple-50 text-purple-600 border-purple-200',
+  cancelled: 'bg-rose-50 text-rose-600 border-rose-200',
+}
+
+const STATUS_ARABIC: Record<string, string> = {
+  draft: 'مسودة',
+  scheduled: 'مجدول',
+  running: 'قيد التشغيل',
+  paused: 'متوقف مؤقتاً',
+  completed: 'مكتمل',
+  cancelled: 'ملغى',
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  overdue_90: 'Overdue 90',
-  pre_salary: 'Pre Salary',
-  post_holiday: 'Post Holiday',
-  settlement: 'Settlement',
-  reminder: 'Reminder',
-  custom: 'Custom',
+  overdue_90: 'متأخر 90 يوماً',
+  pre_salary: 'قبل الراتب',
+  post_holiday: 'بعد الإجازة',
+  settlement: 'تسوية',
+  reminder: 'تذكير ودي',
+  custom: 'مخصص',
 }
 
 export default function CampaignsPage() {
-  const { t, isRTL, locale } = useLocale()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [numbers, setNumbers] = useState<PortfolioWhatsappNumber[]>([])
@@ -127,7 +135,7 @@ export default function CampaignsPage() {
         if (json.success && json.state === 'open') {
           setActiveQr(null)
           clearInterval(interval)
-          alert('WhatsApp Connected Successfully!')
+          alert('تم ربط الواتساب بنجاح!')
           await load()
         }
       } catch (e) {
@@ -155,11 +163,11 @@ export default function CampaignsPage() {
           pairingCode: json.pairingCode
         })
       } else {
-        alert('Failed to generate QR Code. Please check Evolution API integration settings.')
+        alert('فشل في إنشاء رمز الاستجابة السريعة (QR Code). يرجى التحقق من إعدادات Evolution API.')
         setActiveQr(null)
       }
     } catch (e) {
-      alert('Failed to connect')
+      alert('فشل في الاتصال')
       setActiveQr(null)
     } finally {
       setQrLoading(false)
@@ -167,7 +175,7 @@ export default function CampaignsPage() {
   }
 
   async function handleDisconnect(numberId: string) {
-    if (!confirm('Are you sure you want to disconnect this WhatsApp number?')) return
+    if (!confirm('هل أنت متأكد أنك تريد قطع الاتصال بهذا الرقم؟')) return
     setConnectionStates(prev => ({ ...prev, [numberId]: 'loading' }))
     try {
       const res = await fetch(`/api/portfolio-whatsapp-numbers/connect?id=${numberId}`, {
@@ -177,11 +185,11 @@ export default function CampaignsPage() {
         setConnectionStates(prev => ({ ...prev, [numberId]: 'close' }))
         await load()
       } else {
-        alert('Failed to disconnect')
+        alert('فشل في قطع الاتصال')
         void fetchConnectionStatuses(numbers)
       }
     } catch (e) {
-      alert('Failed to disconnect')
+      alert('فشل في قطع الاتصال')
       void fetchConnectionStatuses(numbers)
     }
   }
@@ -244,76 +252,67 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div className="space-y-6" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-2xl font-bold">
-            {locale === 'ar' ? 'محرك الحملات' : 'Campaign Engine'}
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {locale === 'ar'
-              ? 'إدارة حملات التحصيل، أرقام الواتساب للمشاريع، الطاقة اليومية، وجاهزية صف الانتظار.'
-              : 'Manage collection campaigns, project WhatsApp numbers, daily capacity, and queue readiness.'}
-          </p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+            <Megaphone size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">محرك الحملات التسويقية (Campaign Engine)</h1>
+            <p className="text-slate-500 text-sm">إدارة حملات التحصيل، أرقام الواتساب للمشاريع، وتنظيم طوابير الإرسال.</p>
+          </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setShowNumberForm(p => !p)} className="btn-secondary text-sm">
-            {showNumberForm 
-              ? (locale === 'ar' ? 'إلغاء الرقم' : 'Cancel Number') 
-              : (locale === 'ar' ? 'ربط رقم واتساب +' : '+ WhatsApp Number')}
+        <div className="flex gap-3">
+          <button onClick={() => setShowNumberForm(p => !p)} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#1e3e50] font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+            {showNumberForm ? 'إلغاء الرقم' : <><LinkIcon size={18} /> ربط رقم واتساب</>}
           </button>
-          <button onClick={() => setShowCampaignForm(p => !p)} className="btn-primary text-sm">
-            {showCampaignForm 
-              ? (locale === 'ar' ? 'إلغاء الحملة' : 'Cancel Campaign') 
-              : (locale === 'ar' ? 'حملة جديدة +' : '+ New Campaign')}
+          <button onClick={() => setShowCampaignForm(p => !p)} className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+            {showCampaignForm ? 'إلغاء الحملة' : <><Plus size={18} /> حملة جديدة</>}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs">{t.nav.campaigns}</div>
-          <div className="font-display text-2xl font-bold">{campaigns.length}</div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="text-slate-500 text-sm font-bold mb-1">إجمالي الحملات</div>
+          <div className="text-3xl font-bold text-[#1e3e50]">{campaigns.length}</div>
         </div>
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs">
-            {locale === 'ar' ? 'نشطة جارية' : 'Running'}
-          </div>
-          <div className="font-display text-2xl font-bold text-green-500">{runningCampaigns}</div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="text-slate-500 text-sm font-bold mb-1">حملات نشطة (جارية)</div>
+          <div className="text-3xl font-bold text-emerald-500">{runningCampaigns}</div>
         </div>
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs">{t.nav.whatsapp}</div>
-          <div className="font-display text-2xl font-bold">{activeNumbers}</div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="text-slate-500 text-sm font-bold mb-1">أرقام واتساب الفعالة</div>
+          <div className="text-3xl font-bold text-blue-500">{activeNumbers}</div>
         </div>
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs">
-            {locale === 'ar' ? 'القدرة اليومية' : 'Daily Capacity'}
-          </div>
-          <div className="font-display text-2xl font-bold text-brand-500">{String(dailyCapacity)}</div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="text-slate-500 text-sm font-bold mb-1">القدرة الاستيعابية اليومية</div>
+          <div className="text-3xl font-bold text-purple-500">{String(dailyCapacity)}</div>
         </div>
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs">
-            {locale === 'ar' ? 'أُرسل اليوم' : 'Sent Today'}
-          </div>
-          <div className="font-display text-2xl font-bold">{String(sentToday)}</div>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="text-slate-500 text-sm font-bold mb-1">تم إرساله اليوم</div>
+          <div className="text-3xl font-bold text-orange-500">{String(sentToday)}</div>
         </div>
       </div>
 
       {showNumberForm && (
-        <form onSubmit={handleAddNumber} className="card p-5 space-y-4">
-          <div className="font-display font-semibold text-sm">Link WhatsApp Number to Project</div>
+        <form onSubmit={handleAddNumber} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
+          <div className="font-bold text-lg text-[#1e3e50] border-b border-slate-100 pb-3 flex items-center gap-2">
+            <MessageSquare size={18} className="text-emerald-500" />
+            ربط رقم واتساب جديد بمحفظة (Portfolio)
+          </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Project / Portfolio *</label>
-              <select
-                required
-                className="input text-sm"
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">المشروع / المحفظة *</label>
+              <select required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.portfolio_id}
-                onChange={e => setNumberForm(p => ({ ...p, portfolio_id: e.target.value }))}
-              >
-                <option value="">Select project</option>
+                onChange={e => setNumberForm(p => ({ ...p, portfolio_id: e.target.value }))}>
+                <option value="">اختر المشروع...</option>
                 {portfolios.map(p => (
                   <option key={p.id} value={p.id}>
                     {p.code ? `${p.code} - ` : ''}{p.name_ar || p.name}
@@ -322,191 +321,165 @@ export default function CampaignsPage() {
               </select>
             </div>
 
-            <div>
-              <label className="label">Display Name</label>
-              <input
-                className="input text-sm"
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">الاسم الرمزي (اختياري)</label>
+              <input className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.display_name}
                 onChange={e => setNumberForm(p => ({ ...p, display_name: e.target.value }))}
-                placeholder="STC WhatsApp"
-              />
+                placeholder="مثال: واتساب موبايلي" />
             </div>
 
-            <div>
-              <label className="label">Phone Number *</label>
-              <input
-                required
-                className="input text-sm"
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">رقم الهاتف *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.phone_number}
                 onChange={e => setNumberForm(p => ({ ...p, phone_number: e.target.value }))}
-                placeholder="9665XXXXXXXX"
-              />
+                placeholder="9665XXXXXXXX" dir="ltr" />
             </div>
 
-            <div>
-              <label className="label">Evolution Instance *</label>
-              <input
-                required
-                className="input text-sm"
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">اسم خادم Evolution *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.instance_name}
-                onChange={e => setNumberForm(p => ({ ...p, instance_name: e.target.value }))}
-              />
+                onChange={e => setNumberForm(p => ({ ...p, instance_name: e.target.value }))} dir="ltr" />
             </div>
 
-            <div>
-              <label className="label">Evolution API URL</label>
-              <input
-                className="input text-sm"
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">رابط الخادم (Evolution API URL)</label>
+              <input className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.api_url}
-                onChange={e => setNumberForm(p => ({ ...p, api_url: e.target.value }))}
-              />
+                onChange={e => setNumberForm(p => ({ ...p, api_url: e.target.value }))} dir="ltr" />
             </div>
 
-            <div>
-              <label className="label">Daily Limit</label>
-              <input
-                type="number"
-                min={1}
-                max={5000}
-                className="input text-sm"
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">الحد الأقصى للإرسال اليومي</label>
+              <input type="number" min={1} max={5000} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.daily_limit}
-                onChange={e => setNumberForm(p => ({ ...p, daily_limit: Number(e.target.value) }))}
-              />
+                onChange={e => setNumberForm(p => ({ ...p, daily_limit: Number(e.target.value) }))} />
             </div>
           </div>
 
-          <button type="submit" disabled={saving} className="btn-primary text-sm px-6">
-            {saving ? 'Saving...' : 'Save WhatsApp Number'}
-          </button>
+          <div className="flex justify-end pt-2">
+            <button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-8 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50">
+              {saving ? 'جارٍ الحفظ…' : 'حفظ بيانات الرقم'}
+            </button>
+          </div>
         </form>
       )}
 
       {showCampaignForm && (
-        <form onSubmit={handleAddCampaign} className="card p-5 space-y-4">
-          <div className="font-display font-semibold text-sm">New Campaign Draft</div>
-
-          <div>
-            <label className="label">Campaign Name *</label>
-            <input
-              required
-              className="input text-sm"
-              value={campaignForm.name}
-              onChange={e => setCampaignForm(p => ({ ...p, name: e.target.value }))}
-            />
+        <form onSubmit={handleAddCampaign} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
+          <div className="font-bold text-lg text-[#1e3e50] border-b border-slate-100 pb-3 flex items-center gap-2">
+            <Megaphone size={18} className="text-blue-500" />
+            صياغة مسودة حملة جديدة
           </div>
 
-          <div>
-            <label className="label">Campaign Type</label>
-            <select
-              className="input text-sm"
-              value={campaignForm.campaign_type}
-              onChange={e => setCampaignForm(p => ({ ...p, campaign_type: e.target.value }))}
-            >
-              {Object.entries(TYPE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">اسم الحملة *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+                value={campaignForm.name}
+                onChange={e => setCampaignForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="حملة العيد، حملة الرواتب..." />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-slate-500 pl-2">نوع الحملة</label>
+              <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+                value={campaignForm.campaign_type}
+                onChange={e => setCampaignForm(p => ({ ...p, campaign_type: e.target.value }))}>
+                {Object.entries(TYPE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-sm font-bold text-slate-500 pl-2">قالب الرسالة الافتتاحية</label>
+              <textarea rows={3} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50] resize-none"
+                placeholder="اكتب رسالة الواتساب الأولى التي سيبدأ بها الذكاء الاصطناعي محادثته..."
+                value={campaignForm.message_template}
+                onChange={e => setCampaignForm(p => ({ ...p, message_template: e.target.value }))} />
+            </div>
           </div>
 
-          <div>
-            <label className="label">Message Template</label>
-            <textarea
-              rows={3}
-              className="input text-sm"
-              placeholder="Initial WhatsApp message..."
-              value={campaignForm.message_template}
-              onChange={e => setCampaignForm(p => ({ ...p, message_template: e.target.value }))}
-            />
+          <div className="bg-amber-50 text-amber-600 px-4 py-3 rounded-xl text-xs font-bold border border-amber-100 flex items-center gap-2">
+            ستُحفظ الحملة في حالة (مسودة). يمكنك لاحقاً تفعيلها وتشغيل منظم طوابير الإرسال (Queue Worker).
           </div>
 
-          <p className="text-slate-400 text-xs">
-            Campaign will be saved as draft. Queue worker and launch approval will be enabled in the next step.
-          </p>
-
-          <button type="submit" disabled={saving} className="btn-primary text-sm px-6">
-            {saving ? 'Saving...' : 'Create Draft'}
-          </button>
+          <div className="flex justify-end pt-2">
+            <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50">
+              {saving ? 'جارٍ الحفظ…' : 'إنشاء الحملة (مسودة)'}
+            </button>
+          </div>
         </form>
       )}
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
+            <Smartphone className="text-[#1e3e50]" size={20} />
             <div>
-              <div className="font-display font-semibold">
-                {locale === 'ar' ? 'أرقام الواتساب للمشاريع' : 'Project WhatsApp Numbers'}
-              </div>
-              <div className="text-slate-500 text-xs">
-                {locale === 'ar'
-                  ? 'يمكن لكل محفظة استخدام رقم واتساب وحد إرسال يومي خاص بها.'
-                  : 'Each portfolio can use its own Evolution instance and daily limit.'}
-              </div>
+              <h2 className="text-lg font-bold text-[#1e3e50]">أرقام الواتساب المرتبطة بالمشاريع</h2>
+              <div className="text-slate-500 text-xs mt-0.5">يمكن تخصيص رقم منفصل وحد إرسال لكل محفظة.</div>
             </div>
           </div>
 
           {loading ? (
-            <div className="text-slate-500 text-sm py-8 text-center">{t.common.loading}</div>
+            <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div></div>
           ) : numbers.length === 0 ? (
-            <div className="text-slate-400 text-sm py-8 text-center">
-              {locale === 'ar' ? 'لا توجد أرقام واتساب مرتبطة بعد.' : 'No WhatsApp numbers linked yet.'}
-            </div>
+            <div className="text-slate-400 text-sm py-8 text-center font-bold">لا توجد أرقام واتساب مرتبطة بعد.</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {numbers.map(number => (
-                <div key={number.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div key={number.id} className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-medium text-sm">{number.display_name || number.phone_number}</div>
-                      <div className="text-slate-500 text-xs mt-1">
+                      <div className="font-bold text-[#1e3e50] text-base">{number.display_name || number.phone_number}</div>
+                      <div className="text-slate-500 text-sm mt-1">
                         {number.portfolio?.code ? `${number.portfolio.code} - ` : ''}
-                        {number.portfolio?.name_ar || number.portfolio?.name || 'Portfolio'}
+                        {number.portfolio?.name_ar || number.portfolio?.name || 'محفظة غير معروفة'}
                       </div>
-                      <div className="text-slate-400 text-xs mt-1">
+                      <div className="text-slate-400 text-xs mt-1 font-mono">
                         {number.provider} / {number.instance_name}
                       </div>
                     </div>
-                    <span className={`status-badge text-[10px] ${
-                      connectionStates[number.id] === 'open' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                      connectionStates[number.id] === 'connecting' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                      connectionStates[number.id] === 'loading' ? 'bg-slate-100 text-slate-400 animate-pulse' :
-                      'bg-red-500/10 text-red-500 border-red-500/20'
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border flex items-center gap-1 ${
+                      connectionStates[number.id] === 'open' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                      connectionStates[number.id] === 'connecting' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                      connectionStates[number.id] === 'loading' ? 'bg-slate-50 text-slate-500 border-slate-200 animate-pulse' :
+                      'bg-rose-50 text-rose-600 border-rose-200'
                     }`}>
-                      {connectionStates[number.id] === 'open' ? t.whatsapp.connected :
-                       connectionStates[number.id] === 'connecting' ? t.whatsapp.qr_pending :
-                       connectionStates[number.id] === 'loading' ? (locale === 'ar' ? 'تحقق...' : 'checking') :
-                       t.whatsapp.disconnected}
+                      {connectionStates[number.id] === 'open' ? 'متصل' :
+                       connectionStates[number.id] === 'connecting' ? 'بانتظار المسح (QR)' :
+                       connectionStates[number.id] === 'loading' ? 'جاري التحقق...' :
+                       'مقطوع الاتصال'}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-4 text-xs">
-                    <div className="rounded-lg bg-slate-100 border border-slate-200/50 p-3">
-                      <div className="text-slate-500">{t.whatsapp.daily_limit}</div>
-                      <div className="font-semibold text-slate-800">{String(Number(number.daily_limit ?? 0))}</div>
+                  <div className="grid grid-cols-2 gap-3 mt-5 text-sm">
+                    <div className="rounded-xl bg-[#f0f4f8] border border-slate-100 p-3 text-center">
+                      <div className="text-slate-500 font-bold text-xs mb-1">الحد اليومي</div>
+                      <div className="font-bold text-[#1e3e50] text-lg font-mono">{String(Number(number.daily_limit ?? 0))}</div>
                     </div>
-                    <div className="rounded-lg bg-slate-100 border border-slate-200/50 p-3">
-                      <div className="text-slate-500">{t.whatsapp.sent_today}</div>
-                      <div className="font-semibold text-slate-800">{String(Number(number.sent_today ?? 0))}</div>
+                    <div className="rounded-xl bg-[#f0f4f8] border border-slate-100 p-3 text-center">
+                      <div className="text-slate-500 font-bold text-xs mb-1">تم الإرسال</div>
+                      <div className="font-bold text-blue-600 text-lg font-mono">{String(Number(number.sent_today ?? 0))}</div>
                     </div>
                   </div>
 
-                  <div className="flex gap-2 mt-4 justify-end border-t border-slate-200/50 pt-3">
+                  <div className="flex gap-2 mt-5 justify-end">
                     {connectionStates[number.id] === 'open' ? (
-                      <button
-                        onClick={() => handleDisconnect(number.id)}
-                        className="text-xs font-semibold text-red-600 hover:text-red-500 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition"
-                      >
-                        {locale === 'ar' ? 'قطع الاتصال' : 'Disconnect'}
+                      <button onClick={() => handleDisconnect(number.id)}
+                        className="text-xs font-bold text-rose-600 hover:text-white border border-rose-200 hover:border-transparent hover:bg-rose-500 px-4 py-2 rounded-xl transition-colors">
+                        قطع الاتصال
                       </button>
                     ) : connectionStates[number.id] === 'loading' ? (
-                      <span className="text-slate-400 text-xs py-1.5">
-                        {locale === 'ar' ? 'جاري التحقق...' : 'Checking status...'}
-                      </span>
+                      <span className="text-slate-400 text-xs py-2 font-bold">يتحقق من الخادم...</span>
                     ) : (
-                      <button
-                        onClick={() => handleConnect(number.id)}
-                        className="text-xs font-semibold text-brand-600 hover:text-brand-500 bg-brand-500/10 hover:bg-brand-500/20 px-3 py-1.5 rounded-lg transition"
-                      >
-                        {locale === 'ar' ? 'ربط الرقم' : 'Connect WhatsApp'}
+                      <button onClick={() => handleConnect(number.id)}
+                        className="text-xs font-bold text-emerald-600 hover:text-white border border-emerald-200 hover:border-transparent hover:bg-emerald-500 px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5">
+                        <QrCode size={14} /> ربط الرقم (إظهار الباركود)
                       </button>
                     )}
                   </div>
@@ -516,87 +489,78 @@ export default function CampaignsPage() {
           )}
         </div>
 
-        <div className="card p-5">
-          <div className="font-display font-semibold mb-1">
-            {locale === 'ar' ? 'بنية صف التحصيل' : 'Queue Foundation'}
-          </div>
-          <div className="text-slate-500 text-xs mb-4">
-            {locale === 'ar'
-              ? 'جداول الطوابير جاهزة. سيتم إلحاق عامل الطابور لاحقاً لجدولة الرسائل للمستلمين بأمان.'
-              : 'Queue tables are ready. Worker will be added next to schedule and send recipients safely.'}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
+            <Activity className="text-[#1e3e50]" size={20} />
+            <div>
+              <h2 className="text-lg font-bold text-[#1e3e50]">بنية الطوابير والقواعد (Queue Foundation)</h2>
+              <div className="text-slate-500 text-xs mt-0.5">ضمان التوزيع العادل وحماية النظام من الحظر.</div>
+            </div>
           </div>
 
-          <div className="space-y-3 text-sm">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="font-medium">{locale === 'ar' ? 'قواعد إيقاف التحصيل' : 'Stop Rules'}</div>
-              <div className="text-slate-500 text-xs mt-1">
-                {locale === 'ar'
-                  ? 'الإيقاف التلقائي عند الرد، طلب دفع، اعتراض، وعد نشط، أو طلب تقسيط.'
-                  : 'Stop on reply, payment claim, dispute, open promise, or installment request.'}
+          <div className="space-y-4 text-sm mt-6">
+            <div className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">🛑</div>
+              <div>
+                <div className="font-bold text-[#1e3e50]">قواعد الإيقاف التلقائي</div>
+                <div className="text-slate-500 text-xs mt-1 leading-relaxed">يتوقف الواتساب فوراً عن إرسال الرسائل التلقائية إذا قام العميل بالرد، ادعاء الدفع، تقديم اعتراض، أو الدخول في وعد سداد.</div>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="font-medium">{locale === 'ar' ? 'تنظيم التدفق اليومي' : 'Daily Throttling'}</div>
-              <div className="text-slate-500 text-xs mt-1">
-                {locale === 'ar'
-                  ? 'كل رقم واتساب له حد إرسال يومي ومدة تأخير زمنية خاصة لمنع الحظر.'
-                  : 'Each WhatsApp number has its own daily limit and send delay window.'}
+            <div className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">⏳</div>
+              <div>
+                <div className="font-bold text-[#1e3e50]">التدفق الآمن (Throttling)</div>
+                <div className="text-slate-500 text-xs mt-1 leading-relaxed">جدولة الرسائل بفاصل زمني ديناميكي يمنع حظر الواتساب ويتوافق مع سياسات شركة Meta للرسائل التسويقية.</div>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="font-medium">{locale === 'ar' ? 'عزل المحافظ للمشاريع' : 'Portfolio Isolation'}</div>
-              <div className="text-slate-500 text-xs mt-1">
-                {locale === 'ar'
-                  ? 'فصل مشاريع الاتصالات (STC، موبايلي، زين)، التأمين، والخدمات الحكومية بمحافظ مستقلة.'
-                  : 'STC, Mobily, Zain, insurance, utility projects can be separated by portfolio.'}
+            <div className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0">🗂️</div>
+              <div>
+                <div className="font-bold text-[#1e3e50]">العزل الذكي للمحافظ</div>
+                <div className="text-slate-500 text-xs mt-1 leading-relaxed">لا تتداخل بيانات الحملات الخاصة بالاتصالات مع البنوك، كل محفظة تعمل باستقلال تام برقم واتساب مخصص لها.</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
+          <PlayCircle className="text-[#1e3e50]" size={20} />
           <div>
-            <div className="font-display font-semibold">
-              {t.nav.campaigns}
-            </div>
-            <div className="text-slate-500 text-xs">
-              {locale === 'ar' ? 'المسودات، الحملات المجدولة، ونتائج التحصيل.' : 'Drafts, scheduled campaigns, and collection results.'}
-            </div>
+            <h2 className="text-lg font-bold text-[#1e3e50]">سجل الحملات (Campaigns Log)</h2>
+            <div className="text-slate-500 text-xs mt-0.5">المسودات، الحملات المجدولة، ونتائج التحصيل المالية المباشرة.</div>
           </div>
         </div>
 
         {loading ? (
-          <div className="text-center text-slate-500 py-12">{t.common.loading}</div>
+          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div></div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {campaigns.length === 0 && (
-              <div className="p-10 text-center text-slate-400">
-                {locale === 'ar' ? 'لا توجد حملات بعد.' : 'No campaigns yet.'}
-              </div>
+              <div className="py-12 text-center text-slate-400 font-bold">لا توجد حملات مسجلة بعد. ابدأ بإنشاء مسودة حملة جديدة.</div>
             )}
 
             {campaigns.map(campaign => (
-              <div key={campaign.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-4">
+              <div key={campaign.id} className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-medium">{campaign.name}</span>
-                      <span className={`status-badge text-[10px] ${STATUS_STYLES[campaign.status]}`}>
-                        {campaign.status}
+                    <div className="flex items-center gap-3 flex-wrap mb-3">
+                      <span className="font-bold text-[#1e3e50] text-base">{campaign.name}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${STATUS_STYLES[campaign.status]}`}>
+                        {STATUS_ARABIC[campaign.status] ?? campaign.status}
                       </span>
-                      <span className="bg-slate-50 text-slate-500 text-[10px] px-1.5 py-0.5 rounded border border-slate-200">
+                      <span className="bg-[#f0f4f8] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">
                         {TYPE_LABELS[campaign.campaign_type] ?? campaign.campaign_type}
                       </span>
                     </div>
 
-                    <div className="flex gap-4 text-xs text-slate-500 flex-wrap">
-                      <span>{locale === 'ar' ? 'المستهدفين:' : 'Targets:'} {campaign.target_count}</span>
-                      <span>{locale === 'ar' ? 'المرسلة:' : 'Sent:'} {campaign.sent_count}</span>
-                      <span>{locale === 'ar' ? 'الردود:' : 'Replies:'} {campaign.response_count}</span>
-                      <span>{locale === 'ar' ? 'الدفعات:' : 'Payments:'} {campaign.payment_count}</span>
-                      <span>{locale === 'ar' ? 'المحصل:' : 'Collected:'} {String(Number(campaign.total_collected ?? 0))} SAR</span>
+                    <div className="flex gap-6 text-sm text-slate-500 flex-wrap font-medium">
+                      <div className="flex items-center gap-1.5"><Target size={14} className="text-slate-400"/> المستهدفين: {campaign.target_count}</div>
+                      <div className="flex items-center gap-1.5"><Megaphone size={14} className="text-blue-400"/> أُرسلت: {campaign.sent_count}</div>
+                      <div className="flex items-center gap-1.5"><MessageSquare size={14} className="text-purple-400"/> الردود: {campaign.response_count}</div>
+                      <div className="flex items-center gap-1.5"><Activity size={14} className="text-amber-400"/> الدفعات: {campaign.payment_count}</div>
+                      <div className="flex items-center gap-1.5 text-emerald-600 font-bold">المحصّل: {String(Number(campaign.total_collected ?? 0))} SAR</div>
                     </div>
                   </div>
                 </div>
@@ -605,64 +569,66 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        <div className="mt-5 grid grid-cols-3 gap-4 text-xs">
-          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
-            <div className="text-slate-500">{locale === 'ar' ? 'إجمالي المحصل' : 'Total Collected'}</div>
-            <div className="font-display text-lg font-bold text-brand-600">
-              {String(totalCollected)} SAR
-            </div>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm border-t border-slate-100 pt-6">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center">
+            <div className="text-emerald-600/80 font-bold text-xs mb-1">إجمالي المبالغ المحصلة (من الحملات)</div>
+            <div className="font-bold text-emerald-600 text-xl font-mono">{String(totalCollected)} SAR</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
-            <div className="text-slate-500">{locale === 'ar' ? 'الخطوة التالية' : 'Next Step'}</div>
-            <div className="font-semibold text-slate-800">{locale === 'ar' ? 'منظم صفوف الإرسال' : 'Queue Worker'}</div>
+          <div className="rounded-xl border border-slate-100 bg-[#fbfdfd] p-4 text-center">
+            <div className="text-slate-500 font-bold text-xs mb-1">حالة المعالجة في الخلفية</div>
+            <div className="font-bold text-[#1e3e50]">جاهز لإدارة الطوابير</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
-            <div className="text-slate-500">{t.debts.status}</div>
-            <div className="font-semibold text-brand-600">{locale === 'ar' ? 'جاهزية النظام' : 'Backend Ready'}</div>
+          <div className="rounded-xl border border-slate-100 bg-[#fbfdfd] p-4 text-center">
+            <div className="text-slate-500 font-bold text-xs mb-1">استقرار خوادم الإرسال</div>
+            <div className="font-bold text-[#1e3e50] flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> مستقر 100%</div>
           </div>
         </div>
       </div>
+
       {/* QR Code Modal for linking */}
       {activeQr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
-            <h2 className="font-display font-semibold text-lg">Scan QR Code to Link WhatsApp</h2>
-            <p className="text-slate-500 text-xs">Open WhatsApp on your phone, go to Linked Devices, and scan the code below.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white border border-slate-100 rounded-3xl w-full max-w-sm shadow-2xl p-8 text-center space-y-5">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <QrCode size={32} />
+            </div>
+            <h2 className="font-bold text-[#1e3e50] text-xl">مسح الباركود لربط الواتساب</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">افتح تطبيق الواتساب في هاتفك، اذهب إلى "الأجهزة المرتبطة"، وقم بمسح هذا الرمز.</p>
 
-            <div className="w-64 h-64 mx-auto flex items-center justify-center border border-slate-200 rounded-xl bg-slate-50 shadow-inner overflow-hidden">
+            <div className="w-64 h-64 mx-auto flex items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-white overflow-hidden p-2">
               {qrLoading ? (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-slate-400 text-xs">Generating QR Code...</span>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-4 border-[#1e3e50] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-slate-400 text-sm font-bold">جاري توليد الباركود...</span>
                 </div>
               ) : activeQr.qrCode ? (
                 <img
                   src={activeQr.qrCode.startsWith('data:') ? activeQr.qrCode : `data:image/png;base64,${activeQr.qrCode}`}
                   alt="WhatsApp Link QR"
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-contain"
                 />
               ) : (
-                <span className="text-slate-400 text-xs">No QR Code available</span>
+                <span className="text-slate-400 text-sm font-bold">الباركود غير متوفر</span>
               )}
             </div>
 
             {activeQr.pairingCode && (
-              <div className="bg-slate-100 rounded-lg p-2.5 text-xs">
-                <span className="text-slate-500 font-medium">Or enter Pairing Code: </span>
-                <span className="font-mono font-bold text-sm tracking-widest text-brand-600">{activeQr.pairingCode}</span>
+              <div className="bg-[#f0f4f8] rounded-xl p-3 text-sm">
+                <span className="text-slate-500 font-bold">أو أدخل كود الربط: </span>
+                <span className="font-mono font-bold text-lg tracking-widest text-[#1e3e50] block mt-1">{activeQr.pairingCode}</span>
               </div>
             )}
 
-            <div className="text-xs text-brand-500 font-medium flex items-center justify-center gap-1.5 animate-pulse">
-              <span className="w-1.5 h-1.5 bg-brand-500 rounded-full" />
-              Waiting for scanning...
+            <div className="text-sm text-emerald-600 font-bold flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+              في انتظار استجابة هاتفك...
             </div>
 
             <button
               onClick={() => setActiveQr(null)}
-              className="btn-secondary w-full text-sm"
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-[#1e3e50] font-bold text-sm px-6 py-3 rounded-xl transition-colors"
             >
-              Cancel
+              إلغاء وإغلاق
             </button>
           </div>
         </div>
@@ -670,4 +636,3 @@ export default function CampaignsPage() {
     </div>
   )
 }
-

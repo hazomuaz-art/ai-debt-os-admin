@@ -2,26 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import type { SystemConfig } from '@/types'
+import { Settings, ShieldAlert, Cpu, Activity, PowerOff } from 'lucide-react'
 
 const MODE_CONFIG = {
-  off:  { label: 'OFF',  desc: 'النظام يعرض التحليلات فقط — لا إرسال، لا اتصال تلقائي',  color: 'bg-slate-50 text-slate-500 border-slate-200',  dot: 'bg-slate-100' },
-  test: { label: 'TEST', desc: 'تجربة داخلية — يسجّل ما كان سيحدث بدون إرسال فعلي',       color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', dot: 'bg-yellow-400' },
-  live: { label: 'LIVE', desc: 'التشغيل الحقيقي — WhatsApp + AI + Calls + Campaigns',    color: 'bg-green-500/10 text-green-400 border-green-500/20',  dot: 'bg-green-400 animate-pulse' },
+  off:  { label: 'OFF (متوقف)',  desc: 'النظام يعرض التحليلات فقط — لا إرسال، لا اتصال تلقائي',  color: 'bg-slate-50 text-slate-500 border-slate-200',  dot: 'bg-slate-300', icon: PowerOff },
+  test: { label: 'TEST (تجريبي)', desc: 'تجربة داخلية — يسجّل ما كان سيحدث بدون إرسال فعلي للعميل',       color: 'bg-amber-50 text-amber-600 border-amber-200', dot: 'bg-amber-400', icon: Activity },
+  live: { label: 'LIVE (مباشر)', desc: 'التشغيل الحقيقي — WhatsApp + AI + Calls + Campaigns',    color: 'bg-emerald-50 text-emerald-600 border-emerald-200',  dot: 'bg-emerald-500 animate-pulse', icon: Cpu },
 } as const
 
-const MODULE_LABELS: Record<string, string> = {
-  smart_rules:         'Smart Rules Engine',
-  ai_memory:           'AI Memory',
-  behavior_profiles:   'Customer Behavior Profiles',
-  negotiation_engine:  'Negotiation Engine',
-  voice_collector:     'AI Voice Collector',
-  omnichannel_timeline:'Omnichannel Timeline',
-  campaign_engine:     'Campaign Engine',
-  approval_system:     'Approval System',
-  promise_tracker:     'Promise-to-Pay Tracker',
-  knowledge_base:      'Knowledge Base',
-  human_handoff:       'Human Handoff',
-  queue_priority:      'Queue Priority',
+const MODULE_LABELS: Record<string, { en: string, ar: string }> = {
+  smart_rules:         { en: 'Smart Rules Engine', ar: 'محرك القواعد الذكية' },
+  ai_memory:           { en: 'AI Memory', ar: 'ذاكرة الذكاء الاصطناعي' },
+  behavior_profiles:   { en: 'Customer Behavior Profiles', ar: 'ملفات سلوك العملاء' },
+  negotiation_engine:  { en: 'Negotiation Engine', ar: 'محرك التفاوض التلقائي' },
+  voice_collector:     { en: 'AI Voice Collector', ar: 'المحصل الصوتي بالذكاء الاصطناعي' },
+  omnichannel_timeline:{ en: 'Omnichannel Timeline', ar: 'التسلسل الزمني متعدد القنوات' },
+  campaign_engine:     { en: 'Campaign Engine', ar: 'محرك الحملات التسويقية' },
+  approval_system:     { en: 'Approval System', ar: 'نظام الموافقات' },
+  promise_tracker:     { en: 'Promise-to-Pay Tracker', ar: 'متتبع وعود السداد' },
+  knowledge_base:      { en: 'Knowledge Base', ar: 'قاعدة المعرفة' },
+  human_handoff:       { en: 'Human Handoff', ar: 'التحويل لموظف بشري' },
+  queue_priority:      { en: 'Queue Priority', ar: 'أولوية الطابور' },
 }
 
 export default function AutomationPage() {
@@ -70,121 +71,183 @@ export default function AutomationPage() {
   const mc   = MODE_CONFIG[mode]
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-display text-2xl font-bold">Automation Control</h1>
-          <p className="text-slate-500 text-sm mt-0.5">التحكم في وضع التشغيل والموديولات</p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+            <Settings size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إعدادات الأتمتة والتحكم</h1>
+            <p className="text-slate-500 text-sm">التحكم في أوضاع التشغيل، إيقاف الطوارئ، وضبط موديولات الذكاء الاصطناعي</p>
+          </div>
         </div>
-        {saving && <span className="text-slate-400 text-xs mt-2">جارٍ الحفظ…</span>}
-        {saved  && <span className="text-green-400 text-xs mt-2">✓ تم الحفظ</span>}
+        <div className="flex items-center gap-3">
+          {saving && <span className="text-blue-500 text-sm font-bold bg-blue-50 px-3 py-1 rounded-full animate-pulse">جارٍ الحفظ...</span>}
+          {saved  && <span className="text-emerald-500 text-sm font-bold bg-emerald-50 px-3 py-1 rounded-full">✓ تم الحفظ</span>}
+        </div>
       </div>
 
-      {/* Mode selector */}
-      <div className="card p-5 space-y-4">
-        <div className="font-display font-semibold text-sm">وضع التشغيل الحالي</div>
-        <div className="grid grid-cols-3 gap-3">
-          {(['off','test','live'] as const).map(m => {
-            const mc2 = MODE_CONFIG[m]
-            const isActive = mode === m
-            return (
-              <button key={m}
-                onClick={() => setMode(m)}
-                className={`p-4 rounded-xl border text-left transition-all ${isActive ? mc2.color : 'bg-white/3 border-slate-200 text-slate-400 hover:text-slate-500 hover:bg-slate-50'}`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-2 h-2 rounded-full ${isActive ? mc2.dot : 'bg-slate-100'}`} />
-                  <span className="font-display font-bold text-sm">{mc2.label}</span>
-                </div>
-                <p className="text-xs leading-relaxed opacity-70">{mc2.desc}</p>
-              </button>
-            )
-          })}
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column (Main Controls) */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Mode selector */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+              <Cpu className="text-[#1e3e50]" size={20} />
+              <h2 className="text-lg font-bold text-[#1e3e50]">وضع التشغيل الحالي (Mode)</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(['off','test','live'] as const).map(m => {
+                const mc2 = MODE_CONFIG[m]
+                const isActive = mode === m
+                const Icon = mc2.icon
+                return (
+                  <button key={m}
+                    onClick={() => setMode(m)}
+                    className={`p-5 rounded-2xl border text-right transition-all flex flex-col gap-3 ${isActive ? `${mc2.color} shadow-sm ring-2 ring-offset-2 ring-${mc2.color.split(' ')[1].replace('text-', '')}` : 'bg-[#fbfdfd] border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <Icon size={18} />
+                        <span className="font-bold text-base">{mc2.label}</span>
+                      </div>
+                      <div className={`w-3 h-3 rounded-full shadow-sm ${isActive ? mc2.dot : 'bg-slate-200'}`} />
+                    </div>
+                    <p className={`text-xs leading-relaxed ${isActive ? 'opacity-90' : 'opacity-70'}`}>{mc2.desc}</p>
+                  </button>
+                )
+              })}
+            </div>
 
-        {/* Live confirmation */}
-        {confirmLive && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 space-y-3">
-            <div className="text-green-400 font-semibold text-sm">⚠ تأكيد تفعيل LIVE Mode</div>
-            <p className="text-slate-500 text-xs">سيبدأ النظام بإرسال رسائل WhatsApp وإجراء اتصالات AI فعلية. تأكد من ضبط الحدود اليومية أولاً.</p>
-            <div className="flex gap-3">
-              <button onClick={() => { setConfirmLive(false); void save({ automation_mode: 'live' }) }}
-                className="btn-primary text-sm px-4 py-1.5">نعم، فعّل LIVE</button>
-              <button onClick={() => setConfirmLive(false)}
-                className="btn-secondary text-sm px-4 py-1.5">إلغاء</button>
+            {/* Live confirmation */}
+            {confirmLive && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-4 mt-4 animate-in fade-in slide-in-from-top-2">
+                <div className="text-emerald-700 font-bold text-sm flex items-center gap-2">
+                  <ShieldAlert size={18} />
+                  تأكيد تفعيل التشغيل المباشر (LIVE Mode)
+                </div>
+                <p className="text-emerald-600/80 text-sm">سيبدأ النظام بإرسال رسائل WhatsApp وإجراء اتصالات AI فعلية بالعملاء. تأكد من ضبط الحدود اليومية بشكل صحيح قبل المتابعة.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => { setConfirmLive(false); void save({ automation_mode: 'live' }) }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm">
+                    نعم، فعّل النظام المباشر
+                  </button>
+                  <button onClick={() => setConfirmLive(false)}
+                    className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Module toggles */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+              <Activity className="text-[#1e3e50]" size={20} />
+              <h2 className="text-lg font-bold text-[#1e3e50]">الوحدات الذكية (Smart Modules)</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {Object.entries(MODULE_LABELS).map(([key, labels]) => {
+                const enabled = !!(config.modules as Record<string,boolean> | undefined)?.[key]
+                return (
+                  <div key={key}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
+                      enabled
+                        ? 'bg-[#e6f0f9]/50 border-blue-200'
+                        : 'bg-[#fbfdfd] border-slate-200'
+                    }`}
+                  >
+                    <div>
+                      <div className={`font-bold text-sm ${enabled ? 'text-[#1e3e50]' : 'text-slate-500'}`}>{labels.en}</div>
+                      <div className={`text-xs mt-0.5 ${enabled ? 'text-blue-600/70' : 'text-slate-400'}`}>{labels.ar}</div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => toggleModule(key, !enabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-slate-300'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? '-translate-x-6' : '-translate-x-1'}`} />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Emergency stops */}
-      <div className="card p-5">
-        <div className="font-display font-semibold text-sm mb-4 text-red-400">🛑 Emergency Stop Controls</div>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { key: 'emergency_stop_all' as const,      label: 'إيقاف كل شيء' },
-            { key: 'emergency_stop_ai' as const,       label: 'إيقاف AI فقط' },
-            { key: 'emergency_stop_whatsapp' as const, label: 'إيقاف WhatsApp' },
-            { key: 'emergency_stop_calls' as const,    label: 'إيقاف المكالمات' },
-          ].map(({ key, label }) => (
-            <button key={key}
-              onClick={() => toggleEmergency(key)}
-              className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
-                config[key]
-                  ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                  : 'bg-white/3 text-slate-500 border-slate-200 hover:text-slate-600'
-              }`}
-            >
-              {config[key] ? '🔴 ' : '⚪ '}{label}
-            </button>
-          ))}
         </div>
-      </div>
 
-      {/* Usage limits */}
-      <div className="card p-5 space-y-4">
-        <div className="font-display font-semibold text-sm">Usage Limits (Cost Shield)</div>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { key: 'daily_ai_calls_limit' as const,      label: 'حد AI calls / يوم' },
-            { key: 'daily_whatsapp_limit' as const,      label: 'حد WhatsApp / يوم' },
-            { key: 'daily_call_analysis_limit' as const, label: 'حد تحليل مكالمات / يوم' },
-            { key: 'monthly_cost_limit' as const,        label: 'حد التكلفة الشهرية ($)' },
-          ].map(({ key, label }) => (
-            <div key={key}>
-              <label className="label">{label}</label>
-              <input type="number" min="0" className="input text-sm w-full"
-                value={String(config[key] ?? '')}
-                onChange={e => setConfig(p => ({ ...p, [key]: Number(e.target.value) }))}
-                onBlur={() => void save({})}
-              />
+        {/* Right Column (Emergency & Limits) */}
+        <div className="space-y-6">
+          
+          {/* Emergency stops */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+              <ShieldAlert className="text-rose-500" size={20} />
+              <h2 className="text-lg font-bold text-rose-600">أزرار الطوارئ (Emergency Stop)</h2>
             </div>
-          ))}
-        </div>
-      </div>
+            
+            <div className="flex flex-col gap-3">
+              {[
+                { key: 'emergency_stop_all' as const,      label: 'إيقاف النظام بالكامل' },
+                { key: 'emergency_stop_ai' as const,       label: 'إيقاف الذكاء الاصطناعي فقط' },
+                { key: 'emergency_stop_whatsapp' as const, label: 'إيقاف إرسال الواتساب' },
+                { key: 'emergency_stop_calls' as const,    label: 'إيقاف المكالمات الصوتية' },
+              ].map(({ key, label }) => {
+                const isStopped = config[key]
+                return (
+                  <button key={key}
+                    onClick={() => toggleEmergency(key)}
+                    className={`p-4 rounded-xl border text-sm font-bold transition-all flex items-center justify-between ${
+                      isStopped
+                        ? 'bg-rose-50 text-rose-600 border-rose-200 shadow-sm ring-1 ring-rose-200'
+                        : 'bg-[#fbfdfd] text-slate-500 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isStopped ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-400'}`}>
+                      <PowerOff size={16} />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-      {/* Module toggles */}
-      <div className="card p-5">
-        <div className="font-display font-semibold text-sm mb-4">Module Toggles</div>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(MODULE_LABELS).map(([key, label]) => {
-            const enabled = !!(config.modules as Record<string,boolean> | undefined)?.[key]
-            return (
-              <button key={key}
-                onClick={() => toggleModule(key, !enabled)}
-                className={`flex items-center justify-between p-3 rounded-lg border text-sm transition-colors ${
-                  enabled
-                    ? 'bg-brand-600/10 border-brand-500/20 text-slate-900'
-                    : 'bg-white/3 border-slate-200 text-slate-500'
-                }`}
-              >
-                <span className="truncate">{label}</span>
-                <span className={`ml-2 shrink-0 text-xs px-1.5 py-0.5 rounded ${enabled ? 'bg-brand-500/20 text-brand-400' : 'bg-slate-50 text-slate-400'}`}>
-                  {enabled ? 'ON' : 'OFF'}
-                </span>
-              </button>
-            )
-          })}
+          {/* Usage limits */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+              <Activity className="text-[#1e3e50]" size={20} />
+              <h2 className="text-lg font-bold text-[#1e3e50]">حدود الاستخدام (Cost Shield)</h2>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              {[
+                { key: 'daily_ai_calls_limit' as const,      label: 'الحد الأقصى لاتصالات AI (يومياً)' },
+                { key: 'daily_whatsapp_limit' as const,      label: 'الحد الأقصى لرسائل الواتساب (يومياً)' },
+                { key: 'daily_call_analysis_limit' as const, label: 'الحد الأقصى لتحليل المكالمات (يومياً)' },
+                { key: 'monthly_cost_limit' as const,        label: 'الحد الأقصى للتكلفة الشهرية ($)' },
+              ].map(({ key, label }) => (
+                <div key={key} className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 pl-2">{label}</label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+                    value={String(config[key] ?? '')}
+                    onChange={e => setConfig(p => ({ ...p, [key]: Number(e.target.value) }))}
+                    onBlur={() => void save({})}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import AnalyticsCharts from '@/components/dashboard/AnalyticsCharts'
+import { BarChart3, Wallet, Target, Activity } from 'lucide-react'
 
 export default async function AnalyticsPage() {
   const supabase = createClient()
@@ -21,7 +22,7 @@ export default async function AnalyticsPage() {
     const d = new Date()
     d.setMonth(d.getMonth() - (5 - i))
     return {
-      label: d.toLocaleString('en', { month: 'short', year: '2-digit' }),
+      label: d.toLocaleString('ar', { month: 'short', year: '2-digit' }),
       start: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0],
       end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0],
     }
@@ -116,32 +117,58 @@ export default async function AnalyticsPage() {
   const riskChartData = Object.entries(riskCounts).map(([name, value]) => ({ name, value }))
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-syne">Analytics</h1>
-        <p className="text-slate-400">Portfolio performance and collection intelligence</p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+            <BarChart3 size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">التحليلات والمؤشرات (Analytics)</h1>
+            <p className="text-slate-500 text-sm">أداء المحفظة الاستثمارية وذكاء التحصيل المالي</p>
+          </div>
+        </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat-card">
-          <p className="text-slate-400 text-sm">Total Debts</p>
-          <p className="text-2xl font-bold font-syne">{totalDebts.toLocaleString()}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-slate-500 text-sm font-bold">إجمالي المطالبات</div>
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center"><BarChart3 size={20} /></div>
+          </div>
+          <div className="text-3xl font-bold text-[#1e3e50] font-mono">{totalDebts.toLocaleString()}</div>
         </div>
-        <div className="stat-card">
-          <p className="text-slate-400 text-sm">Total Portfolio</p>
-          <p className="text-2xl font-bold font-syne">{formatCurrency(totalOriginal, 'SAR')}</p>
+
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-slate-500 text-sm font-bold">إجمالي المحفظة</div>
+            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center"><Wallet size={20} /></div>
+          </div>
+          <div className="text-3xl font-bold text-emerald-600 font-mono">{formatCurrency(totalOriginal, 'SAR')}</div>
         </div>
-        <div className="stat-card">
-          <p className="text-slate-400 text-sm">Collection Rate</p>
-          <p className="text-2xl font-bold font-syne text-brand-400">{collectionRate.toFixed(1)}%</p>
+
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-slate-500 text-sm font-bold">معدل التحصيل العام</div>
+            <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center"><Target size={20} /></div>
+          </div>
+          <div className="text-3xl font-bold text-purple-600 font-mono">{collectionRate.toFixed(1)}%</div>
         </div>
-        <div className="stat-card">
-          <p className="text-slate-400 text-sm">Avg AI Score</p>
-          <p className={`text-2xl font-bold font-syne ${avgScore >= 60 ? 'text-green-400' : avgScore >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-slate-500 text-sm font-bold">متوسط تقييم الذكاء الاصطناعي</div>
+            <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center"><Activity size={20} /></div>
+          </div>
+          <div className={`text-3xl font-bold font-mono ${avgScore >= 60 ? 'text-emerald-500' : avgScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
             {avgScore || '—'}
-          </p>
+          </div>
         </div>
+
       </div>
 
       {/* Charts — client component with Recharts */}

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatDate, getStatusColor, formatCurrency } from '@/lib/utils'
 import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
+import { Users, Activity, CheckCircle, Wallet } from 'lucide-react'
 
 export default async function AdminTeamPage() {
   const supabase = createClient()
@@ -46,60 +47,82 @@ export default async function AdminTeamPage() {
   }))
 
   const roleColors = {
-    admin: 'bg-brand-600/20 text-brand-400 border-brand-600/30',
-    manager: 'bg-purple-600/20 text-purple-400 border-purple-600/30',
-    collector: 'bg-green-600/20 text-green-400 border-green-600/30',
+    admin: 'bg-rose-50 text-rose-600 border-rose-200',
+    manager: 'bg-purple-50 text-purple-600 border-purple-200',
+    collector: 'bg-blue-50 text-blue-600 border-blue-200',
+  }
+
+  const roleArabic = {
+    admin: 'مدير نظام',
+    manager: 'مشرف تحصيل',
+    collector: 'موظف تحصيل',
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold">Team</h1>
-          <p className="text-slate-500 text-sm">{memberStats.length} team members</p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+            <Users size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إدارة فريق العمل (Team)</h1>
+            <p className="text-slate-500 text-sm">إدارة الموظفين، الصلاحيات، ومتابعة الأداء الشهري</p>
+          </div>
         </div>
+        
         <InviteUserModal companyId={profile.company_id} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {memberStats.map(member => (
-          <div key={member.id} className="card p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-brand-800/50 rounded-full flex items-center justify-center font-semibold">
+          <div key={member.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
+            
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-100 text-[#1e3e50] rounded-full flex items-center justify-center font-bold text-xl shrink-0">
                   {member.full_name?.charAt(0) ?? member.email.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-medium">{member.full_name ?? 'Unnamed'}</div>
-                  <div className="text-slate-500 text-xs">{member.email}</div>
+                  <div className="font-bold text-[#1e3e50] text-lg">{member.full_name ?? 'بدون اسم'}</div>
+                  <div className="text-slate-400 text-xs font-mono">{member.email}</div>
                 </div>
               </div>
-              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium border ${roleColors[member.role as keyof typeof roleColors]}`}>
-                {member.role}
+              <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold border ${roleColors[member.role as keyof typeof roleColors] ?? 'bg-slate-50 text-slate-500'}`}>
+                {roleArabic[member.role as keyof typeof roleArabic] ?? member.role}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-white/3 rounded-lg p-2">
-                <div className="font-display font-bold text-lg">{member.assignedDebts}</div>
-                <div className="text-slate-400 text-[10px]">Assigned</div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="bg-[#f0f4f8] rounded-xl p-3 text-center">
+                <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Activity size={12}/> المسندة</div>
+                <div className="font-bold text-[#1e3e50] text-xl font-mono">{member.assignedDebts}</div>
               </div>
-              <div className="bg-white/3 rounded-lg p-2">
-                <div className="font-display font-bold text-lg text-green-400">
+              <div className="bg-[#f0f4f8] rounded-xl p-3 text-center">
+                <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Wallet size={12}/> تم التحصيل</div>
+                <div className="font-bold text-emerald-600 text-xl font-mono">
                   {formatCurrency(member.collectedThisMonth, 'SAR').replace('SAR', '').trim()}
                 </div>
-                <div className="text-slate-400 text-[10px]">Collected</div>
               </div>
-              <div className="bg-white/3 rounded-lg p-2">
-                <div className="font-display font-bold text-lg text-brand-400">{member.actionsCompletedToday}</div>
-                <div className="text-slate-400 text-[10px]">Actions</div>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-200">
-              <div className={`inline-flex items-center gap-1.5 text-xs ${member.is_active ? 'text-green-400' : 'text-slate-400'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${member.is_active ? 'bg-green-400' : 'bg-slate-100'}`} />
-                {member.is_active ? 'Active' : 'Inactive'}
+              <div className="bg-[#f0f4f8] rounded-xl p-3 text-center">
+                <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><CheckCircle size={12}/> أُنجزت اليوم</div>
+                <div className="font-bold text-blue-600 text-xl font-mono">{member.actionsCompletedToday}</div>
               </div>
             </div>
+
+            <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-center">
+              <div className={`inline-flex items-center gap-2 text-xs font-bold ${member.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <span className={`w-2 h-2 rounded-full ${member.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                {member.is_active ? 'نشط الآن' : 'غير نشط'}
+              </div>
+              <button className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                تعديل الصلاحيات
+              </button>
+            </div>
+
           </div>
         ))}
       </div>

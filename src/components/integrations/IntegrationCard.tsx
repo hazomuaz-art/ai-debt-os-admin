@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import type { IntegrationSetting } from '@/types'
 
-// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Field definitions per integration ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+// ── Field definitions per integration ──
 
 interface FieldDef {
   key:         string
@@ -14,55 +14,47 @@ interface FieldDef {
 }
 
 const FIELD_DEFS: Record<string, FieldDef[]> = {
-  rasf_whatsapp: [
-    { key: 'api_url',    label: 'API URL',    type: 'url',      placeholder: 'https://api.rasf.io/v1', hint: 'Base URL of the Rasf gateway' },
-    { key: 'token',      label: 'Token',      type: 'password', placeholder: 'Bearer token' },
-    { key: 'sender_id',  label: 'Sender ID',  type: 'text',     placeholder: 'Your registered sender ID' },
-    { key: 'webhook_url',label: 'Webhook URL',type: 'url',      placeholder: 'https://yourapp.com/api/integrations/rasf/webhook', hint: 'Paste this URL in the Rasf dashboard' },
+  evolution_whatsapp: [
+    { key: 'api_url', label: 'رابط الخادم (Evolution URL)', type: 'url', placeholder: 'https://evolution.yourdomain.com' },
+    { key: 'api_key', label: 'مفتاح الـ API', type: 'password', placeholder: 'Global API Key' },
+    { key: 'instance_name', label: 'اسم النسخة (Instance)', type: 'text', placeholder: 'instance-1' },
   ],
-  tameez_calls: [
-    { key: 'api_url',     label: 'API URL',          type: 'url',      placeholder: 'https://api.tameez.io/v1' },
-    { key: 'api_key',     label: 'API Key',           type: 'password', placeholder: 'Your Tameez API key' },
-    { key: 'webhook_url', label: 'Callback / Webhook',type: 'url',      placeholder: 'https://yourapp.com/api/integrations/tameez/webhook' },
+  n8n_automation: [
+    { key: 'webhook_url', label: 'رابط ويب هوك (n8n Webhook URL)', type: 'url', placeholder: 'https://n8n.yourdomain.com/webhook/...' },
+    { key: 'auth_token', label: 'رمز التوثيق (Auth Token)', type: 'password', placeholder: 'Secret token used in header' },
   ],
   collection_api: [
-    { key: 'base_url',  label: 'Base API URL', type: 'url',      placeholder: 'https://api.collectionsystem.io' },
-    { key: 'username',  label: 'Username',     type: 'text',     placeholder: 'Service account username' },
-    { key: 'token',     label: 'Password / Token', type: 'password', placeholder: 'Password or API token' },
-  ],
-  evolution_whatsapp: [
-    { key: 'api_url', label: 'Evolution URL', type: 'url', placeholder: 'https://evolution.yourdomain.com' },
-    { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'Evolution API Key' },
-    { key: 'instance_name', label: 'Instance Name', type: 'text', placeholder: 'instance-1' },
-    { key: 'webhook_url', label: 'Webhook URL', type: 'url', placeholder: 'https://yourapp.com/api/whatsapp/webhook' },
+    { key: 'base_url',  label: 'رابط واجهة برمجة تطبيقات التحصيل', type: 'url',      placeholder: 'https://api.collectionsystem.io' },
+    { key: 'username',  label: 'اسم المستخدم',     type: 'text',     placeholder: 'Service account username' },
+    { key: 'token',     label: 'كلمة المرور / الرمز', type: 'password', placeholder: 'Password or API token' },
   ],
 }
 
-// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Status badge ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+// ── Status badge ──
 
 function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: string | null }) {
   if (!enabled) {
     return (
-      <span className="status-badge bg-slate-50 text-slate-400 border-slate-200">
-        Disabled
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+        غير مفعل
       </span>
     )
   }
   if (lastError) {
     return (
-      <span className="status-badge bg-red-500/10 text-red-400 border-red-500/20">
-        ÃƒÂ¢Ã¢â‚¬â€Ã‚Â Error
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200">
+        يوجد خطأ
       </span>
     )
   }
   return (
-    <span className="status-badge bg-green-500/10 text-green-400 border-green-500/20">
-      ÃƒÂ¢Ã¢â‚¬â€Ã‚Â Connected
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+      متصل
     </span>
   )
 }
 
-// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Toggle ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+// ── Toggle ──
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -73,33 +65,31 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={[
-        'relative inline-flex h-5 w-9 shrink-0 rounded-full border transition-colors duration-200',
-        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-surface-950',
+        'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none',
         'disabled:opacity-40 disabled:cursor-not-allowed',
-        checked
-          ? 'bg-brand-600 border-brand-500'
-          : 'bg-slate-100 border-slate-200',
+        checked ? 'bg-[#1e3e50] border-[#1e3e50]' : 'bg-slate-200 border-slate-200',
       ].join(' ')}
+      dir="ltr"
     >
       <span
         className={[
-          'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm',
-          'transition-transform duration-200 transform mt-0.5',
-          checked ? 'translate-x-4' : 'translate-x-0.5',
+          'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm',
+          'transition-transform duration-200 transform',
+          checked ? 'translate-x-5' : 'translate-x-0',
         ].join(' ')}
       />
     </button>
   )
 }
 
-// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Main component ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+// ── Main component ──
 
 interface IntegrationCardProps {
   name:         string
   label:        string
   description:  string
-  icon:         string
-  integrationKey: 'rasf_whatsapp' | 'tameez_calls' | 'collection_api' | 'evolution_whatsapp'
+  icon:         React.ReactNode
+  integrationKey: string
   initial?:     IntegrationSetting | null
 }
 
@@ -122,11 +112,8 @@ export function IntegrationCard({
   const [testMsg,   setTestMsg]   = useState('')
   const [lastError, setLastError] = useState<string | null>(initial?.last_error ?? null)
   const [lastSynced, setLastSynced] = useState<string | null>(initial?.last_synced_at ?? null)
-  const [isPending, startTransition] = useTransition()
 
-  const isConfigured = fields.every(f =>
-    f.key === 'webhook_url' || !!(config[f.key]?.trim())
-  )
+  const isConfigured = fields.every(f => !!(config[f.key]?.trim()))
 
   function handleField(key: string, value: string) {
     setConfig(prev => ({ ...prev, [key]: value }))
@@ -163,49 +150,47 @@ export function IntegrationCard({
       const data = await res.json() as { success: boolean; message: string; latency_ms?: number }
       if (data.success) {
         setTestState('ok')
-        setTestMsg(data.message)
+        setTestMsg('تم الاتصال بنجاح')
         setLastError(null)
       } else {
         setTestState('fail')
-        setTestMsg(data.message)
+        setTestMsg('فشل الاتصال: ' + data.message)
         setLastError(data.message)
       }
     } catch (err) {
       setTestState('fail')
-      setTestMsg(err instanceof Error ? err.message : 'Test failed')
+      setTestMsg('فشل الاتصال بالخادم')
     } finally {
       setTimeout(() => { setTestState('idle'); setTestMsg('') }, 6000)
     }
   }
 
   return (
-    <div className="card p-0 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 p-5 border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-xl shrink-0">
+      <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-50 bg-[#fbfdfd]">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
             {icon}
           </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-display font-semibold text-base">{label}</h3>
+            <div className="flex items-center gap-3 mb-1">
+              <h3 className="font-bold text-[#1e3e50] text-lg">{label}</h3>
               <StatusBadge enabled={enabled} lastError={lastError} />
             </div>
-            <p className="text-slate-500 text-xs mt-0.5">{description}</p>
+            <p className="text-slate-500 text-sm">{description}</p>
           </div>
         </div>
         <Toggle checked={enabled} onChange={setEnabled} />
       </div>
 
       {/* Fields */}
-      <div className="p-5 space-y-4">
+      <div className="p-6 space-y-5 flex-1">
         {fields.map(field => (
           <div key={field.key}>
-            <label className="label">
+            <label className="block text-sm font-bold text-[#1e3e50] mb-2">
               {field.label}
-              {field.hint && (
-                <span className="text-slate-400 font-normal ml-1">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {field.hint}</span>
-              )}
+              {field.hint && <span className="text-slate-400 font-normal mr-2">— {field.hint}</span>}
             </label>
             <input
               type={field.type ?? 'text'}
@@ -213,70 +198,42 @@ export function IntegrationCard({
               onChange={e => handleField(field.key, e.target.value)}
               placeholder={field.placeholder}
               autoComplete={field.type === 'password' ? 'new-password' : 'off'}
-              className="input text-sm font-mono"
+              className="w-full bg-[#f0f4f8] border border-slate-200 text-[#1e3e50] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#1e3e50] focus:ring-1 focus:ring-[#1e3e50] transition-colors font-mono"
+              dir="ltr"
             />
           </div>
         ))}
 
-        {/* Logs / last sync */}
-        <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
-          <span>
-            {lastSynced
-              ? `Last sync: ${new Date(lastSynced).toLocaleString()}`
-              : 'Never synced'}
-          </span>
-          {lastError && (
-            <span className="text-red-400 truncate max-w-[200px]" title={lastError}>
-              ÃƒÂ¢Ã…â€œÃ¢â‚¬â€ {lastError.slice(0, 60)}{lastError.length > 60 ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦' : ''}
-            </span>
-          )}
-        </div>
-
-        {/* Test result */}
+        {/* Test result message */}
         {testMsg && (
-          <div className={[
-            'rounded-lg px-3 py-2 text-xs border',
-            testState === 'ok'
-              ? 'bg-green-500/10 text-green-400 border-green-500/20'
-              : 'bg-red-500/10 text-red-400 border-red-500/20',
-          ].join(' ')}>
-            {testState === 'ok' ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ ' : 'ÃƒÂ¢Ã…â€œÃ¢â‚¬â€ '}{testMsg}
+          <div className={`mt-4 rounded-xl px-4 py-3 text-sm font-medium ${testState === 'ok' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+            {testMsg}
           </div>
         )}
-
-        {/* Actions */}
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saveState === 'saving'}
-            className="btn-primary text-sm px-4 py-1.5 flex items-center gap-1.5"
-          >
-            {saveState === 'saving' && (
-              <span className="w-3 h-3 border border-slate-200 border-t-white rounded-full animate-spin" />
-            )}
-            {saveState === 'saved'   ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Saved'         :
-             saveState === 'error'   ? 'Save failed'      :
-             saveState === 'saving'  ? 'SavingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦'          : 'Save'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleTest}
-            disabled={testState === 'testing' || !isConfigured}
-            title={!isConfigured ? 'Fill in all required fields first' : 'Test connection'}
-            className="btn-secondary text-sm px-4 py-1.5 flex items-center gap-1.5"
-          >
-            {testState === 'testing' && (
-              <span className="w-3 h-3 border border-slate-200 border-t-white rounded-full animate-spin" />
-            )}
-            {testState === 'testing' ? 'TestingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦' :
-             testState === 'ok'      ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Connected'      :
-             testState === 'fail'    ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬â€ Failed'          : 'ÃƒÂ¢Ã…Â¸Ã‚Â³ Test Connection'}
-          </button>
-        </div>
+      </div>
+      
+      {/* Footer Actions */}
+      <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={testState === 'testing' || !isConfigured}
+          className="px-4 py-2 text-[#1e3e50] bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
+        >
+          {testState === 'testing' ? 'جاري الفحص...' : 'فحص الاتصال'}
+        </button>
+        
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saveState === 'saving'}
+          className="px-6 py-2 bg-[#1e3e50] hover:bg-[#152e3b] text-white font-bold rounded-xl text-sm transition-colors"
+        >
+          {saveState === 'saving'  ? 'جاري الحفظ...' :
+           saveState === 'saved'   ? 'تم الحفظ ✔'   :
+           saveState === 'error'   ? 'فشل الحفظ ✖'  : 'حفظ الإعدادات'}
+        </button>
       </div>
     </div>
   )
 }
-

@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
-import Link from 'next/link'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { 
   Wallet, BrainCircuit, CheckCircle, AlertTriangle, 
-  Clock, Activity, MessageCircle, FileText, ArrowLeftRight
+  Activity, Clock, MessageCircle, FileText, ArrowLeftRight, Package
 } from 'lucide-react'
 
 // ── Stats fetch ──────────────────────────────────────────────────────────
@@ -74,170 +73,140 @@ export default async function AdminDashboard() {
   if (!profile?.company_id || profile.role !== 'admin') redirect('/dashboard/collector')
 
   const s = await getStats(profile.company_id)
-  const firstName = profile.full_name?.split(' ')[0] ?? 'المشرف'
 
-  // Stats matching the custom template
   const stats = [
-    { 
-      title: 'إجمالي التحصيل (الشهري)', 
-      value: formatCurrency(s.totalCollected, 'SAR'), 
-      icon: Wallet, 
-      color: 'text-emerald-400', 
-      bg: 'bg-emerald-400/10' 
-    },
-    { 
-      title: 'رسائل AI اليومية', 
-      value: String(s.messagesToday || s.aiActionsToday || 0), 
-      icon: BrainCircuit, 
-      color: 'text-blue-400', 
-      bg: 'bg-blue-400/10' 
-    },
-    { 
-      title: 'وعود السداد النشطة', 
-      value: String(s.statusCount['promised'] ?? 0), 
-      icon: CheckCircle, 
-      color: 'text-purple-400', 
-      bg: 'bg-purple-400/10' 
-    },
-    { 
-      title: 'مراجعات تتطلب تدخلاً', 
-      value: String(s.overdueDebts ?? 0), 
-      icon: AlertTriangle, 
-      color: 'text-rose-400', 
-      bg: 'bg-rose-400/10' 
-    },
-  ]
+    { title: 'إجمالي المحصل (هذا الشهر)', value: formatCurrency(s.totalCollected, 'SAR'), icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-50 border-emerald-100' },
+    { title: 'رسائل AI اليومية', value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, color: 'text-blue-500', bg: 'bg-blue-50 border-blue-100' },
+    { title: 'وعود السداد', value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, color: 'text-purple-500', bg: 'bg-purple-50 border-purple-100' },
+    { title: 'مطالبات متأخرة (تتطلب تدخلاً)', value: String(s.overdueDebts ?? 0), icon: AlertTriangle, color: 'text-rose-500', bg: 'bg-rose-50 border-rose-200', isAlert: true },
+  ];
 
   return (
-    <div className="space-y-8 animate-in" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
       
-      {/* ── Welcome Header ── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap pb-2">
-        <div>
-          <h1 className="font-display font-bold text-2xl text-slate-50 flex items-center gap-2">
-            مرحباً بك مجدداً، {firstName}
-            <span className="animate-pulse">👋</span>
-          </h1>
-          <p className="text-slate-400 text-xs mt-1">
-            إليك نظرة سريعة على مجريات عمليات التحصيل الذكية اليوم.
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link href="/dashboard/admin/debts" className="btn-secondary text-xs px-3 py-2 rounded-xl">
-            الملفات والديون
-          </Link>
-          <Link href="/dashboard/admin/ai-actions" className="btn-primary text-xs px-3 py-2 rounded-xl">
-            إجراءات AI
-          </Link>
+      {/* Overview Section */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mt-6">
+        <h2 className="text-xl font-bold text-[#1e3e50] mb-6">نظرة عامة</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, i) => (
+            <div key={i} className={`border p-5 rounded-2xl flex items-center gap-4 transition-all duration-200 hover:shadow-md ${stat.isAlert ? 'bg-[#fff5f5] border-rose-100' : 'bg-white border-slate-100'}`}>
+              <div className={`p-4 rounded-xl shrink-0 ${stat.bg} ${stat.color}`}>
+                <stat.icon size={28} strokeWidth={2.5} />
+              </div>
+              <div>
+                <div className={`text-2xl font-bold font-mono ${stat.isAlert ? 'text-rose-700' : 'text-[#1e3e50]'}`}>{stat.value}</div>
+                <div className={`text-sm mt-1 ${stat.isAlert ? 'text-rose-600 font-bold' : 'text-slate-500 font-medium'}`}>{stat.title}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Stats Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, idx) => (
-          <div 
-            key={idx} 
-            className="bg-slate-900/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl flex flex-col gap-4 relative overflow-hidden group hover:border-brand-500/20 transition-all duration-300"
-          >
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bg} ${stat.color} shadow-sm`}>
-              <stat.icon size={22} />
-            </div>
-            <div>
-              <h3 className="text-slate-400 text-xs font-semibold mb-1 uppercase tracking-wide">{stat.title}</h3>
-              <p className="text-2xl font-bold text-slate-100 font-display">{stat.value}</p>
-            </div>
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent to-transparent group-hover:from-blue-500 group-hover:to-purple-500 transition-all opacity-0 group-hover:opacity-100"></div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Live Operations Monitor ── */}
-      <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl overflow-hidden flex flex-col shadow-card">
-        <div className="p-5 border-b border-white/5 flex justify-between items-center bg-slate-950/20">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <h2 className="text-sm font-semibold text-slate-200 font-display">مراقبة العمليات اللحظية (AI Control Center)</h2>
-          </div>
-          <Link href="/dashboard/admin/ai-actions" className="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1">
-            عرض السجل الكامل ←
-          </Link>
-        </div>
+      {/* Main Grid Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-right border-collapse">
-            <thead className="bg-slate-950/40 text-slate-400 border-b border-white/5">
-              <tr>
-                <th className="px-6 py-4.5 font-semibold uppercase tracking-wider">العميل / المطالبة</th>
-                <th className="px-6 py-4.5 font-semibold uppercase tracking-wider">المبلغ المتبقي</th>
-                <th className="px-6 py-4.5 font-semibold uppercase tracking-wider">نوع الإجراء</th>
-                <th className="px-6 py-4.5 font-semibold uppercase tracking-wider">الوقت التاريخ</th>
-                <th className="px-6 py-4.5 font-semibold uppercase tracking-wider text-left pl-6">الحالة</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {s.recentActions.map((action) => {
-                const clientName = (action.customer as { full_name?: string } | null)?.full_name ?? 'عميل غير معروف'
-                const refNum = (action.debt as { reference_number?: string } | null)?.reference_number ?? '---'
-                const balance = (action.debt as { current_balance?: number } | null)?.current_balance ?? 0
-                const currency = (action.debt as { currency?: string } | null)?.currency ?? 'SAR'
-
-                return (
-                  <tr key={action.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-200">{clientName}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 font-mono">{refNum}</div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-300 font-mono font-medium">
-                      {formatCurrency(balance, currency)}
-                    </td>
-                    <td className="px-6 py-4">
-                      {action.action_type === 'whatsapp' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/10">
-                          <MessageCircle size={12} /> تفاوض واتساب
-                        </span>
-                      )}
-                      {action.action_type === 'call' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/10">
-                          <BrainCircuit size={12} /> مكالمة صوتية AI
-                        </span>
-                      )}
-                      {action.action_type === 'email' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/10">
-                          <FileText size={12} /> بريد إلكتروني
-                        </span>
-                      )}
-                      {action.action_type !== 'whatsapp' && action.action_type !== 'call' && action.action_type !== 'email' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/10">
-                          <ArrowLeftRight size={12} /> {action.action_type}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-slate-400 font-mono">{formatDate(action.created_at)}</td>
-                    <td className="px-6 py-4 text-left pl-6">
-                      <span className={cn(
-                        "text-[10px] font-bold px-3 py-1 rounded-full border",
-                        action.status === 'completed'
-                          ? "bg-emerald-500/5 text-emerald-400 border-emerald-500/10"
-                          : "bg-amber-500/5 text-amber-400 border-amber-500/10"
-                      )}>
-                        {action.status === 'completed' ? 'نجح الإرسال' : 'بانتظار التنفيذ'}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-              {s.recentActions.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-slate-500 text-xs">
-                    لا توجد عمليات مسجلة حالياً
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        {/* Left Column */}
+        <div className="col-span-1 space-y-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+            <div className="flex justify-between w-full mb-4 px-2">
+              <h3 className="font-bold text-[#1e3e50] text-lg">قاعدة العملاء</h3>
+            </div>
+            <div className="bg-[#e6f0f9] p-4 rounded-full mb-4">
+              <Activity className="text-[#1e3e50]" size={28} />
+            </div>
+            <div className="text-4xl font-bold text-[#1e3e50] font-mono">{s.activeCustomers}</div>
+            <div className="text-sm font-bold text-slate-500 mt-2">عميل مسجل ونشط</div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center hover:shadow-md transition-shadow">
+             <h3 className="font-bold text-[#1e3e50] text-lg mb-6 text-center">أداء المحفظة</h3>
+             <div className="flex justify-center items-center gap-8">
+               <div className="w-28 h-28 rounded-full border-[14px] border-[#1e3e50] border-t-[#a3c1e0] relative flex justify-center items-center shadow-inner">
+                  <span className="text-sm font-bold text-slate-500">68%</span>
+               </div>
+               <div className="space-y-4">
+                 <div className="flex items-center gap-3 text-sm text-[#1e3e50] font-bold">
+                   <div className="w-4 h-4 bg-[#a3c1e0] rounded-sm shadow-sm"></div>
+                   تم تحصيله
+                 </div>
+                 <div className="flex items-center gap-3 text-sm text-[#1e3e50] font-bold">
+                   <div className="w-4 h-4 bg-[#1e3e50] rounded-sm shadow-sm"></div>
+                   المتبقي
+                 </div>
+               </div>
+             </div>
+          </div>
         </div>
-      </div>
 
+        {/* Middle Column (Live Feed) */}
+        <div className="col-span-1 lg:col-span-2 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm flex flex-col hover:shadow-md transition-shadow">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+            <h2 className="text-lg font-bold text-[#1e3e50] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+              العمليات اللحظية (Live Feed)
+            </h2>
+            <button className="text-sm text-blue-600 hover:text-blue-700 font-bold bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl transition-colors">عرض السجل الكامل</button>
+          </div>
+          <div className="overflow-x-auto flex-1 p-2">
+            <table className="w-full text-right">
+              <thead className="text-slate-400 text-xs font-bold border-b border-slate-100">
+                <tr>
+                  <th className="px-5 py-4">العميل</th>
+                  <th className="px-5 py-4">المبلغ</th>
+                  <th className="px-5 py-4">نوع الإجراء (AI)</th>
+                  <th className="px-5 py-4">الوقت</th>
+                  <th className="px-5 py-4">الحالة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {s.recentActions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-400 font-bold">لا توجد عمليات مسجلة اليوم</td>
+                  </tr>
+                ) : s.recentActions.map((action) => {
+                  const clientName = (action.customer as { full_name?: string } | null)?.full_name ?? 'عميل غير معروف'
+                  const balance = (action.debt as { current_balance?: number } | null)?.current_balance ?? 0
+                  const currency = (action.debt as { currency?: string } | null)?.currency ?? 'SAR'
+                  const formattedTime = new Date(action.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+
+                  return (
+                    <tr key={action.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-4 text-sm font-bold text-[#1e3e50]">{clientName}</td>
+                      <td className="px-5 py-4 text-sm font-bold text-emerald-600 font-mono">{formatCurrency(balance, currency)}</td>
+                      <td className="px-5 py-4">
+                        {action.action_type === 'whatsapp' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            محادثة واتساب
+                          </span>
+                        ) : action.action_type === 'call' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-600 border border-purple-100">
+                            مكالمة صوتية
+                          </span>
+                        ) : action.action_type === 'email' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100">
+                            بريد إلكتروني
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                            {action.action_type}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-bold text-slate-400 font-mono">{formattedTime}</td>
+                      <td className="px-5 py-4">
+                        <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${action.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                          {action.status === 'completed' ? 'نجح الإرسال' : 'قيد المعالجة'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
     </div>
   )
 }

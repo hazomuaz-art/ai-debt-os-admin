@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Portfolio, PortfolioCategory } from '@/types'
+import { FolderKanban, Search, Plus, CheckCircle2, XCircle, Power, Box, Settings, Smartphone, ShieldCheck, Zap, Briefcase, Building2, Landmark, MoreHorizontal, Activity } from 'lucide-react'
 
 const CATEGORY_LABELS: Record<PortfolioCategory, string> = {
   telecom:     'اتصالات',
@@ -14,14 +15,25 @@ const CATEGORY_LABELS: Record<PortfolioCategory, string> = {
   other:       'أخرى',
 }
 
+const CATEGORY_ICONS: Record<PortfolioCategory, JSX.Element> = {
+  telecom: <Smartphone size={14} />,
+  insurance: <ShieldCheck size={14} />,
+  utility: <Zap size={14} />,
+  recruitment: <Briefcase size={14} />,
+  government: <Landmark size={14} />,
+  finance: <Activity size={14} />,
+  agriculture: <Box size={14} />,
+  other: <MoreHorizontal size={14} />,
+}
+
 const CATEGORY_COLORS: Record<PortfolioCategory, string> = {
-  telecom:     'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  insurance:   'bg-green-500/10 text-green-400 border-green-500/20',
-  utility:     'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  recruitment: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-  government:  'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  finance:     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  agriculture: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  telecom:     'bg-purple-50 text-purple-600 border-purple-200',
+  insurance:   'bg-emerald-50 text-emerald-600 border-emerald-200',
+  utility:     'bg-blue-50 text-blue-600 border-blue-200',
+  recruitment: 'bg-pink-50 text-pink-600 border-pink-200',
+  government:  'bg-indigo-50 text-indigo-600 border-indigo-200',
+  finance:     'bg-amber-50 text-amber-600 border-amber-200',
+  agriculture: 'bg-lime-50 text-lime-600 border-lime-200',
   other:       'bg-slate-50 text-slate-500 border-slate-200',
 }
 
@@ -56,46 +68,51 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="btn-primary text-sm">
-        + إضافة محفظة
+      <button onClick={() => setOpen(true)} className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+        <Plus size={18} /> إضافة محفظة
       </button>
     )
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="card p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display font-semibold text-lg">إضافة محفظة / مشروع</h2>
-          <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900 text-xl">×</button>
+    <div className="fixed inset-0 bg-[#1e3e50]/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in" dir="rtl">
+      <div className="bg-white border border-slate-100 rounded-2xl w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom-4">
+        
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-[#fbfdfd] rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+              <FolderKanban size={20} />
+            </div>
+            <h2 className="font-bold text-[#1e3e50] text-lg">إضافة محفظة / مشروع جديد</h2>
+          </div>
+          <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors">
+            <XCircle size={20} />
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">الاسم (إنجليزي) *</label>
-              <input required className="input text-sm" value={form.name}
-                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                placeholder="Mobily" />
+              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الاسم (عربي) *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" 
+                value={form.name_ar} onChange={e => setForm(p => ({ ...p, name_ar: e.target.value }))} placeholder="موبايلي" dir="rtl" />
             </div>
             <div>
-              <label className="label">الاسم (عربي)</label>
-              <input className="input text-sm" value={form.name_ar}
-                onChange={e => setForm(p => ({ ...p, name_ar: e.target.value }))}
-                placeholder="موبايلي" dir="rtl" />
+              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الاسم (إنجليزي) *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-left" 
+                value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Mobily" dir="ltr" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label">الرمز *</label>
-              <input required className="input text-sm font-mono uppercase" value={form.code}
-                onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
-                placeholder="MOB" maxLength={10} />
+              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الرمز القصير *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-left" 
+                value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="MOB" maxLength={10} dir="ltr" />
             </div>
             <div>
-              <label className="label">التصنيف *</label>
-              <select required className="input text-sm"
-                value={form.category}
-                onChange={e => setForm(p => ({ ...p, category: e.target.value as PortfolioCategory }))}>
+              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">تصنيف المحفظة *</label>
+              <select required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]"
+                value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value as PortfolioCategory }))}>
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
@@ -103,25 +120,25 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
             </div>
           </div>
           <div>
-            <label className="label">اللون</label>
-            <div className="flex gap-2 items-center">
-              <input type="color" value={form.color}
-                onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
-                className="w-10 h-10 rounded cursor-pointer bg-transparent border border-slate-200" />
-              <span className="text-slate-500 text-xs font-mono">{form.color}</span>
+            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">اللون المميز للمحفظة</label>
+            <div className="flex gap-3 items-center bg-[#f0f4f8] p-2 rounded-xl">
+              <input type="color" value={form.color} onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
+                className="w-10 h-10 rounded-lg cursor-pointer bg-white border border-slate-200" />
+              <span className="text-slate-500 text-sm font-mono font-bold">{form.color}</span>
             </div>
           </div>
           <div>
-            <label className="label">ملاحظات</label>
-            <textarea className="input text-sm" rows={2} value={form.notes}
-              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-              placeholder="أي معلومات إضافية..." />
+            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">ملاحظات داخلية (اختياري)</label>
+            <textarea className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" 
+              rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="أي معلومات إضافية عن شروط العقد أو المحفظة..." />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)} className="btn-secondary flex-1 text-sm">إلغاء</button>
-            <button type="submit" disabled={saving} className="btn-primary flex-1 text-sm">
-              {saving ? 'جارٍ الحفظ…' : 'حفظ'}
+          
+          {error && <p className="text-rose-500 bg-rose-50 p-3 rounded-lg text-sm font-bold">{error}</p>}
+          
+          <div className="flex gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onClick={() => setOpen(false)} className="flex-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold text-sm px-6 py-3 rounded-xl transition-colors">إلغاء</button>
+            <button type="submit" disabled={saving} className="flex-1 bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors disabled:opacity-50">
+              {saving ? 'جارٍ الحفظ…' : 'حفظ المحفظة'}
             </button>
           </div>
         </form>
@@ -169,100 +186,130 @@ export default function PortfoliosPage() {
   }, {} as Record<string, Portfolio[]>)
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold">المحافظ والمشاريع</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            إدارة الشركات والمشاريع المرتبطة بعمليات التحصيل
-          </p>
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+            <FolderKanban size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">المحافظ والمشاريع (Portfolios)</h1>
+            <p className="text-slate-500 text-sm">إدارة الشركات والمشاريع المرتبطة بعمليات التحصيل، وتصنيف الديون</p>
+          </div>
         </div>
-        <AddPortfolioModal onSaved={load} />
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="relative flex-1 md:flex-none">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              className="w-full md:w-64 bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pr-10 pl-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
+              placeholder="ابحث باسم المحفظة أو الرمز…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <AddPortfolioModal onSaved={load} />
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs uppercase tracking-wider">إجمالي</div>
-          <div className="font-display text-2xl font-bold">{portfolios.length}</div>
-          <div className="text-slate-400 text-xs">محفظة</div>
-        </div>
-        <div className="stat-card">
-          <div className="text-slate-500 text-xs uppercase tracking-wider">نشطة</div>
-          <div className="font-display text-2xl font-bold text-green-400">
-            {portfolios.filter(p => p.is_active).length}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-slate-500 text-xs font-bold mb-2">إجمالي المحافظ</div>
+          <div className="flex items-end justify-between">
+            <div className="font-bold text-3xl text-[#1e3e50] font-mono">{portfolios.length}</div>
+            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><FolderKanban size={16}/></div>
           </div>
-          <div className="text-slate-400 text-xs">محفظة</div>
         </div>
-        {Object.keys(byCategory).slice(0, 2).map(cat => (
-          <div key={cat} className="stat-card">
-            <div className="text-slate-500 text-xs uppercase tracking-wider">{CATEGORY_LABELS[cat as PortfolioCategory]}</div>
-            <div className="font-display text-2xl font-bold">{byCategory[cat].length}</div>
-            <div className="text-slate-400 text-xs">مشروع</div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-slate-500 text-xs font-bold mb-2">محافظ نشطة (Active)</div>
+          <div className="flex items-end justify-between">
+            <div className="font-bold text-3xl text-emerald-500 font-mono">
+              {portfolios.filter(p => p.is_active).length}
+            </div>
+            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500"><CheckCircle2 size={16}/></div>
+          </div>
+        </div>
+        {Object.keys(byCategory).slice(0, 2).map((cat, i) => (
+          <div key={cat} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-slate-500 text-xs font-bold mb-2">قطاع {CATEGORY_LABELS[cat as PortfolioCategory]}</div>
+            <div className="flex items-end justify-between">
+              <div className="font-bold text-3xl text-blue-500 font-mono">{byCategory[cat].length}</div>
+              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">{i === 0 ? <Building2 size={16}/> : <Landmark size={16}/>}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Search */}
-      <input
-        type="text"
-        className="input max-w-xs text-sm"
-        placeholder="بحث بالاسم أو الرمز…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
-
       {/* Portfolio grid */}
       {loading ? (
-        <div className="text-center text-slate-500 py-16">جارٍ التحميل…</div>
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div>
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="text-4xl mb-3">🗂</div>
-          <div className="font-display font-semibold mb-2">لا توجد محافظ</div>
-          <p className="text-slate-500 text-sm">أضف محفظة جديدة للبدء</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
+          <div className="w-20 h-20 bg-blue-50 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FolderKanban size={40} />
+          </div>
+          <div className="font-bold text-xl text-[#1e3e50] mb-2">لا توجد محافظ مطابقة</div>
+          <p className="text-slate-500 text-sm">أضف محفظة جديدة للبدء في ربط الديون والعملاء بها.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map(portfolio => (
-            <div key={portfolio.id} className={`card p-4 ${!portfolio.is_active ? 'opacity-50' : ''}`}>
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-mono"
-                    style={{ backgroundColor: portfolio.color + '30', color: portfolio.color, border: `1px solid ${portfolio.color}40` }}
-                  >
+            <div key={portfolio.id} className={`bg-white rounded-2xl border shadow-sm p-6 transition-all duration-300 hover:shadow-md flex flex-col ${!portfolio.is_active ? 'opacity-60 bg-slate-50/50 border-slate-100' : 'border-slate-100'}`}>
+              
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold font-mono shadow-sm"
+                    style={{ backgroundColor: portfolio.color + '15', color: portfolio.color, border: `1px solid ${portfolio.color}30` }}>
                     {portfolio.code.slice(0, 3)}
                   </div>
                   <div>
-                    <div className="font-semibold text-sm">{portfolio.name}</div>
-                    {portfolio.name_ar && (
-                      <div className="text-slate-500 text-xs" dir="rtl">{portfolio.name_ar}</div>
-                    )}
+                    <div className="font-bold text-[#1e3e50] text-lg mb-1">{portfolio.name_ar || portfolio.name}</div>
+                    {portfolio.name_ar && <div className="text-slate-400 text-xs font-mono" dir="ltr">{portfolio.name}</div>}
                   </div>
                 </div>
-                <button
-                  onClick={() => toggleActive(portfolio.id, portfolio.is_active)}
-                  className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-                    portfolio.is_active
-                      ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20'
-                  }`}
-                >
-                  {portfolio.is_active ? 'نشط' : 'معطل'}
-                </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className={`status-badge text-[10px] ${CATEGORY_COLORS[portfolio.category]}`}>
+              <div className="flex items-center gap-3 mb-6 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${CATEGORY_COLORS[portfolio.category]}`}>
+                  {CATEGORY_ICONS[portfolio.category]}
                   {CATEGORY_LABELS[portfolio.category]}
                 </span>
-                <span className="text-slate-400 text-xs font-mono">{portfolio.source_system}</span>
+                <span className="bg-[#f0f4f8] text-slate-500 text-xs font-bold px-3 py-1.5 rounded-lg font-mono flex items-center gap-1.5">
+                  <Settings size={14} /> {portfolio.source_system === 'manual' ? 'يدوي' : portfolio.source_system}
+                </span>
               </div>
 
               {portfolio.notes && (
-                <p className="text-slate-400 text-xs mt-2 truncate">{portfolio.notes}</p>
+                <div className="bg-[#fcfdfd] border border-slate-100 rounded-xl p-3 mb-6">
+                  <p className="text-slate-500 text-xs font-medium leading-relaxed line-clamp-2">{portfolio.notes}</p>
+                </div>
               )}
+
+              <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  onClick={() => toggleActive(portfolio.id, portfolio.is_active)}
+                  className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl border transition-colors ${
+                    portfolio.is_active
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 group'
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
+                  }`}
+                >
+                  <Power size={14} className={portfolio.is_active ? 'group-hover:hidden' : ''} />
+                  {portfolio.is_active && <XCircle size={14} className="hidden group-hover:block" />}
+                  {portfolio.is_active ? <span className="group-hover:hidden">الحالة: نشط</span> : <span>تفعيل المحفظة</span>}
+                  {portfolio.is_active && <span className="hidden group-hover:block">إيقاف المحفظة</span>}
+                </button>
+                
+                <button className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition-colors">
+                  التفاصيل
+                </button>
+              </div>
+
             </div>
           ))}
         </div>

@@ -1,4 +1,4 @@
-﻿import { createLogger, captureError } from '@/lib/logger'
+import { createLogger, captureError } from '@/lib/logger'
 
 const log = createLogger('whatsapp')
 
@@ -10,6 +10,7 @@ export interface SendMessageOptions {
   to:              string
   message:         string
   phone_number_id?: string
+  company_id?:     string
 }
 
 export interface SendResult {
@@ -59,10 +60,30 @@ function truncateMessage(message: string): string {
   return t + 'â€¦'
 }
 
+import { createServiceClient } from '@/lib/supabase/server'
+
 export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<SendResult> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL
-  const evolutionKey = process.env.EVOLUTION_API_KEY
-  const evolutionInstance = process.env.EVOLUTION_INSTANCE_NAME
+  let evolutionUrl = process.env.EVOLUTION_API_URL
+  let evolutionKey = process.env.EVOLUTION_API_KEY
+  let evolutionInstance = process.env.EVOLUTION_INSTANCE_NAME
+
+  if (options.company_id) {
+    const supabase = createServiceClient()
+    const { data: settings } = await supabase
+      .from('integration_settings')
+      .select('config')
+      .eq('company_id', options.company_id)
+      .eq('integration_name', 'evolution_whatsapp')
+      .eq('enabled', true)
+      .maybeSingle()
+
+    if (settings?.config) {
+      const config = settings.config as Record<string, string>
+      evolutionUrl = config.api_url || evolutionUrl
+      evolutionKey = config.api_key || evolutionKey
+      evolutionInstance = config.instance_name || evolutionInstance
+    }
+  }
 
   if (evolutionUrl && evolutionKey && evolutionInstance) {
     const to = normalizePhone(options.to)

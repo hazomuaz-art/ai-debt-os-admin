@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
@@ -168,7 +168,11 @@ export async function POST(request: NextRequest) {
 
             const autoReply = aiDecision.reply
 
-            const sendResult = await sendWhatsAppMessage({ to: phoneRaw, message: autoReply })
+            const sendResult = await sendWhatsAppMessage({ 
+              to: phoneRaw, 
+              message: autoReply,
+              company_id: (customer as { company_id: string }).company_id
+            })
 
             await supabase.from('messages').insert({
               company_id: (customer as { company_id: string }).company_id,
