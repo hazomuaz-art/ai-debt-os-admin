@@ -128,7 +128,11 @@ class N8nClient {
   }): Promise<N8nResponse> {
     return this.triggerWebhook('whatsapp-outbound', {
       event: 'send_message',
-      data: params,
+      data: {
+        ...params,
+        api_url: process.env.EVOLUTION_API_URL || 'http://72.62.30.109:32769',
+        api_key: process.env.EVOLUTION_API_KEY || 'yW9pHPPCn5btvjeqFr2rUdo0gS8KOebB'
+      },
       metadata: {
         company_id: params.company_id,
         customer_id: params.customer_id,

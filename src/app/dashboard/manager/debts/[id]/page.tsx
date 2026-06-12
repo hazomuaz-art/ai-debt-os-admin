@@ -107,7 +107,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/collector/debts" className="text-slate-400 hover:text-slate-900">
+        <Link href="/dashboard/manager/debts" className="text-slate-400 hover:text-slate-900">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>

@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const PUBLIC_ROUTES = [
   '/login',
-  '/register',
   '/api/whatsapp/webhook',
   '/api/health',
 ]
@@ -125,7 +124,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages to dashboard
-  if (user && (pathname === '/login' || pathname === '/register')) {
+  if (user && pathname === '/login') {
     let role = 'admin'
     if (!isDummyUrl) {
       try {
@@ -144,9 +143,30 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(NextResponse.redirect(dest))
   }
 
-  // Role-based guards on dashboard sub-routes
+  // Role-based guards and Active checks on dashboard sub-routes
   if (user && pathname.startsWith('/dashboard')) {
-    // TEMPORARY: Bypassed for UI preview
+    if (!isDummyUrl) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', user.id)
+          .single()
+        
+        if (profile && profile.is_active === false) {
+          // Force signout cookies
+          request.cookies.getAll().forEach(c => {
+            if (c.name.startsWith('sb-')) response.cookies.delete(c.name)
+          })
+          const loginUrl = request.nextUrl.clone()
+          loginUrl.pathname = '/login'
+          loginUrl.searchParams.set('inactive', 'true')
+          return applySecurityHeaders(NextResponse.redirect(loginUrl))
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
   }
 
   return applySecurityHeaders(response)

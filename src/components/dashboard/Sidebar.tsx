@@ -18,22 +18,23 @@ export function Sidebar({ profile }: { profile: any }) {
 
   // Restored full navigation from previous design
   const navItems = [
-    { href: `/dashboard/${role}`,               label: 'الرئيسية', icon: Activity },
-    { href: `/dashboard/${role}/debts`,          label: 'الديون والملفات', icon: Layers },
-    { href: `/dashboard/${role}/customers`,      label: 'العملاء', icon: Users },
-    { href: `/dashboard/${role}/ai-actions`,     label: 'إجراءات AI', icon: BrainCircuit },
-    { href: `/dashboard/${role}/messages`,       label: 'الرسائل', icon: MessageCircle },
-    { href: `/dashboard/${role}/portfolios`,     label: 'المحافظ', icon: Briefcase },
-    { href: `/dashboard/${role}/cost-center`,    label: 'مركز التكلفة', icon: DollarSign },
-    { href: `/dashboard/${role}/analytics`,      label: 'التحليلات', icon: BarChart2 },
-    { href: `/dashboard/${role}/team`,           label: 'فريق العمل', icon: ShieldCheck },
-    { href: `/dashboard/${role}/automation`,     label: 'إعدادات الأتمتة', icon: Settings },
-    { href: `/dashboard/${role}/campaigns`,      label: 'الحملات', icon: Megaphone },
-    { href: `/dashboard/${role}/promises`,       label: 'وعود السداد', icon: CheckCircle },
-    { href: `/dashboard/${role}/approvals`,      label: 'الموافقات والتدخل', icon: Clock },
-    { href: `/dashboard/${role}/integrations`,   label: 'الربط', icon: LinkIcon },
-    { href: `/dashboard/${role}/alerts`,         label: 'التنبيهات', icon: Bell },
-  ]
+    { href: `/dashboard/${role}`,               label: 'الرئيسية', icon: Activity, roles: ['admin', 'manager', 'collector'] },
+    { href: `/dashboard/${role}/debts`,          label: 'الديون والملفات', icon: Layers, roles: ['admin', 'manager', 'collector'] },
+    { href: `/dashboard/${role}/customers`,      label: 'العملاء', icon: Users, roles: ['admin', 'manager'] },
+    { href: `/dashboard/${role}/ai-actions`,     label: 'إجراءات AI', icon: BrainCircuit, roles: ['admin', 'manager'] },
+    { href: `/dashboard/${role}/actions`,        label: 'إجراءات التحصيل', icon: BrainCircuit, roles: ['collector'] },
+    { href: `/dashboard/${role}/messages`,       label: 'الرسائل', icon: MessageCircle, roles: ['admin', 'collector'] },
+    { href: `/dashboard/${role}/portfolios`,     label: 'المحافظ', icon: Briefcase, roles: ['admin'] },
+    { href: `/dashboard/${role}/cost-center`,    label: 'مركز التكلفة', icon: DollarSign, roles: ['admin'] },
+    { href: `/dashboard/${role}/analytics`,      label: 'التحليلات', icon: BarChart2, roles: ['admin'] },
+    { href: `/dashboard/${role}/team`,           label: 'فريق العمل', icon: ShieldCheck, roles: ['admin', 'manager'] },
+    { href: `/dashboard/${role}/automation`,     label: 'إعدادات الأتمتة', icon: Settings, roles: ['admin'] },
+    { href: `/dashboard/${role}/campaigns`,      label: 'الحملات', icon: Megaphone, roles: ['admin'] },
+    { href: `/dashboard/${role}/promises`,       label: 'وعود السداد', icon: CheckCircle, roles: ['admin'] },
+    { href: `/dashboard/${role}/approvals`,      label: 'الموافقات والتدخل', icon: Clock, roles: ['admin'] },
+    { href: `/dashboard/${role}/integrations`,   label: 'الربط', icon: LinkIcon, roles: ['admin'] },
+    { href: `/dashboard/${role}/alerts`,         label: 'التنبيهات', icon: Bell, roles: ['admin'] },
+  ].filter(item => item.roles.includes(role))
 
   return (
     <aside className="w-64 bg-[#1e3e50] text-white flex flex-col shrink-0 z-0 pt-8 pb-4">

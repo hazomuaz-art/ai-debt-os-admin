@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Power, Settings2, Shield, XCircle } from 'lucide-react'
+import { CheckCircle2, Power, Settings2, Shield, XCircle, Trash2 } from 'lucide-react'
 
 export function MemberActions({ 
   memberId, 
@@ -48,6 +48,25 @@ export function MemberActions({
       if (res.ok) {
         setEditingRole(false)
         router.refresh()
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function deleteUser() {
+    if (isSelf) return
+    if (!window.confirm('هل أنت متأكد من حذف هذا الموظف نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) return
+    
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/platform/users/${memberId}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        router.refresh()
+      } else {
+        alert('حدث خطأ أثناء الحذف')
       }
     } finally {
       setLoading(false)
@@ -114,6 +133,20 @@ export function MemberActions({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Delete User */}
+      <div className="mr-auto">
+        <button
+          onClick={deleteUser}
+          disabled={loading || isSelf}
+          title="حذف الموظف نهائياً"
+          className={`flex items-center justify-center p-2 rounded-lg border transition-all ${
+            isSelf ? 'opacity-0 cursor-default' : 'text-rose-500 bg-white border-rose-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
+          }`}
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
 
     </div>

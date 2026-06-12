@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { loginAction } from '@/lib/actions/auth'
 import Link from 'next/link'
 import { BrainCircuit, Activity, Users, ArrowLeft } from 'lucide-react'
@@ -8,6 +8,13 @@ import { BrainCircuit, Activity, Users, ArrowLeft } from 'lucide-react'
 export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('inactive=true')) {
+      setError('حسابك قيد المراجعة بانتظار موافقة الإدارة. يرجى المحاولة لاحقاً.')
+      window.history.replaceState({}, '', '/login')
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -77,10 +84,7 @@ export default function LoginPage() {
             </form>
 
             <p className="text-center text-slate-500 text-sm mt-8 font-medium">
-              ليس لديك حساب؟{' '}
-              <Link href="/register" className="text-blue-600 hover:text-blue-800 font-bold">
-                تواصل معنا لتسجيل شركتك
-              </Link>
+              ليس لديك حساب؟ اطلب من مدير النظام في شركتك إرسال دعوة لك.
             </p>
           </div>
         </div>

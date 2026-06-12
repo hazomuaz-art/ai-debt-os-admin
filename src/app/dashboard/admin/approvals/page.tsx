@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Approval } from '@/types'
+import { Clock, ShieldCheck, CheckCircle, XCircle, AlertTriangle, FileText } from 'lucide-react'
 
-const PRIORITY_STYLES: Record<string, string> = {
-  urgent: 'bg-red-500/10 text-red-400 border-red-500/20',
-  high:   'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  low:    'bg-slate-50 text-slate-500 border-slate-200',
+const PRIORITY_STYLES: Record<string, { label: string, color: string }> = {
+  urgent: { label: 'عاجل جداً', color: 'bg-rose-50 text-rose-600 border-rose-200' },
+  high:   { label: 'مرتفع', color: 'bg-orange-50 text-orange-600 border-orange-200' },
+  medium: { label: 'متوسط', color: 'bg-yellow-50 text-yellow-600 border-yellow-200' },
+  low:    { label: 'منخفض', color: 'bg-blue-50 text-blue-600 border-blue-200' },
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  large_settlement: 'تسوية كبيرة', discount: 'خصم', legal_escalation: 'تصعيد قانوني',
-  stop_followup: 'إيقاف متابعة', write_off: 'إعفاء', ai_learning: 'تعلم AI',
+  large_settlement: 'تسوية كبيرة', discount: 'خصم استثنائي', legal_escalation: 'تصعيد قانوني',
+  stop_followup: 'إيقاف متابعة', write_off: 'إعفاء من المديونية', ai_learning: 'اعتماد تعلم AI',
   campaign_launch: 'تشغيل حملة', custom: 'مخصص',
 }
 
@@ -40,72 +41,118 @@ export default function ApprovalsPage() {
     await load()
   }
 
-  const pending  = items.filter((i: Record<string,unknown>) => i.status === 'pending')
-  const filtered = filter === 'all' ? items : items.filter((i: Record<string,unknown>) => i.status === filter)
+  const pending  = items.filter(i => i.status === 'pending')
+  const filtered = filter === 'all' ? items : items.filter(i => i.status === filter)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Pending Approvals</h1>
-        <p className="text-slate-500 text-sm mt-0.5 ar-text" dir="rtl">عمليات تحتاج موافقة يدوية قبل التنفيذ</p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">الموافقات والتدخل الإداري</h1>
+            <p className="text-slate-500 text-sm">مراجعة العمليات الحساسة واعتمادها قبل التنفيذ الآلي</p>
+          </div>
+        </div>
       </div>
 
       {pending.length > 0 && (
-        <div className="card p-4 border-yellow-500/20 bg-yellow-500/5 flex items-center gap-3">
-          <span className="text-2xl font-display font-bold text-yellow-400">{pending.length}</span>
-          <span className="text-yellow-400 text-sm">طلبات في انتظار المراجعة</span>
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-5 border border-amber-100 flex items-center justify-between shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-amber-500 shadow-sm">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-[#1e3e50]">طلبات بانتظار المراجعة ({pending.length})</p>
+              <p className="text-xs text-amber-700 mt-0.5">يوجد عمليات معلقة تتطلب اتخاذ قرار إداري للحفاظ على سير العمل.</p>
+            </div>
+          </div>
+          <button onClick={() => setFilter('pending')} className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-colors">
+            استعراض الطلبات
+          </button>
         </div>
       )}
 
-      <div className="flex gap-2">
-        {['all','pending','approved','rejected'].map((s: string) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${filter === s ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-            {s === 'all' ? 'الكل' : s === 'pending' ? `انتظار (${pending.length})` : s === 'approved' ? 'موافق' : 'مرفوض'}
-          </button>
-        ))}
+      {/* Tabs */}
+      <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100 w-fit">
+        {['all','pending','approved','rejected'].map((s: string) => {
+          const isActive = filter === s;
+          const labels: any = { all: 'الكل', pending: `انتظار (${pending.length})`, approved: 'موافق عليها', rejected: 'مرفوضة' }
+          return (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${isActive ? 'bg-[#1e3e50] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-[#1e3e50]'}`}>
+              {labels[s]}
+            </button>
+          )
+        })}
       </div>
 
-      {loading ? <div className="text-center text-slate-500 py-12">جارٍ التحميل…</div> : (
-        <div className="space-y-3">
-          {filtered.length === 0 && <div className="card p-10 text-center text-slate-500">لا توجد طلبات في هذه الفئة</div>}
-          {filtered.map((item: Approval) => (
-            <div key={item.id} className="card p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-medium text-sm">{item.title}</span>
-                    <span className={`status-badge text-[10px] ${PRIORITY_STYLES[String(item.priority ?? '')]}`}>{item.priority}</span>
-                    <span className="bg-slate-50 text-slate-500 text-[10px] px-1.5 py-0.5 rounded border border-slate-200">
-                      {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
-                    </span>
-                  </div>
-                  {item.description && <p className="text-slate-500 text-xs mb-1">{item.description}</p>}
-                  <p className="text-slate-400 text-[10px]">
-                    {new Date(String(item.created_at ?? '')).toLocaleString('ar-SA')}
-                    {item.expires_at && ` · تنتهي: ${new Date(String(item.expires_at ?? '')).toLocaleDateString('ar-SA')}`}
-                  </p>
-                </div>
-                {item.status === 'pending' && (
-                  <div className="flex gap-2 shrink-0">
-                    <button onClick={() => void act(item.id, 'approved')}
-                      className="text-xs px-3 py-1.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">
-                      موافقة
-                    </button>
-                    <button onClick={() => void act(item.id, 'rejected')}
-                      className="text-xs px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                      رفض
-                    </button>
-                  </div>
-                )}
-                {item.status !== 'pending' && (
-                  <span className={`text-xs px-2 py-1 rounded border ${item.status === 'approved' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                    {item.status === 'approved' ? '✓ موافق' : '✗ مرفوض'}
-                  </span>
-                )}
-              </div>
+      {/* List */}
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div></div>
+      ) : (
+        <div className="grid gap-4">
+          {filtered.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-100 border-dashed p-12 text-center text-slate-400 font-bold">
+              <ShieldCheck size={32} className="mx-auto mb-3 text-slate-300" />
+              لا توجد طلبات في هذه الفئة
             </div>
-          ))}
+          )}
+          {filtered.map((item: Approval) => {
+            const priorityConf = PRIORITY_STYLES[String(item.priority ?? 'low')] || PRIORITY_STYLES.low;
+            
+            return (
+              <div key={item.id} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center shrink-0">
+                      <FileText size={24} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 flex-wrap mb-1.5">
+                        <span className="font-bold text-[#1e3e50] text-lg">{item.title}</span>
+                        <span className={`px-2.5 py-0.5 rounded-md text-xs font-bold border ${priorityConf.color}`}>
+                          {priorityConf.label}
+                        </span>
+                        <span className="bg-[#f0f4f8] text-slate-600 text-xs px-2.5 py-0.5 rounded-md font-bold">
+                          {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
+                        </span>
+                      </div>
+                      {item.description && <p className="text-slate-500 text-sm mb-2 leading-relaxed">{item.description}</p>}
+                      <div className="flex items-center gap-4 text-xs text-slate-400 font-medium">
+                        <span className="flex items-center gap-1"><Clock size={14} /> {new Date(String(item.created_at ?? '')).toLocaleString('ar-SA')}</span>
+                        {item.expires_at && <span className="text-rose-400 flex items-center gap-1">تنتهي: {new Date(String(item.expires_at ?? '')).toLocaleDateString('ar-SA')}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {item.status === 'pending' && (
+                    <div className="flex gap-2 w-full lg:w-auto shrink-0 border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pr-5">
+                      <button onClick={() => void act(item.id, 'approved')}
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-200 font-bold text-sm transition-colors">
+                        <CheckCircle size={16} /> موافقة
+                      </button>
+                      <button onClick={() => void act(item.id, 'rejected')}
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-200 font-bold text-sm transition-colors">
+                        <XCircle size={16} /> رفض
+                      </button>
+                    </div>
+                  )}
+                  
+                  {item.status !== 'pending' && (
+                    <div className="flex items-center justify-center lg:justify-end w-full lg:w-auto border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pr-5 shrink-0">
+                      <span className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border ${item.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
+                        {item.status === 'approved' ? <><CheckCircle size={16} /> تمت الموافقة</> : <><XCircle size={16} /> تم الرفض</>}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
