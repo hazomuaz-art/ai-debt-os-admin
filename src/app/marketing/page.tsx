@@ -22,7 +22,7 @@ const modules = [
 
 export default function MarketingPage() {
   return (
-    <main className="min-h-screen bg-[#07111f] text-white overflow-hidden">
+    <main className="min-h-screen bg-[#07111f] text-slate-900 overflow-hidden">
       <section className="relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_5%,#2563eb55,transparent_35%),radial-gradient(circle_at_90%_10%,#14b8a644,transparent_30%)]" />
 
@@ -33,7 +33,7 @@ export default function MarketingPage() {
               <div className="text-xs text-white/45">Enterprise Collection Intelligence Platform</div>
             </div>
 
-            <div className="hidden md:flex items-center gap-7 text-sm text-white/60">
+            <div className="hidden md:flex items-center gap-7 text-sm text-slate-500">
               <a href="#modules">Modules</a>
               <a href="#impact">Impact</a>
               <a href="#security">Security</a>
@@ -50,7 +50,7 @@ export default function MarketingPage() {
 
           <div className="grid lg:grid-cols-2 gap-14 items-center py-24">
             <div>
-              <div className="inline-flex rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/70 mb-6">
+              <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm text-slate-600 mb-6">
                 Built for collection companies and enterprise recovery teams
               </div>
 
@@ -58,7 +58,7 @@ export default function MarketingPage() {
                 نظام تشغيل ذكي لشركات التحصيل
               </h1>
 
-              <p className="mt-6 text-xl text-white/70 leading-relaxed">
+              <p className="mt-6 text-xl text-slate-600 leading-relaxed">
                 AI Debt OS يساعد شركات التحصيل على رفع الإنتاجية، إدارة آلاف العملاء،
                 فهم تاريخ كل عميل، متابعة الوعود، وتحويل العمليات اليدوية إلى تشغيل
                 ذكي مدعوم بالذكاء الاصطناعي.
@@ -79,7 +79,7 @@ export default function MarketingPage() {
                 </a>
                 <a
                   href="#modules"
-                  className="rounded-2xl border border-white/15 px-8 py-4 font-bold text-white/85"
+                  className="rounded-2xl border border-slate-200 px-8 py-4 font-bold text-white/85"
                 >
                   استكشف النظام
                 </a>
@@ -87,9 +87,9 @@ export default function MarketingPage() {
 
               <div className="grid grid-cols-3 gap-4 mt-10">
                 {["AI", "Automation", "Analytics"].map((x) => (
-                  <div key={x} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div key={x} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-lg font-black">{x}</div>
-                    <div className="text-xs text-white/40">Enterprise ready</div>
+                    <div className="text-xs text-slate-500">Enterprise ready</div>
                   </div>
                 ))}
               </div>
@@ -100,22 +100,22 @@ export default function MarketingPage() {
               <img
                 src={photos.hero}
                 alt="AI Debt OS enterprise collection team"
-                className="relative w-full h-[560px] object-cover rounded-[2rem] border border-white/10 shadow-2xl"
+                className="relative w-full h-[560px] object-cover rounded-[2rem] border border-slate-200 shadow-2xl"
               />
 
-              <div className="absolute left-6 bottom-6 right-6 rounded-3xl bg-[#08111f]/85 backdrop-blur border border-white/10 p-5">
+              <div className="absolute left-6 bottom-6 right-6 rounded-3xl bg-[#08111f]/85 backdrop-blur border border-slate-200 p-5">
                 <div className="text-sm text-white/45 mb-3">Live collection command center</div>
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl bg-white/8 p-4">
-                    <div className="text-xs text-white/40">Customers</div>
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs text-slate-500">Customers</div>
                     <div className="text-2xl font-black">360°</div>
                   </div>
-                  <div className="rounded-2xl bg-white/8 p-4">
-                    <div className="text-xs text-white/40">AI Actions</div>
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs text-slate-500">AI Actions</div>
                     <div className="text-2xl font-black text-blue-300">Live</div>
                   </div>
-                  <div className="rounded-2xl bg-white/8 p-4">
-                    <div className="text-xs text-white/40">Security</div>
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs text-slate-500">Security</div>
                     <div className="text-2xl font-black text-green-300">On</div>
                   </div>
                 </div>
@@ -125,9 +125,9 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section id="impact" className="px-6 py-24 bg-white/[0.035]">
+      <section id="impact" className="px-6 py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
-          <img src={photos.team} alt="Collection operations team" className="rounded-[2rem] border border-white/10 shadow-2xl h-[520px] w-full object-cover" />
+          <img src={photos.team} alt="Collection operations team" className="rounded-[2rem] border border-slate-200 shadow-2xl h-[520px] w-full object-cover" />
 
           <div>
             <h2 className="text-4xl md:text-5xl font-black">
@@ -148,7 +148,7 @@ export default function MarketingPage() {
                 "تقليل الأخطاء التشغيلية",
                 "وضوح كامل للإدارة",
               ].map((x) => (
-                <div key={x} className="rounded-2xl bg-white/5 border border-white/10 p-5 font-bold">
+                <div key={x} className="rounded-2xl bg-slate-50 border border-slate-200 p-5 font-bold">
                   {x}
                 </div>
               ))}
@@ -169,7 +169,7 @@ export default function MarketingPage() {
 
           <div className="grid md:grid-cols-3 gap-5 mt-14">
             {modules.map(([title, desc]) => (
-              <div key={title} className="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-6 hover:bg-white/[0.07] transition">
+              <div key={title} className="rounded-[1.7rem] border border-slate-200 bg-slate-50 p-6 hover:bg-slate-50 transition">
                 <div className="w-11 h-11 rounded-2xl bg-blue-500/20 flex items-center justify-center mb-5">
                   <span className="w-4 h-4 rounded-full bg-blue-300" />
                 </div>
@@ -181,11 +181,11 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="px-6 py-24 bg-white/[0.035]">
+      <section className="px-6 py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
           <div>
             <h2 className="text-4xl md:text-5xl font-black">How AI Debt OS Works</h2>
-            <p className="mt-5 text-white/60 text-lg">
+            <p className="mt-5 text-slate-500 text-lg">
               من لحظة ربط نظام التحصيل، يبدأ AI Debt OS في تنظيم البيانات، تحليل
               العملاء، اقتراح الإجراءات، وتسجيل كل تفاعل داخل Timeline وAI Memory.
             </p>
@@ -198,7 +198,7 @@ export default function MarketingPage() {
                 ["04", "Act", "اقتراح إجراءات، متابعة وعود، وتنبيهات للإدارة."],
                 ["05", "Measure", "قياس الإنتاجية، الأداء، ونتائج التحصيل."],
               ].map(([n, title, desc]) => (
-                <div key={n} className="flex gap-4 rounded-2xl bg-white/5 border border-white/10 p-5">
+                <div key={n} className="flex gap-4 rounded-2xl bg-slate-50 border border-slate-200 p-5">
                   <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center font-black text-blue-300">
                     {n}
                   </div>
@@ -211,13 +211,13 @@ export default function MarketingPage() {
             </div>
           </div>
 
-          <img src={photos.operations} alt="AI collection operations" className="rounded-[2rem] border border-white/10 shadow-2xl h-[620px] w-full object-cover" />
+          <img src={photos.operations} alt="AI collection operations" className="rounded-[2rem] border border-slate-200 shadow-2xl h-[620px] w-full object-cover" />
         </div>
       </section>
 
       <section id="security" className="px-6 py-24">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
-          <img src={photos.executive} alt="Executive analytics and security review" className="rounded-[2rem] border border-white/10 shadow-2xl h-[520px] w-full object-cover" />
+          <img src={photos.executive} alt="Executive analytics and security review" className="rounded-[2rem] border border-slate-200 shadow-2xl h-[520px] w-full object-cover" />
 
           <div>
             <h2 className="text-4xl md:text-5xl font-black">Security, Privacy & Governance</h2>
@@ -235,7 +235,7 @@ export default function MarketingPage() {
                 "Human approval for sensitive decisions",
                 "Secure integration architecture",
               ].map((x) => (
-                <div key={x} className="flex items-center gap-3 rounded-2xl bg-white/5 border border-white/10 p-4">
+                <div key={x} className="flex items-center gap-3 rounded-2xl bg-slate-50 border border-slate-200 p-4">
                   <span className="w-7 h-7 rounded-full bg-green-500/20 text-green-300 flex items-center justify-center">✓</span>
                   <span>{x}</span>
                 </div>
@@ -245,7 +245,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section id="integrations" className="px-6 py-24 bg-white/[0.035]">
+      <section id="integrations" className="px-6 py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-black">Works with your existing systems</h2>
           <p className="mt-5 text-white/55 text-lg max-w-3xl mx-auto">
@@ -255,7 +255,7 @@ export default function MarketingPage() {
 
           <div className="grid md:grid-cols-3 gap-5 mt-14">
             {["Collection Systems", "WhatsApp Providers", "Call Centers", "CRM Platforms", "Payment Systems", "Custom APIs"].map((x) => (
-              <div key={x} className="rounded-3xl bg-[#08111f] border border-white/10 p-8">
+              <div key={x} className="rounded-3xl bg-[#08111f] border border-slate-200 p-8">
                 <div className="text-2xl font-black">{x}</div>
                 <div className="mt-3 text-white/45">Integration ready</div>
               </div>
@@ -265,11 +265,11 @@ export default function MarketingPage() {
       </section>
 
       <section className="px-6 py-24">
-        <div className="max-w-7xl mx-auto rounded-[2.5rem] bg-gradient-to-br from-blue-700/40 to-cyan-700/20 border border-white/10 p-10 md:p-16 text-center">
+        <div className="max-w-7xl mx-auto rounded-[2.5rem] bg-gradient-to-br from-blue-700/40 to-cyan-700/20 border border-slate-200 p-10 md:p-16 text-center">
           <h2 className="text-4xl md:text-6xl font-black">
             جاهز تحول عمليات التحصيل إلى نظام ذكي؟
           </h2>
-          <p className="mt-6 text-white/70 text-xl max-w-3xl mx-auto">
+          <p className="mt-6 text-slate-600 text-xl max-w-3xl mx-auto">
             احجز عرض توضيحي وشوف كيف AI Debt OS يساعد شركتك على تحسين الإنتاجية،
             تنظيم العملاء، وتحقيق رؤية أوضح لعمليات التحصيل.
           </p>
@@ -281,12 +281,12 @@ export default function MarketingPage() {
             Contact Sales
           </a>
 
-          <div className="mt-6 text-white/50">hazomuaz@gmail.com • Riyadh, Saudi Arabia</div>
+          <div className="mt-6 text-slate-500">hazomuaz@gmail.com • Riyadh, Saudi Arabia</div>
         </div>
       </section>
 
-      <footer className="px-6 py-10 border-t border-white/10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-4 text-sm text-white/40">
+      <footer className="px-6 py-10 border-t border-slate-200">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-4 text-sm text-slate-500">
           <div>© 2026 AI Debt OS. Enterprise Collection Intelligence Platform.</div>
           <div>Security • Privacy • Integrations • Contact</div>
         </div>

@@ -56,7 +56,7 @@ export default async function AdminTeamPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">Team</h1>
-          <p className="text-white/40 text-sm">{memberStats.length} team members</p>
+          <p className="text-slate-500 text-sm">{memberStats.length} team members</p>
         </div>
         <InviteUserModal companyId={profile.company_id} />
       </div>
@@ -71,7 +71,7 @@ export default async function AdminTeamPage() {
                 </div>
                 <div>
                   <div className="font-medium">{member.full_name ?? 'Unnamed'}</div>
-                  <div className="text-white/40 text-xs">{member.email}</div>
+                  <div className="text-slate-500 text-xs">{member.email}</div>
                 </div>
               </div>
               <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium border ${roleColors[member.role as keyof typeof roleColors]}`}>
@@ -81,22 +81,22 @@ export default async function AdminTeamPage() {
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white/3 rounded-lg p-2">
                 <div className="font-display font-bold text-lg">{member.assignedDebts}</div>
-                <div className="text-white/30 text-[10px]">Assigned</div>
+                <div className="text-slate-400 text-[10px]">Assigned</div>
               </div>
               <div className="bg-white/3 rounded-lg p-2">
                 <div className="font-display font-bold text-lg text-green-400">
                   {formatCurrency(member.collectedThisMonth, 'SAR').replace('SAR', '').trim()}
                 </div>
-                <div className="text-white/30 text-[10px]">Collected</div>
+                <div className="text-slate-400 text-[10px]">Collected</div>
               </div>
               <div className="bg-white/3 rounded-lg p-2">
                 <div className="font-display font-bold text-lg text-brand-400">{member.actionsCompletedToday}</div>
-                <div className="text-white/30 text-[10px]">Actions</div>
+                <div className="text-slate-400 text-[10px]">Actions</div>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-white/5">
-              <div className={`inline-flex items-center gap-1.5 text-xs ${member.is_active ? 'text-green-400' : 'text-white/30'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${member.is_active ? 'bg-green-400' : 'bg-white/20'}`} />
+            <div className="mt-3 pt-3 border-t border-slate-200">
+              <div className={`inline-flex items-center gap-1.5 text-xs ${member.is_active ? 'text-green-400' : 'text-slate-400'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${member.is_active ? 'bg-green-400' : 'bg-slate-100'}`} />
                 {member.is_active ? 'Active' : 'Inactive'}
               </div>
             </div>

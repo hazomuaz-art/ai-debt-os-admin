@@ -37,7 +37,7 @@ export default async function CollectorMessagesPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-slate-400 border-b border-surface-200">
+                <tr className="text-left text-slate-400 border-b border-slate-200">
                   <th className="pb-3 pr-4">Date</th>
                   <th className="pb-3 pr-4">Customer</th>
                   <th className="pb-3 pr-4">Ref</th>
@@ -48,7 +48,7 @@ export default async function CollectorMessagesPage() {
               </thead>
               <tbody>
                 {messages.map((msg: any) => (
-                  <tr key={msg.id} className="border-b border-surface-100">
+                  <tr key={msg.id} className="border-b border-slate-200">
                     <td className="py-3 pr-4 text-slate-400 whitespace-nowrap">{formatDate(msg.sent_at || msg.created_at)}</td>
                     <td className="py-3 pr-4 font-medium">{(msg.debt as any)?.customer?.full_name || '—'}</td>
                     <td className="py-3 pr-4 font-mono text-xs text-slate-300">{(msg.debt as any)?.reference_number || '—'}</td>

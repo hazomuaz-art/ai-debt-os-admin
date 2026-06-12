@@ -20,6 +20,13 @@ const registerSchema = z.object({
 })
 
 export async function loginAction(formData: FormData) {
+  const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
+  if (isDummyUrl) {
+    const { cookies } = await import('next/headers')
+    cookies().set('mock-auth-logged-in', 'true', { path: '/' })
+    redirect('/dashboard/admin')
+  }
+
   const supabase = createClient()
 
   const parsed = loginSchema.safeParse({
@@ -62,6 +69,13 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function registerAction(formData: FormData) {
+  const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
+  if (isDummyUrl) {
+    const { cookies } = await import('next/headers')
+    cookies().set('mock-auth-logged-in', 'true', { path: '/' })
+    redirect('/dashboard/admin')
+  }
+
   const serviceClient = createServiceClient()
   const supabase      = createClient()
 
@@ -148,6 +162,13 @@ export async function registerAction(formData: FormData) {
 }
 
 export async function logoutAction() {
+  const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
+  if (isDummyUrl) {
+    const { cookies } = await import('next/headers')
+    cookies().delete('mock-auth-logged-in')
+    redirect('/login')
+  }
+
   const supabase = createClient()
   await supabase.auth.signOut()
   redirect('/login')

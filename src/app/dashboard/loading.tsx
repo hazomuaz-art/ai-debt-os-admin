@@ -7,41 +7,41 @@ export default function DashboardLoading() {
       {/* Header skeleton */}
       <div className="flex items-start justify-between">
         <div className="space-y-2">
-          <div className="h-6 w-56 rounded-lg bg-white/5" />
-          <div className="h-3.5 w-72 rounded-lg bg-white/[0.03]" />
+          <div className="h-6 w-56 rounded-lg bg-slate-50" />
+          <div className="h-3.5 w-72 rounded-lg bg-slate-50" />
         </div>
         <div className="flex gap-2">
-          <div className="h-8 w-24 rounded-xl bg-white/5" />
-          <div className="h-8 w-24 rounded-xl bg-white/5" />
+          <div className="h-8 w-24 rounded-xl bg-slate-50" />
+          <div className="h-8 w-24 rounded-xl bg-slate-50" />
         </div>
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[0,1,2,3].map(i => (
-          <div key={i} className="rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,25,42,0.9)' }}>
+          <div key={i} className="rounded-2xl border border-slate-200 p-5" style={{ background: 'rgba(22,25,42,0.9)' }}>
             <div className="flex items-center justify-between mb-3">
-              <div className="h-3 w-24 rounded-md bg-white/5" />
-              <div className="h-7 w-7 rounded-xl bg-white/5" />
+              <div className="h-3 w-24 rounded-md bg-slate-50" />
+              <div className="h-7 w-7 rounded-xl bg-slate-50" />
             </div>
-            <div className="h-7 w-36 rounded-lg bg-white/[0.07] mb-2" />
-            <div className="h-3 w-20 rounded-md bg-white/[0.04]" />
+            <div className="h-7 w-36 rounded-lg bg-slate-50 mb-2" />
+            <div className="h-3 w-20 rounded-md bg-slate-50" />
           </div>
         ))}
       </div>
 
       {/* Content rows */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-        <div className="xl:col-span-3 rounded-2xl border border-white/[0.05] p-5 h-48" style={{ background: 'rgba(22,25,42,0.8)' }}>
-          <div className="h-4 w-40 rounded-lg bg-white/[0.06] mb-4" />
-          <div className="h-28 w-full rounded-xl bg-white/[0.03]" />
+        <div className="xl:col-span-3 rounded-2xl border border-slate-200 p-5 h-48" style={{ background: 'rgba(22,25,42,0.8)' }}>
+          <div className="h-4 w-40 rounded-lg bg-slate-50 mb-4" />
+          <div className="h-28 w-full rounded-xl bg-slate-50" />
         </div>
-        <div className="xl:col-span-2 rounded-2xl border border-white/[0.05] p-5 h-48" style={{ background: 'rgba(22,25,42,0.8)' }}>
-          <div className="h-4 w-32 rounded-lg bg-white/[0.06] mb-4" />
+        <div className="xl:col-span-2 rounded-2xl border border-slate-200 p-5 h-48" style={{ background: 'rgba(22,25,42,0.8)' }}>
+          <div className="h-4 w-32 rounded-lg bg-slate-50 mb-4" />
           <div className="flex items-center gap-4">
-            <div className="w-24 h-24 rounded-full bg-white/[0.04]" />
+            <div className="w-24 h-24 rounded-full bg-slate-50" />
             <div className="flex-1 space-y-3">
-              {[0,1,2,3].map(i => <div key={i} className="h-3 rounded-md bg-white/[0.03]" style={{ width: `${60+i*10}%` }} />)}
+              {[0,1,2,3].map(i => <div key={i} className="h-3 rounded-md bg-slate-50" style={{ width: `${60+i*10}%` }} />)}
             </div>
           </div>
         </div>
@@ -49,15 +49,15 @@ export default function DashboardLoading() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {[0,1,2].map(i => (
-          <div key={i} className="rounded-2xl border border-white/[0.05] p-5 h-52" style={{ background: 'rgba(22,25,42,0.8)' }}>
-            <div className="h-4 w-36 rounded-lg bg-white/[0.06] mb-4" />
+          <div key={i} className="rounded-2xl border border-slate-200 p-5 h-52" style={{ background: 'rgba(22,25,42,0.8)' }}>
+            <div className="h-4 w-36 rounded-lg bg-slate-50 mb-4" />
             <div className="space-y-3">
               {[0,1,2,3].map(j => (
                 <div key={j} className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-xl bg-white/[0.05] shrink-0" />
+                  <div className="w-7 h-7 rounded-xl bg-slate-50 shrink-0" />
                   <div className="flex-1 space-y-1.5">
-                    <div className="h-2.5 rounded-md bg-white/[0.04]" style={{ width: `${50+j*12}%` }} />
-                    <div className="h-2 w-16 rounded-md bg-white/[0.03]" />
+                    <div className="h-2.5 rounded-md bg-slate-50" style={{ width: `${50+j*12}%` }} />
+                    <div className="h-2 w-16 rounded-md bg-slate-50" />
                   </div>
                 </div>
               ))}

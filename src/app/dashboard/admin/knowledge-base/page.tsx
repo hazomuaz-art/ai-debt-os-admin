@@ -20,7 +20,7 @@ const CAT_STYLES: Record<string, string> = {
   faq:               'bg-green-500/10 text-green-400 border-green-500/20',
   forbidden:         'bg-red-500/10 text-red-400 border-red-500/20',
   escalation_criteria: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  other:             'bg-white/5 text-white/40 border-white/10',
+  other:             'bg-slate-50 text-slate-500 border-slate-200',
 }
 
 const CAT_AR: Record<string, string> = {
@@ -103,7 +103,7 @@ export default function KnowledgeBasePage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">Knowledge Base</h1>
-          <p className="text-white/40 text-sm mt-0.5">
+          <p className="text-slate-500 text-sm mt-0.5">
             سياسات وقواعد وسكريبتات يستخدمها AI أثناء الردود والتفاوض
           </p>
         </div>
@@ -114,12 +114,12 @@ export default function KnowledgeBasePage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="stat-card"><div className="text-white/40 text-xs">إجمالي</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">إجمالي</div>
           <div className="font-display text-2xl font-bold">{entries.length}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">نشط</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">نشط</div>
           <div className="font-display text-2xl font-bold text-green-400">
             {entries.filter(e => e.is_active).length}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">فئات</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">فئات</div>
           <div className="font-display text-2xl font-bold">
             {new Set(entries.map(e => e.category)).size}</div></div>
       </div>
@@ -162,12 +162,12 @@ export default function KnowledgeBasePage() {
           onChange={e => setSearch(e.target.value)} />
         <div className="flex gap-1.5 flex-wrap">
           <button onClick={() => setCatFilter('all')}
-            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${catFilter === 'all' ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-white/5 text-white/30 border-white/10'}`}>
+            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${catFilter === 'all' ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
             الكل
           </button>
           {Object.entries(CAT_AR).map(([k, v]) => (
             <button key={k} onClick={() => setCatFilter(k)}
-              className={`px-3 py-1 rounded-lg text-xs border transition-colors ${catFilter === k ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-white/5 text-white/30 border-white/10'}`}>
+              className={`px-3 py-1 rounded-lg text-xs border transition-colors ${catFilter === k ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
               {v}
             </button>
           ))}
@@ -176,14 +176,14 @@ export default function KnowledgeBasePage() {
 
       {/* Entries */}
       {loading ? (
-        <div className="text-center text-white/40 py-12">جارٍ التحميل…</div>
+        <div className="text-center text-slate-500 py-12">جارٍ التحميل…</div>
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="text-4xl mb-3">📚</div>
           <div className="font-display font-semibold mb-2">
             {entries.length === 0 ? 'قاعدة المعرفة فارغة' : 'لا توجد نتائج'}
           </div>
-          <p className="text-white/40 text-sm">
+          <p className="text-slate-500 text-sm">
             {entries.length === 0
               ? 'أضف السياسات والقواعد التي يستخدمها AI عند الرد على العملاء'
               : 'جرّب بحثاً مختلفاً أو فئة أخرى'}
@@ -204,16 +204,16 @@ export default function KnowledgeBasePage() {
                     <span className={`status-badge text-[10px] ${CAT_STYLES[entry.category] ?? CAT_STYLES.other}`}>
                       {CAT_AR[entry.category] ?? entry.category}
                     </span>
-                    <span className="bg-white/5 text-white/30 text-[10px] px-1.5 py-0.5 rounded border border-white/10">
+                    <span className="bg-slate-50 text-slate-400 text-[10px] px-1.5 py-0.5 rounded border border-slate-200">
                       {entry.language}
                     </span>
                   </div>
                   {expanded === entry.id && (
-                    <div className="mt-3 text-white/60 text-sm leading-relaxed whitespace-pre-wrap bg-white/3 rounded-lg p-3 border border-white/5">
+                    <div className="mt-3 text-slate-500 text-sm leading-relaxed whitespace-pre-wrap bg-white/3 rounded-lg p-3 border border-slate-200">
                       {entry.content}
                     </div>
                   )}
-                  <p className="text-white/30 text-[10px] mt-1">
+                  <p className="text-slate-400 text-[10px] mt-1">
                     {new Date(entry.created_at).toLocaleDateString('ar-SA')}
                   </p>
                 </div>
@@ -221,7 +221,7 @@ export default function KnowledgeBasePage() {
                   className={`shrink-0 text-xs px-2 py-1 rounded border transition-colors ${
                     entry.is_active
                       ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                      : 'bg-white/5 text-white/30 border-white/10'
+                      : 'bg-slate-50 text-slate-400 border-slate-200'
                   }`}>
                   {entry.is_active ? 'نشط' : 'معطّل'}
                 </button>

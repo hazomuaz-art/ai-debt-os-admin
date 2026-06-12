@@ -15,7 +15,7 @@ export function DashboardFooter() {
         ].map(({ icon, label }) => (
           <div
             key={label}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium text-white/30"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium text-slate-400"
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
           >
             <span className="text-xs">{icon}</span>
@@ -31,7 +31,7 @@ export function DashboardFooter() {
             { label: 'GDPR', sub: 'Compliant' },
             { label: 'AES-256', sub: 'Encrypted' },
           ].map(({ label, sub }) => (
-            <div key={label} className="flex items-center gap-1 text-[9px] text-white/20">
+            <div key={label} className="flex items-center gap-1 text-[9px] text-slate-400">
               <div
                 className="w-4 h-4 rounded-full flex items-center justify-center"
                 style={{ border: '1px solid rgba(255,255,255,0.1)' }}
@@ -41,7 +41,7 @@ export function DashboardFooter() {
                 </svg>
               </div>
               <div>
-                <div className="font-bold text-white/30">{label}</div>
+                <div className="font-bold text-slate-400">{label}</div>
                 <div>{sub}</div>
               </div>
             </div>
@@ -61,9 +61,9 @@ export function DashboardFooter() {
             </svg>
           </div>
           <div>
-            <span className="text-xs font-bold text-white/50">AI</span>
+            <span className="text-xs font-bold text-slate-500">AI</span>
             <span className="text-xs font-bold" style={{ color: '#818cf8' }}> DEBT OS</span>
-            <span className="text-[10px] text-white/20 ml-2">® Smarter Collections. Healthier Cashflow.</span>
+            <span className="text-[10px] text-slate-400 ml-2">® Smarter Collections. Healthier Cashflow.</span>
           </div>
         </div>
 

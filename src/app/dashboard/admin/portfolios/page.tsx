@@ -22,7 +22,7 @@ const CATEGORY_COLORS: Record<PortfolioCategory, string> = {
   government:  'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
   finance:     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   agriculture: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  other:       'bg-white/5 text-white/40 border-white/10',
+  other:       'bg-slate-50 text-slate-500 border-slate-200',
 }
 
 function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
@@ -67,7 +67,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
       <div className="card p-6 w-full max-w-md">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display font-semibold text-lg">إضافة محفظة / مشروع</h2>
-          <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white text-xl">×</button>
+          <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900 text-xl">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -107,8 +107,8 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
             <div className="flex gap-2 items-center">
               <input type="color" value={form.color}
                 onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
-                className="w-10 h-10 rounded cursor-pointer bg-transparent border border-white/10" />
-              <span className="text-white/40 text-xs font-mono">{form.color}</span>
+                className="w-10 h-10 rounded cursor-pointer bg-transparent border border-slate-200" />
+              <span className="text-slate-500 text-xs font-mono">{form.color}</span>
             </div>
           </div>
           <div>
@@ -174,7 +174,7 @@ export default function PortfoliosPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold">المحافظ والمشاريع</h1>
-          <p className="text-white/40 text-sm mt-0.5">
+          <p className="text-slate-500 text-sm mt-0.5">
             إدارة الشركات والمشاريع المرتبطة بعمليات التحصيل
           </p>
         </div>
@@ -184,22 +184,22 @@ export default function PortfoliosPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="stat-card">
-          <div className="text-white/40 text-xs uppercase tracking-wider">إجمالي</div>
+          <div className="text-slate-500 text-xs uppercase tracking-wider">إجمالي</div>
           <div className="font-display text-2xl font-bold">{portfolios.length}</div>
-          <div className="text-white/30 text-xs">محفظة</div>
+          <div className="text-slate-400 text-xs">محفظة</div>
         </div>
         <div className="stat-card">
-          <div className="text-white/40 text-xs uppercase tracking-wider">نشطة</div>
+          <div className="text-slate-500 text-xs uppercase tracking-wider">نشطة</div>
           <div className="font-display text-2xl font-bold text-green-400">
             {portfolios.filter(p => p.is_active).length}
           </div>
-          <div className="text-white/30 text-xs">محفظة</div>
+          <div className="text-slate-400 text-xs">محفظة</div>
         </div>
         {Object.keys(byCategory).slice(0, 2).map(cat => (
           <div key={cat} className="stat-card">
-            <div className="text-white/40 text-xs uppercase tracking-wider">{CATEGORY_LABELS[cat as PortfolioCategory]}</div>
+            <div className="text-slate-500 text-xs uppercase tracking-wider">{CATEGORY_LABELS[cat as PortfolioCategory]}</div>
             <div className="font-display text-2xl font-bold">{byCategory[cat].length}</div>
-            <div className="text-white/30 text-xs">مشروع</div>
+            <div className="text-slate-400 text-xs">مشروع</div>
           </div>
         ))}
       </div>
@@ -215,12 +215,12 @@ export default function PortfoliosPage() {
 
       {/* Portfolio grid */}
       {loading ? (
-        <div className="text-center text-white/40 py-16">جارٍ التحميل…</div>
+        <div className="text-center text-slate-500 py-16">جارٍ التحميل…</div>
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="text-4xl mb-3">🗂</div>
           <div className="font-display font-semibold mb-2">لا توجد محافظ</div>
-          <p className="text-white/40 text-sm">أضف محفظة جديدة للبدء</p>
+          <p className="text-slate-500 text-sm">أضف محفظة جديدة للبدء</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -237,7 +237,7 @@ export default function PortfoliosPage() {
                   <div>
                     <div className="font-semibold text-sm">{portfolio.name}</div>
                     {portfolio.name_ar && (
-                      <div className="text-white/40 text-xs" dir="rtl">{portfolio.name_ar}</div>
+                      <div className="text-slate-500 text-xs" dir="rtl">{portfolio.name_ar}</div>
                     )}
                   </div>
                 </div>
@@ -246,7 +246,7 @@ export default function PortfoliosPage() {
                   className={`text-xs px-2 py-0.5 rounded border transition-colors ${
                     portfolio.is_active
                       ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20'
-                      : 'bg-white/5 text-white/30 border-white/10 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20'
+                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20'
                   }`}
                 >
                   {portfolio.is_active ? 'نشط' : 'معطل'}
@@ -257,11 +257,11 @@ export default function PortfoliosPage() {
                 <span className={`status-badge text-[10px] ${CATEGORY_COLORS[portfolio.category]}`}>
                   {CATEGORY_LABELS[portfolio.category]}
                 </span>
-                <span className="text-white/30 text-xs font-mono">{portfolio.source_system}</span>
+                <span className="text-slate-400 text-xs font-mono">{portfolio.source_system}</span>
               </div>
 
               {portfolio.notes && (
-                <p className="text-white/30 text-xs mt-2 truncate">{portfolio.notes}</p>
+                <p className="text-slate-400 text-xs mt-2 truncate">{portfolio.notes}</p>
               )}
             </div>
           ))}

@@ -33,23 +33,23 @@ export default async function PromisesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Promise-to-Pay Tracker</h1>
-        <p className="text-white/40 text-sm mt-0.5">تتبع وعود السداد وتحديث Risk Score تلقائياً</p>
+        <p className="text-slate-500 text-sm mt-0.5">تتبع وعود السداد وتحديث Risk Score تلقائياً</p>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        <div className="stat-card"><div className="text-white/40 text-xs">الكل</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">الكل</div>
           <div className="font-display text-2xl font-bold">{all.length}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">انتظار</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">انتظار</div>
           <div className="font-display text-2xl font-bold text-yellow-400">{pending.length}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">التزام</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">التزام</div>
           <div className="font-display text-2xl font-bold text-green-400">{kept.length}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">نسبة الالتزام</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">نسبة الالتزام</div>
           <div className="font-display text-2xl font-bold text-brand-400">{rate}%</div></div>
       </div>
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="text-white/30 text-xs border-b border-white/5">
+          <thead><tr className="text-slate-400 text-xs border-b border-slate-200">
             <th className="p-3 text-left">العميل</th>
             <th className="p-3 text-left">المرجع</th>
             <th className="p-3 text-left">المبلغ الموعود</th>
@@ -59,15 +59,15 @@ export default async function PromisesPage() {
           </tr></thead>
           <tbody>
             {all.length === 0 && (
-              <tr><td colSpan={6} className="p-8 text-center text-white/30">لا توجد وعود مسجّلة</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400">لا توجد وعود مسجّلة</td></tr>
             )}
             {all.map((p: any) => (
-              <tr key={p.id} className="border-b border-white/5 last:border-0">
+              <tr key={p.id} className="border-b border-slate-200 last:border-0">
                 <td className="p-3 font-medium">{p.customer?.full_name ?? '—'}</td>
-                <td className="p-3 font-mono text-xs text-white/50">{p.debt?.reference_number ?? '—'}</td>
+                <td className="p-3 font-mono text-xs text-slate-500">{p.debt?.reference_number ?? '—'}</td>
                 <td className="p-3">{formatCurrency(p.promised_amount, p.debt?.currency ?? 'SAR')}</td>
-                <td className="p-3 text-white/60">{formatDate(p.promised_date)}</td>
-                <td className="p-3 text-white/50">{p.channel}</td>
+                <td className="p-3 text-slate-500">{formatDate(p.promised_date)}</td>
+                <td className="p-3 text-slate-500">{p.channel}</td>
                 <td className="p-3">
                   <span className={`status-badge text-[10px] ${STATUS_STYLES[p.status] ?? ''}`}>{p.status}</span>
                 </td>

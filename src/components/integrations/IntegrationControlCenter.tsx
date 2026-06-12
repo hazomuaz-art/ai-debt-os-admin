@@ -35,20 +35,20 @@ export function IntegrationControlCenter() {
         <h2 className="font-display text-lg font-semibold">
           Integration Control Center
         </h2>
-        <p className="text-white/40 text-sm mt-0.5">
+        <p className="text-slate-500 text-sm mt-0.5">
           Monitor sync readiness, AI mapping, connection health, and integration errors before enabling live operations.
         </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
         <div className="card p-4">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider mb-3">
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-3">
             System Health
           </div>
           <div className="space-y-3">
             {health.map((item) => (
               <div key={item.label} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-white/60">{item.label}</span>
+                <span className="text-sm text-slate-500">{item.label}</span>
                 <span className={`text-xs font-medium ${item.tone}`}>{item.status}</span>
               </div>
             ))}
@@ -56,13 +56,13 @@ export function IntegrationControlCenter() {
         </div>
 
         <div className="card p-4">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider mb-3">
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-3">
             Sync Status
           </div>
           <div className="grid grid-cols-2 gap-3">
             {syncStats.map((item) => (
               <div key={item.label}>
-                <div className="text-white/30 text-xs">{item.label}</div>
+                <div className="text-slate-400 text-xs">{item.label}</div>
                 <div className="font-display text-lg font-bold">{item.value}</div>
               </div>
             ))}
@@ -70,28 +70,28 @@ export function IntegrationControlCenter() {
         </div>
 
         <div className="card p-4">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider mb-3">
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-3">
             AI Detection
           </div>
           <div className="grid grid-cols-2 gap-3">
             {aiStatus.map((item) => (
               <div key={item.label}>
-                <div className="text-white/30 text-xs">{item.label}</div>
-                <div className="text-sm font-medium text-white/70">{item.value}</div>
+                <div className="text-slate-400 text-xs">{item.label}</div>
+                <div className="text-sm font-medium text-slate-600">{item.value}</div>
               </div>
             ))}
           </div>
         </div>
 
         <div className="card p-4">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider mb-3">
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-3">
             Error Center
           </div>
           <div className="grid grid-cols-2 gap-3">
             {errors.map((item) => (
               <div key={item.label}>
-                <div className="text-white/30 text-xs">{item.label}</div>
-                <div className="font-display text-lg font-bold text-white/70">{item.value}</div>
+                <div className="text-slate-400 text-xs">{item.label}</div>
+                <div className="font-display text-lg font-bold text-slate-600">{item.value}</div>
               </div>
             ))}
           </div>

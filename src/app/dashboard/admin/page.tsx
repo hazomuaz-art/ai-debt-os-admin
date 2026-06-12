@@ -51,8 +51,8 @@ function PerformanceRing({ pct, label }: { pct: number; label: string }) {
           </defs>
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display font-bold text-xl text-white">{pct}%</span>
-          <span className="text-[9px] text-white/40 uppercase tracking-wider">{label}</span>
+          <span className="font-display font-bold text-xl text-slate-900">{pct}%</span>
+          <span className="text-[9px] text-slate-500 uppercase tracking-wider">{label}</span>
         </div>
       </div>
     </div>
@@ -214,11 +214,11 @@ export default async function AdminDashboard() {
       {/* ── Page header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display font-bold text-2xl text-white flex items-center gap-2">
+          <h1 className="font-display font-bold text-2xl text-slate-900 flex items-center gap-2">
             Welcome back, {firstName}
             <span>👋</span>
           </h1>
-          <p className="text-white/40 text-sm mt-0.5">
+          <p className="text-slate-500 text-sm mt-0.5">
             Here&apos;s what&apos;s happening with your collections today.
           </p>
         </div>
@@ -235,10 +235,10 @@ export default async function AdminDashboard() {
       {/* ── KPI row — 4 cards ── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.map(kpi => (
-          <div key={kpi.label} className="kpi-card group hover:border-white/[0.12] transition-all">
+          <div key={kpi.label} className="kpi-card group hover:border-slate-200 transition-all">
             {/* Top: icon + label */}
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-white/40 font-medium">{kpi.label}</span>
+              <span className="text-xs text-slate-500 font-medium">{kpi.label}</span>
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center"
                 style={{ background: kpi.iconBg }}
@@ -249,7 +249,7 @@ export default async function AdminDashboard() {
               </div>
             </div>
             {/* Value */}
-            <div className="font-display font-bold text-2xl text-white tracking-tight mb-1">
+            <div className="font-display font-bold text-2xl text-slate-900 tracking-tight mb-1">
               {kpi.value}
             </div>
             {/* Delta */}
@@ -274,13 +274,13 @@ export default async function AdminDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="section-title">Collections Overview</h2>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-4 text-[10px] text-white/40">
+              <div className="flex items-center gap-4 text-[10px] text-slate-500">
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#4f46e5' }} />Collected</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#06b6d4' }} />Pending</span>
                 <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#ef4444' }} />Overdue</span>
               </div>
               <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] text-white/50 cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] text-slate-500 cursor-pointer"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 This Week
@@ -349,7 +349,7 @@ export default async function AdminDashboard() {
                 { label: 'Failed',              value: Math.max(0, (s.aiActionsTotal ?? 0) - (s.aiSuccessCount ?? 0) - (s.aiActionsToday ?? 0)), color: '#f87171' },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex items-center justify-between text-xs">
-                  <span className="text-white/40">{label}</span>
+                  <span className="text-slate-500">{label}</span>
                   <span className="font-semibold font-mono" style={{ color }}>{value.toLocaleString()}</span>
                 </div>
               ))}
@@ -374,7 +374,7 @@ export default async function AdminDashboard() {
         <div className="card p-5">
           <div className="section-header">
             <h2 className="section-title">Top Performing Campaigns</h2>
-            <button className="w-6 h-6 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5">
+            <button className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-500 hover:bg-slate-50">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
@@ -394,7 +394,7 @@ export default async function AdminDashboard() {
               const icColors = ['#f87171','#818cf8','#fbbf24','#34d399']
               return (
                 <div key={debt.id}
-                  className="flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/[0.03]"
+                  className="flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-slate-50"
                   style={{ border: '1px solid rgba(255,255,255,0.04)' }}
                 >
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shrink-0"
@@ -402,13 +402,13 @@ export default async function AdminDashboard() {
                     {String.fromCharCode(65 + idx)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-white/80 truncate">
+                    <div className="text-xs font-medium text-slate-600 truncate">
                       {(debt.customer as {full_name?: string}|null)?.full_name ?? 'Customer'}
                     </div>
-                    <div className="text-[10px] text-white/30">{debt.reference_number}</div>
+                    <div className="text-[10px] text-slate-400">{debt.reference_number}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs font-semibold text-white/70">
+                    <div className="text-xs font-semibold text-slate-600">
                       {formatCurrency(debt.current_balance, debt.currency)}
                     </div>
                     <div className="text-[10px] font-semibold" style={{ color: '#34d399' }}>{deltas[idx]}</div>
@@ -447,13 +447,13 @@ export default async function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white/70 leading-snug">
+                  <div className="text-xs text-slate-600 leading-snug">
                     {action.action_type === 'call' ? 'Payment reminder call' :
                      action.action_type === 'whatsapp' ? 'WhatsApp message sent' :
                      action.action_type === 'email' ? 'Email follow-up sent' :
                      `${action.action_type} action`}
                     {(action.customer as {full_name?: string}|null)?.full_name &&
-                      <span className="text-white/40"> to {(action.customer as {full_name?: string}).full_name}</span>
+                      <span className="text-slate-500"> to {(action.customer as {full_name?: string}).full_name}</span>
                     }
                   </div>
                   <div className="text-[10px] text-white/25 mt-0.5">{formatDate(action.created_at)}</div>
@@ -513,7 +513,7 @@ export default async function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white/70 leading-snug">{alert.title}</div>
+                  <div className="text-xs text-slate-600 leading-snug">{alert.title}</div>
                   <div className="text-[10px] text-white/25 mt-0.5">{alert.time}</div>
                 </div>
               </div>
@@ -544,7 +544,7 @@ export default async function AdminDashboard() {
                 <span className={`status-badge text-[9px] ${getStatusColor(status)}`}>
                   {statusLabels[status] ?? status}
                 </span>
-                <span className="font-mono text-sm font-bold text-white/70">{count}</span>
+                <span className="font-mono text-sm font-bold text-slate-600">{count}</span>
               </div>
             ))}
             {Object.keys(s.statusCount).length === 0 && (
@@ -564,7 +564,7 @@ export default async function AdminDashboard() {
               { label: 'Total Debts',        value: s.totalDebts,      icon: '📋', color: '#a78bfa' },
             ].map(({ label, value, icon, color }) => (
               <div key={label} className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-white/50">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span>{icon}</span>
                   {label}
                 </div>
@@ -578,7 +578,7 @@ export default async function AdminDashboard() {
         <div className="card p-5 flex flex-col items-center justify-center gap-2">
           <h2 className="section-title self-start mb-2">AI Confidence</h2>
           <PerformanceRing pct={s.successRate} label="AI Rate" />
-          <div className="text-[10px] text-white/30 text-center">
+          <div className="text-[10px] text-slate-400 text-center">
             Based on {s.aiActionsTotal.toLocaleString()} actions
           </div>
         </div>

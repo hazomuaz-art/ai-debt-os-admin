@@ -62,10 +62,10 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-surface-900 border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-white/5">
-          <h2 className="font-display font-semibold text-white">Invite Team Member</h2>
-          <button type="button" onClick={() => setOpen(false)} className="text-white/40 hover:text-white text-xl">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-200">
+          <h2 className="font-display font-semibold text-slate-900">Invite Team Member</h2>
+          <button type="button" onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900 text-xl">
             x
           </button>
         </div>

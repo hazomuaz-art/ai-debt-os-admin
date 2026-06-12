@@ -23,7 +23,7 @@ export default async function ManagerCustomersPage() {
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-surface-200">
+            <tr className="text-left text-slate-400 border-b border-slate-200">
               <th className="pb-3 pr-4">Name</th>
               <th className="pb-3 pr-4">Phone</th>
               <th className="pb-3 pr-4">City</th>
@@ -33,7 +33,7 @@ export default async function ManagerCustomersPage() {
           </thead>
           <tbody>
             {customers?.map((c: any) => (
-              <tr key={c.id} className="border-b border-surface-100">
+              <tr key={c.id} className="border-b border-slate-200">
                 <td className="py-3 pr-4 font-medium">{c.full_name}</td>
                 <td className="py-3 pr-4 text-slate-300">{c.phone || '—'}</td>
                 <td className="py-3 pr-4 text-slate-300">{c.city || '—'}</td>

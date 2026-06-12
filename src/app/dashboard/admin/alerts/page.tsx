@@ -57,7 +57,7 @@ export default function AlertsPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">System Alerts</h1>
-          <p className="text-white/40 text-sm mt-0.5">مراقبة النظام — أخطاء، تحذيرات، تنبيهات</p>
+          <p className="text-slate-500 text-sm mt-0.5">مراقبة النظام — أخطاء، تحذيرات، تنبيهات</p>
         </div>
         <button onClick={load} className="btn-secondary text-sm">⟳ تحديث</button>
       </div>
@@ -81,7 +81,7 @@ export default function AlertsPage() {
             className={`px-3 py-1 rounded-lg text-xs border transition-colors ${
               filter === s
                 ? 'bg-brand-600/20 text-brand-400 border-brand-500/30'
-                : 'bg-white/5 text-white/30 border-white/10 hover:text-white/60'
+                : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-500'
             }`}>
             {s === 'all' ? `الكل (${alerts.length})` : `${s} (${counts[s] ?? 0})`}
           </button>
@@ -89,12 +89,12 @@ export default function AlertsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center text-white/40 py-12">جارٍ التحميل…</div>
+        <div className="text-center text-slate-500 py-12">جارٍ التحميل…</div>
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <div className="text-4xl mb-3">✅</div>
           <div className="font-display font-semibold">لا توجد تنبيهات نشطة</div>
-          <p className="text-white/40 text-sm mt-1">النظام يعمل بشكل طبيعي</p>
+          <p className="text-slate-500 text-sm mt-1">النظام يعمل بشكل طبيعي</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -110,12 +110,12 @@ export default function AlertsPage() {
                       <span className={`status-badge text-[10px] ${SEV[alert.severity]}`}>
                         {alert.severity}
                       </span>
-                      <span className="text-white/30 text-xs font-mono">{alert.alert_type}</span>
+                      <span className="text-slate-400 text-xs font-mono">{alert.alert_type}</span>
                     </div>
                     {alert.message && (
-                      <p className="text-white/50 text-xs">{alert.message}</p>
+                      <p className="text-slate-500 text-xs">{alert.message}</p>
                     )}
-                    <p className="text-white/30 text-[10px] mt-1">
+                    <p className="text-slate-400 text-[10px] mt-1">
                       {new Date(alert.created_at).toLocaleString('ar-SA')}
                     </p>
                   </div>
@@ -123,12 +123,12 @@ export default function AlertsPage() {
                 <div className="flex gap-2 shrink-0">
                   {!alert.is_read && (
                     <button onClick={() => void markRead(alert.id)}
-                      className="text-xs px-2 py-1 rounded bg-white/5 text-white/40 border border-white/10 hover:text-white">
+                      className="text-xs px-2 py-1 rounded bg-slate-50 text-slate-500 border border-slate-200 hover:text-slate-900">
                       قراءة
                     </button>
                   )}
                   <button onClick={() => void resolve(alert.id)}
-                    className="text-xs px-2 py-1 rounded bg-white/5 text-white/40 border border-white/10 hover:text-green-400">
+                    className="text-xs px-2 py-1 rounded bg-slate-50 text-slate-500 border border-slate-200 hover:text-green-400">
                     حل ✓
                   </button>
                 </div>

@@ -43,7 +43,7 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
 function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: string | null }) {
   if (!enabled) {
     return (
-      <span className="status-badge bg-white/5 text-white/30 border-white/10">
+      <span className="status-badge bg-slate-50 text-slate-400 border-slate-200">
         Disabled
       </span>
     )
@@ -78,7 +78,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
         'disabled:opacity-40 disabled:cursor-not-allowed',
         checked
           ? 'bg-brand-600 border-brand-500'
-          : 'bg-white/10 border-white/20',
+          : 'bg-slate-100 border-slate-200',
       ].join(' ')}
     >
       <span
@@ -181,9 +181,9 @@ export function IntegrationCard({
   return (
     <div className="card p-0 overflow-hidden">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 p-5 border-b border-white/5">
+      <div className="flex items-start justify-between gap-4 p-5 border-b border-slate-200">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center text-xl shrink-0">
+          <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-xl shrink-0">
             {icon}
           </div>
           <div>
@@ -191,7 +191,7 @@ export function IntegrationCard({
               <h3 className="font-display font-semibold text-base">{label}</h3>
               <StatusBadge enabled={enabled} lastError={lastError} />
             </div>
-            <p className="text-white/40 text-xs mt-0.5">{description}</p>
+            <p className="text-slate-500 text-xs mt-0.5">{description}</p>
           </div>
         </div>
         <Toggle checked={enabled} onChange={setEnabled} />
@@ -204,7 +204,7 @@ export function IntegrationCard({
             <label className="label">
               {field.label}
               {field.hint && (
-                <span className="text-white/30 font-normal ml-1">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {field.hint}</span>
+                <span className="text-slate-400 font-normal ml-1">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {field.hint}</span>
               )}
             </label>
             <input
@@ -219,7 +219,7 @@ export function IntegrationCard({
         ))}
 
         {/* Logs / last sync */}
-        <div className="flex items-center justify-between pt-1 text-xs text-white/30">
+        <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
           <span>
             {lastSynced
               ? `Last sync: ${new Date(lastSynced).toLocaleString()}`
@@ -253,7 +253,7 @@ export function IntegrationCard({
             className="btn-primary text-sm px-4 py-1.5 flex items-center gap-1.5"
           >
             {saveState === 'saving' && (
-              <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="w-3 h-3 border border-slate-200 border-t-white rounded-full animate-spin" />
             )}
             {saveState === 'saved'   ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Saved'         :
              saveState === 'error'   ? 'Save failed'      :
@@ -268,7 +268,7 @@ export function IntegrationCard({
             className="btn-secondary text-sm px-4 py-1.5 flex items-center gap-1.5"
           >
             {testState === 'testing' && (
-              <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="w-3 h-3 border border-slate-200 border-t-white rounded-full animate-spin" />
             )}
             {testState === 'testing' ? 'TestingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦' :
              testState === 'ok'      ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Connected'      :

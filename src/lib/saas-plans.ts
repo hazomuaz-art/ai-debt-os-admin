@@ -73,7 +73,7 @@ export const PLAN_DEFINITIONS: Record<PlanName, PlanDefinition> = {
       voice: false, campaigns: false, api_access: false,
       sso: false, custom_rules: false,
     },
-    badge_color: 'bg-white/5 text-white/50 border-white/10',
+    badge_color: 'bg-slate-50 text-slate-500 border-slate-200',
     highlight: false,
   },
   business: {
@@ -265,7 +265,7 @@ export async function getAllPlans(): Promise<PlanDefinition[]> {
         custom_rules: row.feature_custom_rules ?? false,
       },
       badge_color: PLAN_DEFINITIONS[row.name as PlanName]?.badge_color
-                   ?? 'bg-white/5 text-white/50 border-white/10',
+                   ?? 'bg-slate-50 text-slate-500 border-slate-200',
       highlight: PLAN_DEFINITIONS[row.name as PlanName]?.highlight ?? false,
     }))
   } catch {
@@ -310,5 +310,5 @@ export const STATUS_COLORS: Record<SubscriptionStatus, string> = {
   active:    'bg-green-500/10 text-green-400 border-green-500/20',
   past_due:  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   suspended: 'bg-red-500/10 text-red-400 border-red-500/20',
-  cancelled: 'bg-white/5 text-white/30 border-white/10',
+  cancelled: 'bg-slate-50 text-slate-400 border-slate-200',
 }

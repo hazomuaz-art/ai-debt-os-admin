@@ -54,7 +54,7 @@ export default async function ActivityPage() {
                     )}
                   </div>
 
-                  <p className="text-sm text-white mt-1">
+                  <p className="text-sm text-slate-900 mt-1">
                     {event.title || 'System activity'}
                   </p>
 

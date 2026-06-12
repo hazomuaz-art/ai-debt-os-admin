@@ -64,7 +64,7 @@ export function AISchemaTest() {
     <div className="card p-5 space-y-4 border-blue-500/20 bg-blue-500/5">
       <div>
         <div className="font-display text-lg font-semibold">AI Schema Test</div>
-        <p className="text-white/40 text-sm mt-0.5">
+        <p className="text-slate-500 text-sm mt-0.5">
           Paste columns and statuses from any collection system. AI Debt OS will detect fields, project type, and status meanings.
         </p>
       </div>
@@ -106,21 +106,21 @@ export function AISchemaTest() {
       {result && (
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="card p-4">
-            <div className="text-white/40 text-xs uppercase tracking-wider">Confidence</div>
+            <div className="text-slate-500 text-xs uppercase tracking-wider">Confidence</div>
             <div className="font-display text-2xl font-bold text-green-400">
               {Math.round((result.confidence ?? 0) * 100)}%
             </div>
-            <div className="text-white/30 text-xs mt-1">
+            <div className="text-slate-400 text-xs mt-1">
               Project: {result.detected_project_type ?? 'unknown'}
             </div>
           </div>
 
           <div className="card p-4 lg:col-span-2">
-            <div className="text-white/40 text-xs uppercase tracking-wider mb-3">Field Mapping</div>
+            <div className="text-slate-500 text-xs uppercase tracking-wider mb-3">Field Mapping</div>
             <div className="space-y-2">
               {Object.entries(result.field_mapping ?? {}).map(([source, target]) => (
-                <div key={source} className="flex items-center justify-between gap-3 text-sm border-b border-white/5 pb-2">
-                  <span className="text-white/60">{source}</span>
+                <div key={source} className="flex items-center justify-between gap-3 text-sm border-b border-slate-200 pb-2">
+                  <span className="text-slate-500">{source}</span>
                   <span className="font-mono text-blue-300 text-xs">{target}</span>
                 </div>
               ))}
@@ -128,13 +128,13 @@ export function AISchemaTest() {
           </div>
 
           <div className="card p-4 lg:col-span-3">
-            <div className="text-white/40 text-xs uppercase tracking-wider mb-3">Status Mapping</div>
+            <div className="text-slate-500 text-xs uppercase tracking-wider mb-3">Status Mapping</div>
             {Object.keys(result.status_mapping ?? {}).length === 0 ? (
               <div className="text-white/35 text-sm">No statuses detected yet.</div>
             ) : (
               <div className="grid md:grid-cols-2 gap-3">
                 {Object.entries(result.status_mapping).map(([source, info]) => (
-                  <div key={source} className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  <div key={source} className="rounded-xl bg-slate-50 border border-slate-200 p-3">
                     <div className="font-medium">{source}</div>
                     <div className="text-sm text-white/45 mt-1">
                       Base: <span className="text-green-300">{info.base_status}</span>

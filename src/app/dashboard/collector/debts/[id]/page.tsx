@@ -36,7 +36,7 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/collector/debts" className="text-slate-400 hover:text-white">
+        <Link href="/dashboard/collector/debts" className="text-slate-400 hover:text-slate-900">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
@@ -76,14 +76,14 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
               </div>
               <div>
                 <p className="text-slate-400">Status</p>
-                <span className="px-2 py-1 rounded text-xs bg-surface-300 text-slate-300">
+                <span className="px-2 py-1 rounded text-xs bg-slate-50 text-slate-300">
                   {(debt.status as string).replace(/_/g, ' ')}
                 </span>
               </div>
               {debt.notes && (
                 <div className="col-span-2">
                   <p className="text-slate-400">Notes</p>
-                  <p className="text-white">{debt.notes as string}</p>
+                  <p className="text-slate-900">{debt.notes as string}</p>
                 </div>
               )}
             </div>
@@ -98,7 +98,7 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
             {(debt.payments as any[])?.length > 0 ? (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-slate-400 border-b border-surface-200">
+                  <tr className="text-left text-slate-400 border-b border-slate-200">
                     <th className="pb-2">Date</th>
                     <th className="pb-2">Amount</th>
                     <th className="pb-2">Method</th>
@@ -107,7 +107,7 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
                 </thead>
                 <tbody>
                   {(debt.payments as any[]).map((p) => (
-                    <tr key={p.id} className="border-b border-surface-100">
+                    <tr key={p.id} className="border-b border-slate-200">
                       <td className="py-2 text-slate-300">{formatDate(p.payment_date)}</td>
                       <td className="py-2 font-medium text-green-400">{formatCurrency(p.amount, debt.currency as string)}</td>
                       <td className="py-2 text-slate-300">{p.payment_method || '—'}</td>
@@ -128,7 +128,7 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
               <div className="space-y-3 max-h-80 overflow-y-auto">
                 {(debt.messages as any[]).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((msg) => (
                   <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xs px-4 py-2 rounded-lg text-sm ${msg.direction === 'outbound' ? 'bg-brand-600' : 'bg-surface-300'}`}>
+                    <div className={`max-w-xs px-4 py-2 rounded-lg text-sm ${msg.direction === 'outbound' ? 'bg-brand-600' : 'bg-slate-50'}`}>
                       <p>{msg.content}</p>
                       <p className="text-xs mt-1 opacity-60">{formatDate(msg.created_at)}</p>
                     </div>

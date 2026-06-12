@@ -34,12 +34,12 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
 
       <div className="flex gap-2 flex-wrap">
         <Link href="/dashboard/manager/debts"
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${!searchParams.status ? 'bg-brand-600/20 text-brand-400 border-brand-600/30' : 'bg-surface-100 text-slate-400 border-surface-200 hover:text-white'}`}>
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${!searchParams.status ? 'bg-brand-600/20 text-brand-400 border-brand-600/30' : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-900'}`}>
           All
         </Link>
         {statuses.map(s => (
           <Link key={s} href={`/dashboard/manager/debts?status=${s}`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${searchParams.status === s ? 'bg-brand-600/20 text-brand-400 border-brand-600/30' : 'bg-surface-100 text-slate-400 border-surface-200 hover:text-white'}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${searchParams.status === s ? 'bg-brand-600/20 text-brand-400 border-brand-600/30' : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-900'}`}>
             {s.replace(/_/g, ' ')}
           </Link>
         ))}
@@ -48,7 +48,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-surface-200">
+            <tr className="text-left text-slate-400 border-b border-slate-200">
               <th className="pb-3 pr-4">Reference</th>
               <th className="pb-3 pr-4">Customer</th>
               <th className="pb-3 pr-4">Balance</th>
@@ -60,7 +60,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
           </thead>
           <tbody>
             {debts?.map((debt: any) => (
-              <tr key={debt.id} className="border-b border-surface-100 hover:bg-surface-100/50">
+              <tr key={debt.id} className="border-b border-slate-200 hover:bg-slate-50">
                 <td className="py-3 pr-4">
                   <Link href={`/dashboard/admin/debts/${debt.id}`} className="font-mono text-xs text-brand-400 hover:underline">
                     {debt.reference_number}
@@ -72,7 +72,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
                 </td>
                 <td className="py-3 pr-4 font-medium">{formatCurrency(debt.current_balance, debt.currency)}</td>
                 <td className="py-3 pr-4">
-                  <span className="px-2 py-0.5 rounded text-xs bg-surface-300 text-slate-300">
+                  <span className="px-2 py-0.5 rounded text-xs bg-slate-50 text-slate-300">
                     {debt.status.replace(/_/g, ' ')}
                   </span>
                 </td>

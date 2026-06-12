@@ -1,52 +1,52 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { logoutAction } from '@/lib/actions/auth'
 import type { Profile } from '@/types'
 import { cn } from '@/lib/utils'
+import { useLocale } from '@/lib/i18n'
 
 interface SidebarProps {
   profile: Profile & { company?: { name: string } }
 }
 
 const adminNav = [
-  { href: '/dashboard/admin',               label: 'Dashboard',     icon: 'grid',       group: 'core' },
-  { href: '/dashboard/admin/debts',          label: 'Debts',         icon: 'layers',     group: 'core' },
-  { href: '/dashboard/admin/customers',      label: 'Customers',     icon: 'users',      group: 'core' },
-  { href: '/dashboard/admin/ai-actions',     label: 'AI Actions',    icon: 'zap',        group: 'core' },
-  { href: '/dashboard/admin/messages',       label: 'Messages',      icon: 'message',    group: 'core' },
-  { href: '/dashboard/admin/portfolios',     label: 'Portfolios',    icon: 'briefcase',  group: 'data' },
-  { href: '/dashboard/admin/cost-center',    label: 'Cost Centers',  icon: 'dollar',     group: 'data' },
-  { href: '/dashboard/admin/analytics',      label: 'Analytics',     icon: 'chart',      group: 'data' },
-  { href: '/dashboard/admin/ai-revenue',     label: 'AI Revenue',    icon: 'dollar',     group: 'data' },
-  { href: '/dashboard/admin/team',           label: 'Team',          icon: 'shield',     group: 'data' },
-  { href: '/dashboard/admin/automation',     label: 'Automation',    icon: 'cpu',        group: 'ai' },
-  { href: '/dashboard/admin/campaigns',      label: 'Campaigns',     icon: 'megaphone',  group: 'ai' },
-  { href: '/dashboard/admin/promises',       label: 'Promises',      icon: 'check',      group: 'ai' },
-  { href: '/dashboard/admin/approvals',      label: 'Approvals',     icon: 'clock',      group: 'ai' },
-  { href: '/dashboard/admin/integrations',   label: 'Integrations',  icon: 'link',       group: 'system' },
-  { href: '/dashboard/admin/alerts',         label: 'Alerts',        icon: 'bell',       group: 'system' },
-  { href: '/dashboard/admin/memory',         label: 'AI Memory',     icon: 'brain',      group: 'system' },
-  { href: '/dashboard/admin/knowledge-base', label: 'Knowledge Base',icon: 'book',       group: 'system' },
-  { href: '/dashboard/admin/rules',          label: 'Rules',          icon: 'cpu',        group: 'system' },
-{ href: '/dashboard/admin/health',         label: 'Health',         icon: 'shield',     group: 'system' },
-{ href: '/dashboard/admin/platform',       label: 'Plans & Usage',  icon: 'package',    group: 'system' },
-{ href: '/dashboard/admin/platform/companies', label: 'Companies', icon: 'briefcase', group: 'system' },
+  { href: '/dashboard/admin',               labelKey: 'command_center', icon: 'grid',       group: 'core' },
+  { href: '/dashboard/admin/debts',          labelKey: 'debts',         icon: 'layers',     group: 'core' },
+  { href: '/dashboard/admin/customers',      labelKey: 'customers',     icon: 'users',      group: 'core' },
+  { href: '/dashboard/admin/ai-actions',     labelKey: 'ai_actions',    icon: 'zap',        group: 'core' },
+  { href: '/dashboard/admin/messages',       labelKey: 'messages',      icon: 'message',    group: 'core' },
+  { href: '/dashboard/admin/portfolios',     labelKey: 'portfolios',    icon: 'briefcase',  group: 'data' },
+  { href: '/dashboard/admin/cost-center',    labelKey: 'cost_center',   icon: 'dollar',     group: 'data' },
+  { href: '/dashboard/admin/analytics',      labelKey: 'analytics',     icon: 'chart',      group: 'data' },
+  { href: '/dashboard/admin/ai-revenue',     labelKey: 'ai_revenue',    icon: 'dollar',     group: 'data' },
+  { href: '/dashboard/admin/team',           labelKey: 'team',          icon: 'shield',     group: 'data' },
+  { href: '/dashboard/admin/automation',     labelKey: 'automation',    icon: 'cpu',        group: 'ai' },
+  { href: '/dashboard/admin/campaigns',      labelKey: 'campaigns',     icon: 'megaphone',  group: 'ai' },
+  { href: '/dashboard/admin/promises',       labelKey: 'promises',      icon: 'check',      group: 'ai' },
+  { href: '/dashboard/admin/approvals',      labelKey: 'approvals',     icon: 'clock',      group: 'ai' },
+  { href: '/dashboard/admin/integrations',   labelKey: 'integrations',  icon: 'link',       group: 'system' },
+  { href: '/dashboard/admin/alerts',         labelKey: 'alerts',        icon: 'bell',       group: 'system' },
+  { href: '/dashboard/admin/memory',         labelKey: 'memory',        icon: 'brain',      group: 'system' },
+  { href: '/dashboard/admin/knowledge-base', labelKey: 'knowledge_base',icon: 'book',       group: 'system' },
+  { href: '/dashboard/admin/rules',          labelKey: 'rules',         icon: 'cpu',        group: 'system' },
+  { href: '/dashboard/admin/health',         labelKey: 'health',        icon: 'shield',     group: 'system' },
+  { href: '/dashboard/admin/platform',       labelKey: 'platform',      icon: 'package',    group: 'system' },
 ]
 
 const managerNav = [
-  { href: '/dashboard/manager',             label: 'Dashboard',  icon: 'grid' },
-  { href: '/dashboard/manager/debts',       label: 'Debts',      icon: 'layers' },
-  { href: '/dashboard/manager/customers',   label: 'Customers',  icon: 'users' },
-  { href: '/dashboard/manager/ai-actions',  label: 'AI Actions', icon: 'zap' },
-  { href: '/dashboard/manager/team',        label: 'Team',       icon: 'shield' },
+  { href: '/dashboard/manager',             labelKey: 'command_center', icon: 'grid' },
+  { href: '/dashboard/manager/debts',       labelKey: 'debts',      icon: 'layers' },
+  { href: '/dashboard/manager/customers',   labelKey: 'customers',  icon: 'users' },
+  { href: '/dashboard/manager/ai-actions',  labelKey: 'ai_actions', icon: 'zap' },
+  { href: '/dashboard/manager/team',        labelKey: 'team',       icon: 'shield' },
 ]
 
 const collectorNav = [
-  { href: '/dashboard/collector',           label: 'My Queue',   icon: 'grid' },
-  { href: '/dashboard/collector/debts',     label: 'My Debts',   icon: 'layers' },
-  { href: '/dashboard/collector/actions',   label: 'Actions',    icon: 'zap' },
-  { href: '/dashboard/collector/messages',  label: 'Messages',   icon: 'message' },
+  { href: '/dashboard/collector',           labelKey: 'command_center', icon: 'grid' },
+  { href: '/dashboard/collector/debts',     labelKey: 'debts',      icon: 'layers' },
+  { href: '/dashboard/collector/actions',   labelKey: 'ai_actions', icon: 'zap' },
+  { href: '/dashboard/collector/messages',  labelKey: 'messages',   icon: 'message' },
 ]
 
 const GROUP_LABELS: Record<string, string> = {
@@ -88,6 +88,7 @@ function NavIcon({ name }: { name: string }) {
 }
 
 export function Sidebar({ profile }: SidebarProps) {
+  const { t, isRTL } = useLocale()
   const nav       = profile.role === 'admin'   ? adminNav :
                     profile.role === 'manager' ? managerNav : collectorNav
   const isAdmin   = profile.role === 'admin'
@@ -97,17 +98,25 @@ export function Sidebar({ profile }: SidebarProps) {
                     profile.role === 'manager' ? 'from-purple-600 to-pink-600' :
                     'from-emerald-600 to-teal-600'
 
+  const GROUP_LABELS: Record<string, string> = {
+    core:   t.nav.command_center,
+    data:   t.nav.analytics,
+    ai:     t.nav.automation,
+    system: t.nav.settings,
+  }
+
   return (
     <aside
-      className="flex flex-col h-screen sticky top-0 shrink-0"
+      className="flex flex-col h-screen sticky top-0 shrink-0 bg-white border-r border-slate-200"
       style={{
         width: '220px',
-        background: 'linear-gradient(180deg, #0d0f1e 0%, #080a14 100%)',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
+        direction: isRTL ? 'rtl' : 'ltr',
+        borderRight: isRTL ? 'none' : undefined,
+        borderLeft: isRTL ? '1px solid #e2e8f0' : undefined,
       }}
     >
       {/* â”€â”€ Logo â”€â”€ */}
-      <div className="px-4 py-4 border-b border-white/[0.05]">
+      <div className="px-4 py-4 border-b border-slate-200">
         <div className="flex items-center gap-3">
           {/* Shield logo matching concept */}
           <div
@@ -123,34 +132,31 @@ export function Sidebar({ profile }: SidebarProps) {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1">
-              <span className="font-display font-bold text-sm text-white">AI</span>
+              <span className="font-display font-bold text-sm text-slate-900">AI</span>
               <span className="font-display font-bold text-sm" style={{ color: '#818cf8' }}>DEBT OS</span>
             </div>
-            <div className="text-[10px] text-white/30 truncate font-medium tracking-wide uppercase">
+            <div className="text-[10px] text-slate-400 truncate font-medium tracking-wide uppercase">
               {company || 'Platform'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* â”€â”€ Navigation â”€â”€ */}
+      {/* ── Navigation ── */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-none space-y-4">
         {isAdmin ? (
           Object.entries(GROUP_LABELS).map(([group, label]) => {
             const items = adminNav.filter(i => i.group === group)
             return (
               <div key={group}>
-                <div
-                  className="px-2 mb-1.5 text-[9px] font-bold uppercase tracking-[0.15em]"
-                  style={{ color: 'rgba(255,255,255,0.2)' }}
-                >
+                <div className={`px-2 mb-1.5 text-[9px] font-bold tracking-[0.15em] text-slate-400 ${isRTL ? 'text-right' : 'uppercase'}`}>
                   {label}
                 </div>
                 <div className="space-y-0.5">
                   {items.map(item => (
                     <Link key={item.href} href={item.href} prefetch={true} className="sidebar-link group">
                       <NavIcon name={item.icon} />
-                      <span className="text-xs">{item.label}</span>
+                      <span className="text-xs">{t.nav[item.labelKey as keyof typeof t.nav] || item.labelKey}</span>
                     </Link>
                   ))}
                 </div>
@@ -162,25 +168,25 @@ export function Sidebar({ profile }: SidebarProps) {
             {nav.map(item => (
               <Link key={item.href} href={item.href} prefetch={true} className="sidebar-link">
                 <NavIcon name={item.icon} />
-                <span className="text-xs">{item.label}</span>
+                <span className="text-xs">{t.nav[item.labelKey as keyof typeof t.nav] || item.labelKey}</span>
               </Link>
             ))}
           </div>
         )}
       </nav>
 
-      {/* â”€â”€ Secure Session indicator â”€â”€ */}
+      {/* ── Secure Session indicator ── */}
       <div className="px-3 py-2 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)' }}>
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-[10px] font-medium text-emerald-400/80">SECURE SESSION</span>
         </div>
-        <div className="text-[9px] text-white/25 mt-0.5 pl-3.5">All systems operational</div>
+        <div className="text-[9px] text-slate-400 mt-0.5 pl-3.5">All systems operational</div>
       </div>
 
-      {/* â”€â”€ User â”€â”€ */}
-      <div className="px-3 pb-3 border-t border-white/[0.05] pt-3">
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+      {/* ── User ── */}
+      <div className="px-3 pb-3 border-t border-slate-200 pt-3">
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1 bg-slate-50 border border-slate-100">
           <div
             className={`w-7 h-7 rounded-full bg-gradient-to-br ${roleColor} flex items-center justify-center text-[11px] font-bold text-white shrink-0`}
             style={{ boxShadow: '0 2px 8px rgba(79,70,229,0.4)' }}
@@ -188,14 +194,14 @@ export function Sidebar({ profile }: SidebarProps) {
             {initial}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-white/80 truncate">{profile.full_name ?? 'User'}</div>
-            <div className="text-[10px] text-white/30 capitalize">{profile.role}</div>
+            <div className="text-xs font-semibold text-slate-700 truncate">{profile.full_name ?? 'User'}</div>
+            <div className="text-[10px] text-slate-400 capitalize">{profile.role}</div>
           </div>
         </div>
         <form action={logoutAction}>
           <button
             type="submit"
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-white/30 hover:text-red-400 hover:bg-red-500/5 transition-all"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />

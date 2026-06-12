@@ -7,7 +7,7 @@ const PRIORITY_STYLES: Record<string, string> = {
   urgent: 'bg-red-500/10 text-red-400 border-red-500/20',
   high:   'bg-orange-500/10 text-orange-400 border-orange-500/20',
   medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  low:    'bg-white/5 text-white/40 border-white/10',
+  low:    'bg-slate-50 text-slate-500 border-slate-200',
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -47,7 +47,7 @@ export default function ApprovalsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Pending Approvals</h1>
-        <p className="text-white/40 text-sm mt-0.5 ar-text" dir="rtl">عمليات تحتاج موافقة يدوية قبل التنفيذ</p>
+        <p className="text-slate-500 text-sm mt-0.5 ar-text" dir="rtl">عمليات تحتاج موافقة يدوية قبل التنفيذ</p>
       </div>
 
       {pending.length > 0 && (
@@ -60,15 +60,15 @@ export default function ApprovalsPage() {
       <div className="flex gap-2">
         {['all','pending','approved','rejected'].map((s: string) => (
           <button key={s} onClick={() => setFilter(s)}
-            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${filter === s ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-white/5 text-white/30 border-white/10'}`}>
+            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${filter === s ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
             {s === 'all' ? 'الكل' : s === 'pending' ? `انتظار (${pending.length})` : s === 'approved' ? 'موافق' : 'مرفوض'}
           </button>
         ))}
       </div>
 
-      {loading ? <div className="text-center text-white/40 py-12">جارٍ التحميل…</div> : (
+      {loading ? <div className="text-center text-slate-500 py-12">جارٍ التحميل…</div> : (
         <div className="space-y-3">
-          {filtered.length === 0 && <div className="card p-10 text-center text-white/40">لا توجد طلبات في هذه الفئة</div>}
+          {filtered.length === 0 && <div className="card p-10 text-center text-slate-500">لا توجد طلبات في هذه الفئة</div>}
           {filtered.map((item: Approval) => (
             <div key={item.id} className="card p-4">
               <div className="flex items-start justify-between gap-4">
@@ -76,12 +76,12 @@ export default function ApprovalsPage() {
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-medium text-sm">{item.title}</span>
                     <span className={`status-badge text-[10px] ${PRIORITY_STYLES[String(item.priority ?? '')]}`}>{item.priority}</span>
-                    <span className="bg-white/5 text-white/40 text-[10px] px-1.5 py-0.5 rounded border border-white/10">
+                    <span className="bg-slate-50 text-slate-500 text-[10px] px-1.5 py-0.5 rounded border border-slate-200">
                       {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
                     </span>
                   </div>
-                  {item.description && <p className="text-white/50 text-xs mb-1">{item.description}</p>}
-                  <p className="text-white/30 text-[10px]">
+                  {item.description && <p className="text-slate-500 text-xs mb-1">{item.description}</p>}
+                  <p className="text-slate-400 text-[10px]">
                     {new Date(String(item.created_at ?? '')).toLocaleString('ar-SA')}
                     {item.expires_at && ` · تنتهي: ${new Date(String(item.expires_at ?? '')).toLocaleDateString('ar-SA')}`}
                   </p>

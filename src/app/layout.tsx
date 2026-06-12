@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Inter, Syne, JetBrains_Mono } from 'next/font/google'
+import { Inter, Syne, JetBrains_Mono, IBM_Plex_Sans_Arabic } from 'next/font/google'
+import { LanguageProvider } from '@/lib/i18n'
 import './globals.css'
 
 const inter = Inter({
@@ -20,6 +21,13 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 })
 
+const ibmPlexArabic = IBM_Plex_Sans_Arabic({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['arabic'],
+  variable: '--font-ibm-plex',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'AI Debt OS — Intelligent Debt Collection Platform',
   description: 'AI-powered debt collection and management platform for modern financial institutions',
@@ -31,9 +39,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable} font-sans bg-surface-950 text-white antialiased`}>
-        {children}
+    <html lang="en">
+      <body className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} font-sans bg-slate-50 text-slate-900 antialiased`}>
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   )

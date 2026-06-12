@@ -30,7 +30,7 @@ export default function RegisterPage() {
 
         <div className="card p-8">
           <h2 className="text-2xl font-display font-bold mb-1">Create your workspace</h2>
-          <p className="text-white/40 mb-8">Set up your company and admin account</p>
+          <p className="text-slate-500 mb-8">Set up your company and admin account</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -61,7 +61,7 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          <p className="text-center text-white/30 text-sm mt-6">
+          <p className="text-center text-slate-400 text-sm mt-6">
             Already have an account?{' '}
             <Link href="/login" className="text-brand-400 hover:text-brand-300">Sign in</Link>
           </p>

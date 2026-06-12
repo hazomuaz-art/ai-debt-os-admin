@@ -9,21 +9,17 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, company:companies(name, slug, plan)')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) redirect('/login')
+  // TEMPORARY: Mock profile for UI preview
+  const profile = {
+    id: 'mock-id',
+    full_name: 'Admin User',
+    email: 'admin@aidebtos.com',
+    role: 'admin',
+    company: { name: 'DebtCorp UI Preview' },
+  } as any
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#080a14' }}>
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       {/* Sidebar */}
       <Sidebar profile={profile} />
 

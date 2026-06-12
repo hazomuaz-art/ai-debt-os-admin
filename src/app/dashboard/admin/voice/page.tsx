@@ -29,14 +29,14 @@ export default async function VoicePage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">AI Voice Collector</h1>
-        <p className="text-white/40 text-sm mt-0.5">جاهز للربط مع Tameez — لا مكالمات حقيقية حتى تفعيل LIVE Mode</p>
+        <p className="text-slate-500 text-sm mt-0.5">جاهز للربط مع Tameez — لا مكالمات حقيقية حتى تفعيل LIVE Mode</p>
       </div>
 
       <div className="card p-4 border-yellow-500/20 bg-yellow-500/5 flex items-center gap-3">
         <span className="text-yellow-400 text-lg">⚠</span>
         <div>
           <div className="text-yellow-400 text-sm font-medium">الموديول في وضع الإعداد</div>
-          <p className="text-white/40 text-xs mt-0.5">ربط Tameez أو Twilio مطلوب من صفحة Integrations لبدء المكالمات الفعلية</p>
+          <p className="text-slate-500 text-xs mt-0.5">ربط Tameez أو Twilio مطلوب من صفحة Integrations لبدء المكالمات الفعلية</p>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ export default async function VoicePage() {
           { label: 'التكلفة',   val: `$${stats.total_cost.toFixed(4)}`, color: 'text-yellow-400' },
         ].map(({ label, val, color }) => (
           <div key={label} className="stat-card">
-            <div className="text-white/40 text-xs">{label}</div>
+            <div className="text-slate-500 text-xs">{label}</div>
             <div className={`font-display text-xl font-bold ${color}`}>{val}</div>
           </div>
         ))}
@@ -68,31 +68,31 @@ export default async function VoicePage() {
           ].map(({ label, key, val }) => (
             <div key={key}>
               <label className="label">{label}</label>
-              <div className="input text-sm text-white/50 cursor-not-allowed">{val}</div>
+              <div className="input text-sm text-slate-500 cursor-not-allowed">{val}</div>
             </div>
           ))}
         </div>
-        <p className="text-white/30 text-xs">لتعديل الإعدادات، استخدم صفحة <strong>Automation Control</strong></p>
+        <p className="text-slate-400 text-xs">لتعديل الإعدادات، استخدم صفحة <strong>Automation Control</strong></p>
       </div>
 
       <div className="card p-5">
         <div className="font-display font-semibold text-sm mb-4">آخر الجلسات الصوتية</div>
         {s.length === 0 ? (
-          <p className="text-white/30 text-sm text-center py-8">لا توجد جلسات مسجّلة</p>
+          <p className="text-slate-400 text-sm text-center py-8">لا توجد جلسات مسجّلة</p>
         ) : (
           <table className="w-full text-sm">
-            <thead><tr className="text-white/30 text-xs border-b border-white/5">
+            <thead><tr className="text-slate-400 text-xs border-b border-slate-200">
               <th className="pb-2 text-left">الحالة</th>
               <th className="pb-2 text-left">النتيجة</th>
               <th className="pb-2 text-left">المدة</th>
               <th className="pb-2 text-left">التكلفة</th>
             </tr></thead>
             <tbody>{s.slice(0, 20).map((sess, i) => (
-              <tr key={i} className="border-b border-white/5">
-                <td className="py-2 text-white/60">{sess.status}</td>
-                <td className="py-2 text-white/60">{sess.outcome ?? '—'}</td>
-                <td className="py-2 text-white/40">{sess.duration_seconds ?? 0}s</td>
-                <td className="py-2 font-mono text-xs text-white/40">${Number(sess.cost_usd).toFixed(4)}</td>
+              <tr key={i} className="border-b border-slate-200">
+                <td className="py-2 text-slate-500">{sess.status}</td>
+                <td className="py-2 text-slate-500">{sess.outcome ?? '—'}</td>
+                <td className="py-2 text-slate-500">{sess.duration_seconds ?? 0}s</td>
+                <td className="py-2 font-mono text-xs text-slate-500">${Number(sess.cost_usd).toFixed(4)}</td>
               </tr>
             ))}</tbody>
           </table>

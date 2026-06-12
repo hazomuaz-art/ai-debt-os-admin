@@ -39,7 +39,7 @@ interface Props {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-surface-900 border border-surface-200 rounded-lg p-3 text-sm shadow-xl">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-xl">
       {label && <p className="text-slate-400 mb-1">{label}</p>}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }}>
@@ -55,7 +55,7 @@ function CustomTooltip({ active, payload, label }: any) {
 function PieTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-surface-900 border border-surface-200 rounded-lg p-3 text-sm shadow-xl">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-xl">
       <p style={{ color: payload[0].payload.fill }}>{payload[0].name}: {payload[0].value}</p>
     </div>
   )

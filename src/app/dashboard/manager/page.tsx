@@ -59,21 +59,21 @@ export default async function ManagerDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-2xl font-bold">Manager Dashboard</h1>
-        <p className="text-white/40 text-sm">Team performance overview</p>
+        <p className="text-slate-500 text-sm">Team performance overview</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="stat-card">
-          <div className="text-white/40 text-xs uppercase tracking-wider">Total Portfolio</div>
+          <div className="text-slate-500 text-xs uppercase tracking-wider">Total Portfolio</div>
           <div className="font-display text-2xl font-bold">{formatCurrency(totalBalance)}</div>
-          <div className="text-white/30 text-xs">{totalDebts} debts</div>
+          <div className="text-slate-400 text-xs">{totalDebts} debts</div>
         </div>
         <div className="stat-card">
-          <div className="text-white/40 text-xs uppercase tracking-wider">Collected This Month</div>
+          <div className="text-slate-500 text-xs uppercase tracking-wider">Collected This Month</div>
           <div className="font-display text-2xl font-bold text-green-400">{formatCurrency(totalCollected)}</div>
         </div>
         <div className="stat-card">
-          <div className="text-white/40 text-xs uppercase tracking-wider">Active Collectors</div>
+          <div className="text-slate-500 text-xs uppercase tracking-wider">Active Collectors</div>
           <div className="font-display text-2xl font-bold text-brand-400">{collectors?.length ?? 0}</div>
         </div>
       </div>
@@ -84,7 +84,7 @@ export default async function ManagerDashboard() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5">
+              <tr className="border-b border-slate-200">
                 <th className="table-header px-4 py-3 text-left">Collector</th>
                 <th className="table-header px-4 py-3 text-right">Assigned</th>
                 <th className="table-header px-4 py-3 text-right">Collected (Month)</th>
@@ -93,7 +93,7 @@ export default async function ManagerDashboard() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {collectorStats.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-white/30">No collectors yet</td></tr>
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">No collectors yet</td></tr>
               ) : collectorStats.sort((a, b) => b.collected - a.collected).map(col => (
                 <tr key={col.id} className="hover:bg-white/2">
                   <td className="px-4 py-3">
@@ -103,7 +103,7 @@ export default async function ManagerDashboard() {
                       </div>
                       <div>
                         <div className="text-sm font-medium">{col.full_name ?? 'Unnamed'}</div>
-                        <div className="text-white/30 text-xs">{col.email}</div>
+                        <div className="text-slate-400 text-xs">{col.email}</div>
                       </div>
                     </div>
                   </td>

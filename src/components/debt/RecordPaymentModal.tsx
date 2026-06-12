@@ -56,7 +56,7 @@ export default function RecordPaymentModal({
               <button onClick={() => setOpen(false)}><X className="w-5 h-5 text-slate-400" /></button>
             </div>
             <p className="text-sm text-slate-400 mb-4">
-              Outstanding balance: <span className="text-white font-medium">{formatCurrency(currentBalance, currency)}</span>
+              Outstanding balance: <span className="text-slate-900 font-medium">{formatCurrency(currentBalance, currency)}</span>
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">

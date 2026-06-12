@@ -49,10 +49,10 @@ export function CreateDebtModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-surface-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-white/5">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-200">
           <h2 className="font-display font-semibold text-lg">Create New Debt</h2>
-          <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white text-xl">×</button>
+          <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900 text-xl">×</button>
         </div>
         <form ref={formRef} onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (

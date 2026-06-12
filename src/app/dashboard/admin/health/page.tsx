@@ -45,8 +45,8 @@ function HealthRing({ score }: { score: number }) {
           strokeDashoffset={dash} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display font-bold text-2xl text-white">{score}%</span>
-        <span className="text-[9px] text-white/40 uppercase tracking-wider">Health</span>
+        <span className="font-display font-bold text-2xl text-slate-900">{score}%</span>
+        <span className="text-[9px] text-slate-500 uppercase tracking-wider">Health</span>
       </div>
     </div>
   )
@@ -65,10 +65,10 @@ function ModuleRow({ item }: { item: AuditItem }) {
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-0.5">
-          <span className="text-sm font-medium text-white/80">{item.name}</span>
+          <span className="text-sm font-medium text-slate-600">{item.name}</span>
           <StatusBadge status={item.status} />
         </div>
-        <p className="text-xs text-white/40 leading-relaxed">{item.detail}</p>
+        <p className="text-xs text-slate-500 leading-relaxed">{item.detail}</p>
         {item.fix && (
           <p className="text-xs mt-1" style={{ color: '#818cf8' }}>
             💡 {item.fix}
@@ -77,7 +77,7 @@ function ModuleRow({ item }: { item: AuditItem }) {
       </div>
       {item.row_count !== undefined && (
         <div className="shrink-0 text-right">
-          <div className="font-mono text-sm font-bold text-white/60">{item.row_count.toLocaleString()}</div>
+          <div className="font-mono text-sm font-bold text-slate-500">{item.row_count.toLocaleString()}</div>
           <div className="text-[9px] text-white/25">rows</div>
         </div>
       )}
@@ -94,7 +94,7 @@ function Section({ title, items, emoji }: { title: string; items: AuditItem[]; e
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-title">{emoji} {title}</h2>
-        <span className="text-xs text-white/40">{working}/{items.length} working</span>
+        <span className="text-xs text-slate-500">{working}/{items.length} working</span>
       </div>
       <div className="space-y-2">
         {items.map((item: AuditItem, i: number) => <div key={i}><ModuleRow item={item} /></div>)}
@@ -132,8 +132,8 @@ export default async function SystemHealthPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display font-bold text-2xl text-white">System Health</h1>
-          <p className="text-white/40 text-sm mt-0.5">
+          <h1 className="font-display font-bold text-2xl text-slate-900">System Health</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
             AI System Orchestrator &amp; Auditor — {report.generated_at.slice(0, 19).replace('T', ' ')} UTC
           </p>
         </div>
@@ -152,7 +152,7 @@ export default async function SystemHealthPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="card p-5 flex flex-col items-center gap-2 xl:col-span-1">
           <HealthRing score={report.health_score} />
-          <div className="text-xs text-white/40 text-center">Overall</div>
+          <div className="text-xs text-slate-500 text-center">Overall</div>
         </div>
 
         {([
@@ -164,7 +164,7 @@ export default async function SystemHealthPage() {
         ] as Array<{ label: string; value: number; color: string }>).map(({ label, value, color }) => (
           <div key={label} className="stat-card flex flex-col justify-center">
             <div className="font-display font-bold text-2xl" style={{ color }}>{value}</div>
-            <div className="text-[11px] text-white/40 mt-1">{label}</div>
+            <div className="text-[11px] text-slate-500 mt-1">{label}</div>
           </div>
         ))}
       </div>
@@ -181,7 +181,7 @@ export default async function SystemHealthPage() {
           ] as Array<{ label: string; value: string | number; color: string }>).map(({ label, value, color }) => (
             <div key={label} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="font-mono font-bold text-xl" style={{ color }}>{value}</div>
-              <div className="text-xs text-white/40 mt-1">{label}</div>
+              <div className="text-xs text-slate-500 mt-1">{label}</div>
             </div>
           ))}
         </div>
@@ -191,7 +191,7 @@ export default async function SystemHealthPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-white/30 text-left border-b border-white/[0.05]">
+                <tr className="text-slate-400 text-left border-b border-slate-200">
                   <th className="pb-2 font-medium">Source</th>
                   <th className="pb-2 font-medium">Mode</th>
                   <th className="pb-2 font-medium">Score</th>
@@ -204,12 +204,12 @@ export default async function SystemHealthPage() {
               </thead>
               <tbody>
                 {(runs as Array<Record<string, unknown>>).map(run => (
-                  <tr key={String(run.id)} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                    <td className="py-2 pr-4 font-mono text-white/60">{String(run.event_source ?? '').replace('_',' ')}</td>
-                    <td className="py-2 pr-4 text-white/40">{String(run.mode ?? '—')}</td>
+                  <tr key={String(run.id)} className="border-b border-slate-200 hover:bg-slate-50">
+                    <td className="py-2 pr-4 font-mono text-slate-500">{String(run.event_source ?? '').replace('_',' ')}</td>
+                    <td className="py-2 pr-4 text-slate-500">{String(run.mode ?? '—')}</td>
                     <td className="py-2 pr-4" style={{ color: '#818cf8' }}>{run.ai_score != null ? String(run.ai_score) : '—'}</td>
-                    <td className="py-2 pr-4 text-white/60">{String(run.ai_actions_count ?? 0)}</td>
-                    <td className="py-2 pr-4 text-white/60">{String(run.alerts_count ?? 0)}</td>
+                    <td className="py-2 pr-4 text-slate-500">{String(run.ai_actions_count ?? 0)}</td>
+                    <td className="py-2 pr-4 text-slate-500">{String(run.alerts_count ?? 0)}</td>
                     <td className="py-2 pr-4">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         run.success
@@ -219,8 +219,8 @@ export default async function SystemHealthPage() {
                         {run.success ? '✓' : '✗'} {run.success ? 'OK' : String(run.error_message ?? 'Error').slice(0, 25)}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-white/30 font-mono">{run.duration_ms != null ? `${run.duration_ms}ms` : '—'}</td>
-                    <td className="py-2 text-white/30">{String(run.created_at ?? '').slice(11, 19)}</td>
+                    <td className="py-2 pr-4 text-slate-400 font-mono">{run.duration_ms != null ? `${run.duration_ms}ms` : '—'}</td>
+                    <td className="py-2 text-slate-400">{String(run.created_at ?? '').slice(11, 19)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -250,7 +250,7 @@ export default async function SystemHealthPage() {
           <h2 className="section-title mb-3" style={{ color: '#34d399' }}>Safe Fixes Applied</h2>
           <ul className="space-y-1">
             {report.safe_fixes_applied.map((fix: string, i: number) => (
-              <li key={i} className="text-sm text-white/70 flex items-start gap-2">
+              <li key={i} className="text-sm text-slate-600 flex items-start gap-2">
                 <span className="text-green-400 mt-0.5">✓</span>{fix}
               </li>
             ))}
@@ -260,7 +260,7 @@ export default async function SystemHealthPage() {
 
       {/* Footer note */}
       <div className="text-center pb-4">
-        <p className="text-xs text-white/20">
+        <p className="text-xs text-slate-400">
           Auditor reads data only — no changes unless you click "Apply Safe Fixes".
           Health score: {report.total_checks} checks · {report.working} working · {report.broken} broken.
         </p>

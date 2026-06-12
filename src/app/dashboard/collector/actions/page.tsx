@@ -34,12 +34,12 @@ export default async function CollectorActionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Today&apos;s Actions</h1>
-        <p className="text-white/40 text-sm">{done} done · {pending} pending</p>
+        <p className="text-slate-500 text-sm">{done} done · {pending} pending</p>
       </div>
 
       <div className="space-y-3">
         {(actions ?? []).length === 0 ? (
-          <div className="card p-12 text-center text-white/30">
+          <div className="card p-12 text-center text-slate-400">
             <div className="text-3xl mb-2">◆</div>
             <div>No actions scheduled for today. Check back later.</div>
           </div>
@@ -53,13 +53,13 @@ export default async function CollectorActionsPage() {
                     <span className="font-semibold text-sm">{(action.customer as {full_name?: string} | null)?.full_name}</span>
                     <span className={`status-badge text-[10px] ${getStatusColor(action.priority)}`}>{action.priority}</span>
                   </div>
-                  <div className="text-white/50 text-sm mt-1">{action.reason}</div>
+                  <div className="text-slate-500 text-sm mt-1">{action.reason}</div>
                   {action.suggested_message && (
-                    <div className="mt-2 p-3 bg-white/3 rounded-lg border border-white/5 text-white/70 text-sm">
+                    <div className="mt-2 p-3 bg-white/3 rounded-lg border border-slate-200 text-slate-600 text-sm">
                       {action.suggested_message}
                     </div>
                   )}
-                  <div className="mt-2 flex items-center gap-3 text-xs text-white/30">
+                  <div className="mt-2 flex items-center gap-3 text-xs text-slate-400">
                     {action.best_time_to_contact && <span>⏰ {action.best_time_to_contact}</span>}
                     <span>{formatCurrency((action.debt as {current_balance: number; currency: string} | null)?.current_balance ?? 0, (action.debt as {currency: string} | null)?.currency ?? 'SAR')}</span>
                   </div>

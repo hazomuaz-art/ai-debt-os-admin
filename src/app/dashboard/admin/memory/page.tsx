@@ -63,7 +63,7 @@ export default function MemoryPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">AI Memory</h1>
-          <p className="text-white/40 text-sm mt-0.5">مكتبة الردود الذكية — يرد من الذاكرة بدون OpenAI</p>
+          <p className="text-slate-500 text-sm mt-0.5">مكتبة الردود الذكية — يرد من الذاكرة بدون OpenAI</p>
         </div>
         <button onClick={() => setShowAdd(p => !p)} className="btn-primary text-sm">
           {showAdd ? 'إلغاء' : '+ إضافة رد'}
@@ -71,11 +71,11 @@ export default function MemoryPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="stat-card"><div className="text-white/40 text-xs">إجمالي الردود</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">إجمالي الردود</div>
           <div className="font-display text-2xl font-bold">{entries.length}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">إجمالي الاستخدام</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">إجمالي الاستخدام</div>
           <div className="font-display text-2xl font-bold text-brand-400">{totalUse}</div></div>
-        <div className="stat-card"><div className="text-white/40 text-xs">متوسط النجاح</div>
+        <div className="stat-card"><div className="text-slate-500 text-xs">متوسط النجاح</div>
           <div className="font-display text-2xl font-bold text-green-400">{avgSuccess}%</div></div>
       </div>
 
@@ -98,7 +98,7 @@ export default function MemoryPage() {
                 <option value="ar">عربي</option><option value="en">English</option><option value="both">كلاهما</option>
               </select></div>
           </div>
-          <p className="text-white/30 text-xs">⚠ سيُضاف الرد بحالة "في الانتظار" ويحتاج موافقة قبل التفعيل</p>
+          <p className="text-slate-400 text-xs">⚠ سيُضاف الرد بحالة "في الانتظار" ويحتاج موافقة قبل التفعيل</p>
           <button type="submit" disabled={saving} className="btn-primary text-sm px-6">
             {saving ? 'جارٍ الحفظ…' : 'إضافة للمراجعة'}
           </button>
@@ -108,15 +108,15 @@ export default function MemoryPage() {
       <div className="flex gap-2 flex-wrap">
         {['all','approved','pending','rejected'].map(s => (
           <button key={s} onClick={() => setFilter(s)}
-            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${filter === s ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-white/5 text-white/30 border-white/10 hover:text-white/60'}`}>
+            className={`px-3 py-1 rounded-lg text-xs border transition-colors ${filter === s ? 'bg-brand-600/20 text-brand-400 border-brand-500/30' : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-500'}`}>
             {s === 'all' ? 'الكل' : s === 'approved' ? 'معتمد' : s === 'pending' ? 'انتظار' : 'مرفوض'}
           </button>
         ))}
       </div>
 
-      {loading ? <div className="text-center text-white/40 py-12">جارٍ التحميل…</div> : (
+      {loading ? <div className="text-center text-slate-500 py-12">جارٍ التحميل…</div> : (
         <div className="space-y-2">
-          {filtered.length === 0 && <div className="card p-10 text-center text-white/40">لا توجد ردود في هذه الفئة</div>}
+          {filtered.length === 0 && <div className="card p-10 text-center text-slate-500">لا توجد ردود في هذه الفئة</div>}
           {filtered.map(entry => (
             <div key={entry.id} className={`card p-4 ${!entry.is_active ? 'opacity-60' : ''}`}>
               <div className="flex items-start justify-between gap-4">
@@ -124,12 +124,12 @@ export default function MemoryPage() {
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-mono text-sm font-medium">"{entry.trigger_pattern}"</span>
                     <span className={`status-badge text-[10px] ${STATUS_STYLES[entry.status] ?? ''}`}>{entry.status}</span>
-                    <span className="bg-white/5 text-white/40 text-[10px] px-1.5 py-0.5 rounded border border-white/10">
+                    <span className="bg-slate-50 text-slate-500 text-[10px] px-1.5 py-0.5 rounded border border-slate-200">
                       {CATEGORY_LABELS[entry.category] ?? entry.category}
                     </span>
                   </div>
-                  <p className="text-white/60 text-sm mb-2">{entry.response_text}</p>
-                  <div className="flex gap-4 text-[10px] text-white/30">
+                  <p className="text-slate-500 text-sm mb-2">{entry.response_text}</p>
+                  <div className="flex gap-4 text-[10px] text-slate-400">
                     <span>استُخدم {entry.use_count} مرة</span>
                     <span>نجاح {entry.success_rate?.toFixed(0) ?? 0}%</span>
                     {entry.last_used_at && <span>آخر استخدام: {new Date(entry.last_used_at).toLocaleDateString('ar-SA')}</span>}
@@ -143,7 +143,7 @@ export default function MemoryPage() {
                     </button>
                   )}
                   <button onClick={() => void toggleEntry(entry.id, !entry.is_active, entry.status)}
-                    className={`text-xs px-2 py-1 rounded border transition-colors ${entry.is_active ? 'bg-brand-500/10 text-brand-400 border-brand-500/20' : 'bg-white/5 text-white/30 border-white/10'}`}>
+                    className={`text-xs px-2 py-1 rounded border transition-colors ${entry.is_active ? 'bg-brand-500/10 text-brand-400 border-brand-500/20' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                     {entry.is_active ? 'مفعّل' : 'معطّل'}
                   </button>
                 </div>

@@ -66,7 +66,7 @@ export default async function ManagerTeamPage() {
                     <span>Collection rate</span>
                     <span>{Math.round((c.settled / c.totalAssigned) * 100)}%</span>
                   </div>
-                  <div className="w-full bg-surface-300 rounded-full h-1.5">
+                  <div className="w-full bg-slate-50 rounded-full h-1.5">
                     <div
                       className="bg-brand-500 h-1.5 rounded-full"
                       style={{ width: `${Math.round((c.settled / c.totalAssigned) * 100)}%` }}

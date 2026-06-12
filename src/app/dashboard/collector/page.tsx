@@ -61,7 +61,7 @@ export default async function CollectorDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-2xl font-bold">My Queue</h1>
-        <p className="text-white/40 text-sm mt-0.5">
+        <p className="text-slate-500 text-sm mt-0.5">
           {profile.full_name?.split(' ')[0] ?? 'Collector'} — {new Date().toLocaleDateString('en-SA', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
@@ -70,12 +70,12 @@ export default async function CollectorDashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Assigned Debts', value: totalAssigned ?? 0, color: 'text-blue-400' },
-          { label: 'Total Balance', value: formatCurrency(totalBalance), color: 'text-white' },
+          { label: 'Total Balance', value: formatCurrency(totalBalance), color: 'text-slate-900' },
           { label: 'Collected This Month', value: formatCurrency(collectedMonth), color: 'text-green-400' },
           { label: "Today's Actions", value: (todayActions ?? []).length, color: 'text-brand-400' },
         ].map(stat => (
           <div key={stat.label} className="stat-card">
-            <div className="text-white/40 text-xs font-medium uppercase tracking-wider">{stat.label}</div>
+            <div className="text-slate-500 text-xs font-medium uppercase tracking-wider">{stat.label}</div>
             <div className={`font-display text-xl font-bold ${stat.color}`}>{stat.value}</div>
           </div>
         ))}
@@ -89,7 +89,7 @@ export default async function CollectorDashboard() {
             <Link href="/dashboard/collector/actions" className="text-brand-400 text-xs hover:text-brand-300">View all →</Link>
           </div>
           {(todayActions ?? []).length === 0 ? (
-            <div className="text-center py-8 text-white/30 text-sm">No actions for today yet</div>
+            <div className="text-center py-8 text-slate-400 text-sm">No actions for today yet</div>
           ) : (todayActions ?? []).map((action: {
             id: string
             action_type: string
@@ -99,14 +99,14 @@ export default async function CollectorDashboard() {
             customer?: { full_name?: string } | null
             debt?: { reference_number?: string; current_balance?: number; currency?: string } | null
           }) => (
-            <div key={action.id} className="flex items-start gap-3 p-3 bg-white/2 rounded-lg border border-white/5 mb-2">
+            <div key={action.id} className="flex items-start gap-3 p-3 bg-white/2 rounded-lg border border-slate-200 mb-2">
               <span className="text-xl">{actionTypeIcons[action.action_type] ?? '◆'}</span>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">{(action.customer as {full_name?: string} | null)?.full_name}</span>
                   <span className={`status-badge text-[10px] ${getStatusColor(action.priority)}`}>{action.priority}</span>
                 </div>
-                <div className="text-white/50 text-xs mt-0.5">{action.reason}</div>
+                <div className="text-slate-500 text-xs mt-0.5">{action.reason}</div>
               </div>
             </div>
           ))}
@@ -119,7 +119,7 @@ export default async function CollectorDashboard() {
             <Link href="/dashboard/collector/debts" className="text-brand-400 text-xs hover:text-brand-300">View all →</Link>
           </div>
           {sortedDebts.length === 0 ? (
-            <div className="text-center py-8 text-white/30 text-sm">No debts assigned yet</div>
+            <div className="text-center py-8 text-slate-400 text-sm">No debts assigned yet</div>
           ) : sortedDebts.slice(0, 5).map((debt: {
             id: string
             reference_number: string
@@ -130,7 +130,7 @@ export default async function CollectorDashboard() {
             due_date?: string
             customer?: { full_name?: string; phone?: string } | null
           }) => (
-            <div key={debt.id} className="flex items-center justify-between p-3 bg-white/2 rounded-lg border border-white/5 mb-2 hover:border-white/10 transition-colors">
+            <div key={debt.id} className="flex items-center justify-between p-3 bg-white/2 rounded-lg border border-slate-200 mb-2 hover:border-slate-200 transition-colors">
               <div>
                 <div className="text-sm font-medium">{(debt.customer as {full_name?: string} | null)?.full_name}</div>
                 <div className="flex items-center gap-2 mt-0.5">

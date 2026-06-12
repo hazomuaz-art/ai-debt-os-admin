@@ -107,7 +107,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/admin/debts" className="text-slate-400 hover:text-white">
+        <Link href="/dashboard/admin/debts" className="text-slate-400 hover:text-slate-900">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
@@ -165,7 +165,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               {debt.description && (
                 <div className="col-span-2">
                   <p className="text-slate-400 text-sm">Description</p>
-                  <p className="text-white">{debt.description}</p>
+                  <p className="text-slate-900">{debt.description}</p>
                 </div>
               )}
             </div>
@@ -184,7 +184,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             {debt.payments?.length > 0 ? (
               <table className="w-full">
                 <thead>
-                  <tr className="text-left text-slate-400 text-sm border-b border-surface-200">
+                  <tr className="text-left text-slate-400 text-sm border-b border-slate-200">
                     <th className="pb-2">Date</th>
                     <th className="pb-2">Amount</th>
                     <th className="pb-2">Method</th>
@@ -194,7 +194,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 </thead>
                 <tbody>
                   {debt.payments.map((p: any) => (
-                    <tr key={p.id} className="border-b border-surface-100 text-sm">
+                    <tr key={p.id} className="border-b border-slate-200 text-sm">
                       <td className="py-2 text-slate-300">{formatDate(p.payment_date)}</td>
                       <td className="py-2 font-medium text-green-400">{formatCurrency(p.amount, debt.currency)}</td>
                       <td className="py-2 text-slate-300">{p.payment_method || '—'}</td>
@@ -218,8 +218,8 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                   <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm ${
                       msg.direction === 'outbound'
-                        ? 'bg-brand-600 text-white'
-                        : 'bg-surface-300 text-slate-200'
+                        ? 'bg-brand-600 text-slate-900'
+                        : 'bg-slate-50 text-slate-200'
                     }`}>
                       <p>{msg.content}</p>
                       <p className={`text-xs mt-1 ${msg.direction === 'outbound' ? 'text-brand-200' : 'text-slate-400'}`}>
@@ -333,7 +333,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             {aiActions?.length ? (
               <div className="space-y-3">
                 {aiActions.map((a: any) => (
-                  <div key={a.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={a.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{a.action_type}</span>
                       <span className="text-xs text-slate-400">{a.priority}</span>
@@ -374,7 +374,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             {promises?.length ? (
               <div className="space-y-3">
                 {promises.map((pr: any) => (
-                  <div key={pr.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={pr.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{formatCurrency(pr.promised_amount, debt.currency)}</span>
                       <span className="text-xs text-slate-400">{pr.status}</span>
@@ -394,7 +394,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             {approvals?.length ? (
               <div className="space-y-3">
                 {approvals.map((ap: any) => (
-                  <div key={ap.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={ap.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{ap.approval_type}</span>
                       <span className="text-xs text-slate-400">{ap.status}</span>
@@ -415,7 +415,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             {memoryEntries?.length ? (
               <div className="space-y-3">
                 {memoryEntries.map((m: any) => (
-                  <div key={m.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={m.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{m.trigger_pattern}</span>
                       <span className="text-xs text-slate-400">{m.category}</span>
@@ -438,7 +438,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <div className="space-y-3 mb-5">
                 <p className="text-xs text-slate-400">Latest Followups</p>
                 {collectionFollowups.map((f: any) => (
-                  <div key={f.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={f.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{f.original_status || f.normalized_status || 'Followup'}</span>
                       <span className="text-xs text-slate-500">{formatDate(f.occurred_at)}</span>
@@ -458,7 +458,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <div className="space-y-3 mb-5">
                 <p className="text-xs text-slate-400">Status History</p>
                 {collectionStatusHistory.map((s: any) => (
-                  <div key={s.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={s.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{s.new_status}</span>
                       <span className="text-xs text-slate-500">{formatDate(s.changed_at)}</span>
@@ -476,7 +476,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <div className="space-y-3">
                 <p className="text-xs text-slate-400">Assignments</p>
                 {collectionAssignments.map((a: any) => (
-                  <div key={a.id} className="border border-surface-200 rounded-lg p-3">
+                  <div key={a.id} className="border border-slate-200 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{a.assigned_to_name || 'Unassigned'}</span>
                       <span className="text-xs text-slate-500">{a.assignment_status || 'assignment'}</span>

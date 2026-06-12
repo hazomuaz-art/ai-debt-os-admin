@@ -113,7 +113,7 @@ export function SendWhatsAppButton(props: Props) {
             </div>
             {!isActionProps(props) && (
               <p className="text-sm text-slate-400 mb-4">
-                To: <span className="text-white">{props.customerName}</span> ({props.phone || 'No phone set'})
+                To: <span className="text-slate-900">{props.customerName}</span> ({props.phone || 'No phone set'})
               </p>
             )}
             <textarea

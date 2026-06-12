@@ -49,7 +49,7 @@ export default async function AIActionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">AI Action Plan</h1>
-          <p className="text-white/40 text-sm">
+          <p className="text-slate-500 text-sm">
             {today} — {completedCount}/{(actions ?? []).length} completed
           </p>
         </div>
@@ -72,7 +72,7 @@ export default async function AIActionsPage() {
           <div className="card p-12 text-center">
             <div className="text-4xl mb-3">◆</div>
             <div className="font-display font-semibold mb-2">No AI Actions Generated</div>
-            <p className="text-white/40 text-sm mb-4">Click &quot;Generate AI Plan&quot; to create today&apos;s action plan</p>
+            <p className="text-slate-500 text-sm mb-4">Click &quot;Generate AI Plan&quot; to create today&apos;s action plan</p>
             <GenerateActionsButton />
           </div>
         ) : (actions ?? []).map((action: {
@@ -96,21 +96,21 @@ export default async function AIActionsPage() {
                     <span className={`status-badge text-[10px] ${getStatusColor(action.priority)}`}>
                       {action.priority}
                     </span>
-                    <span className="text-white/30 text-xs font-mono">{(action.debt as {reference_number?: string} | null)?.reference_number}</span>
+                    <span className="text-slate-400 text-xs font-mono">{(action.debt as {reference_number?: string} | null)?.reference_number}</span>
                   </div>
-                  <div className="text-white/60 text-sm mt-1">{action.reason}</div>
+                  <div className="text-slate-500 text-sm mt-1">{action.reason}</div>
                   {action.suggested_message && (
-                    <div className="mt-2 p-3 bg-white/3 rounded-lg border border-white/5">
-                      <div className="text-white/30 text-[10px] uppercase tracking-wider mb-1">Suggested Message</div>
-                      <div className="text-white/80 text-sm">{action.suggested_message}</div>
+                    <div className="mt-2 p-3 bg-white/3 rounded-lg border border-slate-200">
+                      <div className="text-slate-400 text-[10px] uppercase tracking-wider mb-1">Suggested Message</div>
+                      <div className="text-slate-600 text-sm">{action.suggested_message}</div>
                     </div>
                   )}
                   <div className="flex items-center gap-3 mt-2">
                     {action.best_time_to_contact && (
-                      <span className="text-white/30 text-xs">⏰ {action.best_time_to_contact}</span>
+                      <span className="text-slate-400 text-xs">⏰ {action.best_time_to_contact}</span>
                     )}
                     {(action.debt as {current_balance?: number; currency?: string} | null)?.current_balance && (
-                      <span className="text-white/30 text-xs">
+                      <span className="text-slate-400 text-xs">
                         {formatCurrency((action.debt as {current_balance: number; currency: string}).current_balance, (action.debt as {currency: string}).currency)}
                       </span>
                     )}

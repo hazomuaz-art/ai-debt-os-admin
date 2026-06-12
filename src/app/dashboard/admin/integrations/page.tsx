@@ -77,12 +77,12 @@ export default async function IntegrationsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold">Integrations</h1>
-          <p className="text-white/40 text-sm mt-0.5">
+          <p className="text-slate-500 text-sm mt-0.5">
             Connect external services to automate your debt collection workflow
           </p>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-white/30">
+          <span className="text-slate-400">
             {enabledCount}/{INTEGRATIONS.length} enabled
           </span>
           {errorCount > 0 && (
@@ -100,8 +100,8 @@ export default async function IntegrationsPage() {
             <span className="text-yellow-400 text-lg">⚠</span>
             <div>
               <div className="font-medium text-yellow-400 text-sm">Database migration required</div>
-              <p className="text-white/50 text-xs mt-1">
-                Run migration <code className="font-mono bg-white/5 px-1 rounded">012_integration_settings.sql</code> in
+              <p className="text-slate-500 text-xs mt-1">
+                Run migration <code className="font-mono bg-slate-50 px-1 rounded">012_integration_settings.sql</code> in
                 your Supabase SQL Editor to enable integration settings storage.
                 Until then, settings are not persisted between sessions.
               </p>
@@ -113,21 +113,21 @@ export default async function IntegrationsPage() {
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="stat-card">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider">Total</div>
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider">Total</div>
           <div className="font-display text-2xl font-bold">{INTEGRATIONS.length}</div>
-          <div className="text-white/30 text-xs">available integrations</div>
+          <div className="text-slate-400 text-xs">available integrations</div>
         </div>
         <div className="stat-card">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider">Active</div>
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider">Active</div>
           <div className="font-display text-2xl font-bold text-green-400">{enabledCount}</div>
-          <div className="text-white/30 text-xs">currently enabled</div>
+          <div className="text-slate-400 text-xs">currently enabled</div>
         </div>
         <div className="stat-card">
-          <div className="text-white/40 text-xs font-medium uppercase tracking-wider">Errors</div>
-          <div className={`font-display text-2xl font-bold ${errorCount > 0 ? 'text-red-400' : 'text-white/30'}`}>
+          <div className="text-slate-500 text-xs font-medium uppercase tracking-wider">Errors</div>
+          <div className={`font-display text-2xl font-bold ${errorCount > 0 ? 'text-red-400' : 'text-slate-400'}`}>
             {errorCount}
           </div>
-          <div className="text-white/30 text-xs">need attention</div>
+          <div className="text-slate-400 text-xs">need attention</div>
         </div>
       </div>
 
@@ -151,7 +151,7 @@ export default async function IntegrationsPage() {
       <div className="card p-4 flex items-center justify-between">
         <div>
           <div className="text-sm font-medium">Need help setting up an integration?</div>
-          <div className="text-white/40 text-xs mt-0.5">
+          <div className="text-slate-500 text-xs mt-0.5">
             Configure credentials in the cards above. Use &quot;Test Connection&quot; to verify before enabling.
           </div>
         </div>

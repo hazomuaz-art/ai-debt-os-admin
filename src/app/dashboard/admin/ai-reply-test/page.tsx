@@ -89,8 +89,8 @@ export default function Page() {
                 <div
                   className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-6 ${
                     item.role === 'customer'
-                      ? 'bg-surface-300 text-slate-100'
-                      : 'bg-brand-600 text-white'
+                      ? 'bg-slate-50 text-slate-100'
+                      : 'bg-brand-600 text-slate-900'
                   }`}
                 >
                   <div className="text-[10px] opacity-60 mb-1">
@@ -103,9 +103,9 @@ export default function Page() {
           )}
         </div>
 
-        <div className="flex gap-2 pt-4 border-t border-white/10">
+        <div className="flex gap-2 pt-4 border-t border-slate-200">
           <textarea
-            className="flex-1 min-h-[90px] rounded-xl bg-surface-300 border border-white/10 p-3 text-sm outline-none focus:border-brand-500"
+            className="flex-1 min-h-[90px] rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm outline-none focus:border-brand-500"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="اكتب رسالة العميل هنا..."

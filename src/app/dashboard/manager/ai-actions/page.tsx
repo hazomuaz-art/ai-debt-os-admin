@@ -38,7 +38,7 @@ export default async function ManagerAIActionsPage() {
         {actions && actions.length > 0 ? (
           <div className="space-y-3">
             {actions.map((action: any) => (
-              <div key={action.id} className="p-4 bg-surface-100 rounded-lg border border-surface-200">
+              <div key={action.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
                     <p className="font-semibold">{action.debt?.customer?.full_name}</p>

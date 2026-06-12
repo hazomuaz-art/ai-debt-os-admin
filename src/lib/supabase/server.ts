@@ -1,6 +1,9 @@
 import { createServerClient as _createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient as _createServiceClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { getMockSupabaseClient } from './mock'
+
+const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
 
 /**
  * Server-side Supabase client for Next.js 14 (App Router).
@@ -8,6 +11,10 @@ import { cookies } from 'next/headers'
  * Call this in Server Components, Route Handlers, and Server Actions.
  */
 export function createClient() {
+  if (isDummyUrl) {
+    return getMockSupabaseClient()
+  }
+
   const cookieStore = cookies()
 
   return _createServerClient(
@@ -34,6 +41,10 @@ export function createClient() {
  * Only use in trusted server-side contexts (webhook, job worker, invite).
  */
 export function createServiceClient() {
+  if (isDummyUrl) {
+    return getMockSupabaseClient()
+  }
+
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
   }
@@ -52,3 +63,4 @@ export function createServiceClient() {
     }
   )
 }
+

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import type { SystemConfig } from '@/types'
 
 const MODE_CONFIG = {
-  off:  { label: 'OFF',  desc: 'النظام يعرض التحليلات فقط — لا إرسال، لا اتصال تلقائي',  color: 'bg-white/5 text-white/50 border-white/10',  dot: 'bg-white/30' },
+  off:  { label: 'OFF',  desc: 'النظام يعرض التحليلات فقط — لا إرسال، لا اتصال تلقائي',  color: 'bg-slate-50 text-slate-500 border-slate-200',  dot: 'bg-slate-100' },
   test: { label: 'TEST', desc: 'تجربة داخلية — يسجّل ما كان سيحدث بدون إرسال فعلي',       color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', dot: 'bg-yellow-400' },
   live: { label: 'LIVE', desc: 'التشغيل الحقيقي — WhatsApp + AI + Calls + Campaigns',    color: 'bg-green-500/10 text-green-400 border-green-500/20',  dot: 'bg-green-400 animate-pulse' },
 } as const
@@ -74,9 +74,9 @@ export default function AutomationPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">Automation Control</h1>
-          <p className="text-white/40 text-sm mt-0.5">التحكم في وضع التشغيل والموديولات</p>
+          <p className="text-slate-500 text-sm mt-0.5">التحكم في وضع التشغيل والموديولات</p>
         </div>
-        {saving && <span className="text-white/30 text-xs mt-2">جارٍ الحفظ…</span>}
+        {saving && <span className="text-slate-400 text-xs mt-2">جارٍ الحفظ…</span>}
         {saved  && <span className="text-green-400 text-xs mt-2">✓ تم الحفظ</span>}
       </div>
 
@@ -90,10 +90,10 @@ export default function AutomationPage() {
             return (
               <button key={m}
                 onClick={() => setMode(m)}
-                className={`p-4 rounded-xl border text-left transition-all ${isActive ? mc2.color : 'bg-white/3 border-white/5 text-white/30 hover:text-white/60 hover:bg-white/5'}`}
+                className={`p-4 rounded-xl border text-left transition-all ${isActive ? mc2.color : 'bg-white/3 border-slate-200 text-slate-400 hover:text-slate-500 hover:bg-slate-50'}`}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-2 h-2 rounded-full ${isActive ? mc2.dot : 'bg-white/20'}`} />
+                  <div className={`w-2 h-2 rounded-full ${isActive ? mc2.dot : 'bg-slate-100'}`} />
                   <span className="font-display font-bold text-sm">{mc2.label}</span>
                 </div>
                 <p className="text-xs leading-relaxed opacity-70">{mc2.desc}</p>
@@ -106,7 +106,7 @@ export default function AutomationPage() {
         {confirmLive && (
           <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 space-y-3">
             <div className="text-green-400 font-semibold text-sm">⚠ تأكيد تفعيل LIVE Mode</div>
-            <p className="text-white/60 text-xs">سيبدأ النظام بإرسال رسائل WhatsApp وإجراء اتصالات AI فعلية. تأكد من ضبط الحدود اليومية أولاً.</p>
+            <p className="text-slate-500 text-xs">سيبدأ النظام بإرسال رسائل WhatsApp وإجراء اتصالات AI فعلية. تأكد من ضبط الحدود اليومية أولاً.</p>
             <div className="flex gap-3">
               <button onClick={() => { setConfirmLive(false); void save({ automation_mode: 'live' }) }}
                 className="btn-primary text-sm px-4 py-1.5">نعم، فعّل LIVE</button>
@@ -132,7 +132,7 @@ export default function AutomationPage() {
               className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
                 config[key]
                   ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                  : 'bg-white/3 text-white/40 border-white/10 hover:text-white/70'
+                  : 'bg-white/3 text-slate-500 border-slate-200 hover:text-slate-600'
               }`}
             >
               {config[key] ? '🔴 ' : '⚪ '}{label}
@@ -174,12 +174,12 @@ export default function AutomationPage() {
                 onClick={() => toggleModule(key, !enabled)}
                 className={`flex items-center justify-between p-3 rounded-lg border text-sm transition-colors ${
                   enabled
-                    ? 'bg-brand-600/10 border-brand-500/20 text-white'
-                    : 'bg-white/3 border-white/5 text-white/40'
+                    ? 'bg-brand-600/10 border-brand-500/20 text-slate-900'
+                    : 'bg-white/3 border-slate-200 text-slate-500'
                 }`}
               >
                 <span className="truncate">{label}</span>
-                <span className={`ml-2 shrink-0 text-xs px-1.5 py-0.5 rounded ${enabled ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-white/20'}`}>
+                <span className={`ml-2 shrink-0 text-xs px-1.5 py-0.5 rounded ${enabled ? 'bg-brand-500/20 text-brand-400' : 'bg-slate-50 text-slate-400'}`}>
                   {enabled ? 'ON' : 'OFF'}
                 </span>
               </button>
