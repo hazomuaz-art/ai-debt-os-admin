@@ -19,7 +19,7 @@ export default async function DashboardLayout({
   } as any
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* Sidebar */}
       <Sidebar profile={profile} />
 

@@ -40,7 +40,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} font-sans bg-slate-50 text-slate-900 antialiased`}>
+      <body className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} font-sans bg-slate-950 text-slate-100 antialiased`}>
         <LanguageProvider>
           {children}
         </LanguageProvider>
