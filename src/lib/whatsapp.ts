@@ -66,9 +66,27 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
   let evolutionUrl = process.env.EVOLUTION_API_URL
   let evolutionKey = process.env.EVOLUTION_API_KEY
   let evolutionInstance = process.env.EVOLUTION_INSTANCE_NAME
+  let n8nEnabled = false
+  let n8nConfig: Record<string, string> | null = null
 
   if (options.company_id) {
     const supabase = createServiceClient()
+    
+    // Check n8n automation first
+    const { data: n8nSettings } = await supabase
+      .from('integration_settings')
+      .select('config')
+      .eq('company_id', options.company_id)
+      .eq('integration_name', 'n8n_automation')
+      .eq('enabled', true)
+      .maybeSingle()
+      
+    if (n8nSettings?.config) {
+      n8nEnabled = true
+      n8nConfig = n8nSettings.config as Record<string, string>
+    }
+
+    // Also get evolution settings as fallback payload
     const { data: settings } = await supabase
       .from('integration_settings')
       .select('config')
@@ -85,9 +103,36 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
     }
   }
 
+  const to = normalizePhone(options.to)
+  const message = truncateMessage(options.message)
+
+  // 1. If n8n is enabled, route via n8n webhook
+  if (n8nEnabled && options.company_id) {
+    const { getN8nClient } = await import('@/lib/n8n/client')
+    const n8nClient = getN8nClient()
+    
+    log.info('Routing WhatsApp message via n8n', { to, company_id: options.company_id })
+    
+    const result = await n8nClient.sendWhatsAppMessage({
+      company_id: options.company_id,
+      customer_id: 'unknown', // Typically resolved before calling this, but we pass what we have
+      phone_number: to,
+      message: message,
+      instance_name: evolutionInstance ?? 'default',
+    })
+
+    if (!result.success) {
+      return { message_id: null, status: 'failed', error: result.error ?? 'n8n webhook failed' }
+    }
+
+    return {
+      message_id: `n8n-${Date.now()}`,
+      status: 'sent',
+    }
+  }
+
+  // 2. Direct Evolution API fallback
   if (evolutionUrl && evolutionKey && evolutionInstance) {
-    const to = normalizePhone(options.to)
-    const message = truncateMessage(options.message)
 
     try {
       const response = await fetch(`${evolutionUrl.replace(/\/$/, '')}/message/sendText/${evolutionInstance}`, {
@@ -119,8 +164,7 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
     return { message_id: null, status: 'failed', error: 'WhatsApp credentials not configured' }
   }
 
-  const to      = normalizePhone(options.to)
-  const message = truncateMessage(options.message)
+
 
   if (to.length < 10 || to.length > 15) {
     return { message_id: null, status: 'failed', error: `Invalid phone: ${options.to}` }

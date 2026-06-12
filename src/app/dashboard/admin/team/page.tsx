@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatDate, getStatusColor, formatCurrency } from '@/lib/utils'
 import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
+import { MemberActions } from '@/components/dashboard/MemberActions'
 import { Users, Activity, CheckCircle, Wallet } from 'lucide-react'
 
 export default async function AdminTeamPage() {
@@ -113,14 +114,13 @@ export default async function AdminTeamPage() {
               </div>
             </div>
 
-            <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-center">
-              <div className={`inline-flex items-center gap-2 text-xs font-bold ${member.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <span className={`w-2 h-2 rounded-full ${member.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                {member.is_active ? 'نشط الآن' : 'غير نشط'}
-              </div>
-              <button className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                تعديل الصلاحيات
-              </button>
+            <div className="mt-auto">
+              <MemberActions 
+                memberId={member.id} 
+                currentRole={member.role} 
+                isActive={member.is_active} 
+                currentUserId={user.id} 
+              />
             </div>
 
           </div>

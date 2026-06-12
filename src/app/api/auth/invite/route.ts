@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
           company_id: ctx.profile.company_id,
           role:       body.role,
           full_name:  body.full_name,
-          is_active:  true,
+          is_active:  false, // Changed to false: requires admin approval
         })
         .eq('id', newUser.user.id)
 

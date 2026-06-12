@@ -4,7 +4,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import RecordPaymentModal from '@/components/debt/RecordPaymentModal'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowRight, User, Wallet, Phone, MessageCircle, AlertTriangle, FileText, CheckCircle2, History, MapPin, Building, CreditCard, Sparkles } from 'lucide-react'
 
 export default async function CollectorDebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -17,7 +17,7 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
       *,
       customer:customers(*),
       payments(*),
-      messages(*, created_at),
+      messages(*),
       ai_scores(*)
     `)
     .eq('id', params.id)
@@ -33,17 +33,22 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
   const totalPaid = (debt.payments as any[])?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0
   const customer = debt.customer as any
 
+  const getStatusLabel = (s: string) => {
+    const labels: Record<string, string> = {
+      active: 'نشط', promised: 'وعد سداد', disputed: 'معترض', partial: 'سداد جزئي', settled: 'مسدد بالكامل'
+    }
+    return labels[s] ?? s
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/collector/debts" className="text-slate-400 hover:text-slate-900">
-          <ArrowLeft className="w-5 h-5" />
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header Toolbar */}
+      <div className="flex items-center justify-between mt-6 mb-2">
+        <Link href="/dashboard/collector/debts" className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold text-sm bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 transition-colors">
+          <ArrowRight size={16} /> العودة للقائمة
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold font-syne">{debt.reference_number}</h1>
-          <p className="text-slate-400">{customer?.full_name}</p>
-        </div>
-        <div className="ml-auto">
+        <div className="flex items-center gap-3">
           <SendWhatsAppButton
             debtId={debt.id}
             phone={customer?.whatsapp || customer?.phone}
@@ -52,128 +57,236 @@ export default async function CollectorDebtDetailPage({ params }: { params: { id
         </div>
       </div>
 
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Right Column (Wider) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Overview */}
-          <div className="card">
-            <h2 className="text-lg font-semibold font-syne mb-4">Debt Overview</h2>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-slate-400">Original Amount</p>
-                <p className="text-xl font-bold">{formatCurrency(debt.original_amount, debt.currency)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Current Balance</p>
-                <p className="text-xl font-bold text-brand-400">{formatCurrency(debt.current_balance, debt.currency)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Total Paid</p>
-                <p className="text-xl font-bold text-green-400">{formatCurrency(totalPaid, debt.currency)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Due Date</p>
-                <p className="text-xl font-bold">{formatDate(debt.due_date)}</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Status</p>
-                <span className="px-2 py-1 rounded text-xs bg-slate-50 text-slate-300">
-                  {(debt.status as string).replace(/_/g, ' ')}
-                </span>
-              </div>
-              {debt.notes && (
-                <div className="col-span-2">
-                  <p className="text-slate-400">Notes</p>
-                  <p className="text-slate-900">{debt.notes as string}</p>
+          
+          {/* Debt Overview Card */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-500 rounded-r-2xl"></div>
+            
+            <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                  <Wallet size={20} />
                 </div>
-              )}
+                <div>
+                  <h2 className="text-lg font-bold text-[#1e3e50]">تفاصيل المديونية</h2>
+                  <p className="text-slate-400 text-xs font-mono mt-0.5">{debt.reference_number}</p>
+                </div>
+              </div>
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#f0f4f8] text-slate-600 border border-slate-200">
+                الحالة: {getStatusLabel(debt.status as string)}
+              </span>
             </div>
-          </div>
 
-          {/* Payments */}
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold font-syne">Payments</h2>
-              <RecordPaymentModal debtId={debt.id} currentBalance={Number(debt.current_balance)} currency={debt.currency as string} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-slate-500 font-bold text-xs mb-1">المبلغ الأصلي</p>
+                <p className="text-lg font-bold text-[#1e3e50] font-mono">{formatCurrency(debt.original_amount, debt.currency)}</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                <p className="text-blue-600 font-bold text-xs mb-1">الرصيد المتبقي</p>
+                <p className="text-lg font-bold text-blue-700 font-mono">{formatCurrency(debt.current_balance, debt.currency)}</p>
+              </div>
+              <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                <p className="text-emerald-600 font-bold text-xs mb-1">إجمالي المسدد</p>
+                <p className="text-lg font-bold text-emerald-700 font-mono">{formatCurrency(totalPaid, debt.currency)}</p>
+              </div>
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                <p className="text-amber-600 font-bold text-xs mb-1">تاريخ الاستحقاق</p>
+                <p className="text-lg font-bold text-amber-700">{formatDate(debt.due_date)}</p>
+              </div>
             </div>
-            {(debt.payments as any[])?.length > 0 ? (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-400 border-b border-slate-200">
-                    <th className="pb-2">Date</th>
-                    <th className="pb-2">Amount</th>
-                    <th className="pb-2">Method</th>
-                    <th className="pb-2">Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(debt.payments as any[]).map((p) => (
-                    <tr key={p.id} className="border-b border-slate-200">
-                      <td className="py-2 text-slate-300">{formatDate(p.payment_date)}</td>
-                      <td className="py-2 font-medium text-green-400">{formatCurrency(p.amount, debt.currency as string)}</td>
-                      <td className="py-2 text-slate-300">{p.payment_method || '—'}</td>
-                      <td className="py-2 text-slate-400">{p.notes || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-slate-400 text-center py-6">No payments recorded</p>
+
+            {debt.notes && (
+              <div className="mt-6 p-4 bg-[#fcfdfd] border border-slate-100 rounded-xl">
+                <p className="text-slate-500 font-bold text-xs flex items-center gap-1.5 mb-2"><FileText size={14} /> ملاحظات الملف</p>
+                <p className="text-slate-700 text-sm leading-relaxed">{debt.notes as string}</p>
+              </div>
             )}
           </div>
 
-          {/* Messages */}
-          <div className="card">
-            <h2 className="text-lg font-semibold font-syne mb-4">Messages</h2>
+          {/* Payments History Card */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                  <CreditCard size={20} />
+                </div>
+                <h2 className="text-lg font-bold text-[#1e3e50]">سجل الدفعات</h2>
+              </div>
+              <RecordPaymentModal debtId={debt.id} currentBalance={Number(debt.current_balance)} currency={debt.currency as string} />
+            </div>
+
+            {(debt.payments as any[])?.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-right">
+                  <thead className="bg-[#fbfdfd] border-b border-slate-100 text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 font-bold">التاريخ</th>
+                      <th className="px-4 py-3 font-bold">المبلغ</th>
+                      <th className="px-4 py-3 font-bold">طريقة الدفع</th>
+                      <th className="px-4 py-3 font-bold">ملاحظات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(debt.payments as any[]).map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 text-slate-600 font-medium">{formatDate(p.payment_date)}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-600 font-mono">{formatCurrency(p.amount, debt.currency as string)}</td>
+                        <td className="px-4 py-3 text-slate-500">
+                          <span className="bg-slate-100 px-2.5 py-1 rounded-md text-[11px] font-bold">{p.payment_method || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{p.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <History size={20} />
+                </div>
+                <p className="text-slate-500 font-bold text-sm">لم يتم تسجيل أي دفعات حتى الآن</p>
+              </div>
+            )}
+          </div>
+
+          {/* Messages Timeline */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+              <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center">
+                <MessageCircle size={20} />
+              </div>
+              <h2 className="text-lg font-bold text-[#1e3e50]">سجل المراسلات</h2>
+            </div>
+
             {(debt.messages as any[])?.length > 0 ? (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
+              <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                 {(debt.messages as any[]).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xs px-4 py-2 rounded-lg text-sm ${msg.direction === 'outbound' ? 'bg-brand-600' : 'bg-slate-50'}`}>
-                      <p>{msg.content}</p>
-                      <p className="text-xs mt-1 opacity-60">{formatDate(msg.created_at)}</p>
+                  <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm ${
+                      msg.direction === 'outbound' 
+                        ? 'bg-blue-600 text-white rounded-tr-sm shadow-sm' 
+                        : 'bg-slate-100 text-slate-800 rounded-tl-sm border border-slate-200'
+                    }`}>
+                      <p className="leading-relaxed">{msg.content}</p>
+                      <p className={`text-[10px] mt-2 font-bold ${msg.direction === 'outbound' ? 'text-blue-200' : 'text-slate-400'}`}>
+                        {formatDate(msg.created_at)}
+                      </p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-slate-400 text-center py-6">No messages yet</p>
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
+                <MessageCircle size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-500 font-bold text-sm">لا توجد رسائل سابقة مع هذا العميل</p>
+              </div>
             )}
           </div>
+
         </div>
 
+        {/* Left Column (Narrower) */}
         <div className="space-y-6">
-          {/* Customer Info */}
-          <div className="card">
-            <h2 className="text-lg font-semibold font-syne mb-4">Customer</h2>
-            <div className="space-y-3 text-sm">
-              <div><p className="text-slate-400">Name</p><p className="font-medium">{customer?.full_name}</p></div>
-              <div><p className="text-slate-400">Phone</p><p className="font-medium">{customer?.phone || '—'}</p></div>
-              <div><p className="text-slate-400">WhatsApp</p><p className="font-medium">{customer?.whatsapp || '—'}</p></div>
-              <div><p className="text-slate-400">City</p><p className="font-medium">{customer?.city || '—'}</p></div>
-              <div><p className="text-slate-400">Employer</p><p className="font-medium">{customer?.employer || '—'}</p></div>
+          
+          {/* Customer Profile Card */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-full h-1.5 bg-slate-800"></div>
+            
+            <div className="text-center mb-6 pt-2">
+              <div className="w-20 h-20 bg-[#f0f4f8] text-[#1e3e50] rounded-full flex items-center justify-center mx-auto mb-3 border-[4px] border-white shadow-sm">
+                <User size={32} />
+              </div>
+              <h2 className="text-lg font-bold text-[#1e3e50]">{customer?.full_name}</h2>
+              <p className="text-slate-400 text-xs font-medium mt-1">العميل المدين</p>
+            </div>
+
+            <div className="space-y-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="flex items-start gap-3">
+                <Phone size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-slate-400 text-xs font-bold mb-0.5">رقم الجوال</p>
+                  <p className="font-bold text-[#1e3e50] font-mono" dir="ltr">{customer?.phone || '—'}</p>
+                </div>
+              </div>
+              <div className="w-full h-px bg-slate-200"></div>
+              <div className="flex items-start gap-3">
+                <MessageCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-slate-400 text-xs font-bold mb-0.5">رقم الواتساب</p>
+                  <p className="font-bold text-[#1e3e50] font-mono" dir="ltr">{customer?.whatsapp || '—'}</p>
+                </div>
+              </div>
+              <div className="w-full h-px bg-slate-200"></div>
+              <div className="flex items-start gap-3">
+                <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-slate-400 text-xs font-bold mb-0.5">المدينة / العنوان</p>
+                  <p className="font-bold text-[#1e3e50]">{customer?.city || '—'}</p>
+                </div>
+              </div>
+              <div className="w-full h-px bg-slate-200"></div>
+              <div className="flex items-start gap-3">
+                <Building size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-slate-400 text-xs font-bold mb-0.5">جهة العمل</p>
+                  <p className="font-bold text-[#1e3e50]">{customer?.employer || '—'}</p>
+                </div>
+              </div>
               {customer?.monthly_income && (
-                <div><p className="text-slate-400">Monthly Income</p><p className="font-medium">{formatCurrency(customer.monthly_income, debt.currency as string)}</p></div>
+                <>
+                  <div className="w-full h-px bg-slate-200"></div>
+                  <div className="flex items-start gap-3">
+                    <Wallet size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-slate-400 text-xs font-bold mb-0.5">الدخل الشهري</p>
+                      <p className="font-bold text-emerald-600 font-mono">{formatCurrency(customer.monthly_income, debt.currency as string)}</p>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {/* AI Score */}
+          {/* AI Score Card */}
           {latestScore && (
-            <div className="card">
-              <h2 className="text-lg font-semibold font-syne mb-4">AI Score</h2>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`text-4xl font-bold font-syne ${latestScore.score >= 70 ? 'text-green-400' : latestScore.score >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+            <div className="bg-gradient-to-br from-[#1e3e50] to-slate-900 rounded-2xl p-6 shadow-md text-white relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+              
+              <div className="flex items-center gap-2 mb-4 text-brand-300 font-bold text-sm relative z-10">
+                <Sparkles size={16} /> تقييم الذكاء الاصطناعي
+              </div>
+              
+              <div className="flex items-center gap-4 mb-5 relative z-10">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold font-mono border-[3px] shadow-inner ${
+                  latestScore.score >= 70 ? 'border-emerald-400 text-emerald-400 bg-emerald-400/10' : 
+                  latestScore.score >= 40 ? 'border-amber-400 text-amber-400 bg-amber-400/10' : 
+                  'border-rose-400 text-rose-400 bg-rose-400/10'
+                }`}>
                   {latestScore.score}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{latestScore.risk_classification}</p>
-                  <p className="text-xs text-slate-400">{Math.round(latestScore.collection_probability * 100)}% probability</p>
+                  <p className="text-lg font-bold mb-1">{latestScore.risk_classification}</p>
+                  <p className="text-xs text-slate-300 bg-white/10 px-2 py-1 rounded-md inline-block">
+                    احتمالية التحصيل: {Math.round(latestScore.collection_probability * 100)}%
+                  </p>
                 </div>
               </div>
-              <p className="text-sm text-slate-300">{latestScore.recommended_strategy}</p>
+              
+              <div className="bg-white/10 p-4 rounded-xl border border-white/5 relative z-10 backdrop-blur-sm">
+                <p className="text-xs font-bold text-brand-200 mb-1">الاستراتيجية الموصى بها:</p>
+                <p className="text-sm text-slate-100 leading-relaxed">{latestScore.recommended_strategy}</p>
+              </div>
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

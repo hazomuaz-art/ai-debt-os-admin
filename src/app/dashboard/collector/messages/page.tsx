@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, MessageCircle, Mail, Smartphone, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 
 export default async function CollectorMessagesPage() {
   const supabase = createClient()
@@ -25,53 +25,97 @@ export default async function CollectorMessagesPage() {
         .limit(100)
     : { data: [] }
 
+  const getChannelIcon = (channel: string) => {
+    switch (channel) {
+      case 'whatsapp': return <MessageCircle size={16} className="text-emerald-500" />
+      case 'sms': return <Smartphone size={16} className="text-blue-500" />
+      case 'email': return <Mail size={16} className="text-rose-500" />
+      default: return <MessageSquare size={16} className="text-slate-500" />
+    }
+  }
+
+  const getChannelLabel = (channel: string) => {
+    switch (channel) {
+      case 'whatsapp': return 'واتساب'
+      case 'sms': return 'رسالة نصية'
+      case 'email': return 'بريد إلكتروني'
+      default: return channel
+    }
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-syne">Messages</h1>
-        <p className="text-slate-400">Communication history for your assigned debts</p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+      
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-4 mt-6">
+        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+          <MessageSquare size={24} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">سجل المراسلات</h1>
+          <p className="text-slate-500 text-sm font-medium">سجل التواصل لجميع ملفات الديون المسندة إليك</p>
+        </div>
       </div>
 
-      <div className="card">
+      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
         {messages && messages.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400 border-b border-slate-200">
-                  <th className="pb-3 pr-4">Date</th>
-                  <th className="pb-3 pr-4">Customer</th>
-                  <th className="pb-3 pr-4">Ref</th>
-                  <th className="pb-3 pr-4">Channel</th>
-                  <th className="pb-3 pr-4">Direction</th>
-                  <th className="pb-3">Content</th>
+            <table className="w-full text-sm text-right">
+              <thead className="bg-[#fbfdfd] border-b border-slate-100 text-slate-500">
+                <tr>
+                  <th className="px-6 py-4 font-bold">التاريخ</th>
+                  <th className="px-6 py-4 font-bold">العميل ورقم الملف</th>
+                  <th className="px-6 py-4 font-bold text-center">القناة</th>
+                  <th className="px-6 py-4 font-bold text-center">الاتجاه</th>
+                  <th className="px-6 py-4 font-bold w-1/3">محتوى الرسالة</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {messages.map((msg: any) => (
-                  <tr key={msg.id} className="border-b border-slate-200">
-                    <td className="py-3 pr-4 text-slate-400 whitespace-nowrap">{formatDate(msg.sent_at || msg.created_at)}</td>
-                    <td className="py-3 pr-4 font-medium">{(msg.debt as any)?.customer?.full_name || '—'}</td>
-                    <td className="py-3 pr-4 font-mono text-xs text-slate-300">{(msg.debt as any)?.reference_number || '—'}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`px-2 py-0.5 rounded text-xs ${msg.channel === 'whatsapp' ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-400'}`}>
-                        {msg.channel}
+                  <tr key={msg.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 text-slate-600 font-medium whitespace-nowrap">
+                      {formatDate(msg.sent_at || msg.created_at)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-[#1e3e50] text-sm mb-0.5">{(msg.debt as any)?.customer?.full_name || '—'}</div>
+                      <div className="text-slate-400 text-xs font-mono">{(msg.debt as any)?.reference_number || '—'}</div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100">
+                        {getChannelIcon(msg.channel)}
+                        <span className="text-xs font-bold text-slate-600">{getChannelLabel(msg.channel)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                        msg.direction === 'inbound' 
+                          ? 'bg-blue-50 text-blue-600 border border-blue-100' 
+                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      }`}>
+                        {msg.direction === 'inbound' ? (
+                          <><ArrowDownRight size={14} /> واردة</>
+                        ) : (
+                          <><ArrowUpRight size={14} /> صادرة</>
+                        )}
                       </span>
                     </td>
-                    <td className="py-3 pr-4">
-                      <span className={`px-2 py-0.5 rounded text-xs ${msg.direction === 'inbound' ? 'bg-brand-500/20 text-brand-400' : 'bg-slate-500/20 text-slate-400'}`}>
-                        {msg.direction}
-                      </span>
+                    <td className="px-6 py-4">
+                      <div className="bg-[#fcfdfd] border border-slate-100 p-3 rounded-xl text-slate-600 text-sm leading-relaxed truncate max-w-sm hover:max-w-none hover:whitespace-normal transition-all cursor-default">
+                        {msg.content}
+                      </div>
                     </td>
-                    <td className="py-3 max-w-xs truncate text-slate-300">{msg.content}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <div className="text-center py-12">
-            <MessageSquare className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400">No messages for your assigned debts</p>
+          <div className="text-center py-16">
+            <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MessageSquare size={32} />
+            </div>
+            <h3 className="font-bold text-lg text-[#1e3e50] mb-2">لا توجد رسائل مسجلة</h3>
+            <p className="text-slate-500 text-sm">لم يتم إرسال أو استقبال أي رسائل للديون المسندة إليك بعد.</p>
           </div>
         )}
       </div>

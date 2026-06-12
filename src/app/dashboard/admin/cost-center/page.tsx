@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { CostSettings } from '@/types'
-import { DollarSign, Settings2, BarChart2, CheckCircle2, AlertTriangle, Zap, Server, Database } from 'lucide-react'
-
+import { DollarSign, Settings2, BarChart2, CheckCircle2, AlertTriangle, Zap, Server, Database, Clock, Activity } from 'lucide-react'
 interface CostSummary {
   totalCost:   number
   todayCost:   number

@@ -246,7 +246,7 @@ export const createCustomerSchema = z.object({
 export const inviteUserSchema = z.object({
   email:      z.string().email(),
   full_name:  z.string().min(2).max(200),
-  role:       z.enum(['manager', 'collector']),
+  role:       z.enum(['admin', 'manager', 'collector']),
   password:   z.string().min(8).max(72),
   company_id: uuidSchema,
 })

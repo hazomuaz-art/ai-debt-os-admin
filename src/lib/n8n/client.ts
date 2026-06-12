@@ -41,17 +41,52 @@ class N8nClient {
    * Trigger an n8n workflow via webhook
    */
   async triggerWebhook(webhookPath: string, payload: N8nWebhookPayload): Promise<N8nResponse> {
-    if (!this.baseUrl) {
-      console.warn('[n8n] N8N_BASE_URL not configured, skipping webhook trigger')
-      return { success: false, error: 'N8N_BASE_URL not configured' }
+    let url = this.baseUrl
+    let key = this.apiKey
+    let authHeader = ''
+
+    // If company_id is provided, try to fetch custom n8n config from DB
+    if (payload.metadata?.company_id) {
+      const { createServiceClient } = await import('@/lib/supabase/server')
+      const supabase = createServiceClient()
+      const { data: settings } = await supabase
+        .from('integration_settings')
+        .select('config')
+        .eq('company_id', payload.metadata.company_id)
+        .eq('integration_name', 'n8n_automation')
+        .eq('enabled', true)
+        .maybeSingle()
+
+      if (settings?.config) {
+        const config = settings.config as Record<string, string>
+        // webhook_url might be the full URL (e.g. https://n8n.domain.com/webhook/path) or just base
+        // But in our UI we asked for 'webhook_url' so they might put full webhook base.
+        if (config.webhook_url) {
+          url = config.webhook_url.replace(/\/webhook\/.*$/, '').replace(/\/$/, '')
+        }
+        if (config.auth_token) {
+          key = config.auth_token
+        }
+      }
     }
 
-    const url = `${this.baseUrl}/webhook/${webhookPath}`
+    if (!url) {
+      console.warn('[n8n] N8N_BASE_URL not configured and no company config found, skipping webhook trigger')
+      return { success: false, error: 'n8n not configured' }
+    }
+
+    const fullUrl = `${url}/webhook/${webhookPath}`
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (key) {
+      // If it's a JWT key or standard Bearer
+      headers['Authorization'] = `Bearer ${key}`
+      headers['X-N8N-API-KEY'] = key // Fallback for n8n standard API
+    }
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(fullUrl, {
         method: 'POST',
-        headers: this.headers,
+        headers,
         body: JSON.stringify({
           ...payload,
           metadata: {
