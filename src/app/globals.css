@@ -385,3 +385,61 @@ header.bg-white {
   background-color: rgba(0, 0, 0, 0.75) !important;
   backdrop-filter: blur(4px);
 }
+
+/* ── Futuristic Floating Action Bar for Header Buttons ── */
+.flex.items-start.justify-between.gap-4.flex-wrap > .flex.gap-2.flex-wrap,
+.flex.justify-between.items-center.mb-6 > .flex.gap-2,
+.flex.justify-between.items-center > .flex.gap-2 {
+  background-color: rgba(9, 12, 28, 0.6) !important;
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 8px 12px !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* ── Floating Desktop Glass Panels ── */
+main.flex-1.overflow-y-auto {
+  margin: 1rem !important;
+  background-color: rgba(10, 14, 32, 0.4) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 1.5rem !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+  padding: 1.5rem !important;
+}
+
+header.sticky.top-0.z-30 {
+  margin: 1rem 1rem 0 1rem !important;
+  border-radius: 1.25rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background-color: rgba(9, 12, 28, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+}
+
+aside.bg-white {
+  margin: 1rem 0 1rem 1rem !important;
+  border-radius: 1.5rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* RTL layout margins adjustment */
+[style*="direction: rtl"] aside.bg-white,
+[style*="direction: rtl"] aside {
+  margin: 1rem 1rem 1rem 0 !important;
+}
+
+/* Redesign page headers text to glow */
+h1.font-display.text-2xl.font-bold {
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+

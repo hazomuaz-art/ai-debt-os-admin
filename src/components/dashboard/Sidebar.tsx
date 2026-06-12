@@ -1,6 +1,8 @@
 'use client'
 
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { logoutAction } from '@/lib/actions/auth'
 import type { Profile } from '@/types'
 import { cn } from '@/lib/utils'
@@ -49,14 +51,7 @@ const collectorNav = [
   { href: '/dashboard/collector/messages',  labelKey: 'messages',   icon: 'message' },
 ]
 
-const GROUP_LABELS: Record<string, string> = {
-  core:   'Main',
-  data:   'Data & Finance',
-  ai:     'AI & Automation',
-  system: 'System',
-}
-
-// Icon paths at module level â€” never re-created on re-render
+// Icon paths
 const NAV_ICONS: Record<string, string> = {
   grid:      'M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z',
   layers:    'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
@@ -78,10 +73,10 @@ const NAV_ICONS: Record<string, string> = {
   package:   'M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12',
 }
 
-function NavIcon({ name }: { name: string }) {
+function NavIcon({ name, size = 15, className }: { name: string; size?: number; className?: string }) {
   const d = NAV_ICONS[name] ?? NAV_ICONS.grid
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0", className)}>
       <path d={d} />
     </svg>
   )
@@ -89,14 +84,13 @@ function NavIcon({ name }: { name: string }) {
 
 export function Sidebar({ profile }: SidebarProps) {
   const { t, isRTL } = useLocale()
-  const nav       = profile.role === 'admin'   ? adminNav :
-                    profile.role === 'manager' ? managerNav : collectorNav
-  const isAdmin   = profile.role === 'admin'
-  const company   = (profile.company as { name: string } | undefined)?.name ?? ''
-  const initial   = (profile.full_name?.charAt(0) ?? profile.email.charAt(0)).toUpperCase()
-  const roleColor = profile.role === 'admin' ? 'from-brand-600 to-purple-600' :
-                    profile.role === 'manager' ? 'from-purple-600 to-pink-600' :
-                    'from-emerald-600 to-teal-600'
+  const pathname = usePathname()
+  const isAdmin = profile.role === 'admin'
+  const company = (profile.company as { name: string } | undefined)?.name ?? ''
+  const initial = (profile.full_name?.charAt(0) ?? profile.email.charAt(0)).toUpperCase()
+  const roleColor = profile.role === 'admin' ? 'from-brand-500 to-indigo-500' :
+                    profile.role === 'manager' ? 'from-purple-500 to-pink-500' :
+                    'from-emerald-500 to-teal-500'
 
   const GROUP_LABELS: Record<string, string> = {
     core:   t.nav.command_center,
@@ -105,114 +99,192 @@ export function Sidebar({ profile }: SidebarProps) {
     system: t.nav.settings,
   }
 
+  // Find active group based on current URL path
+  const currentGroup = useMemo(() => {
+    if (!pathname) return 'core'
+    const found = adminNav.find(item => pathname.startsWith(item.href))
+    return found?.group ?? 'core'
+  }, [pathname])
+
+  const [activeGroup, setActiveGroup] = useState<string>('core')
+
+  useEffect(() => {
+    if (currentGroup) {
+      setActiveGroup(currentGroup)
+    }
+  }, [currentGroup])
+
+  const menuGroups = [
+    { id: 'core',   label: t.nav.command_center, icon: 'grid' },
+    { id: 'data',   label: t.nav.analytics,      icon: 'briefcase' },
+    { id: 'ai',     label: t.nav.automation,     icon: 'zap' },
+    { id: 'system', label: t.nav.settings,       icon: 'cpu' },
+  ]
+
   return (
     <aside
-      className="flex flex-col h-screen sticky top-0 shrink-0 bg-white border-r border-slate-200"
+      className="flex h-screen sticky top-0 shrink-0 bg-slate-950/85 backdrop-blur-2xl border-r border-white/5"
       style={{
-        width: '220px',
+        width: '240px',
         direction: isRTL ? 'rtl' : 'ltr',
         borderRight: isRTL ? 'none' : undefined,
-        borderLeft: isRTL ? '1px solid #e2e8f0' : undefined,
+        borderLeft: isRTL ? '1px solid rgba(255,255,255,0.05)' : undefined,
       }}
     >
-      {/* â”€â”€ Logo â”€â”€ */}
-      <div className="px-4 py-4 border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          {/* Shield logo matching concept */}
+      {/* ── STAGE 1: Narrow vertical icon strip (Admin Only) ── */}
+      {isAdmin && (
+        <div className="w-[60px] flex flex-col items-center py-4 border-r border-white/5 justify-between shrink-0 bg-slate-950/40">
+          {/* Logo */}
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden"
+            className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden shadow-glow-brand"
             style={{
-              background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-              boxShadow: '0 4px 12px rgba(79,70,229,0.5)',
+              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-display font-bold text-sm text-slate-900">AI</span>
-              <span className="font-display font-bold text-sm" style={{ color: '#818cf8' }}>DEBT OS</span>
+
+          {/* Group Tabs */}
+          <div className="flex-1 flex flex-col gap-3.5 items-center justify-center mt-6 w-full px-1">
+            {menuGroups.map(group => {
+              const isActive = activeGroup === group.id
+              return (
+                <button
+                  key={group.id}
+                  onClick={() => setActiveGroup(group.id)}
+                  className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 group relative",
+                    isActive 
+                      ? "text-white bg-white/5 border border-white/10 shadow-glow-brand" 
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  )}
+                  title={group.label}
+                >
+                  <NavIcon name={group.icon} size={16} />
+                  {/* Indicator bar */}
+                  {isActive && (
+                    <span 
+                      className={cn(
+                        "absolute w-1 h-5 rounded-full bg-brand-400 top-2.5",
+                        isRTL ? "right-0" : "left-0"
+                      )} 
+                    />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* User profile initials block */}
+          <div className="flex flex-col gap-3 items-center">
+            <div
+              className={cn(
+                "w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center text-xs font-bold text-white shadow-glow-brand cursor-pointer",
+                roleColor
+              )}
+              title={profile.full_name ?? profile.email}
+            >
+              {initial}
             </div>
-            <div className="text-[10px] text-slate-400 truncate font-medium tracking-wide uppercase">
-              {company || 'Platform'}
-            </div>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                title="Sign out"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+              </button>
+            </form>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Navigation ── */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 scrollbar-none space-y-4">
-        {isAdmin ? (
-          Object.entries(GROUP_LABELS).map(([group, label]) => {
-            const items = adminNav.filter(i => i.group === group)
-            return (
-              <div key={group}>
-                <div className={`px-2 mb-1.5 text-[9px] font-bold tracking-[0.15em] text-slate-400 ${isRTL ? 'text-right' : 'uppercase'}`}>
-                  {label}
-                </div>
-                <div className="space-y-0.5">
-                  {items.map(item => (
-                    <Link key={item.href} href={item.href} prefetch={true} className="sidebar-link group">
-                      <NavIcon name={item.icon} />
-                      <span className="text-xs">{t.nav[item.labelKey as keyof typeof t.nav] || item.labelKey}</span>
-                    </Link>
-                  ))}
-                </div>
+      {/* ── STAGE 2: Navigation Links Column ── */}
+      <div className="flex-1 flex flex-col h-full min-w-0">
+        {/* Header Title based on Active Group */}
+        <div className="px-4 py-4.5 border-b border-white/5 flex flex-col justify-center">
+          <div className="flex items-center gap-2">
+            {!isAdmin && (
+              <div className="w-6 h-6 rounded-lg bg-gradient-brand flex items-center justify-center shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
               </div>
-            )
-          })
-        ) : (
-          <div className="space-y-0.5">
-            {nav.map(item => (
-              <Link key={item.href} href={item.href} prefetch={true} className="sidebar-link">
-                <NavIcon name={item.icon} />
-                <span className="text-xs">{t.nav[item.labelKey as keyof typeof t.nav] || item.labelKey}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </nav>
-
-      {/* ── Secure Session indicator ── */}
-      <div className="px-3 py-2 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)' }}>
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[10px] font-medium text-emerald-400/80">SECURE SESSION</span>
-        </div>
-        <div className="text-[9px] text-slate-400 mt-0.5 pl-3.5">All systems operational</div>
-      </div>
-
-      {/* ── User ── */}
-      <div className="px-3 pb-3 border-t border-slate-200 pt-3">
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1 bg-slate-50 border border-slate-100">
-          <div
-            className={`w-7 h-7 rounded-full bg-gradient-to-br ${roleColor} flex items-center justify-center text-[11px] font-bold text-white shrink-0`}
-            style={{ boxShadow: '0 2px 8px rgba(79,70,229,0.4)' }}
-          >
-            {initial}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-slate-700 truncate">{profile.full_name ?? 'User'}</div>
-            <div className="text-[10px] text-slate-400 capitalize">{profile.role}</div>
+            )}
+            <div className="min-w-0">
+              <span className="font-display font-bold text-xs tracking-wider text-slate-100 uppercase">
+                {isAdmin ? GROUP_LABELS[activeGroup] : 'AI DEBT OS'}
+              </span>
+              <p className="text-[9px] text-slate-400 truncate mt-0.5 tracking-wide font-medium uppercase">
+                {company || 'Workspace'}
+              </p>
+            </div>
           </div>
         </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-            </svg>
-            Sign out
-          </button>
-        </form>
+
+        {/* Links Navigation */}
+        <nav className="flex-1 overflow-y-auto px-2 py-3 scrollbar-none space-y-1">
+          {isAdmin ? (
+            adminNav
+              .filter(item => item.group === activeGroup)
+              .map(item => {
+                const isActive = pathname === item.href
+                return (
+                  <Link 
+                    key={item.href} 
+                    href={item.href} 
+                    prefetch={true} 
+                    className={cn(
+                      "sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 border border-transparent",
+                      isActive 
+                        ? "text-white bg-gradient-brand border-white/10 shadow-glow-brand" 
+                        : "text-slate-400 hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    <NavIcon name={item.icon} size={14} className={isActive ? "text-white" : "text-slate-400"} />
+                    <span className="truncate">{t.nav[item.labelKey as keyof typeof t.nav] || item.labelKey}</span>
+                  </Link>
+                )
+              })
+          ) : (
+            // Non-admins navigation
+            (profile.role === 'manager' ? managerNav : collectorNav).map(item => {
+              const isActive = pathname === item.href
+              return (
+                <Link 
+                  key={item.href} 
+                  href={item.href} 
+                  prefetch={true} 
+                  className={cn(
+                    "sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 border border-transparent",
+                    isActive 
+                      ? "text-white bg-gradient-brand border-white/10 shadow-glow-brand" 
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <NavIcon name={item.icon} size={14} className={isActive ? "text-white" : "text-slate-400"} />
+                  <span className="truncate">{t.nav[item.labelKey as keyof typeof t.nav] || item.labelKey}</span>
+                </Link>
+              )
+            })
+          )}
+        </nav>
+
+        {/* Status Indicator */}
+        <div className="p-3 border-t border-white/5">
+          <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="flex-1 min-w-0">
+              <span className="block text-[9px] font-bold text-emerald-400 tracking-wider">SECURE LINK</span>
+              <span className="block text-[8px] text-slate-400 truncate">V2.0 Core Active</span>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   )
 }
-
-
-
