@@ -21,23 +21,19 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $json.body.data.api_url }}/message/sendText/{{ $json.body.data.instance_name }}",
+        "url": "http://72.62.30.109:32769/message/sendText/ai-debt-mainmobily-instance",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $json.body.data.api_key }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
+              "value": "yW9pHPPCn5btvjeqFr2rUdo0gS8KOebB"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $json.body.data.phone_number }}\",\n  \"text\": \"{{ $json.body.data.message }}\"\n}",
+        "jsonBody": "={\n  \"number\": \"{{ $json.body.to }}\",\n  \"options\": {\n    \"delay\": 1200\n  },\n  \"text\": \"{{ $json.body.message }}\"\n}",
         "options": {}
       },
       "id": "12345678-89ab-cdef-0123-456789abcdef",
