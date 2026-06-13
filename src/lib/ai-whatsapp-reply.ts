@@ -111,16 +111,17 @@ function debtAnswer(debtContext: any) {
   const s = debtContext?.summary ?? {}
   const parts: string[] = []
 
-  if (s.creditor_name && s.creditor_name !== 'Unknown') parts.push(`الجهة ${s.creditor_name}`)
-  if (s.product_type && s.product_type !== 'Unknown') parts.push(`نوعها ${s.product_type}`)
-  if (s.reference_number && s.reference_number !== 'Unknown') parts.push(`المرجع ${s.reference_number}`)
-  if (s.current_balance) parts.push(`والمبلغ الظاهر ${s.current_balance} ${s.currency ?? 'ريال'}`)
+  if (s.portfolio_name && s.portfolio_name !== 'Unknown Portfolio' && s.portfolio_name !== 'Unknown') parts.push(`الجهة ${s.portfolio_name}`)
+  else if (s.creditor_name && s.creditor_name !== 'Unknown') parts.push(`الجهة ${s.creditor_name}`)
+  
+  if (s.reference_number && s.reference_number !== 'Unknown') parts.push(`برقم المطالبة ${s.reference_number}`)
+  if (s.current_balance) parts.push(`والمبلغ الظاهر هو ${s.current_balance} ${s.currency ?? 'ريال'}`)
 
   if (!parts.length) {
     return 'تفاصيل سبب المطالبة ما هي واضحة عندي حالياً، بنراجع الملف ونوضحها لك بدل ما أعطيك كلام ناقص.'
   }
 
-  return `${parts.join('، ')}. لو فيه نقطة محددة غير واضحة قل لي عليها ونراجعها.`
+  return `${parts.join(' ')}. لو فيه نقطة محددة غير واضحة بخصوص التفاصيل المذكورة في الملاحظات بلغني.`
 }
 
 function robotic(reply: string) {
@@ -269,6 +270,10 @@ Understand the full conversation, then decide the next useful move.
 Rules:
 - Before responding, you MUST silently review the customer's profile, prior notes (customer.notes, debt.notes), collection followups, and timeline events provided in the JSON context.
 - Act as if you have a perfect long-term memory of all past conversations (conversationHistory) and previous interactions. Never ask for information that is already in the file or was previously stated.
+- DO NOT repeat the customer's name during the conversation. Use it ONLY in the very first greeting message.
+- ALWAYS clarify the source of the debt using the portfolio_name from the context (e.g. "جهة المديونية هي [portfolio_name]").
+- READ the debt details, schedule, and reason from the debt.notes field in the context and explain them clearly to the customer if they ask.
+- NEVER mention the product_type (e.g. "حق الرجوع") to the customer under any circumstances. Only refer to the claim number (reference_number).
 - NEVER repeat the same question or ask obvious/stupid questions. If the customer evades, change your psychological approach.
 - Never repeat the same request using different wording.
 - Use smart psychological persuasion techniques to convince the customer to pay without being aggressive.

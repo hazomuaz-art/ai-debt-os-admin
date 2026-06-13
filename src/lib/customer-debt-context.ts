@@ -1,4 +1,4 @@
-﻿import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function buildCustomerDebtContext(params: {
   company_id: string
@@ -16,7 +16,7 @@ export async function buildCustomerDebtContext(params: {
 
   const debtQuery = supabase
     .from('debts')
-    .select('id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at')
+    .select('id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name)')
     .eq('company_id', params.company_id)
     .eq('customer_id', params.customer_id)
 
@@ -279,6 +279,7 @@ export async function buildCustomerDebtContext(params: {
       phone: customer?.phone ?? null,
       whatsapp: customer?.whatsapp ?? null,
       national_id: customer?.national_id ?? null,
+      portfolio_name: debt?.portfolio?.name ?? 'Unknown',
       creditor_name: debt?.creditor_name ?? 'Unknown',
       product_type: debt?.product_type ?? 'Unknown',
       reference_number: debt?.reference_number ?? 'Unknown',
