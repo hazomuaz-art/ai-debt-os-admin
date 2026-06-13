@@ -147,6 +147,16 @@ function parseCSVBuffer(buf: ArrayBuffer): { headers: string[]; rows: string[][]
   const lines = text.trim().split('\n')
   if (lines.length < 2) return { headers: [], rows: [] }
 
+  // Detect delimiter
+  const firstLine = lines[0]
+  const commaCount = (firstLine.match(/,/g) || []).length
+  const semiCount = (firstLine.match(/;/g) || []).length
+  const tabCount = (firstLine.match(/\t/g) || []).length
+  
+  let delimiter = ','
+  if (tabCount > commaCount && tabCount > semiCount) delimiter = '\t'
+  else if (semiCount > commaCount) delimiter = ';'
+
   function parseLine(line: string): string[] {
     const result: string[] = []
     let current = ''
@@ -156,7 +166,7 @@ function parseCSVBuffer(buf: ArrayBuffer): { headers: string[]; rows: string[][]
       if (ch === '"') {
         if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
         else inQuotes = !inQuotes
-      } else if ((ch === ',' || ch === '\t') && !inQuotes) {
+      } else if (ch === delimiter && !inQuotes) {
         result.push(fixEncoding(current.trim()))
         current = ''
       } else {

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -72,7 +72,7 @@ export default function ImportDebtsModal() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'debt_import_template.csv,.xlsx'
+    a.download = 'debt_import_template.csv'
     a.click()
     URL.revokeObjectURL(url)
   }
