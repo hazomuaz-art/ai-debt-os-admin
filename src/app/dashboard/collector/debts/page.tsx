@@ -79,7 +79,6 @@ export default async function CollectorDebtsPage({
             <p className="text-slate-500 text-sm font-medium">إجمالي {count ?? 0} ملف مسند إليك بقيمة {formatCurrency(totalBalance, 'SAR')}</p>
           </div>
         </div>
-        </div>
       </div>
 
       <DebtFilters 
