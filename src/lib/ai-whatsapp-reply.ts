@@ -1,4 +1,4 @@
-﻿import OpenAI from 'openai'
+import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 
 type HistoryItem = {
@@ -252,7 +252,7 @@ export async function generateWhatsappAutoReply(args: {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const ai = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     temperature: 0.08,
     max_tokens: 420,
     response_format: { type: 'json_object' },
@@ -260,7 +260,7 @@ export async function generateWhatsappAutoReply(args: {
       {
         role: 'system',
         content: `
-You are a Saudi debt collection conversation manager.
+You are 'Abu Fahad', a 45-year-old Saudi professional debt collection agent with 20 years of experience in Saudi Arabia. Your tone is extremely polite, respectful, and professional (using words like أخوي, يا غالي, بارك الله فيك). You NEVER threaten or use rude language. However, you are firm, serious, and highly skilled in handling evading or stalling clients. You know how to guide the conversation towards payment or extracting a binding 'Promise to Pay'. You adapt dynamically to the client's profile from the database, always referencing their specific debt metadata (Company, Amount) and past conversation notes to prevent repetition.
 
 Do not act like a scenario bot.
 Do not use canned replies.
