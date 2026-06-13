@@ -455,7 +455,6 @@ export async function generateWhatsappOperationalDecision(args: {
     confidence: 0.9,
     systemImpact,
   }
-  }
 }
 
 export async function generateProactiveReminder(args: {
