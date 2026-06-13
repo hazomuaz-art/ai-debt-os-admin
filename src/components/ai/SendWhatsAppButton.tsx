@@ -17,6 +17,7 @@ interface DirectProps {
   debtId: string
   phone?: string
   customerName?: string
+  small?: boolean
 }
 
 type Props = ActionProps | DirectProps
@@ -100,35 +101,46 @@ export function SendWhatsAppButton(props: Props) {
 
   return (
     <>
-      <button onClick={() => setShowModal(true)} className="btn-secondary flex items-center gap-2">
-        <MessageSquare className="w-4 h-4" /> Send WhatsApp
+      <button 
+        onClick={() => setShowModal(true)} 
+        className={
+          (!isActionProps(props) && props.small)
+            ? "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100 rounded-lg text-xs font-bold transition-colors"
+            : "flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+        }
+      >
+        <MessageSquare size={(!isActionProps(props) && props.small) ? 14 : 18} /> 
+        {(!isActionProps(props) && props.small) ? 'إرسال' : 'إرسال واتساب'}
       </button>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="card w-full max-w-md">
+        <div className="fixed inset-0 bg-[#1e3e50]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold font-syne">Send WhatsApp</h2>
-              <button onClick={() => setShowModal(false)}><X className="w-5 h-5 text-slate-400" /></button>
+              <h2 className="text-lg font-bold text-[#1e3e50] flex items-center gap-2">
+                <MessageSquare className="text-emerald-500" /> إرسال رسالة واتساب
+              </h2>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:bg-slate-100 p-1 rounded-md transition-colors"><X className="w-5 h-5" /></button>
             </div>
             {!isActionProps(props) && (
-              <p className="text-sm text-slate-400 mb-4">
-                To: <span className="text-slate-900">{props.customerName}</span> ({props.phone || 'No phone set'})
+              <p className="text-sm text-slate-500 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                المرسل إليه: <strong className="text-[#1e3e50]">{props.customerName}</strong> <br/>
+                <span className="font-mono text-xs mt-1 inline-block" dir="ltr">{props.phone || 'رقم الهاتف غير مسجل'}</span>
               </p>
             )}
             <textarea
-              className="input w-full mb-4"
+              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none mb-4 resize-none"
               rows={5}
-              placeholder="Type your message..."
+              placeholder="اكتب رسالتك هنا..."
               value={customMessage}
               onChange={e => setCustomMessage(e.target.value)}
             />
-            {status === 'error' && <p className="text-red-400 text-sm mb-3">Failed to send. Check phone number and WhatsApp config.</p>}
+            {status === 'error' && <p className="text-rose-500 text-sm font-bold mb-3">فشل الإرسال. تأكد من إعدادات الواتساب والرقم.</p>}
             <div className="flex gap-3">
-              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleDirectSend} disabled={loading || !customMessage.trim()} className="btn-primary flex-1 flex items-center justify-center gap-2">
+              <button onClick={() => setShowModal(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors text-sm">إلغاء</button>
+              <button onClick={handleDirectSend} disabled={loading || !customMessage.trim()} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
-                Send
+                إرسال
               </button>
             </div>
           </div>

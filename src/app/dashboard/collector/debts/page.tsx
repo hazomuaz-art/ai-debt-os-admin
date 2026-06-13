@@ -3,18 +3,45 @@ import { redirect } from 'next/navigation'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { Wallet, Search, Filter, ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, ShieldAlert } from 'lucide-react'
+import DebtFilters from '@/components/debt/DebtFilters'
 
-export default async function CollectorDebtsPage() {
+export default async function CollectorDebtsPage({
+  searchParams,
+}: {
+  searchParams: { status?: string; page?: string; q?: string; product?: string; creditor?: string }
+}) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: debts, count } = await supabase
+  let query = supabase
     .from('debts')
     .select('*, customer:customers(full_name, phone, whatsapp)', { count: 'exact' })
     .eq('assigned_to', user.id)
     .order('priority', { ascending: false })
     .order('due_date', { ascending: true })
+
+  if (searchParams.status) query = query.eq('status', searchParams.status)
+  if (searchParams.product) query = query.eq('product_type', searchParams.product)
+  if (searchParams.creditor) query = query.eq('creditor_name', searchParams.creditor)
+  
+  if (searchParams.q) {
+    query = query.or(`reference_number.ilike.%${searchParams.q}%,account_number.ilike.%${searchParams.q}%`)
+  }
+
+  const { data: debts, count } = await query
+
+  // Fetch filter options
+  const [
+    { data: productsData },
+    { data: creditorsData }
+  ] = await Promise.all([
+    supabase.from('debts').select('product_type').neq('product_type', null).eq('assigned_to', user.id),
+    supabase.from('debts').select('creditor_name').neq('creditor_name', null).eq('assigned_to', user.id)
+  ])
+
+  const productTypes = Array.from(new Set((productsData || []).map(p => p.product_type)))
+  const creditors = Array.from(new Set((creditorsData || []).map(c => c.creditor_name)))
 
   const getPriorityStyle = (p: string) => {
     if (p === 'critical' || p === 'high') return 'bg-rose-50 text-rose-600 border-rose-200'
@@ -52,20 +79,14 @@ export default async function CollectorDebtsPage() {
             <p className="text-slate-500 text-sm font-medium">إجمالي {count ?? 0} ملف مسند إليك بقيمة {formatCurrency(totalBalance, 'SAR')}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:flex-none">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input
-              type="text"
-              className="w-full md:w-64 bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pr-10 pl-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
-              placeholder="ابحث برقم الهوية، الاسم أو الجوال..."
-            />
-          </div>
-          <button className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 p-2.5 rounded-xl transition-colors shadow-sm">
-            <Filter size={18} />
-          </button>
         </div>
       </div>
+
+      <DebtFilters 
+        collectors={[]} 
+        creditors={creditors} 
+        productTypes={productTypes} 
+      />
 
       {/* Debts List */}
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">

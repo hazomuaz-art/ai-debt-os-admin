@@ -6,6 +6,7 @@ import ImportDebtsModal from '@/components/debt/ImportDebtsModal'
 import ExportDebtsButton from '@/components/debt/ExportDebtsButton'
 import Link from 'next/link'
 import { WalletCards } from 'lucide-react'
+import DebtFilters from '@/components/debt/DebtFilters'
 
 // Helper function for Light Theme Status Colors
 function getLightStatusColor(status: string) {
@@ -57,12 +58,39 @@ export default async function AdminDebtsPage({
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (searchParams.status) {
-    query = query.eq('status', searchParams.status)
+  if (searchParams.status) query = query.eq('status', searchParams.status)
+  if (searchParams.product) query = query.eq('product_type', searchParams.product)
+  if (searchParams.creditor) query = query.eq('creditor_name', searchParams.creditor)
+  
+  if (searchParams.collector) {
+    if (searchParams.collector === 'unassigned') {
+      query = query.is('assigned_to', null)
+    } else {
+      query = query.eq('assigned_to', searchParams.collector)
+    }
+  }
+
+  if (searchParams.q) {
+    // Search by reference_number or account_number
+    query = query.or(`reference_number.ilike.%${searchParams.q}%,account_number.ilike.%${searchParams.q}%`)
   }
 
   const { data: debts, count } = await query
   const totalPages = Math.ceil((count ?? 0) / limit)
+
+  // Fetch filter options (collectors, unique products, unique creditors)
+  const [
+    { data: collectorsData },
+    { data: productsData },
+    { data: creditorsData }
+  ] = await Promise.all([
+    supabase.from('profiles').select('id, full_name').in('role', ['manager', 'collector']),
+    supabase.from('debts').select('product_type').neq('product_type', null),
+    supabase.from('debts').select('creditor_name').neq('creditor_name', null)
+  ])
+
+  const productTypes = Array.from(new Set((productsData || []).map(p => p.product_type)))
+  const creditors = Array.from(new Set((creditorsData || []).map(c => c.creditor_name)))
 
   const statuses = ['active', 'in_progress', 'promised', 'partial', 'settled', 'legal', 'disputed', 'written_off']
 
@@ -93,24 +121,12 @@ export default async function AdminDebtsPage({
         </div>
       </div>
 
-      {/* Status Filter Tabs */}
-      <div className="flex gap-2 flex-wrap items-center bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-        <Link 
-          href="/dashboard/admin/debts" 
-          className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors ${!searchParams.status ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-slate-50'}`}
-        >
-          الكل
-        </Link>
-        {statuses.map(status => (
-          <Link 
-            key={status} 
-            href={`/dashboard/admin/debts?status=${status}`}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${searchParams.status === status ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-slate-50'}`}
-          >
-            {statusLabels[status]}
-          </Link>
-        ))}
-      </div>
+      {/* Advanced Filters */}
+      <DebtFilters 
+        collectors={collectorsData || []} 
+        creditors={creditors} 
+        productTypes={productTypes} 
+      />
 
       {/* Debts Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">

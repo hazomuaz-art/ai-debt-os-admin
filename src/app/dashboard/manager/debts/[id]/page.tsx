@@ -8,6 +8,8 @@ import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import AssignDebtSelect from '@/components/debt/AssignDebtSelect'
 import Link from 'next/link'
 import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldAlert, CheckCircle, BrainCircuit, Wallet, Calendar, AlertTriangle, FileText, BellRing, Target } from 'lucide-react'
+import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
+import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -135,6 +137,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
         {/* Main Info (Right Column in RTL) */}
         <div className="lg:col-span-2 space-y-6">
           
+          {/* Quick Actions Panel */}
+          <QuickActionsPanel debtId={debt.id} currentStatus={debt.status} />
+
           {/* Debt Overview */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
@@ -187,6 +192,13 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               </div>
             )}
           </div>
+
+          {/* Collector Note & Follow-up */}
+          <CollectorNotePanel 
+            debtId={debt.id} 
+            currentNote={debt.notes} 
+            currentFollowUpDate={debt.next_follow_up} 
+          />
 
           {/* Payment History */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -308,11 +320,25 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                 <span className="text-slate-500 font-bold">الهاتف</span>
-                <span className="font-bold font-mono text-[#1e3e50]">{debt.customer?.phone || '—'}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold font-mono text-[#1e3e50]" dir="ltr">{debt.customer?.phone || '—'}</span>
+                  {debt.customer?.phone && <SendWhatsAppButton debtId={debt.id} phone={debt.customer.phone} customerName={debt.customer.full_name} small />}
+                </div>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                 <span className="text-slate-500 font-bold">واتساب</span>
-                <span className="font-bold font-mono text-[#1e3e50]">{debt.customer?.whatsapp || '—'}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold font-mono text-[#1e3e50]" dir="ltr">{debt.customer?.whatsapp || '—'}</span>
+                  {debt.customer?.whatsapp && <SendWhatsAppButton debtId={debt.id} phone={debt.customer.whatsapp} customerName={debt.customer.full_name} small />}
+                </div>
+              </div>
+              <div className="flex justify-between items-center pb-3 border-b border-slate-50">
+                <span className="text-slate-500 font-bold">رقم الحساب / العقد</span>
+                <span className="font-bold font-mono text-[#1e3e50]">{debt.account_number || '—'}</span>
+              </div>
+              <div className="flex justify-between items-center pb-3 border-b border-slate-50">
+                <span className="text-slate-500 font-bold">نوع المنتج</span>
+                <span className="font-bold text-[#1e3e50]">{debt.product_type || '—'}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                 <span className="text-slate-500 font-bold">الهوية الوطنية</span>
