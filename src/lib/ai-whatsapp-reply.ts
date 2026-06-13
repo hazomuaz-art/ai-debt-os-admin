@@ -324,10 +324,23 @@ Return JSON only:
   })
 
   let decision: Decision
-
+  
+  const rawContent = ai.choices[0]?.message?.content ?? '{}'
   try {
-    decision = JSON.parse(ai.choices[0]?.message?.content ?? '{}') as Decision
-  } catch {
+    let cleanRaw = rawContent.trim()
+    if (cleanRaw.startsWith('```json')) {
+      cleanRaw = cleanRaw.substring(7)
+    } else if (cleanRaw.startsWith('```')) {
+      cleanRaw = cleanRaw.substring(3)
+    }
+    if (cleanRaw.endsWith('```')) {
+      cleanRaw = cleanRaw.slice(0, -3)
+    }
+    decision = JSON.parse(cleanRaw.trim()) as Decision
+    console.log('[AI Decision Output]:', decision)
+  } catch (err) {
+    console.error('[AI Decision Error]: failed to parse JSON', err)
+    console.error('[AI Raw Content]:', rawContent)
     decision = {
       shouldReply: true,
       reply: 'وصلت ملاحظتك، بنراجع الملف ونرد عليك.',
