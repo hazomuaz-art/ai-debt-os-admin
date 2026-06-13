@@ -1,0 +1,30 @@
+{
+  "617783": {
+    "accidentDate": "6/8/2026",
+    "carType": "هيونداى / النترا",
+    "plate": "د و و 3996",
+    "faultPercentage": "25",
+    "reason": "لا يحمل رخصة قيادة"
+  },
+  "809198": {
+    "accidentDate": "6/10/2026",
+    "carType": "جي ام سي / يوكون",
+    "plate": "ر ط ط 6948",
+    "faultPercentage": "25",
+    "reason": "رخصة قيادة منتهية"
+  },
+  "835749": {
+    "accidentDate": "6/8/2026",
+    "carType": "هيونداى / النترا",
+    "plate": "د و و 3996",
+    "faultPercentage": "25",
+    "reason": "لا يحمل رخصة قيادة"
+  },
+  "RD1702265978": {
+    "accidentDate": "6/10/2026",
+    "carType": "جي ام سي / يوكون",
+    "plate": "ر ط ط 6948",
+    "faultPercentage": "25",
+    "reason": "رخصة قيادة منتهية"
+  }
+}

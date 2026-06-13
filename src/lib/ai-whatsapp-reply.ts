@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
+import insuranceReasons from './insurance_reasons.json'
 
 type HistoryItem = {
   direction: string
@@ -117,8 +118,9 @@ function debtAnswer(debtContext: any) {
   if (s.reference_number && s.reference_number !== 'Unknown') parts.push(`برقم المطالبة ${s.reference_number}`)
   if (s.current_balance) parts.push(`والمبلغ الظاهر هو ${s.current_balance} ${s.currency ?? 'ريال'}`)
 
-  if (s.product_type === 'حق رجوع') {
-    return `${parts.join(' ')}. وسبب المطالبة هو مطالبة مالية نتيجة تعويض شركة التأمين للطرف المتضرر في حادث مروري سابق، ويتم الآن مطالبتكم بقيمة التعويض بصفتكم الطرف المتسبب في الحادث.`
+  const extReason = insuranceReasons[s.reference_number] || insuranceReasons[s.account_number]
+  if (extReason) {
+    return `${parts.join(' ')}. وسبب المطالبة هو مطالبة مالية نتيجة تعويض شركة التأمين للطرف المتضرر في حادث مروري (رقم الحادث: ${s.reference_number}) بتاريخ ${extReason.accidentDate} على المركبة ${extReason.carType}. نسبة الإدانة المسجلة عليك هي ${extReason.faultPercentage}%. السبب الرئيسي لرجوع التأمين عليك هو: ${extReason.reason}.`
   }
 
   if (!parts.length) {
@@ -277,8 +279,8 @@ Rules:
 - DO NOT repeat the customer's name during the conversation. Use it ONLY in the very first greeting message.
 - ALWAYS clarify the source of the debt using the portfolio_name from the context (e.g. "جهة المديونية هي [portfolio_name]").
 - READ the debt details, schedule, and reason from the debt.notes field in the context and explain them clearly to the customer if they ask.
-- If the debt is from an insurance company (e.g., التعاونية, ميدغلف) and is a Right of Recourse (حق رجوع), and the customer asks for the reason, explain that "this is a financial claim resulting from a previous traffic accident where the insurance company compensated the injured party, and we are now claiming the compensation amount from you as the at-fault party."
-- NEVER mention the product_type (e.g. "حق رجوع") to the customer under any circumstances. Only refer to the claim number (reference_number).
+- If the customer's debt has "external_insurance_reason" provided in the JSON context, you MUST explain the detailed reason, accident date, fault percentage, and car type directly from that object if the customer asks for details.
+- NEVER mention the product_type (e.g. "حق الرجوع") to the customer under any circumstances. Only refer to the claim number (reference_number).
 - NEVER repeat the same question or ask obvious/stupid questions. If the customer evades, change your psychological approach.
 - Never repeat the same request using different wording.
 - Use smart psychological persuasion techniques to convince the customer to pay without being aggressive.
@@ -309,7 +311,10 @@ Return JSON only:
           latestCustomerMessage: text,
           lastAgentMessage: lastOutbound(history),
           conversationHistory: history,
-          customerDebtContext: debtContext,
+          customerDebtContext: {
+             ...debtContext,
+             external_insurance_reason: insuranceReasons[debtContext?.summary?.reference_number] || insuranceReasons[debtContext?.summary?.account_number] || null
+          },
         }, null, 2),
       },
     ],
