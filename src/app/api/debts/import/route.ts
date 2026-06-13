@@ -98,6 +98,33 @@ function mapStatus(raw: string | undefined): string {
   return STATUS_MAP[s] ?? STATUS_MAP[raw.trim()] ?? 'active'
 }
 
+function getMappedColumn(header: string): string | null {
+  const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
+  // Clean up hidden characters, zero width spaces, BOM, etc.
+  const clean = h.replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+  if (COLUMN_MAP[clean]) return COLUMN_MAP[clean];
+  
+  // Fuzzy match keywords to completely eliminate strict header errors
+  if (clean.includes('اسم') && (clean.includes('عميل') || clean.includes('مستفيد'))) return 'full_name';
+  if (clean.includes('العميل')) return 'full_name';
+  if (clean.includes('هوية') || clean.includes('إقامة') || clean.includes('اقامة')) return 'national_id';
+  if (clean.includes('مبلغ') || clean.includes('مديونية') || clean.includes('رصيد') || clean.includes('مطالبة')) return 'current_balance';
+  if (clean.includes('تواصل') || clean.includes('جوال') || clean.includes('هاتف') || clean.includes('موبايل')) return 'phone';
+  if (clean.includes('حساب') && !clean.includes('نوع')) return 'account_number';
+  if (clean.includes('عقد') || clean.includes('مرجع')) return 'reference_number';
+  if (clean.includes('محفظة') || clean.includes('مشروع')) return 'portfolio_name';
+  if (clean.includes('حالة') || clean.includes('حاله')) return 'status';
+  if (clean.includes('منتج') || clean.includes('خدمة')) return 'product_type';
+  if (clean.includes('ملاحظ') || clean.includes('تعليق')) return 'notes';
+  if (clean.includes('موعد') || clean.includes('استحقاق') || clean.includes('سداد')) return 'due_date';
+  if (clean.includes('راتب') || clean.includes('دخل')) return 'monthly_income';
+  if (clean.includes('شركة') || clean.includes('عمل') || clean.includes('جهة')) return 'employer';
+  if (clean.includes('مستخدم') || clean.includes('محصل') || clean.includes('مسؤول')) return 'collector_name';
+  
+  return null;
+}
+
 // ── Fix encoding issues (Windows-1256 / CP1256 for Arabic) ─────────────────
 
 function fixEncoding(text: string): string {
@@ -275,11 +302,10 @@ export async function POST(request: NextRequest) {
     if (!headers || headers.length === 0)
       return NextResponse.json({ error: 'لم يتم العثور على أعمدة في الملف' }, { status: 400 })
 
-    // Map headers to field names
+    // Map headers to field names using Fuzzy Matcher
     const fieldMap: Record<number, string> = {}
     for (let i = 0; i < headers.length; i++) {
-      const h      = headers[i].toLowerCase().trim()
-      const mapped = COLUMN_MAP[h] ?? COLUMN_MAP[headers[i].trim()] // also try original case
+      const mapped = getMappedColumn(headers[i])
       if (mapped) fieldMap[i] = mapped
     }
 
@@ -310,10 +336,10 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const rawAmount = f.original_amount ?? f.current_balance ?? ''
-      const amount = parseFloat(String(rawAmount).replace(/[,،، ]/g, ''))
-      if (isNaN(amount) || amount <= 0) {
-        results.errors.push(`Row ${rowIdx + 2}: invalid amount "${f.original_amount}"`)
+      const rawAmount = f.original_amount ?? f.current_balance ?? '0'
+      const amount = parseFloat(String(rawAmount).replace(/[,،، ]/g, '')) || 0
+      if (amount <= 0) {
+        results.errors.push(`Row ${rowIdx + 2}: invalid amount "${rawAmount}"`)
         results.skipped++
         continue
       }
