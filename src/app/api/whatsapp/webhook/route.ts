@@ -145,47 +145,56 @@ export async function POST(request: NextRequest) {
               data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
             }).catch(() => {})
 
-            const aiDecision = await generateWhatsappOperationalDecision({
-              company_id: (customer as { company_id: string }).company_id,
-              customer_id: (customer as { id: string }).id,
-              debt_id: (latestDebt as { id: string } | null)?.id ?? null,
-              message: text,
-            })
-
-            processEvent({
-              source: 'webhook_evolution',
-              company_id: (customer as { company_id: string }).company_id,
-              _customer_id: (customer as { id: string }).id,
-              _debt_id: (latestDebt as { id: string } | null)?.id,
-              data: {
+            // Process AI decision and reply asynchronously to prevent webhook timeouts
+            ;(async () => {
+              const aiDecision = await generateWhatsappOperationalDecision({
+                company_id: (customer as { company_id: string }).company_id,
+                customer_id: (customer as { id: string }).id,
+                debt_id: (latestDebt as { id: string } | null)?.id ?? null,
                 message: text,
-                from: phoneRaw,
-                message_id: String(evo.data.key.id ?? ''),
-                ai_next_action: aiDecision.nextAction,
-                ai_system_impact: aiDecision.systemImpact,
-              },
-            }).catch(() => {})
+              })
 
-            const autoReply = aiDecision.reply
+              processEvent({
+                source: 'webhook_evolution',
+                company_id: (customer as { company_id: string }).company_id,
+                _customer_id: (customer as { id: string }).id,
+                _debt_id: (latestDebt as { id: string } | null)?.id,
+                data: {
+                  message: text,
+                  from: phoneRaw,
+                  message_id: String(evo.data.key.id ?? ''),
+                  ai_next_action: aiDecision.nextAction,
+                  ai_system_impact: aiDecision.systemImpact,
+                },
+              }).catch(() => {})
 
-            const sendResult = await sendWhatsAppMessage({ 
-              to: phoneRaw, 
-              message: autoReply,
-              company_id: (customer as { company_id: string }).company_id
-            })
+              const autoReply = aiDecision.reply
 
-            await supabase.from('messages').insert({
-              company_id: (customer as { company_id: string }).company_id,
-              customer_id: (customer as { id: string }).id,
-              debt_id: (latestDebt as { id: string } | null)?.id ?? null,
-              channel: 'whatsapp',
-              direction: 'outbound',
-              content: autoReply,
-              status: sendResult.status === 'sent' ? 'sent' : 'failed',
-              whatsapp_message_id: sendResult.message_id ?? null,
-              sent_at: new Date().toISOString(),
-              metadata: { provider: 'evolution_ai_auto_reply', error: sendResult.error ?? null },
-            })
+              if (autoReply) {
+                // Human-like typing delay (2 to 6 seconds)
+                const delayMs = Math.floor(Math.random() * 4000) + 2000
+                await new Promise(r => setTimeout(r, delayMs))
+
+                const sendResult = await sendWhatsAppMessage({ 
+                  to: phoneRaw, 
+                  message: autoReply,
+                  company_id: (customer as { company_id: string }).company_id
+                })
+
+                await supabase.from('messages').insert({
+                  company_id: (customer as { company_id: string }).company_id,
+                  customer_id: (customer as { id: string }).id,
+                  debt_id: (latestDebt as { id: string } | null)?.id ?? null,
+                  channel: 'whatsapp',
+                  direction: 'outbound',
+                  content: autoReply,
+                  status: sendResult.status === 'sent' ? 'sent' : 'failed',
+                  whatsapp_message_id: sendResult.message_id ?? null,
+                  sent_at: new Date().toISOString(),
+                  metadata: { provider: 'evolution_ai_auto_reply', error: sendResult.error ?? null },
+                })
+              }
+            })().catch(err => log.error('AI Reply Background Processing Error', err))
           }
         }
       }
