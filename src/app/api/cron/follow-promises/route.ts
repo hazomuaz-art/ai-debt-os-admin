@@ -18,11 +18,13 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
 
   // Find promises due today or earlier that are still 'pending'
-  // For testing: we will fetch ALL pending promises regardless of date
+  const today = new Date().toISOString()
+  
   const { data: duePromises, error } = await supabase
     .from('promises')
     .select('*, debts(*, customers(*))')
     .eq('status', 'pending')
+    .lte('promised_date', today)
 
   if (error) {
     log.error('Failed to fetch due promises', error)
