@@ -143,9 +143,17 @@ function parseCSVBuffer(buf: ArrayBuffer): { headers: string[]; rows: string[][]
   }
 
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  
+  // Clean up null bytes if it was UTF-16 decoded as UTF-8
+  text = text.replace(/\0/g, '')
 
   const lines = text.trim().split('\n')
-  if (lines.length < 2) return { headers: [], rows: [] }
+  if (lines.length === 0 || text.trim() === '') {
+    throw new Error('الملف فارغ تماماً (Empty File).')
+  }
+  if (lines.length === 1) {
+    throw new Error('الملف يحتوي على صف العناوين فقط ولا توجد بيانات عملاء.')
+  }
 
   // Detect delimiter
   const firstLine = lines[0]
@@ -253,13 +261,19 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
     } else {
-      const parsed = parseCSVBuffer(buf)
-      headers = parsed.headers
-      rows    = parsed.rows
+      try {
+        const parsed = parseCSVBuffer(buf)
+        headers = parsed.headers
+        rows    = parsed.rows
+      } catch (csvErr) {
+        return NextResponse.json({
+          error: csvErr instanceof Error ? csvErr.message : 'Invalid CSV file format'
+        }, { status: 400 })
+      }
     }
 
-    if (headers.length === 0)
-      return NextResponse.json({ error: 'Empty or invalid file' }, { status: 400 })
+    if (!headers || headers.length === 0)
+      return NextResponse.json({ error: 'لم يتم العثور على أعمدة في الملف' }, { status: 400 })
 
     // Map headers to field names
     const fieldMap: Record<number, string> = {}
