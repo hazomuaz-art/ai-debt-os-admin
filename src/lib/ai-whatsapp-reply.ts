@@ -262,7 +262,7 @@ export async function generateWhatsappAutoReply(args: {
   })
 
   const ai = await client.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-1.5-pro' : 'gpt-4o',
+    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-2.5-pro' : 'gpt-4o',
     temperature: 0.08,
     max_tokens: 420,
     response_format: { type: 'json_object' },
@@ -478,7 +478,7 @@ export async function generateProactiveReminder(args: {
   })
 
   const res = await ai.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-1.5-pro' : 'gpt-4o',
+    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-2.5-pro' : 'gpt-4o',
     messages: [
       {
         role: 'system',
