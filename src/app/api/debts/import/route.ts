@@ -286,9 +286,9 @@ export async function POST(request: NextRequest) {
     // Validate required columns
     const fields = Object.values(fieldMap)
     if (!fields.includes('full_name'))
-      return NextResponse.json({ error: 'Missing required column: customer name (or اسم العميل)' }, { status: 400 })
+      return NextResponse.json({ error: `العمود المطلوب "اسم العميل" مفقود. الأعمدة التي تم العثور عليها: ${headers.join(' | ')}` }, { status: 400 })
     if (!fields.includes('original_amount') && !fields.includes('current_balance'))
-      return NextResponse.json({ error: 'Missing required amount column. Expected: amount, balance, current balance, المبلغ, or الرصيد' }, { status: 400 })
+      return NextResponse.json({ error: `العمود المطلوب "المبلغ" مفقود. الأعمدة التي تم العثور عليها: ${headers.join(' | ')}` }, { status: 400 })
 
     const portfolioCache = new Map<string, string>()
     const results = { imported: 0, skipped: 0, errors: [] as string[] }
