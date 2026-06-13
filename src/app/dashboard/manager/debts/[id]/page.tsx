@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import RecordPaymentModal from '@/components/debt/RecordPaymentModal'
 import UpdateDebtStatusSelect from '@/components/debt/UpdateDebtStatusSelect'
 import ScoreDebtButton from '@/components/ai/ScoreDebtButton'
+import EditDebtModal from '@/components/debt/EditDebtModal'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import AssignDebtSelect from '@/components/debt/AssignDebtSelect'
 import Link from 'next/link'
@@ -124,6 +125,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           </div>
         </div>
         <div className="flex gap-3">
+          <EditDebtModal debt={debt} customer={debt.customer} />
           <ScoreDebtButton debtId={debt.id} />
           <SendWhatsAppButton
             debtId={debt.id}
