@@ -277,7 +277,7 @@ export async function generateWhatsappAutoReply(args: {
   const ai = await client.chat.completions.create({
     model: 'gpt-5.5',
     temperature: 0.35,
-    max_tokens: 420,
+    max_completion_tokens: 420,
     tools: [
       {
         type: "function",
