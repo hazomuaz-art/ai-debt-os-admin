@@ -228,8 +228,6 @@ export async function generateWhatsappAutoReply(args: {
   message: string
   conversation_history?: HistoryItem[]
 }) {
-  // EMERGENCY KILL SWITCH: AI Replies are disabled
-  return { reply: '', nextAction: 'silent' }
   const text = args.message.trim()
   const history = args.conversation_history ?? []
 
