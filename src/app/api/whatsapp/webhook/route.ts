@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseWebhookPayload, normalizePhone, sendWhatsAppMessage, type WhatsAppWebhookEntry } from '@/lib/whatsapp'
 import { createLogger } from '@/lib/logger'
 import { processEvent } from '@/lib/automation-pipeline'
-import { generateWhatsappOperationalDecision } from '@/lib/ai-whatsapp-reply'
+import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 import { createHash } from 'crypto'
 
 const log = createLogger('webhook/whatsapp')
@@ -145,25 +145,61 @@ export async function POST(request: NextRequest) {
               data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
             }).catch(() => {})
 
-            // Process AI decision via n8n
+            // Process AI decision natively instead of n8n
             ;(async () => {
-              const { getN8nClient } = await import('@/lib/n8n/client')
-              const n8nClient = getN8nClient()
+              const { runCollectorAgent } = await import('@/lib/ai-collector-agent')
+              const { sendWhatsAppMessage } = await import('@/lib/evolution/client')
+              const { processEvent } = await import('@/lib/automation-pipeline')
+              const { buildCustomerDebtContext } = await import('@/lib/customer-debt-context')
+
               const company_id = (customer as { company_id: string }).company_id
               const customer_id = (customer as { id: string }).id
               const debt_id = (latestDebt as { id: string } | null)?.id ?? undefined
 
-              log.info('Delegating AI processing to n8n webhook', { company_id, customer_id, debt_id })
-
-              await n8nClient.triggerAIAnalysis({
+              const debtContext = await buildCustomerDebtContext({
                 company_id,
                 customer_id,
-                debt_id,
-                message: text,
-                instance_name: evo.instance,
-                conversation_id: phoneRaw
+                debt_id: debt_id ?? null,
               })
-            })().catch(err => log.error('n8n AI Webhook Trigger Error', err))
+
+              const aiDecision = await runCollectorAgent({
+                company_id,
+                customer_id,
+                debt_id: debt_id ?? null,
+                message: text,
+                conversation_history: debtContext.recent_messages || []
+              })
+
+              if (aiDecision.shouldReply && aiDecision.message) {
+                const waResult = await sendWhatsAppMessage({
+                  to: phoneRaw,
+                  message: aiDecision.message,
+                })
+
+                await createServiceClient().from('messages').insert({
+                  company_id,
+                  customer_id,
+                  debt_id: debt_id ?? null,
+                  channel: 'whatsapp',
+                  direction: 'outbound',
+                  content: aiDecision.message,
+                  status: waResult.status === 'sent' ? 'sent' : 'failed',
+                  whatsapp_message_id: waResult.message_id || null,
+                  metadata: { sender: 'ai', action_type: aiDecision.action, instance_name: evo.instance, error: waResult.error },
+                  sent_at: new Date().toISOString(),
+                })
+
+                if (waResult.status === 'sent') {
+                  await processEvent({
+                    debt_id: debt_id ?? 'temp',
+                    company_id,
+                    source: 'ai_reply',
+                    event_type: 'whatsapp_outbound',
+                    data: { message: aiDecision.message, action: aiDecision.action }
+                  }).catch(e => log.error('pipeline processing failed', e))
+                }
+              }
+            })().catch(err => log.error('AI Processing Error', err))
           }
         }
       }

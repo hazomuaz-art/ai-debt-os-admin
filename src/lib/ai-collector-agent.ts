@@ -39,7 +39,10 @@ function isCloser(text: string) {
 }
 
 function isGreeting(text: string) {
-  return /^(السلام عليكم|سلام عليكم|السلام عليكم ورحمة الله|هلا|مرحبا|هاي|hi|hello)$/i.test(text.trim())
+  const normalized = text.trim().toLowerCase()
+  const greetingRegex = /^(السلام|سلام|هلا|مرحبا|هاي|hi|hello|مساء|صباح|يسعد|يا هلا|أهلين|اهلين|كيف|شلونك|اخبارك|كيفك).*/i
+  const businessRegex = /(سدد|رقم|مبلغ|ريال|فاتورة|اقساط|قسط|راتب|تحويل|خصم|بنك|رسالة|شركة|مديونية|دين|حساب|أدفع|ادفع|فلوس|صعب|ظروف)/i
+  return greetingRegex.test(normalized) && normalized.length <= 40 && !businessRegex.test(normalized)
 }
 
 function cleanReply(reply: string) {
@@ -113,8 +116,18 @@ export async function runCollectorAgent(args: {
     return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
   }
 
-  if (isGreeting(text) && history.length <= 2) {
-    return { shouldReply: true, action: 'reply', reason: 'fresh_greeting', message: 'وعليكم السلام' }
+  if (isGreeting(text)) {
+    let msg = 'يا هلا بك، تفضل؟'
+    if (text.includes('سلام')) msg = 'وعليكم السلام، حياك الله تفضل؟'
+    else if (text.includes('مساء')) msg = 'مساء النور، تفضل؟'
+    else if (text.includes('صباح')) msg = 'صباح النور، تفضل؟'
+    
+    // If it is the very first message ever, we might want a simple "وعليكم السلام"
+    if (history.length <= 2 && text.includes('سلام')) {
+      msg = 'وعليكم السلام'
+    }
+
+    return { shouldReply: true, action: 'reply', reason: 'greeting', message: msg }
   }
 
   const debtContext = await buildCustomerDebtContext({
@@ -125,14 +138,100 @@ export async function runCollectorAgent(args: {
 
   const customerBrain = buildCustomerBrain(debtContext)
 
-  if (!process.env.OPENAI_API_KEY) {
-    return { shouldReply: true, action: 'reply', reason: 'fallback_no_openai', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+    return { shouldReply: true, action: 'reply', reason: 'fallback_no_api_key', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const client = new OpenAI({ 
+    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined
+  })
+
+  // Format history to proper OpenAI message roles
+  const messageHistory = history.map(m => ({
+    role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
+    content: String(m.content)
+  }))
+
+  // Determine Intent (Router Logic)
+  type AgentIntent = 'INTRODUCTION' | 'NEGOTIATION' | 'DISPUTE' | 'GENERAL'
+  let intent: AgentIntent = 'GENERAL'
+  
+  const historyText = history.map(h => String(h.content)).join(' ')
+  const balance = debtContext.debt?.current_balance ? String(debtContext.debt.current_balance) : null
+  const creditor = debtContext.debt?.creditor_name ? String(debtContext.debt.creditor_name) : null
+  
+  const hasMentionedDebt = (balance && historyText.includes(balance)) || (creditor && historyText.includes(creditor))
+  
+  if (!hasMentionedDebt && history.length <= 4 && !signals.angry && !signals.dispute) {
+    intent = 'INTRODUCTION'
+  } else if (signals.angry || signals.dispute || signals.wrongNumber) {
+    intent = 'DISPUTE'
+  } else if (signals.promise || signals.installment || signals.hardship) {
+    intent = 'NEGOTIATION'
+  }
+
+  // Specialized Prompts
+  let specializedPrompt = ''
+
+  if (intent === 'INTRODUCTION') {
+    specializedPrompt = `
+=== وكيل التقديم (Introduction Agent) ===
+الهدف: أنت تتحدث مع العميل لأول مرة (بعد التحية).
+المهمة:
+- اذكر بوضوح أنك من طرف الشركة الدائنة (creditor_name) بخصوص مديونية قدرها (current_balance).
+- اسأل العميل مباشرة وبكل لباقة عن الموعد الذي يقدر فيه سداد هذا المبلغ.
+- اذكر المبلغ واسم الشركة مرة واحدة فقط في رسالتك، ولا تسأل أكثر من سؤال واحد.
+`
+  } else if (intent === 'DISPUTE') {
+    specializedPrompt = `
+=== وكيل معالجة الاعتراضات (Dispute & De-escalation Agent) ===
+الهدف: العميل إما غاضب، أو ينكر المديونية، أو يقول أن الرقم خطأ.
+المهمة:
+- إذا كان العميل غاضباً، امتص غضبه بكلمة واحدة (مثل: أقدر انزعاجك، أو حقك تزعل) ثم اطلب منه الهدوء لنراجع الملف.
+- إذا أنكر المديونية أو قال الرقم خطأ، اطلب منه الإثبات أو قل له أنك سترفع ملاحظته للإدارة للمراجعة.
+- 🔴 تحذير هام: يمنع منعاً باتاً تكرار ذكر مبلغ المديونية الآن. مهمتك فقط معالجة الاعتراض أو امتصاص الغضب بهدوء.
+`
+  } else if (intent === 'NEGOTIATION') {
+    specializedPrompt = `
+=== وكيل التفاوض والوعود (Negotiation & Promise Agent) ===
+الهدف: العميل يقدم أعذاراً، أو يطلب أقساطاً، أو يعد بالسداد لاحقاً.
+المهمة:
+- إذا أعطى عذراً (مثل: ظروفي صعبة)، تعاطف معه بكلمة واحدة (الله يعينك، مقدر ظرفك) ثم فاوضه على موعد للسداد الجزئي أو الكلي.
+- إذا طلب تقسيط ولم يكن لديه تقسيط معتمد في النظام: أخبره أن الأقساط تحتاج موافقة وسنرفع طلباً، ولا توافق من نفسك أبداً.
+- إذا وعد بالسداد لكن بدون تاريخ، اسأله عن التاريخ الدقيق للسداد.
+- 🔴 تحذير هام: لا تكرر إجمالي المبلغ في كل رسالة، العميل يعرفه مسبقاً. ركز فقط على التفاوض وموعد السداد.
+`
+  } else {
+    specializedPrompt = `
+=== الوكيل العام (General Collection Agent) ===
+الهدف: متابعة المحادثة بشكل عام.
+المهمة:
+- رد بشكل طبيعي وحازم بناءً على كلام العميل الأخير.
+- إذا كان قد ذكر أنه سدد، اطلب منه إرسال الإيصال.
+- 🔴 تحذير هام: يُمنع منعاً باتاً تكرار ذكر إجمالي المبلغ أو اسم الشركة في ردك الحالي، لأن العميل يعرفه مسبقاً. اكتفِ بسؤاله عن الخطوة القادمة.
+`
+  }
+
+  // Check active states and override if necessary
+  const activeInstallmentApproval = debtContext.recent_approvals?.find(a => a.approval_type === 'installment' && a.status === 'approved')
+  const activePromise = debtContext.recent_promises?.find(p => p.status === 'pending')
+
+  if (activeInstallmentApproval) {
+    specializedPrompt += `
+- 🔴 حالة خاصة جداً: العميل لديه خطة تقسيط معتمدة بالفعل! لا ترفض التقسيط، بل أكد له الأقساط واطلب منه سداد الدفعة الأولى أو القسط القادم.
+`
+  }
+  if (activePromise) {
+    specializedPrompt += `
+- 🔴 حالة خاصة جداً: العميل لديه وعد سداد مسجل بمبلغ ${activePromise.promised_amount} في تاريخ ${activePromise.promised_date}. ذكّره بهذا الوعد وألزمه به.
+`
+  }
+
+  const systemRulesText = customerBrain.strict_rules ? customerBrain.strict_rules.join('\n') : ''
 
   const ai = await client.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.28,
     max_tokens: 260,
     response_format: { type: 'json_object' },
@@ -140,32 +239,20 @@ export async function runCollectorAgent(args: {
       {
         role: 'system',
         content: `
-You are a senior Saudi debt collector on WhatsApp with strong conversation skills.
+أنت "خالد"، محصّل ديون سعودي عمرك 45 سنة.
+تتحدث بلهجة سعودية بيضاء، طبيعية جداً، وكأنك تتحدث في الواتساب مع شخص حقيقي.
 
-You are NOT a bot and NOT customer service.
+=== القواعد الأساسية للبيانات (STRICT RULES) ===
+${systemRulesText}
 
-Your job:
-- Understand the entire conversation before replying.
-- Never restart from zero.
-- Never repeat the same question.
-- Never repeat the same answer.
-- If the customer answered your previous question, move forward.
-- If the customer gives a reason, acknowledge it and decide the next useful step.
-- Do not keep asking for "reason or proof" after the customer already gave a reason.
-- Do not mention the amount every time.
-- Do not ask multiple questions.
-- Reply in the customer's language.
-- If Arabic, use natural Saudi Arabic, not formal Arabic.
-- Keep it short: one or two human sentences.
-- Be firm, calm, persuasive, and professional.
-- No robotic phrases.
-- No "dear customer", no "how can I help", no "I am here to help".
-- Never offer installments or payment plans yourself.
-- If customer requests installments: record it for review only, no approval and no rejection.
-- If customer says paid: ask for receipt unless receipt was already discussed.
-- If customer disputes: handle the specific objection, do not repeat generic dispute wording.
-- If customer is angry: calm briefly then move to the file.
-- If conversation is done, stay silent.
+${specializedPrompt}
+
+=== تعليمات عامة للمحادثة ===
+1. تصرف كإنسان طبيعي تماماً (لا تقل "عزيزي العميل" أو "كيف أقدر أخدمك").
+2. يُمنع منعاً باتاً تكرار سؤال سألته سابقاً، أو إعادة المطالبة بشيء وافق عليه العميل للتو.
+3. ردودك يجب أن تكون قصيرة جداً (جملة أو جملتين كحد أقصى).
+4. إذا انتهت المحادثة (العميل أنهى النقاش أو ودّعك)، ابق صامتاً (اختر silent).
+
 
 Return JSON only:
 {
@@ -176,28 +263,19 @@ Return JSON only:
 }
         `.trim(),
       },
+      ...messageHistory,
       {
         role: 'user',
         content: `
 Current customer message:
 ${text}
 
-Detected signals:
-${JSON.stringify(signals, null, 2)}
+Important Context:
+- Detected signals: ${JSON.stringify(signals)}
+- Last agent message: ${lastAgentMessage}
+- Customer & Debt Summary: ${JSON.stringify(customerBrain.summary)}
+- Negotiation Strategy: ${JSON.stringify(customerBrain.negotiation_profile)}
 
-Last agent message:
-${lastAgentMessage}
-
-Conversation history:
-${JSON.stringify(history, null, 2)}
-
-Customer Brain:
-${JSON.stringify(customerBrain, null, 2)}
-
-Full customer/debt context:
-${JSON.stringify(debtContext, null, 2)}
-
-Important:
 If the last agent message was a question and the customer just answered it, do not ask the same question again. Move the conversation forward naturally.
         `.trim(),
       },

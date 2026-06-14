@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { processEvent } from '@/lib/automation-pipeline'
 
 /**
  * POST /api/n8n/webhook
@@ -155,26 +157,142 @@ export async function POST(request: NextRequest) {
 
       // ── AI reply generated (from n8n AI workflow) ──
       case 'ai_reply_generated': {
-        const { customer_id, message_content, action_type, instance_name } = data as Record<string, string>
+        const { customer_id, message_content, action_type, instance_name, phone_number, debt_id } = data as Record<string, string>
         const company_id = metadata?.company_id
+
+        console.log('[ai_reply_generated] Received:', { customer_id, company_id, phone_number, action_type, message_content: message_content?.substring(0, 50) })
 
         if (!company_id || !customer_id || !message_content) {
           return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
+        let phone = phone_number
+        let active_debt_id = debt_id
+
+        if (!phone || !active_debt_id) {
+          const { data: customerData } = await supabase
+            .from('customers')
+            .select('phone, whatsapp')
+            .eq('id', customer_id)
+            .single()
+
+          console.log('[ai_reply_generated] Customer lookup:', customerData)
+            
+          phone = phone || customerData?.whatsapp || customerData?.phone
+
+          if (!active_debt_id) {
+            const { data: debtData } = await supabase
+              .from('debts')
+              .select('id')
+              .eq('customer_id', customer_id)
+              .eq('company_id', company_id)
+              .in('status', ['active', 'promise_to_pay', 'disputed', 'escalated'])
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            active_debt_id = debtData?.id
+          }
+        }
+
+        if (!phone) {
+           console.error('[ai_reply_generated] No phone found for customer:', customer_id)
+           return NextResponse.json({ error: 'Customer phone not found' }, { status: 404 })
+        }
+
+        // Send WhatsApp message DIRECTLY to Evolution API (no n8n routing)
+        // We intentionally do NOT pass company_id to avoid circular n8n routing
+        console.log('[ai_reply_generated] Sending directly to Evolution API:', { phone, messageLength: message_content.length })
+        const waResult = await sendWhatsAppMessage({
+          to: phone,
+          message: message_content,
+        })
+        console.log('[ai_reply_generated] Evolution API Result:', JSON.stringify(waResult))
+
         // Save outbound AI message
         await supabase.from('messages').insert({
           company_id,
           customer_id,
+          debt_id: active_debt_id || null,
           channel: 'whatsapp',
           direction: 'outbound',
           content: message_content,
-          status: 'sent',
-          metadata: { sender: 'ai', action_type, instance_name },
+          status: waResult.status === 'sent' ? 'sent' : 'failed',
+          whatsapp_message_id: waResult.message_id || null,
+          metadata: { sender: 'ai', action_type, instance_name, error: waResult.error },
           sent_at: new Date().toISOString(),
         })
 
-        result = { action: 'ai_reply_saved', customer_id }
+        // Check if AI requested installment approval
+        if (message_content.includes('موافقة') || message_content.includes('مراجعة') || message_content.includes('رفع طلب')) {
+          console.log('[ai_reply_generated] Intercepted installment request from AI output')
+          
+          const { data: existingApproval } = await supabase
+            .from('approvals')
+            .select('id')
+            .eq('company_id', company_id)
+            .eq('entity_type', 'debt')
+            .eq('entity_id', active_debt_id)
+            .eq('status', 'pending')
+            .in('approval_type', ['custom', 'payment_plan'])
+            .maybeSingle()
+
+          if (!existingApproval) {
+            // 1. Create Approval Request
+            const { error: approvalErr } = await supabase.from('approvals').insert({
+              company_id,
+              approval_type: 'custom',
+              title: 'طلب موافقة على تقسيط',
+              description: 'العميل يصر على التقسيط وتم إبلاغه برفع الطلب للإدارة.',
+              entity_type: 'debt',
+              entity_id: active_debt_id,
+              status: 'pending',
+              priority: 'high',
+            })
+            if (approvalErr) console.error('[ai_reply_generated] Failed to create approval:', approvalErr)
+            
+            // 2. Insert System Alert
+            await supabase.from('system_alerts').insert({
+              company_id,
+              alert_type: 'installment_request',
+              severity: 'warning',
+              title: 'مطلوب موافقة تقسيط',
+              message: `العميل يطلب تقسيط المديونية والموضوع بانتظار قرار الإدارة.`,
+              metadata: { customer_id, debt_id: active_debt_id },
+            })
+            
+            // 3. Update Debt status
+            if (active_debt_id) {
+              await supabase.from('debts').update({ status: 'in_negotiation' }).eq('id', active_debt_id)
+              
+              // Add status history
+              await supabase.from('collection_status_history').insert({
+                company_id,
+                customer_id,
+                debt_id: active_debt_id,
+                old_status: 'active',
+                new_status: 'in_negotiation',
+                normalized_status: 'in_negotiation',
+                changed_by_name: 'AI Agent',
+                changed_at: new Date().toISOString(),
+                source_system: 'whatsapp_ai',
+              })
+            }
+          } else {
+            console.log('[ai_reply_generated] Pending approval already exists for this debt, skipping duplicate creation.')
+          }
+        }
+
+        // Trigger dashboard and timeline updates
+        processEvent({
+          source: 'ai_reply',
+          company_id,
+          _customer_id: customer_id,
+          _debt_id: active_debt_id || null,
+          data: { action: action_type, message: message_content }
+        }).catch(() => {})
+
+        console.log('[ai_reply_generated] Pipeline complete. WA status:', waResult.status)
+        result = { action: 'ai_reply_processed', customer_id, status: waResult.status }
         break
       }
 

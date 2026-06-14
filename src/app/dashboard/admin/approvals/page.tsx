@@ -21,6 +21,14 @@ export default function ApprovalsPage() {
   const [items,   setItems]   = useState<Approval[]>([])
   const [loading, setLoading] = useState(true)
   const [filter,  setFilter]  = useState('pending')
+  
+  // Payment Plan Modal State
+  const [planModalItem, setPlanModalItem] = useState<Approval | null>(null)
+  const [planData, setPlanData] = useState({
+    count: 3,
+    frequency: 'شهري',
+    firstPayment: ''
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,12 +41,21 @@ export default function ApprovalsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  async function act(id: string, status: 'approved' | 'rejected') {
+  async function act(id: string, status: 'approved' | 'rejected', paymentPlan?: any) {
     await fetch('/api/modules/approvals', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({ id, status, paymentPlan }),
     })
+    setPlanModalItem(null)
     await load()
+  }
+
+  function handleActionClick(item: Approval, status: 'approved' | 'rejected') {
+    if (status === 'approved' && (item.approval_type === 'custom' || item.approval_type === 'payment_plan')) {
+      setPlanModalItem(item)
+    } else {
+      void act(item.id, status)
+    }
   }
 
   const pending  = items.filter(i => i.status === 'pending')
@@ -131,11 +148,11 @@ export default function ApprovalsPage() {
                   
                   {item.status === 'pending' && (
                     <div className="flex gap-2 w-full lg:w-auto shrink-0 border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pe-5">
-                      <button onClick={() => void act(item.id, 'approved')}
+                      <button onClick={() => handleActionClick(item, 'approved')}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-200 font-bold text-sm transition-colors">
                         <CheckCircle size={16} /> موافقة
                       </button>
-                      <button onClick={() => void act(item.id, 'rejected')}
+                      <button onClick={() => handleActionClick(item, 'rejected')}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-200 font-bold text-sm transition-colors">
                         <XCircle size={16} /> رفض
                       </button>
@@ -153,6 +170,72 @@ export default function ApprovalsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Plan Modal */}
+      {planModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-[#1e3e50] mb-1">تحديد خطة التقسيط</h3>
+              <p className="text-sm text-slate-500 mb-6">يرجى إدخال تفاصيل الدفع لاعتمادها وإرسالها للعميل.</p>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">عدد الأقساط</label>
+                  <select 
+                    value={planData.count} 
+                    onChange={e => setPlanData({ ...planData, count: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1e3e50]/20"
+                  >
+                    {[2,3,4,6,12].map(n => <option key={n} value={n}>{n} أقساط</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">فترة السداد</label>
+                  <select 
+                    value={planData.frequency} 
+                    onChange={e => setPlanData({ ...planData, frequency: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1e3e50]/20"
+                  >
+                    <option value="شهري">شهري</option>
+                    <option value="أسبوعي">أسبوعي</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1.5">الدفعة الأولى المطلوبة للبدء</label>
+                  <div className="relative">
+                    <input 
+                      type="number"
+                      placeholder="مثال: 500"
+                      value={planData.firstPayment}
+                      onChange={e => setPlanData({ ...planData, firstPayment: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 pe-12 focus:outline-none focus:ring-2 focus:ring-[#1e3e50]/20"
+                    />
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
+                      SAR
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button onClick={() => setPlanModalItem(null)} className="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-200/50 transition-colors">
+                إلغاء
+              </button>
+              <button 
+                disabled={!planData.firstPayment}
+                onClick={() => act(planModalItem.id, 'approved', planData)} 
+                className="px-6 py-2.5 rounded-xl font-bold bg-[#1e3e50] text-white hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                تأكيد واعتماد
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

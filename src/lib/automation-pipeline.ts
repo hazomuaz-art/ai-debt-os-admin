@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Automation Pipeline — Production Orchestrator
  *
  * Single source of truth for all module orchestration.
@@ -420,6 +420,8 @@ async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<
     if ((count ?? 0) > 0) return false
   } catch { /* continue */ }
 
+  if (['promised', 'in_negotiation', 'payment_plan'].includes(ctx.debt.status)) return false
+
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
   const hasWA = !!(ctx.customer.whatsapp)
   const hasPhone = !!(ctx.customer.phone)
@@ -648,7 +650,7 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
     eventText.includes('نهاية الشهر') || eventText.includes('اخر الشهر') || eventText.includes('آخر الشهر') ||
     eventText.includes('يوم') || eventText.includes('تاريخ') ||
     eventText.toLowerCase().includes('tomorrow')
-  const detectedIntent = rawIntent === 'payment_intent' && hasPromiseTime ? 'promise' : rawIntent
+  const detectedIntent = (rawIntent === 'payment_intent' || rawIntent === 'promise') && hasPromiseTime ? 'promise' : (rawIntent === 'promise' && !hasPromiseTime ? 'payment_intent' : rawIntent)
   const promiseDate =
     eventText.includes('بكرة') || eventText.includes('بكره') || eventText.toLowerCase().includes('tomorrow')
       ? new Date(Date.now() + 86400000).toISOString().split('T')[0]
@@ -676,6 +678,8 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
           status: 'pending',
           notes: eventText ? `Auto-created from inbound intent: ${eventText}` : 'Auto-created from promise_update event',
         })
+        
+        await sb.from('debts').update({ status: 'promised' }).eq('id', ctx.debt.id)
       }
     }
 
@@ -1084,6 +1088,7 @@ async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
   if (!phone) return false
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
   if (daysOverdue <= 0) return false
+  if (['promised', 'in_negotiation', 'payment_plan'].includes(ctx.debt.status)) return false
 
   const nameIsArabicWA = /[\u0600-\u06FF]/.test(ctx.customer.full_name ?? '')
   const waBal = ctx.debt.current_balance.toLocaleString('en-SA')

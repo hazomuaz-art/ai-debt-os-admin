@@ -151,6 +151,7 @@ class N8nClient {
     customer_id: string
     debt_id?: string
     message: string
+    context?: string
     conversation_id?: string
     instance_name?: string
   }): Promise<N8nResponse> {

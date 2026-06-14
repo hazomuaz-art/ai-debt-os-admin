@@ -131,8 +131,14 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
     }
   }
 
-  // 2. Direct Evolution API fallback
+  // 2. Direct Evolution API
   if (evolutionUrl && evolutionKey && evolutionInstance) {
+    console.log('[whatsapp] Sending DIRECTLY via Evolution API:', {
+      url: `${evolutionUrl}/message/sendText/${evolutionInstance}`,
+      to: to,
+      rawTo: options.to,
+      messageLength: message.length,
+    })
 
     try {
       const response = await fetch(`${evolutionUrl.replace(/\/$/, '')}/message/sendText/${evolutionInstance}`, {
@@ -142,16 +148,24 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
       })
 
       const data = await response.json().catch(() => ({}))
+      console.log('[whatsapp] Evolution API response:', { status: response.status, ok: response.ok, data: JSON.stringify(data) })
 
       if (!response.ok) {
-        return { message_id: null, status: 'failed', error: data?.message ?? `Evolution HTTP ${response.status}` }
+        const errMsg = typeof data?.response?.message === 'string' 
+          ? data.response.message 
+          : JSON.stringify(data?.response?.message ?? data?.message ?? `HTTP ${response.status}`)
+        console.error('[whatsapp] Evolution API FAILED:', errMsg)
+        return { message_id: null, status: 'failed', error: errMsg }
       }
 
+      const messageId = data?.key?.id ?? data?.messageId ?? null
+      console.log('[whatsapp] Evolution API SUCCESS. message_id:', messageId)
       return {
-        message_id: data?.key?.id ?? data?.messageId ?? null,
+        message_id: messageId,
         status: 'sent',
       }
     } catch (err) {
+      console.error('[whatsapp] Evolution API EXCEPTION:', err)
       return { message_id: null, status: 'failed', error: err instanceof Error ? err.message : 'Evolution send failed' }
     }
   }

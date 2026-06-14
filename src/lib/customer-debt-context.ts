@@ -242,6 +242,50 @@ export async function buildCustomerDebtContext(params: {
   }
 
   return {
+    // ══════════════════════════════════════════════════════════════
+    // ⛔ STRICT RULES — MUST be injected into the AI prompt
+    // ══════════════════════════════════════════════════════════════
+    strict_rules: [
+      'أنت خالد، محصّل ديون سعودي محترف. عمرك 45 سنة.',
+      '⛔ ممنوع منعاً باتاً اختراع أو تخمين أي بيانات غير موجودة في هذا السياق.',
+      '⛔ إذا كانت أي قيمة "غير محدد" أو null، لا تذكرها أبداً في ردك ولا تخترع بديلاً لها.',
+      '⛔ لا تذكر اسم أي شركة أو مؤسسة إلا إذا كانت موجودة بالضبط في حقل creditor_name أو employer.',
+      '⛔ لا تذكر أي مبلغ إلا المبلغ الموجود في حقل current_balance بالضبط.',
+      '⛔ لا تخترع أرقام مرجعية أو أرقام حسابات أو تواريخ غير موجودة.',
+      '⛔ إذا سألك العميل عن معلومة غير موجودة في السياق، قل "ما عندي هالمعلومة حالياً، بتواصل مع الإدارة وأرد عليك".',
+      'استخدم اللهجة السعودية البيضاء. كن مهنياً ومختصراً.',
+      'لا ترسل أكثر من جملتين في الرد الواحد.',
+    ],
+
+    // ══════════════════════════════════════════════════════════════
+    // 📋 VERIFIED DATA — Only these values are real
+    // ══════════════════════════════════════════════════════════════
+    verified_customer_data: {
+      customer_name: customer?.full_name || null,
+      phone: customer?.phone || null,
+      whatsapp: customer?.whatsapp || null,
+      national_id: customer?.national_id || null,
+      employer: customer?.employer || null,
+      city: customer?.city || null,
+      risk_level: customer?.risk_level || null,
+    },
+
+    verified_debt_data: {
+      reference_number: debt?.reference_number || null,
+      account_number: debt?.account_number || null,
+      creditor_name: debt?.creditor_name || null,
+      product_type: debt?.product_type || null,
+      original_amount: debt?.original_amount ?? null,
+      current_balance: debt?.current_balance ?? null,
+      currency: debt?.currency || 'SAR',
+      status: debt?.status || null,
+      priority: debt?.priority || null,
+      due_date: debt?.due_date || null,
+      last_payment_date: debt?.last_payment_date || null,
+      portfolio_name: (debt as any)?.portfolio?.name || null,
+      notes: debt?.notes || null,
+    },
+
     customer: customer ?? null,
     debt: debt ?? null,
     recent_payments: payments ?? [],
@@ -269,29 +313,30 @@ export async function buildCustomerDebtContext(params: {
       last_ai_reply: lastOutbound?.content ?? null,
       open_promises_count: openPromises.length,
       completed_payments_count: completedPayments.length,
-      customer_risk_level: customer?.risk_level ?? 'unknown',
-      debt_status: debt?.status ?? 'unknown',
-      debt_priority: debt?.priority ?? 'unknown',
+      customer_risk_level: customer?.risk_level ?? null,
+      debt_status: debt?.status ?? null,
+      debt_priority: debt?.priority ?? null,
       should_be_careful: ['disputed', 'legal'].includes(String(debt?.status ?? '')),
     },
+    negotiation_profile,
     summary: {
-      customer_name: customer?.full_name ?? 'Unknown',
+      customer_name: customer?.full_name ?? null,
       phone: customer?.phone ?? null,
       whatsapp: customer?.whatsapp ?? null,
       national_id: customer?.national_id ?? null,
-      portfolio_name: debt?.portfolio?.name ?? 'Unknown',
-      creditor_name: debt?.creditor_name ?? 'Unknown',
-      product_type: debt?.product_type ?? 'Unknown',
-      reference_number: debt?.reference_number ?? 'Unknown',
-      account_number: debt?.account_number ?? 'Unknown',
+      portfolio_name: (debt as any)?.portfolio?.name ?? null,
+      creditor_name: debt?.creditor_name ?? null,
+      product_type: debt?.product_type ?? null,
+      reference_number: debt?.reference_number ?? null,
+      account_number: debt?.account_number ?? null,
       current_balance: debt?.current_balance ?? null,
       original_amount: debt?.original_amount ?? null,
       currency: debt?.currency ?? 'SAR',
-      debt_status: debt?.status ?? 'unknown',
-      debt_priority: debt?.priority ?? 'unknown',
+      debt_status: debt?.status ?? null,
+      debt_priority: debt?.priority ?? null,
       due_date: debt?.due_date ?? null,
       last_payment_date: debt?.last_payment_date ?? null,
-      risk_level: customer?.risk_level ?? 'unknown',
+      risk_level: customer?.risk_level ?? null,
       has_recent_payments: (payments?.length ?? 0) > 0,
       has_conversation_history: (messages?.length ?? 0) > 0,
       has_open_promise: openPromises.length > 0,
