@@ -533,7 +533,7 @@ export async function generateProactiveReminder(args: {
   })
 
   const res = await ai.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-2.5-pro' : 'gpt-4o',
+    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-3.1-pro-preview' : 'gpt-4o',
     messages: [
       {
         role: 'system',
