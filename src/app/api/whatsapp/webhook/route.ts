@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
                 const waResult = await sendWhatsAppMessage({
                   to: phoneRaw,
                   message: aiDecision.message,
+                  company_id,
                 })
 
                 await createServiceClient().from('messages').insert({

@@ -85,8 +85,7 @@ export async function trackEvent(opts: TrackEventOptions): Promise<void> {
         user_id:     opts.user_id  ?? null,
         debt_id:     opts.debt_id  ?? null,
         customer_id: opts.customer_id ?? null,
-        cost_usd:    opts.cost_usd ?? 0,
-        metadata:    opts.metadata ?? {},
+        metadata:    { ...(opts.metadata ?? {}), ...(opts.cost_usd ? { cost_usd: opts.cost_usd } : {}) },
       })
 
     if (insertErr) {
