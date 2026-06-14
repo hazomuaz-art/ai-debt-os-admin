@@ -164,14 +164,36 @@ function buildCaseFile(ctx: any): string {
   add('الرصيد الحالي المستحق', money(d.current_balance, currency))
   add('المبلغ الأصلي', money(d.original_amount, currency))
   add('الرقم المرجعي', d.reference_number)
-  add('حالة الملف', d.status)
+  const statusLabels: Record<string, string> = {
+    'payment_plan': 'خطة تقسيط معتمدة وفعّالة',
+    'active': 'نشط',
+    'overdue': 'متأخر',
+    'settled': 'تم السداد',
+    'written_off': 'شُطب',
+    'disputed': 'معترض عليه',
+    'legal': 'إجراء قانوني',
+  }
+  add('حالة الملف', statusLabels[String(d.status ?? '').toLowerCase()] ?? d.status)
   add('تاريخ الاستحقاق', dateOnly(d.due_date))
   add('تاريخ آخر سداد', dateOnly(d.last_payment_date))
 
   // 3) What we already discussed / agreed on (the core of "memory")
   const agreed: string[] = []
-  const approvedInstallment = (ctx.recent_approvals ?? []).find((a: any) => a.approval_type === 'installment' && a.status === 'approved')
-  if (approvedInstallment) agreed.push('✅ يوجد خطة تقسيط معتمدة بالفعل — لا ترفض التقسيط، أكّدها واطلب القسط القادم.')
+
+  // Detect active installment plan from EITHER: debt status, OR any approved approval mentioning installments
+  const debtStatus = String(d.status ?? '').toLowerCase()
+  const hasPaymentPlan = debtStatus === 'payment_plan' || debtStatus === 'installment'
+  const approvedInstallment = (ctx.recent_approvals ?? []).find((a: any) =>
+    a.status === 'approved' && (
+      a.approval_type === 'installment' ||
+      String(a.title ?? '').includes('تقسيط') ||
+      String(a.description ?? '').includes('تقسيط')
+    )
+  )
+
+  if (hasPaymentPlan || approvedInstallment) {
+    agreed.push('✅ يوجد خطة تقسيط معتمدة بالفعل في النظام (حالة الملف: payment_plan). لا ترفض التقسيط ولا تقل إنه يحتاج موافقة — أكّد للعميل أن التقسيط معتمد واسأله عن موعد القسط القادم.')
+  }
 
   const openPromise = (ctx.recent_promises ?? []).find((p: any) => p.status === 'pending')
   if (openPromise) {

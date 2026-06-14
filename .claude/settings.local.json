@@ -28,7 +28,8 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} -> %{redirect_url}\\\\n\" http://72.62.30.109)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://72.62.30.109/api/health)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://72.62.30.109/login)",
-      "mcp__8df7cc95-054b-443e-ab11-9b5f8aef464f__execute_sql"
+      "mcp__8df7cc95-054b-443e-ab11-9b5f8aef464f__execute_sql",
+      "Bash(ssh -o BatchMode=yes root@72.62.30.109 'pm2 logs ai-debt-os-admin --lines 0 --nostream 2>/dev/null; timeout 120 tail -f /root/.pm2/logs/ai-debt-os-admin-out.log /root/.pm2/logs/ai-debt-os-admin-error.log 2>/dev/null')"
     ]
   }
 }
