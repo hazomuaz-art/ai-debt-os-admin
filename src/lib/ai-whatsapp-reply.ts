@@ -270,12 +270,12 @@ export async function generateWhatsappAutoReply(args: {
   }
 
   const client = new OpenAI({ 
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined
+    apiKey: process.env.OPENAI_API_KEY,
+    // baseURL removed
   })
 
   const ai = await client.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-3.1-pro-preview' : 'gpt-4o',
+    model: 'gpt-5.5',
     temperature: 0.35,
     max_tokens: 420,
     tools: [
@@ -549,12 +549,12 @@ export async function generateProactiveReminder(args: {
   })
 
   const ai = new OpenAI({ 
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined
+    apiKey: process.env.OPENAI_API_KEY,
+    // baseURL removed
   })
 
   const res = await ai.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-3.1-pro-preview' : 'gpt-4o',
+    model: 'gpt-5.5',
     messages: [
       {
         role: 'system',
