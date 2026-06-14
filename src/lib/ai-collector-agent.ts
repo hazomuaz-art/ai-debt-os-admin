@@ -1,5 +1,8 @@
 import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('ai-collector-agent')
 
 export type CollectorDecision = {
   shouldReply: boolean
@@ -83,16 +86,36 @@ function isRobotic(reply: string) {
   ])
 }
 
+// Conservative: only flag a reply as "repeated" if it is essentially the SAME
+// message as a previous one (near-exact). Never flag substantive replies that
+// carry a number/amount/date — those are real answers, not robotic filler.
 function isRepeated(reply: string, prevOutbound: string[]) {
   const r = reply.replace(/\s+/g, ' ').trim()
   if (!r || r.length < 20) return false
+  if (/\d/.test(r)) return false // contains a figure → treat as a real answer
   return prevOutbound.some(p => {
     const old = p.replace(/\s+/g, ' ').trim()
     if (!old || old.length < 20) return false
-    const shorter = r.length < old.length ? r : old
-    const longer = r.length < old.length ? old : r
-    return longer.includes(shorter) || shorter.includes(longer.slice(0, Math.max(60, longer.length * 0.8)))
+    if (old === r) return true
+    // near-duplicate only when lengths are close and one fully contains the other
+    const ratio = Math.min(r.length, old.length) / Math.max(r.length, old.length)
+    return ratio >= 0.85 && (old.includes(r) || r.includes(old))
   })
+}
+
+// Robustly extract a JSON object even when the model wraps it in markdown
+// fences or adds prose around it (Claude via OpenRouter often ignores json_object).
+function extractJson(raw: string): any | null {
+  if (!raw) return null
+  let s = String(raw).trim()
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  try { return JSON.parse(s) } catch {}
+  const first = s.indexOf('{')
+  const last = s.lastIndexOf('}')
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(s.slice(first, last + 1)) } catch {}
+  }
+  return null
 }
 
 // Format money/dates, skipping nulls so we never feed "null" to the model
@@ -339,17 +362,20 @@ ${intentPrompts[intent]}
 
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
 
-  const ai = await client.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o',
-    temperature: 0.3,
-    max_tokens: 400,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...turns,
-      {
-        role: 'user',
-        content: `رسالة العميل الحالية:
+  const modelId = process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o'
+  let ai
+  try {
+    ai = await client.chat.completions.create({
+      model: modelId,
+      temperature: 0.3,
+      max_tokens: 400,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...turns,
+        {
+          role: 'user',
+          content: `رسالة العميل الحالية:
 ${text}
 
 (للسياق فقط — لا تردده حرفياً)
@@ -357,24 +383,45 @@ ${text}
 - آخر رسالة أرسلتها أنت للعميل: ${lastAgentMessage || 'لا يوجد'}
 
 إن كانت رسالتك الأخيرة سؤالاً وقد أجاب العميل عليه الآن، لا تعد السؤال — انتقل بالمحادثة للأمام.`,
-      },
-    ],
-  })
+        },
+      ],
+    })
+  } catch (err: any) {
+    log.error('LLM call failed', { model: modelId, error: String(err?.message ?? err) })
+    return { shouldReply: true, action: 'human_review', reason: 'llm_error', message: 'لحظة من فضلك، بأرجع لك بخصوص ملفك حالاً.' }
+  }
 
+  const raw = ai.choices[0]?.message?.content ?? ''
+  const obj = extractJson(raw)
   let parsed: CollectorDecision
-  try {
-    parsed = JSON.parse(ai.choices[0]?.message?.content ?? '{}')
-  } catch {
-    parsed = { shouldReply: true, action: 'reply', reason: 'invalid_json', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
+
+  if (obj && typeof obj === 'object' && 'message' in obj) {
+    parsed = obj as CollectorDecision
+  } else if (raw.trim().length > 1) {
+    // Model replied in plain prose instead of JSON → use the prose as the reply
+    // rather than dropping to a canned fallback.
+    parsed = { shouldReply: true, action: 'reply', reason: 'prose_fallback', message: raw.trim() }
+    log.warn('model returned non-JSON, using prose', { intent, raw_preview: raw.slice(0, 120) })
+  } else {
+    parsed = { shouldReply: true, action: 'reply', reason: 'empty_response', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
+    log.error('model returned empty response', { intent, model: modelId })
   }
 
   parsed.message = cleanReply(parsed.message)
+  log.info('agent decision', {
+    intent,
+    action: parsed.action,
+    reason: parsed.reason,
+    balance: ctx.verified_debt_data?.current_balance ?? null,
+    reply_preview: parsed.message.slice(0, 80),
+  })
 
   if (!parsed.shouldReply || !parsed.message.trim()) {
     return { ...parsed, shouldReply: false, message: '' }
   }
 
   if (isRobotic(parsed.message) || isRepeated(parsed.message, prevOutbound)) {
+    log.warn('anti-repetition guard fired', { intent, original: parsed.message.slice(0, 80) })
     const fallbacks = [
       'طيب، وش تبي نسوي بخصوص الموضوع؟',
       'تمام، خلنا نمشي قدام. وش الخطوة الجاية من عندك؟',

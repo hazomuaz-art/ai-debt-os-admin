@@ -24,7 +24,11 @@
       "Bash(wc -l ai-collector-agent.ts ai-whatsapp-reply.ts customer-brain.ts customer-debt-context.ts negotiation-*.ts smart-response.ts)",
       "Bash(wc -l ../app/api/whatsapp/webhook/route.ts)",
       "Bash(npx tsc *)",
-      "PowerShell(powershell -ExecutionPolicy Bypass -File D:\\\\ai-debt-os-admin\\\\deploy.ps1 \"fix: AI agent reviews full case file + history before reply; fix context-injection, ordering, encoding bugs\")"
+      "PowerShell(powershell -ExecutionPolicy Bypass -File D:\\\\ai-debt-os-admin\\\\deploy.ps1 \"fix: AI agent reviews full case file + history before reply; fix context-injection, ordering, encoding bugs\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} -> %{redirect_url}\\\\n\" http://72.62.30.109)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://72.62.30.109/api/health)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://72.62.30.109/login)",
+      "mcp__8df7cc95-054b-443e-ab11-9b5f8aef464f__execute_sql"
     ]
   }
 }
