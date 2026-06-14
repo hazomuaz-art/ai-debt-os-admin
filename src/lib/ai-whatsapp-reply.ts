@@ -231,10 +231,10 @@ export async function generateWhatsappAutoReply(args: {
   const text = args.message.trim()
   const history = args.conversation_history ?? []
 
-  if (!text) return ''
-  if (isCloseOnly(text)) return ''
+  if (!text) return { reply: '', nextAction: 'silent' }
+  if (isCloseOnly(text)) return { reply: '', nextAction: 'silent' }
   if (isGreetingOnly(text)) {
-    return text.toLowerCase() === 'hi' || text.toLowerCase() === 'hello' ? 'Hello' : 'وعليكم السلام'
+    return { reply: text.toLowerCase() === 'hi' || text.toLowerCase() === 'hello' ? 'Hello' : 'وعليكم السلام', nextAction: 'reply' }
   }
 
   const debtContext = await buildCustomerDebtContext({
@@ -250,10 +250,10 @@ export async function generateWhatsappAutoReply(args: {
     debtContext,
   })
 
-  if (hardReply) return hardReply
+  if (hardReply) return { reply: hardReply, nextAction: 'reply' }
 
   if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
-    return 'وصلت ملاحظتك، بنراجع الملف ونرد عليك.'
+    return { reply: 'وصلت ملاحظتك، بنراجع الملف ونرد عليك.', nextAction: 'review' }
   }
 
   const client = new OpenAI({ 
@@ -295,6 +295,9 @@ Rules:
 - If the customer asks about debt details, answer from file context first.
 - If data is missing, move to review instead of guessing.
 - If no useful reply is needed, return shouldReply=false.
+- If the customer asks a general question, do not aggressively jump straight to telling them they have a debt. Be conversational, understand their question, answer it professionally, and then naturally transition to the debt if appropriate. Do not be pushy or rigid.
+- If the customer asks for installments, you must FIRST try to negotiate and persuade them to pay the full amount. Do NOT immediately agree to installments.
+- If the customer INSISTS on installments after your initial negotiation, set nextAction to "review_installments" and reply with EXACTLY this text: "سيتم مراجعة طلبك بخصوص الاقساط وبنعلمك اذا تم الموافقه"
 - Arabic replies must be Saudi spoken WhatsApp Arabic only.
 - No formal Arabic.
 - No customer service phrases.
@@ -303,7 +306,7 @@ Return JSON only:
 {
   "shouldReply": true,
   "reply": "short natural WhatsApp reply",
-  "nextAction": "reply|silent|explain_debt|review|record_dispute|record_promise|request_receipt",
+  "nextAction": "reply|silent|explain_debt|review|record_dispute|record_promise|request_receipt|review_installments",
   "confidence": 0.9
 }
         `.trim(),
@@ -349,14 +352,16 @@ Return JSON only:
     }
   }
 
-  if (!decision.shouldReply) return ''
+  if (!decision.shouldReply) return { reply: '', nextAction: 'silent' }
 
-  return finalGuard({
+  const finalReply = finalGuard({
     current: text,
     history,
     reply: decision.reply,
     debtContext,
   })
+
+  return { reply: finalReply, nextAction: decision.nextAction }
 }
 
 
@@ -392,7 +397,9 @@ export async function generateWhatsappOperationalDecision(args: {
   message: string
   conversation_history?: HistoryItem[]
 }): Promise<WhatsappOperationalDecision> {
-  const reply = await generateWhatsappAutoReply(args)
+  const aiResult = await generateWhatsappAutoReply(args)
+  const reply = aiResult.reply
+  const aiAction = aiResult.nextAction
   const text = args.message.trim().toLowerCase()
 
   const isPromise =
@@ -444,6 +451,13 @@ export async function generateWhatsappOperationalDecision(args: {
     systemImpact.promise = true
     systemImpact.risk_impact = 'decrease'
     systemImpact.summary = 'Customer gave a payment promise.'
+  }
+
+  if (aiAction === 'review_installments') {
+    nextAction = 'record_installment_request'
+    systemImpact.approval = true
+    systemImpact.alert = true
+    systemImpact.summary = 'Customer explicitly requested and insisted on installments. Waiting for management approval.'
   }
 
   if (isDispute) {
