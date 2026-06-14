@@ -275,8 +275,8 @@ export async function generateWhatsappAutoReply(args: {
   })
 
   const ai = await client.chat.completions.create({
-    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-2.5-pro' : 'gpt-4o',
-    temperature: 0.08,
+    model: process.env.OPENROUTER_API_KEY ? 'google/gemini-3.1-pro-preview' : 'gpt-4o',
+    temperature: 0.45,
     max_tokens: 420,
     response_format: { type: 'json_object' },
     messages: [
