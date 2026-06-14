@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
             // Process AI decision natively instead of n8n
             ;(async () => {
               const { runCollectorAgent } = await import('@/lib/ai-collector-agent')
-              const { sendWhatsAppMessage } = await import('@/lib/evolution/client')
+              const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
               const { processEvent } = await import('@/lib/automation-pipeline')
               const { buildCustomerDebtContext } = await import('@/lib/customer-debt-context')
 
