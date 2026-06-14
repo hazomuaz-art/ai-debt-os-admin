@@ -155,8 +155,17 @@ function asksSameClarification(reply: string) {
   return hasAny(reply, ['وش الجزء', 'شنو الجزء', 'حدد', 'وين الغلط', 'ايش الغلط', 'إيش الغلط'])
 }
 
-function clean(reply: string) {
-  return String(reply ?? '')
+function clean(reply: string, customerName?: string) {
+  let r = String(reply ?? '')
+  if (customerName) {
+    const names = customerName.split(' ')
+    const firstName = names[0]
+    if (firstName) {
+       const re = new RegExp(`(هلا|مرحبا|يا|أهلين)\\s*${firstName}[،,\\s]*`, 'g')
+       r = r.replace(re, '')
+    }
+  }
+  return r
     .replace(/عزيزي العميل[،,\s]*/g, '')
     .replace(/عميلنا العزيز[،,\s]*/g, '')
     .replace(/أخوي[،,\s]*/g, '')
@@ -178,8 +187,9 @@ function finalGuard(args: {
   history: HistoryItem[]
   reply: string
   debtContext: any
+  customerName?: string
 }) {
-  const reply = clean(args.reply)
+  const reply = clean(args.reply, args.customerName)
   const repeated = repeatedMeaning(args.current, args.history)
 
   if (!reply) return ''
@@ -243,11 +253,14 @@ export async function generateWhatsappAutoReply(args: {
     debt_id: args.debt_id ?? null,
   })
 
+  const customerName = debtContext?.customer?.full_name ?? ''
+
   const hardReply = finalGuard({
     current: text,
     history,
     reply: asksDebtDetails(text) ? debtAnswer(debtContext) : '',
     debtContext,
+    customerName,
   })
 
   if (hardReply) return { reply: hardReply, nextAction: 'reply' }
@@ -373,6 +386,7 @@ Return JSON only:
     history,
     reply: decision.reply,
     debtContext,
+    customerName,
   })
 
   return { reply: finalReply, nextAction: decision.nextAction }
