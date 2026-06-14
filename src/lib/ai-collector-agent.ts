@@ -85,18 +85,19 @@ function isRobotic(reply: string) {
     'يرجى التكرم',
     'نود إشعاركم',
     'نفيدكم',
-    'خطة سداد',
-    'نرتب لك',
-    'نقدر نرتب',
   ])
 }
 
 function isRepeated(reply: string, history: HistoryItem[]) {
   const r = reply.replace(/\s+/g, ' ').trim()
-  if (!r) return false
+  if (!r || r.length < 20) return false
   return previousOutboundTexts(history).some(p => {
     const old = p.replace(/\s+/g, ' ').trim()
-    return old && (old.includes(r.slice(0, 35)) || r.includes(old.slice(0, 35)))
+    if (!old || old.length < 20) return false
+    // Only flag as repeated if 80%+ of the text is identical
+    const shorter = r.length < old.length ? r : old
+    const longer = r.length < old.length ? old : r
+    return longer.includes(shorter) || shorter.includes(longer.slice(0, Math.max(60, longer.length * 0.8)))
   })
 }
 
@@ -300,7 +301,14 @@ If the last agent message was a question and the customer just answered it, do n
   }
 
   if (isRobotic(parsed.message) || isRepeated(parsed.message, history)) {
-    parsed.message = 'وصلت النقطة، بنثبتها على الملف ونمشي بالإجراء المناسب بدل تكرار نفس الكلام.'
+    const fallbacks = [
+      'طيب، وش تبي نسوي بخصوص الموضوع؟',
+      'تمام، خلنا نمشي قدام. وش الخطوة الجاية من عندك؟',
+      'فهمت عليك. تبي نتكلم عن طريقة السداد؟',
+      'ماشي، بس أبي أعرف متى تقدر تسدد؟',
+      'أوكي، بس الموضوع يحتاج حل. متى نتوقع السداد؟',
+    ]
+    parsed.message = fallbacks[Math.floor(Math.random() * fallbacks.length)]
     parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
     parsed.reason = 'anti_repetition_guard'
   }
