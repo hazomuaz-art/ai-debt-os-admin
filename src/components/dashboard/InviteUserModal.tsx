@@ -62,7 +62,7 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
   if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in" dir="rtl">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in" >
       <div className="bg-white border border-slate-100 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-4">
         
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-[#fbfdfd] rounded-t-2xl">
@@ -94,26 +94,26 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
           )}
 
           <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الاسم الكامل</label>
+            <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الاسم الكامل</label>
             <input name="full_name" type="text" required placeholder="مثال: أحمد محمد"
               className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">البريد الإلكتروني للعمل</label>
+            <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">البريد الإلكتروني للعمل</label>
             <input name="email" type="email" required placeholder="employee@company.com" dir="ltr"
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-left" />
+              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">كلمة مرور مؤقتة</label>
+            <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">كلمة مرور مؤقتة</label>
             <input name="password" type="password" required minLength={8} placeholder="8 أحرف كحد أدنى" dir="ltr"
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-left" />
+              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" />
             <p className="text-xs text-slate-400 font-medium mt-2">سيُطلب من الموظف تغيير كلمة المرور عند أول تسجيل دخول.</p>
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الدور (الصلاحية)</label>
+            <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الدور (الصلاحية)</label>
             <select name="role" className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]">
               <option value="collector">موظف تحصيل (Collector)</option>
               <option value="manager">مشرف تحصيل (Manager)</option>

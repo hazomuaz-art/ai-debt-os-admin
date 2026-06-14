@@ -84,7 +84,7 @@ export default async function ManagerDashboard() {
   ]
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -125,13 +125,13 @@ export default async function ManagerDashboard() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-right border-collapse">
+          <table className="w-full text-sm text-start border-collapse">
             <thead className="bg-[#f0f4f8] text-slate-500 border-b border-slate-100">
               <tr>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider">المحصل</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-center">الملفات المسندة</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-center">التحصيل (هذا الشهر)</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider text-left pl-6">إجراءات اليوم</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider text-end ps-6">إجراءات اليوم</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -157,7 +157,7 @@ export default async function ManagerDashboard() {
                     </td>
                     <td className="px-6 py-4 text-center font-mono font-bold text-[#1e3e50] bg-slate-50/50">{col.assigned}</td>
                     <td className="px-6 py-4 text-center text-emerald-600 font-mono font-bold">{formatCurrency(col.collected, 'SAR')}</td>
-                    <td className="px-6 py-4 text-left pl-6 font-mono text-purple-600 font-bold bg-slate-50/50">{col.actionsToday}</td>
+                    <td className="px-6 py-4 text-end ps-6 font-mono text-purple-600 font-bold bg-slate-50/50">{col.actionsToday}</td>
                   </tr>
                 ))
               )}

@@ -71,7 +71,7 @@ export default function AutomationPage() {
   const mc   = MODE_CONFIG[mode]
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -109,7 +109,7 @@ export default function AutomationPage() {
                 return (
                   <button key={m}
                     onClick={() => setMode(m)}
-                    className={`p-5 rounded-2xl border text-right transition-all flex flex-col gap-3 ${isActive ? `${mc2.color} shadow-sm ring-2 ring-offset-2 ring-${mc2.color.split(' ')[1].replace('text-', '')}` : 'bg-[#fbfdfd] border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                    className={`p-5 rounded-2xl border text-start transition-all flex flex-col gap-3 ${isActive ? `${mc2.color} shadow-sm ring-2 ring-offset-2 ring-${mc2.color.split(' ')[1].replace('text-', '')}` : 'bg-[#fbfdfd] border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
@@ -234,7 +234,7 @@ export default function AutomationPage() {
                 { key: 'monthly_cost_limit' as const,        label: 'الحد الأقصى للتكلفة الشهرية ($)' },
               ].map(({ key, label }) => (
                 <div key={key} className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 pl-2">{label}</label>
+                  <label className="text-xs font-bold text-slate-500 ps-2">{label}</label>
                   <input 
                     type="number" 
                     min="0" 

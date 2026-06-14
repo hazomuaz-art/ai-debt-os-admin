@@ -101,7 +101,7 @@ export default async function AdminDebtsPage({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -134,13 +134,13 @@ export default async function AdminDebtsPage({
           <table className="w-full text-sm">
             <thead className="bg-[#fbfdfd] border-b border-slate-100">
               <tr>
-                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">رقم المرجع</th>
-                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">العميل</th>
-                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">المبلغ المستحق</th>
+                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">رقم المرجع</th>
+                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">العميل</th>
+                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">المبلغ المستحق</th>
                 <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">الحالة</th>
                 <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">تقييم الذكاء الاصطناعي</th>
-                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">المسؤول (المحصل)</th>
-                <th className="px-6 py-4 text-right font-bold text-[#1e3e50]">تاريخ الاستحقاق</th>
+                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">المسؤول (المحصل)</th>
+                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">تاريخ الاستحقاق</th>
                 <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">الإجراءات</th>
               </tr>
             </thead>

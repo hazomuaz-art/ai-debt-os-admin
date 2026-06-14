@@ -94,15 +94,15 @@ export default async function PlatformCompaniesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-500 border-b border-slate-200">
-                <th className="text-left p-3">Company</th>
-                <th className="text-left p-3">Plan</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-right p-3">Users</th>
-                <th className="text-right p-3">Customers</th>
-                <th className="text-right p-3">Debts</th>
-                <th className="text-right p-3">AI Calls</th>
-                <th className="text-right p-3">WhatsApp</th>
-                <th className="text-right p-3">MRR</th>
+                <th className="text-end p-3">Company</th>
+                <th className="text-end p-3">Plan</th>
+                <th className="text-end p-3">Status</th>
+                <th className="text-start p-3">Users</th>
+                <th className="text-start p-3">Customers</th>
+                <th className="text-start p-3">Debts</th>
+                <th className="text-start p-3">AI Calls</th>
+                <th className="text-start p-3">WhatsApp</th>
+                <th className="text-start p-3">MRR</th>
               </tr>
             </thead>
             <tbody>
@@ -120,12 +120,12 @@ export default async function PlatformCompaniesPage() {
                         {c.is_active ? 'active' : 'suspended'}
                       </span>
                     </td>
-                    <td className="p-3 text-right">{countByCompany(users, c.id)}</td>
-                    <td className="p-3 text-right">{countByCompany(customers, c.id)}</td>
-                    <td className="p-3 text-right">{countByCompany(debts, c.id)}</td>
-                    <td className="p-3 text-right">{sumUsage(c.id, 'ai_openai_calls').toLocaleString()}</td>
-                    <td className="p-3 text-right">{sumUsage(c.id, 'whatsapp_sent').toLocaleString()}</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-start">{countByCompany(users, c.id)}</td>
+                    <td className="p-3 text-start">{countByCompany(customers, c.id)}</td>
+                    <td className="p-3 text-start">{countByCompany(debts, c.id)}</td>
+                    <td className="p-3 text-start">{sumUsage(c.id, 'ai_openai_calls').toLocaleString()}</td>
+                    <td className="p-3 text-start">{sumUsage(c.id, 'whatsapp_sent').toLocaleString()}</td>
+                    <td className="p-3 text-start">
                       {sub?.mrr_usd ? `$${Number(sub.mrr_usd).toFixed(0)}` : '-'}
                     </td>
                   </tr>

@@ -45,7 +45,7 @@ export default function ApprovalsPage() {
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -130,7 +130,7 @@ export default function ApprovalsPage() {
                   </div>
                   
                   {item.status === 'pending' && (
-                    <div className="flex gap-2 w-full lg:w-auto shrink-0 border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pr-5">
+                    <div className="flex gap-2 w-full lg:w-auto shrink-0 border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pe-5">
                       <button onClick={() => void act(item.id, 'approved')}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-200 font-bold text-sm transition-colors">
                         <CheckCircle size={16} /> موافقة
@@ -143,7 +143,7 @@ export default function ApprovalsPage() {
                   )}
                   
                   {item.status !== 'pending' && (
-                    <div className="flex items-center justify-center lg:justify-end w-full lg:w-auto border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pr-5 shrink-0">
+                    <div className="flex items-center justify-center lg:justify-end w-full lg:w-auto border-t lg:border-t-0 lg:border-r border-slate-100 pt-4 lg:pt-0 lg:pe-5 shrink-0">
                       <span className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border ${item.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
                         {item.status === 'approved' ? <><CheckCircle size={16} /> تمت الموافقة</> : <><XCircle size={16} /> تم الرفض</>}
                       </span>

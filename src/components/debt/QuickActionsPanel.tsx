@@ -132,7 +132,7 @@ export default function QuickActionsPanel({
           {loading === 'human_handoff' ? <Loader2 size={24} className="animate-spin" /> : <UserCog size={24} />}
           <span className="text-xs font-bold">تدخل بشري مباشر</span>
           {currentStatus === 'human_handoff' && (
-             <div className="absolute top-0 right-0 bg-amber-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-bl-lg">نشط حالياً</div>
+             <div className="absolute top-0 end-0 bg-amber-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-bl-lg">نشط حالياً</div>
           )}
         </button>
       </div>

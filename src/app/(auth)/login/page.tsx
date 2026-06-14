@@ -29,7 +29,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#e6f0f9] p-4 sm:p-8 font-sans" dir="rtl">
+    <div className="min-h-screen flex items-center justify-center bg-[#e6f0f9] p-4 sm:p-8 font-sans" >
       
       <div className="flex w-full max-w-5xl bg-white rounded-3xl overflow-hidden shadow-2xl ring-1 ring-slate-900/5">
         
@@ -92,8 +92,8 @@ export default function LoginPage() {
         {/* Left panel (Image/Info) - in RTL this is on the left */}
         <div className="hidden lg:flex w-1/2 bg-[#1e3e50] flex-col justify-center items-center p-16 relative overflow-hidden">
           {/* Abstract background shapes */}
-          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl"></div>
+          <div className="absolute top-0 end-0 -mt-20 -me-20 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 start-0 -mb-20 -ms-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl"></div>
 
           <div className="relative z-10 w-full max-w-md">
             <h1 className="text-4xl font-bold mb-4 text-white leading-tight">AI Debt OS</h1>

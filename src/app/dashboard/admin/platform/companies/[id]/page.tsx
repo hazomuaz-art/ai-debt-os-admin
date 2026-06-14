@@ -83,7 +83,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
           </p>
         </div>
 
-        <div className="text-right">
+        <div className="text-start">
           <div className={company.is_active ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
             {company.is_active ? 'Active' : 'Suspended'}
           </div>
@@ -112,10 +112,10 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
         <table className="w-full text-sm">
           <thead>
             <tr className="text-slate-500 border-b border-slate-200">
-              <th className="text-left p-3">Name</th>
-              <th className="text-left p-3">Email</th>
-              <th className="text-left p-3">Role</th>
-              <th className="text-left p-3">Status</th><th className="text-left p-3">Action</th>
+              <th className="text-end p-3">Name</th>
+              <th className="text-end p-3">Email</th>
+              <th className="text-end p-3">Role</th>
+              <th className="text-end p-3">Status</th><th className="text-end p-3">Action</th>
             </tr>
           </thead>
           <tbody>

@@ -1,4 +1,4 @@
-﻿import { AISchemaTest } from './AISchemaTest'
+import { AISchemaTest } from './AISchemaTest'
 
 export function IntegrationControlCenter() {
   const health = [

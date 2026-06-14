@@ -108,7 +108,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800">
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -217,7 +217,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             </div>
             {debt.payments?.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-sm">
+                <table className="w-full text-start text-sm">
                   <thead>
                     <tr className="text-slate-500 bg-slate-50">
                       <th className="p-3 rounded-r-xl font-bold">التاريخ</th>
@@ -254,7 +254,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <h2 className="text-lg font-bold text-[#1e3e50]">سجل المراسلات</h2>
             </div>
             {debt.messages?.length > 0 ? (
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pe-2 custom-scrollbar">
                 {debt.messages.map((msg: any) => (
                   <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-start' : 'justify-end'}`}>
                     <div className={`max-w-xs lg:max-w-md px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
@@ -284,7 +284,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <h2 className="text-lg font-bold text-[#1e3e50]">الخط الزمني المباشر (Timeline)</h2>
             </div>
             {timelineEvents?.length ? (
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ms-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
                 {timelineEvents.map((ev: any) => (
                   <div key={ev.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">

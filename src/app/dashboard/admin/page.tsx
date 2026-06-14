@@ -82,7 +82,7 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Overview Section */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mt-6">
@@ -148,7 +148,7 @@ export default async function AdminDashboard() {
             <button className="text-sm text-blue-600 hover:text-blue-700 font-bold bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl transition-colors">عرض السجل الكامل</button>
           </div>
           <div className="overflow-x-auto flex-1 p-2">
-            <table className="w-full text-right">
+            <table className="w-full text-start">
               <thead className="text-slate-400 text-xs font-bold border-b border-slate-100">
                 <tr>
                   <th className="px-5 py-4">العميل</th>

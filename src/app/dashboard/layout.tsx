@@ -17,12 +17,12 @@ export default async function DashboardLayout({
     .from('profiles').select('id, full_name, email, role, company_id').eq('id', user.id).single()
 
   return (
-    <div className="flex h-screen bg-[#1e3e50] text-slate-800 font-sans" dir="rtl">
+    <div className="flex h-screen bg-[#1e3e50] text-slate-800 font-sans" >
       {/* Sidebar */}
       <Sidebar profile={profile || {}} />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-[#f0f4f8] rounded-r-3xl z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.1)]">
+      <main className="flex-1 flex flex-col overflow-hidden bg-[#f0f4f8] rounded-e-3xl z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.1)]">
         {/* Header */}
         <Topbar profile={profile || {}} />
 

@@ -82,10 +82,10 @@ export default async function VoicePage() {
         ) : (
           <table className="w-full text-sm">
             <thead><tr className="text-slate-400 text-xs border-b border-slate-200">
-              <th className="pb-2 text-left">الحالة</th>
-              <th className="pb-2 text-left">النتيجة</th>
-              <th className="pb-2 text-left">المدة</th>
-              <th className="pb-2 text-left">التكلفة</th>
+              <th className="pb-2 text-end">الحالة</th>
+              <th className="pb-2 text-end">النتيجة</th>
+              <th className="pb-2 text-end">المدة</th>
+              <th className="pb-2 text-end">التكلفة</th>
             </tr></thead>
             <tbody>{s.slice(0, 20).map((sess, i) => (
               <tr key={i} className="border-b border-slate-200">

@@ -55,7 +55,7 @@ export default async function IntegrationsPage() {
   const enabledCount  = (settings ?? []).filter(s => s.enabled).length
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div>

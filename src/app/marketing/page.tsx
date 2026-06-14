@@ -1,4 +1,4 @@
-﻿const photos = {
+const photos = {
   hero: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1600&q=90",
   team: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1600&q=90",
   executive: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=90",
@@ -103,7 +103,7 @@ export default function MarketingPage() {
                 className="relative w-full h-[560px] object-cover rounded-[2rem] border border-slate-200 shadow-2xl"
               />
 
-              <div className="absolute left-6 bottom-6 right-6 rounded-3xl bg-[#08111f]/85 backdrop-blur border border-slate-200 p-5">
+              <div className="absolute start-6 bottom-6 end-6 rounded-3xl bg-[#08111f]/85 backdrop-blur border border-slate-200 p-5">
                 <div className="text-sm text-white/45 mb-3">Live collection command center</div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-2xl bg-slate-50 p-4">

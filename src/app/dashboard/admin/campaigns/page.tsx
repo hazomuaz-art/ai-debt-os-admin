@@ -252,7 +252,7 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -308,7 +308,7 @@ export default function CampaignsPage() {
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">المشروع / المحفظة *</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">المشروع / المحفظة *</label>
               <select required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.portfolio_id}
                 onChange={e => setNumberForm(p => ({ ...p, portfolio_id: e.target.value }))}>
@@ -322,7 +322,7 @@ export default function CampaignsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">الاسم الرمزي (اختياري)</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">الاسم الرمزي (اختياري)</label>
               <input className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.display_name}
                 onChange={e => setNumberForm(p => ({ ...p, display_name: e.target.value }))}
@@ -330,7 +330,7 @@ export default function CampaignsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">رقم الهاتف *</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">رقم الهاتف *</label>
               <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.phone_number}
                 onChange={e => setNumberForm(p => ({ ...p, phone_number: e.target.value }))}
@@ -338,21 +338,21 @@ export default function CampaignsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">اسم خادم Evolution *</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">اسم خادم Evolution *</label>
               <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.instance_name}
                 onChange={e => setNumberForm(p => ({ ...p, instance_name: e.target.value }))} dir="ltr" />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">رابط الخادم (Evolution API URL)</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">رابط الخادم (Evolution API URL)</label>
               <input className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.api_url}
                 onChange={e => setNumberForm(p => ({ ...p, api_url: e.target.value }))} dir="ltr" />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">الحد الأقصى للإرسال اليومي</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">الحد الأقصى للإرسال اليومي</label>
               <input type="number" min={1} max={5000} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={numberForm.daily_limit}
                 onChange={e => setNumberForm(p => ({ ...p, daily_limit: Number(e.target.value) }))} />
@@ -376,7 +376,7 @@ export default function CampaignsPage() {
 
           <div className="grid md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">اسم الحملة *</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">اسم الحملة *</label>
               <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={campaignForm.name}
                 onChange={e => setCampaignForm(p => ({ ...p, name: e.target.value }))}
@@ -384,7 +384,7 @@ export default function CampaignsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">نوع الحملة</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">نوع الحملة</label>
               <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                 value={campaignForm.campaign_type}
                 onChange={e => setCampaignForm(p => ({ ...p, campaign_type: e.target.value }))}>
@@ -395,7 +395,7 @@ export default function CampaignsPage() {
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-bold text-slate-500 pl-2">قالب الرسالة الافتتاحية</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">قالب الرسالة الافتتاحية</label>
               <textarea rows={3} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50] resize-none"
                 placeholder="اكتب رسالة الواتساب الأولى التي سيبدأ بها الذكاء الاصطناعي محادثته..."
                 value={campaignForm.message_template}

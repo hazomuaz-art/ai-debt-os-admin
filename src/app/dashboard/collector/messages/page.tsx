@@ -44,7 +44,7 @@ export default async function CollectorMessagesPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-4 mt-6">
@@ -60,7 +60,7 @@ export default async function CollectorMessagesPage() {
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
         {messages && messages.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
+            <table className="w-full text-sm text-start">
               <thead className="bg-[#fbfdfd] border-b border-slate-100 text-slate-500">
                 <tr>
                   <th className="px-6 py-4 font-bold">التاريخ</th>

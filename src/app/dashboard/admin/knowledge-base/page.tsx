@@ -87,7 +87,7 @@ export default function KnowledgeBasePage() {
   })
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -150,14 +150,14 @@ export default function KnowledgeBasePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-bold text-slate-500 pl-2">العنوان *</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">العنوان *</label>
               <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]" 
                 value={form.title} placeholder="مثال: سياسة التقسيط المريحة..."
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-bold text-slate-500 pl-2">المحتوى *</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">المحتوى *</label>
               <textarea required rows={5} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50] resize-none" 
                 value={form.content}
                 onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
@@ -165,7 +165,7 @@ export default function KnowledgeBasePage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">الفئة (Category)</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">الفئة (Category)</label>
               <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]" 
                 value={form.category}
                 onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
@@ -174,7 +174,7 @@ export default function KnowledgeBasePage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 pl-2">اللغة (Language)</label>
+              <label className="text-sm font-bold text-slate-500 ps-2">اللغة (Language)</label>
               <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]" 
                 value={form.language}
                 onChange={e => setForm(p => ({ ...p, language: e.target.value }))}>
@@ -196,8 +196,8 @@ export default function KnowledgeBasePage() {
       {/* Search + filter */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
-          <input type="text" className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pr-10 pl-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+          <Search className="absolute end-3 top-2.5 text-slate-400" size={18} />
+          <input type="text" className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
             placeholder="البحث في المقالات والقواعد…" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
@@ -257,12 +257,12 @@ export default function KnowledgeBasePage() {
                   </div>
                   
                   {expanded === entry.id && (
-                    <div className="mt-4 text-slate-600 text-sm leading-loose whitespace-pre-wrap bg-[#fcfdfd] rounded-xl p-4 border border-slate-100/50 mr-6">
+                    <div className="mt-4 text-slate-600 text-sm leading-loose whitespace-pre-wrap bg-[#fcfdfd] rounded-xl p-4 border border-slate-100/50 me-6">
                       {entry.content}
                     </div>
                   )}
                   
-                  <div className="text-slate-400 text-xs mt-3 font-mono mr-7">
+                  <div className="text-slate-400 text-xs mt-3 font-mono me-7">
                     تمت الإضافة: {new Date(entry.created_at).toLocaleDateString('ar-SA')}
                   </div>
                 </div>

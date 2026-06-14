@@ -66,7 +66,7 @@ export default async function AIActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -145,7 +145,7 @@ export default async function AIActionsPage() {
                   
                   {action.suggested_message && (
                     <div className="p-4 bg-[#fcfdfd] rounded-xl border border-slate-100 mb-3 relative">
-                      <div className="absolute top-0 right-4 -translate-y-1/2 bg-white px-2 text-xs font-bold text-blue-500 border border-slate-100 rounded-md">الرسالة المقترحة</div>
+                      <div className="absolute top-0 end-4 -translate-y-1/2 bg-white px-2 text-xs font-bold text-blue-500 border border-slate-100 rounded-md">الرسالة المقترحة</div>
                       <div className="text-slate-600 text-sm font-medium leading-relaxed whitespace-pre-wrap">{action.suggested_message}</div>
                     </div>
                   )}

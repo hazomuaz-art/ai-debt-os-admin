@@ -77,9 +77,9 @@ export default function DebtFilters({
             placeholder="بحث برقم المرجع أو العقد..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pl-10 pr-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium"
+            className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl ps-10 pe-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium"
           />
-          <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500">
+          <button type="submit" className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500">
             <Search size={16} />
           </button>
         </form>

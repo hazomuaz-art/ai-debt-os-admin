@@ -133,7 +133,7 @@ function PlanCard({
       {/* Price */}
       <div className="font-display font-bold text-2xl text-slate-900 mb-1">
         ${plan.monthly_usd}
-        <span className="text-xs font-normal text-slate-400 ml-1">/mo</span>
+        <span className="text-xs font-normal text-slate-400 ms-1">/mo</span>
       </div>
       <div className="text-[10px] text-white/25 mb-4">
         ${plan.annual_usd}/mo billed annually
@@ -328,7 +328,7 @@ export default async function PlatformPage() {
               )}
             </div>
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-start shrink-0">
             <div className="font-display font-bold text-2xl text-slate-900">
               ${plan.monthly_usd}
               <span className="text-sm font-normal text-slate-400">/mo</span>
@@ -374,7 +374,7 @@ export default async function PlatformPage() {
                 <span className="text-slate-500">Cache / Template hits</span>
                 <span className="font-mono">
                   <span className="text-slate-600">{usage.ai_cache_hits.toLocaleString()}</span>
-                  <span className="text-green-400 ml-2 text-[10px] font-semibold">
+                  <span className="text-green-400 ms-2 text-[10px] font-semibold">
                     {cacheRate}% saved
                   </span>
                 </span>

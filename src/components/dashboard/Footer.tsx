@@ -23,7 +23,7 @@ export function DashboardFooter() {
           </div>
         ))}
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ms-auto flex items-center gap-3">
           {/* Compliance marks */}
           {[
             { label: 'ISO 27001', sub: 'Certified' },
@@ -63,13 +63,13 @@ export function DashboardFooter() {
           <div>
             <span className="text-xs font-bold text-slate-500">AI</span>
             <span className="text-xs font-bold" style={{ color: '#818cf8' }}> DEBT OS</span>
-            <span className="text-[10px] text-slate-400 ml-2">® Smarter Collections. Healthier Cashflow.</span>
+            <span className="text-[10px] text-slate-400 ms-2">® Smarter Collections. Healthier Cashflow.</span>
           </div>
         </div>
 
-        <div className="text-[11px] text-white/25 text-right">
+        <div className="text-[11px] text-white/25 text-start">
           <div>© 2025 AI Debt OS. All rights reserved.</div>
-          <div dir="rtl" className="text-white/15">جميع الحقوق محفوظة</div>
+          <div  className="text-white/15">جميع الحقوق محفوظة</div>
         </div>
       </div>
     </footer>

@@ -190,7 +190,7 @@ export function IntegrationCard({
           <div key={field.key}>
             <label className="block text-sm font-bold text-[#1e3e50] mb-2">
               {field.label}
-              {field.hint && <span className="text-slate-400 font-normal mr-2">— {field.hint}</span>}
+              {field.hint && <span className="text-slate-400 font-normal me-2">— {field.hint}</span>}
             </label>
             <input
               type={field.type ?? 'text'}

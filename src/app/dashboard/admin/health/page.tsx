@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { runAudit, type AuditStatus, type AuditItem } from '@/lib/auditor'
@@ -76,7 +76,7 @@ function ModuleRow({ item }: { item: AuditItem }) {
         )}
       </div>
       {item.row_count !== undefined && (
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-start">
           <div className="font-mono text-sm font-bold text-slate-500">{item.row_count.toLocaleString()}</div>
           <div className="text-[9px] text-white/25">rows</div>
         </div>
@@ -191,7 +191,7 @@ export default async function SystemHealthPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-slate-400 text-left border-b border-slate-200">
+                <tr className="text-slate-400 text-end border-b border-slate-200">
                   <th className="pb-2 font-medium">Source</th>
                   <th className="pb-2 font-medium">Mode</th>
                   <th className="pb-2 font-medium">Score</th>
@@ -205,12 +205,12 @@ export default async function SystemHealthPage() {
               <tbody>
                 {(runs as Array<Record<string, unknown>>).map(run => (
                   <tr key={String(run.id)} className="border-b border-slate-200 hover:bg-slate-50">
-                    <td className="py-2 pr-4 font-mono text-slate-500">{String(run.event_source ?? '').replace('_',' ')}</td>
-                    <td className="py-2 pr-4 text-slate-500">{String(run.mode ?? '—')}</td>
-                    <td className="py-2 pr-4" style={{ color: '#818cf8' }}>{run.ai_score != null ? String(run.ai_score) : '—'}</td>
-                    <td className="py-2 pr-4 text-slate-500">{String(run.ai_actions_count ?? 0)}</td>
-                    <td className="py-2 pr-4 text-slate-500">{String(run.alerts_count ?? 0)}</td>
-                    <td className="py-2 pr-4">
+                    <td className="py-2 pe-4 font-mono text-slate-500">{String(run.event_source ?? '').replace('_',' ')}</td>
+                    <td className="py-2 pe-4 text-slate-500">{String(run.mode ?? '—')}</td>
+                    <td className="py-2 pe-4" style={{ color: '#818cf8' }}>{run.ai_score != null ? String(run.ai_score) : '—'}</td>
+                    <td className="py-2 pe-4 text-slate-500">{String(run.ai_actions_count ?? 0)}</td>
+                    <td className="py-2 pe-4 text-slate-500">{String(run.alerts_count ?? 0)}</td>
+                    <td className="py-2 pe-4">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         run.success
                           ? 'bg-green-500/10 text-green-400'
@@ -219,7 +219,7 @@ export default async function SystemHealthPage() {
                         {run.success ? '✓' : '✗'} {run.success ? 'OK' : String(run.error_message ?? 'Error').slice(0, 25)}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-slate-400 font-mono">{run.duration_ms != null ? `${run.duration_ms}ms` : '—'}</td>
+                    <td className="py-2 pe-4 text-slate-400 font-mono">{run.duration_ms != null ? `${run.duration_ms}ms` : '—'}</td>
                     <td className="py-2 text-slate-400">{String(run.created_at ?? '').slice(11, 19)}</td>
                   </tr>
                 ))}

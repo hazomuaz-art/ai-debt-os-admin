@@ -57,7 +57,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -73,7 +73,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center bg-white p-2 rounded-2xl border border-slate-100 shadow-sm px-4">
-        <Filter size={16} className="text-slate-400 ml-2" />
+        <Filter size={16} className="text-slate-400 ms-2" />
         <Link href="/dashboard/manager/debts"
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${!searchParams.status ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-[#1e3e50] hover:bg-slate-100'}`}>
           الكل
@@ -89,7 +89,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
       {/* Table */}
       <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-right">
+          <table className="w-full text-sm text-start">
             <thead className="bg-[#f0f4f8] text-slate-500 border-b border-slate-100 text-xs">
               <tr>
                 <th className="py-4 px-6 font-bold uppercase">المرجع</th>

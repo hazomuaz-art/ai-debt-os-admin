@@ -103,7 +103,7 @@ function CostSettingsPanel() {
       </button>
       
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-[400px] sm:w-[500px] z-50 bg-white border border-slate-100 rounded-2xl shadow-2xl p-6 animate-in slide-in-from-top-2">
+        <div className="absolute start-0 top-full mt-2 w-[400px] sm:w-[500px] z-50 bg-white border border-slate-100 rounded-2xl shadow-2xl p-6 animate-in slide-in-from-top-2">
           <div className="font-bold text-lg text-[#1e3e50] mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
             <span>تعديل أسعار التكلفة للـ API</span>
             <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-50 px-3 py-1 rounded-lg">إغلاق</button>
@@ -155,7 +155,7 @@ export default function CostCenterPage() {
   const maxPortfolio = Math.max(...(data?.byPortfolio.map(r => r.cost) ?? [0]), 0.000001)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
@@ -209,7 +209,7 @@ export default function CostCenterPage() {
             </div>
             
             <div className="bg-[#1e3e50] rounded-2xl border border-slate-700 shadow-lg p-5 col-span-1 sm:col-span-2 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-y-1/2 -translate-x-1/2"></div>
+              <div className="absolute top-0 start-0 w-32 h-32 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-y-1/2 -translate-x-1/2"></div>
               <div className="relative z-10">
                 <div className="text-blue-200 text-xs font-bold mb-2 flex items-center gap-1.5"><DollarSign size={14}/> إجمالي التكلفة ({range === 'today' ? 'لليوم' : range === 'month' ? 'للشهر' : 'للإجمالي'})</div>
                 <div className="font-bold text-4xl text-white font-mono" dir="ltr">{fmt(data.summary.totalCost)}</div>
@@ -305,7 +305,7 @@ export default function CostCenterPage() {
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
             <h3 className="font-bold text-[#1e3e50] text-sm mb-4">سجل تفاصيل العمليات الأخيرة</h3>
             <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="w-full text-sm text-right">
+              <table className="w-full text-sm text-start">
                 <thead className="bg-[#fcfdfd] border-b border-slate-100 text-slate-500 text-xs font-bold">
                   <tr>
                     <th className="py-3 px-4">المزود</th>

@@ -92,19 +92,19 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-160px)] bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" dir="rtl">
+    <div className="flex h-[calc(100vh-160px)] bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" >
       
       {/* ── Sidebar (Chat List) ── */}
       <div className="w-1/3 bg-[#fbfdfd] border-l border-slate-100 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-100">
           <div className="relative">
-            <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
+            <Search className="absolute end-3 top-2.5 text-slate-400" size={18} />
             <input 
               type="text" 
               placeholder="البحث عن عميل أو رقم..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pr-10 pl-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
             />
           </div>
         </div>
@@ -128,7 +128,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     <span className="text-xs text-slate-400 shrink-0">{formatTime(lastMsg.sent_at || lastMsg.created_at)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className="text-xs text-slate-500 truncate pl-4">
+                    <p className="text-xs text-slate-500 truncate ps-4">
                       {lastMsg.direction === 'outbound' ? 'Ã¢Å“â€œ ' : ''}{lastMsg.content}
                     </p>
                     {lastMsg.direction === 'inbound' && (
@@ -162,7 +162,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-right">
+                <div className="text-start">
                   <div className="text-xs text-slate-400">المبلغ المستحق</div>
                   <div className="font-bold text-rose-600">
                     {formatCurrency(selectedChat.debt?.current_balance || 0, selectedChat.debt?.currency || 'SAR')}
@@ -218,7 +218,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
                     placeholder="اكتب رسالة للرد المباشر..." 
-                    className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+                    className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl ps-12 pe-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && replyText.trim()) {
                         // Dummy send
@@ -227,7 +227,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     }}
                   />
                   <button 
-                    className="absolute left-2 top-1.5 p-1.5 bg-[#1e3e50] text-white rounded-lg hover:bg-[#152e3b] transition-colors"
+                    className="absolute start-2 top-1.5 p-1.5 bg-[#1e3e50] text-white rounded-lg hover:bg-[#152e3b] transition-colors"
                     onClick={() => setReplyText('')}
                   >
                     <Send size={16} className="transform rotate-180" />

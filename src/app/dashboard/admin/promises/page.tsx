@@ -31,7 +31,7 @@ export default async function PromisesPage() {
   const rate    = all.length ? Math.round((kept.length / all.length) * 100) : 0
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -68,7 +68,7 @@ export default async function PromisesPage() {
       {/* Table */}
       <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-right">
+          <table className="w-full text-sm text-start">
             <thead className="bg-[#f0f4f8] text-slate-500 border-b border-slate-100 text-xs">
               <tr>
                 <th className="py-4 px-6 font-bold uppercase">العميل</th>

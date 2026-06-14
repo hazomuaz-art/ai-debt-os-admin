@@ -60,7 +60,7 @@ interface Props {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-4 text-sm shadow-xl font-bold text-[#1e3e50] text-right" dir="rtl">
+    <div className="bg-white border border-slate-100 rounded-xl p-4 text-sm shadow-xl font-bold text-[#1e3e50] text-start" >
       {label && <p className="text-slate-400 mb-2 border-b border-slate-50 pb-2">{label}</p>}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }} className="flex justify-between gap-4 mt-1">
@@ -81,7 +81,7 @@ function PieTooltip({ active, payload }: any) {
   const entry = payload[0]
   const name = STATUS_ARABIC[entry.name] || PRIORITY_ARABIC[entry.name] || entry.name
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-3 text-sm shadow-xl font-bold text-right" dir="rtl">
+    <div className="bg-white border border-slate-100 rounded-xl p-3 text-sm shadow-xl font-bold text-start" >
       <p style={{ color: entry.payload.fill }}>{name}: <span className="font-mono">{entry.value}</span></p>
     </div>
   )
@@ -95,7 +95,7 @@ export default function AnalyticsCharts({
   riskChartData,
 }: Props) {
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6" >
       {/* Monthly Collection Bar Chart */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
         <h2 className="text-lg font-bold text-[#1e3e50] mb-6">التحصيلات الشهرية (بالريال السعودي)</h2>
@@ -150,7 +150,7 @@ export default function AnalyticsCharts({
                 </Pie>
                 <Tooltip content={<PieTooltip />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-600 text-xs font-bold mr-1">{STATUS_ARABIC[value] || value.replace(/_/g, ' ')}</span>}
+                  formatter={(value) => <span className="text-slate-600 text-xs font-bold me-1">{STATUS_ARABIC[value] || value.replace(/_/g, ' ')}</span>}
                   wrapperStyle={{ direction: 'rtl' }}
                 />
               </PieChart>
@@ -183,7 +183,7 @@ export default function AnalyticsCharts({
                 </Pie>
                 <Tooltip content={<PieTooltip />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-600 text-xs font-bold mr-1">{PRIORITY_ARABIC[value] || value}</span>}
+                  formatter={(value) => <span className="text-slate-600 text-xs font-bold me-1">{PRIORITY_ARABIC[value] || value}</span>}
                   wrapperStyle={{ direction: 'rtl' }}
                 />
               </PieChart>
@@ -215,7 +215,7 @@ export default function AnalyticsCharts({
                 </Pie>
                 <Tooltip content={<PieTooltip />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-600 text-xs font-bold mr-1 capitalize">{value}</span>}
+                  formatter={(value) => <span className="text-slate-600 text-xs font-bold me-1 capitalize">{value}</span>}
                   wrapperStyle={{ direction: 'rtl' }}
                 />
               </PieChart>

@@ -43,7 +43,7 @@ export default async function ManagerAIActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -107,7 +107,7 @@ export default async function ManagerAIActionsPage() {
                         <p className="text-xs text-slate-600 mt-2 font-bold bg-slate-50 px-2 py-1 rounded-md inline-block border border-slate-100">{action.reason}</p>
                         {action.suggested_message && (
                           <div className="mt-3 p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-500 italic relative">
-                            <div className="absolute top-0 right-0 w-1 h-full bg-slate-300 rounded-r-lg"></div>
+                            <div className="absolute top-0 end-0 w-1 h-full bg-slate-300 rounded-r-lg"></div>
                             "{action.suggested_message}"
                           </div>
                         )}

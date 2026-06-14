@@ -60,7 +60,7 @@ export default async function CollectorActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -135,7 +135,7 @@ export default async function CollectorActionsPage() {
                   
                   {action.suggested_message && (
                     <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-[#1e3e50] text-sm relative">
-                      <span className="absolute -top-2.5 right-4 bg-white px-2 text-[10px] font-bold text-blue-500 border border-blue-100 rounded-md">رسالة مقترحة</span>
+                      <span className="absolute -top-2.5 end-4 bg-white px-2 text-[10px] font-bold text-blue-500 border border-blue-100 rounded-md">رسالة مقترحة</span>
                       {action.suggested_message}
                     </div>
                   )}
@@ -148,7 +148,7 @@ export default async function CollectorActionsPage() {
                     )}
                     <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
                       رصيد المديونية: 
-                      <span className="text-emerald-600 font-mono text-sm ml-1">
+                      <span className="text-emerald-600 font-mono text-sm ms-1">
                         {formatCurrency((action.debt as {current_balance: number; currency: string} | null)?.current_balance ?? 0, (action.debt as {currency: string} | null)?.currency ?? 'SAR')}
                       </span>
                     </span>

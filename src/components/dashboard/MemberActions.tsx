@@ -113,13 +113,13 @@ export function MemberActions({
             <Settings2 size={14} /> تعديل الصلاحية
           </button>
         ) : (
-          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 absolute left-0 bottom-0 min-w-max z-10 animate-in fade-in zoom-in-95">
+          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 absolute start-0 bottom-0 min-w-max z-10 animate-in fade-in zoom-in-95">
             <select 
               className="text-xs border-none bg-white rounded-md py-1 px-2 font-bold text-slate-700 focus:ring-1 focus:ring-blue-500"
               defaultValue={currentRole}
               onChange={(e) => updateRole(e.target.value)}
               disabled={loading}
-              dir="rtl"
+              
             >
               <option value="admin">مدير نظام</option>
               <option value="manager">مشرف تحصيل</option>
@@ -136,7 +136,7 @@ export function MemberActions({
       </div>
 
       {/* Delete User */}
-      <div className="mr-auto">
+      <div className="me-auto">
         <button
           onClick={deleteUser}
           disabled={loading || isSelf}

@@ -87,7 +87,7 @@ export default async function CollectorDashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div>
@@ -195,7 +195,7 @@ export default async function CollectorDashboard() {
                     </span>
                   </div>
                 </div>
-                <div className="text-left flex flex-col items-end">
+                <div className="text-end flex flex-col items-end">
                   <div className="text-sm font-bold text-[#1e3e50] font-mono mb-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-lg">
                     {formatCurrency(debt.current_balance, debt.currency)}
                   </div>

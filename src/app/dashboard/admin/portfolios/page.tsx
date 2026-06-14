@@ -75,7 +75,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#1e3e50]/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in" dir="rtl">
+    <div className="fixed inset-0 bg-[#1e3e50]/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in" >
       <div className="bg-white border border-slate-100 rounded-2xl w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom-4">
         
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-[#fbfdfd] rounded-t-2xl">
@@ -93,24 +93,24 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الاسم (عربي) *</label>
+              <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الاسم (عربي) *</label>
               <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" 
-                value={form.name_ar} onChange={e => setForm(p => ({ ...p, name_ar: e.target.value }))} placeholder="موبايلي" dir="rtl" />
+                value={form.name_ar} onChange={e => setForm(p => ({ ...p, name_ar: e.target.value }))} placeholder="موبايلي"  />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الاسم (إنجليزي) *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-left" 
+              <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الاسم (إنجليزي) *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" 
                 value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Mobily" dir="ltr" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">الرمز القصير *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-left" 
+              <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الرمز القصير *</label>
+              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" 
                 value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="MOB" maxLength={10} dir="ltr" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">تصنيف المحفظة *</label>
+              <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">تصنيف المحفظة *</label>
               <select required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]"
                 value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value as PortfolioCategory }))}>
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
@@ -120,7 +120,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">اللون المميز للمحفظة</label>
+            <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">اللون المميز للمحفظة</label>
             <div className="flex gap-3 items-center bg-[#f0f4f8] p-2 rounded-xl">
               <input type="color" value={form.color} onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
                 className="w-10 h-10 rounded-lg cursor-pointer bg-white border border-slate-200" />
@@ -128,7 +128,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-slate-600 mb-2 pl-2">ملاحظات داخلية (اختياري)</label>
+            <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">ملاحظات داخلية (اختياري)</label>
             <textarea className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" 
               rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="أي معلومات إضافية عن شروط العقد أو المحفظة..." />
           </div>
@@ -186,7 +186,7 @@ export default function PortfoliosPage() {
   }, {} as Record<string, Portfolio[]>)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" dir="rtl">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
@@ -201,10 +201,10 @@ export default function PortfoliosPage() {
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto">
           <div className="relative flex-1 md:flex-none">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              className="w-full md:w-64 bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pr-10 pl-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
+              className="w-full md:w-64 bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
               placeholder="ابحث باسم المحفظة أو الرمز…"
               value={search}
               onChange={e => setSearch(e.target.value)}

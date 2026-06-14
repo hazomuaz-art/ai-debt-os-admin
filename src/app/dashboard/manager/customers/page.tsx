@@ -23,21 +23,21 @@ export default async function ManagerCustomersPage() {
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-200">
-              <th className="pb-3 pr-4">Name</th>
-              <th className="pb-3 pr-4">Phone</th>
-              <th className="pb-3 pr-4">City</th>
-              <th className="pb-3 pr-4">Debts</th>
+            <tr className="text-end text-slate-400 border-b border-slate-200">
+              <th className="pb-3 pe-4">Name</th>
+              <th className="pb-3 pe-4">Phone</th>
+              <th className="pb-3 pe-4">City</th>
+              <th className="pb-3 pe-4">Debts</th>
               <th className="pb-3">Joined</th>
             </tr>
           </thead>
           <tbody>
             {customers?.map((c: any) => (
               <tr key={c.id} className="border-b border-slate-200">
-                <td className="py-3 pr-4 font-medium">{c.full_name}</td>
-                <td className="py-3 pr-4 text-slate-300">{c.phone || '—'}</td>
-                <td className="py-3 pr-4 text-slate-300">{c.city || '—'}</td>
-                <td className="py-3 pr-4 text-slate-300">{c.debts?.length ?? 0}</td>
+                <td className="py-3 pe-4 font-medium">{c.full_name}</td>
+                <td className="py-3 pe-4 text-slate-300">{c.phone || '—'}</td>
+                <td className="py-3 pe-4 text-slate-300">{c.city || '—'}</td>
+                <td className="py-3 pe-4 text-slate-300">{c.debts?.length ?? 0}</td>
                 <td className="py-3 text-slate-400">{formatDate(c.created_at)}</td>
               </tr>
             ))}
