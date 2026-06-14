@@ -192,10 +192,10 @@ export async function buildCustomerDebtContext(params: {
   const lastOutbound = (messages ?? []).find((m: any) => m.direction === 'outbound') ?? null
 
   const allCustomerText = inboundMessages.map((m: any) => String(m.content ?? '')).join(' ').toLowerCase()
-  const angryWords = ['ØºØµØ¨', 'Ø§Ø²Ø¹Ø§Ø¬', 'Ø§Ø²Ø¹Ø¬ØªÙˆÙ†ÙŠ', 'Ø·ÙØ´ØªÙˆÙ†ÙŠ', 'Ø¨Ù„Ø§Øº', 'Ù…Ø­Ø§Ù…ÙŠ', 'Ø´ÙƒÙˆÙ‰', 'court', 'lawyer', 'complaint']
-  const refusalWords = ['Ù…Ø§ Ø¨Ø³Ø¯Ø¯', 'Ù…Ø§Ø±Ø§Ø­ Ø§Ø³Ø¯Ø¯', 'Ù…Ø§ Ø±Ø§Ø­ Ø§Ø³Ø¯Ø¯', 'Ù„Ù† Ø§Ø³Ø¯Ø¯', 'Ø±ÙØ¶', 'not paying', "won't pay"]
-  const paidWords = ['Ø³Ø¯Ø¯Øª', 'Ø¯ÙØ¹Øª', 'Ø­ÙˆÙ„Øª', 'Ø§ÙŠØµØ§Ù„', 'Ø¥ÙŠØµØ§Ù„', 'paid', 'receipt', 'transfer']
-  const promiseWords = ['Ø¨Ø³Ø¯Ø¯', 'Ø§Ø³Ø¯Ø¯', 'Ø§Ù„Ø®Ù…ÙŠØ³', 'Ø¨ÙƒØ±Ø©', 'Ø¨ÙƒØ±Ù‡', 'Ù†Ù‡Ø§ÙŠØ© Ø§Ù„Ø´Ù‡Ø±', 'Ø±Ø§ØªØ¨', 'salary', 'tomorrow']
+  const angryWords = ['غصب', 'ازعاج', 'ازعجتوني', 'طفشتوني', 'بلاغ', 'محامي', 'شكوى', 'court', 'lawyer', 'complaint']
+  const refusalWords = ['ما بسدد', 'ماراح اسدد', 'ما راح اسدد', 'لن اسدد', 'رفض', 'not paying', "won't pay"]
+  const paidWords = ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']
+  const promiseWords = ['بسدد', 'اسدد', 'الخميس', 'بكرة', 'بكره', 'نهاية الشهر', 'راتب', 'salary', 'tomorrow']
 
   const isAngry = angryWords.some(w => allCustomerText.includes(w))
   const isRefusing = refusalWords.some(w => allCustomerText.includes(w))

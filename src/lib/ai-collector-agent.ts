@@ -1,6 +1,5 @@
 import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
-import { buildCustomerBrain } from '@/lib/customer-brain'
 
 export type CollectorDecision = {
   shouldReply: boolean
@@ -24,6 +23,10 @@ type HistoryItem = {
   direction: string
   content: string
 }
+
+// ════════════════════════════════════════════════════════════════════
+//  Helpers
+// ════════════════════════════════════════════════════════════════════
 
 function norm(text: string) {
   return String(text ?? '').trim().toLowerCase()
@@ -65,14 +68,6 @@ function detectSignals(text: string) {
   }
 }
 
-function lastOutbound(history: HistoryItem[]) {
-  return [...history].reverse().find(m => m.direction === 'outbound')?.content ?? ''
-}
-
-function previousOutboundTexts(history: HistoryItem[]) {
-  return history.filter(m => m.direction === 'outbound').slice(-5).map(m => String(m.content ?? ''))
-}
-
 function isRobotic(reply: string) {
   return hasAny(reply, [
     'أنا هنا للمساعدة',
@@ -88,83 +83,191 @@ function isRobotic(reply: string) {
   ])
 }
 
-function isRepeated(reply: string, history: HistoryItem[]) {
+function isRepeated(reply: string, prevOutbound: string[]) {
   const r = reply.replace(/\s+/g, ' ').trim()
   if (!r || r.length < 20) return false
-  return previousOutboundTexts(history).some(p => {
+  return prevOutbound.some(p => {
     const old = p.replace(/\s+/g, ' ').trim()
     if (!old || old.length < 20) return false
-    // Only flag as repeated if 80%+ of the text is identical
     const shorter = r.length < old.length ? r : old
     const longer = r.length < old.length ? old : r
     return longer.includes(shorter) || shorter.includes(longer.slice(0, Math.max(60, longer.length * 0.8)))
   })
 }
 
+// Format money/dates, skipping nulls so we never feed "null" to the model
+function money(amount: any, currency = 'SAR') {
+  if (amount === null || amount === undefined || amount === '') return null
+  const n = Number(amount)
+  if (Number.isNaN(n)) return null
+  return `${n.toLocaleString('en-US')} ${currency}`
+}
+
+function dateOnly(d: any) {
+  if (!d) return null
+  const s = String(d)
+  return s.length >= 10 ? s.slice(0, 10) : s
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Case file — the "memory" the agent reviews BEFORE every reply.
+//  Pulls verified DB facts, what was agreed, dashboard notes & history.
+// ════════════════════════════════════════════════════════════════════
+
+function buildCaseFile(ctx: any): string {
+  const lines: string[] = []
+  const add = (label: string, value: any) => {
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      lines.push(`- ${label}: ${value}`)
+    }
+  }
+
+  const c = ctx.verified_customer_data ?? {}
+  const d = ctx.verified_debt_data ?? {}
+  const currency = d.currency || 'SAR'
+
+  // 1) Who am I talking to (verified identity & status)
+  lines.push('【 هوية العميل وحالته 】')
+  add('الاسم', c.customer_name)
+  add('المدينة', c.city)
+  add('جهة العمل', c.employer)
+  add('مستوى الخطورة', c.risk_level)
+
+  // 2) The debt facts (the ONLY numbers/names allowed)
+  lines.push('')
+  lines.push('【 بيانات المديونية المؤكدة 】')
+  add('الجهة الدائنة', d.creditor_name)
+  add('نوع المنتج', d.product_type)
+  add('الرصيد الحالي المستحق', money(d.current_balance, currency))
+  add('المبلغ الأصلي', money(d.original_amount, currency))
+  add('الرقم المرجعي', d.reference_number)
+  add('حالة الملف', d.status)
+  add('تاريخ الاستحقاق', dateOnly(d.due_date))
+  add('تاريخ آخر سداد', dateOnly(d.last_payment_date))
+
+  // 3) What we already discussed / agreed on (the core of "memory")
+  const agreed: string[] = []
+  const approvedInstallment = (ctx.recent_approvals ?? []).find((a: any) => a.approval_type === 'installment' && a.status === 'approved')
+  if (approvedInstallment) agreed.push('✅ يوجد خطة تقسيط معتمدة بالفعل — لا ترفض التقسيط، أكّدها واطلب القسط القادم.')
+
+  const openPromise = (ctx.recent_promises ?? []).find((p: any) => p.status === 'pending')
+  if (openPromise) {
+    const amt = money(openPromise.promised_amount, currency)
+    const dt = dateOnly(openPromise.promised_date)
+    agreed.push(`📌 وعد سداد قائم${amt ? ` بمبلغ ${amt}` : ''}${dt ? ` بتاريخ ${dt}` : ''} — ذكّر العميل به وألزمه.`)
+  }
+
+  const brokenCount = (ctx.recent_promises ?? []).filter((p: any) => p.status === 'broken').length
+  if (brokenCount > 0) agreed.push(`⚠️ العميل أخلف ${brokenCount} وعد سابق — كن أكثر حزماً واطلب تاريخاً محدداً.`)
+
+  const lastPayment = (ctx.recent_payments ?? []).find((p: any) => p.status === 'completed')
+  if (lastPayment) {
+    const amt = money(lastPayment.amount, lastPayment.currency || currency)
+    agreed.push(`💰 آخر سداد مؤكد${amt ? `: ${amt}` : ''}${lastPayment.payment_date ? ` بتاريخ ${dateOnly(lastPayment.payment_date)}` : ''}.`)
+  }
+
+  const lastFollowup = ctx.latest_collection_context?.last_followup
+  if (lastFollowup) {
+    if (lastFollowup.collector_note) agreed.push(`🗒️ آخر ملاحظة محصّل: ${lastFollowup.collector_note}`)
+    else if (lastFollowup.result_summary) agreed.push(`🗒️ آخر نتيجة متابعة: ${lastFollowup.result_summary}`)
+  }
+
+  const lastStatus = ctx.latest_collection_context?.last_status_change
+  if (lastStatus?.normalized_status) agreed.push(`📊 آخر حالة في النظام: ${lastStatus.normalized_status}`)
+
+  if (agreed.length) {
+    lines.push('')
+    lines.push('【 ما تم نقاشه أو الاتفاق عليه سابقاً (اقرأه جيداً قبل الرد) 】')
+    agreed.forEach(a => lines.push(`- ${a}`))
+  }
+
+  // 4) Dashboard notes (collector / admin notes added in the panel)
+  const notes: string[] = []
+  if (ctx.customer?.notes) notes.push(`ملاحظة على العميل: ${ctx.customer.notes}`)
+  if (d.notes) notes.push(`ملاحظة على الملف: ${d.notes}`)
+  if (notes.length) {
+    lines.push('')
+    lines.push('【 ملاحظات لوحة التحكم 】')
+    notes.forEach(n => lines.push(`- ${n}`))
+  }
+
+  return lines.join('\n')
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Main agent
+// ════════════════════════════════════════════════════════════════════
+
 export async function runCollectorAgent(args: {
   company_id: string
   customer_id: string
   debt_id?: string | null
   message: string
-  conversation_history: HistoryItem[]
+  conversation_history?: HistoryItem[]
 }): Promise<CollectorDecision> {
   const text = args.message.trim()
-  const history = args.conversation_history ?? []
-  const lastAgentMessage = lastOutbound(history)
   const signals = detectSignals(text)
 
+  // Fast path: customer ended the chat → stay silent, no cost.
   if (isCloser(text)) {
     return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
   }
 
-  if (isGreeting(text)) {
-    let msg = 'يا هلا بك، تفضل؟'
-    if (text.includes('سلام')) msg = 'وعليكم السلام، حياك الله تفضل؟'
-    else if (text.includes('مساء')) msg = 'مساء النور، تفضل؟'
-    else if (text.includes('صباح')) msg = 'صباح النور، تفضل؟'
-    
-    // If it is the very first message ever, we might want a simple "وعليكم السلام"
-    if (history.length <= 2 && text.includes('سلام')) {
-      msg = 'وعليكم السلام'
-    }
-
-    return { shouldReply: true, action: 'reply', reason: 'greeting', message: msg }
-  }
-
-  const debtContext = await buildCustomerDebtContext({
+  // ── Always review the case file + history from the DB BEFORE replying ──
+  const ctx = await buildCustomerDebtContext({
     company_id: args.company_id,
     customer_id: args.customer_id,
     debt_id: args.debt_id ?? null,
   })
 
-  const customerBrain = buildCustomerBrain(debtContext)
+  // Build chronological conversation (DB returns newest-first → reverse it).
+  // Drop the trailing inbound if it duplicates the current message.
+  const rawMessages: HistoryItem[] = (ctx.recent_messages ?? []).map((m: any) => ({
+    direction: m.direction,
+    content: String(m.content ?? ''),
+  }))
+  const chronological = [...rawMessages].reverse()
+  if (
+    chronological.length &&
+    chronological[chronological.length - 1].direction === 'inbound' &&
+    chronological[chronological.length - 1].content.trim() === text
+  ) {
+    chronological.pop()
+  }
+
+  const prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content).slice(-5)
+  const lastAgentMessage = prevOutbound[prevOutbound.length - 1] ?? ''
+  const hasHistory = chronological.length > 0
+
+  // Pure greeting with NO prior history → light canned reply (true first contact).
+  // If there IS history, fall through to the AI so it uses what was discussed.
+  if (isGreeting(text) && !hasHistory) {
+    let msg = 'يا هلا بك، تفضل؟'
+    if (text.includes('سلام')) msg = 'وعليكم السلام، حياك الله تفضل؟'
+    else if (text.includes('مساء')) msg = 'مساء النور، تفضل؟'
+    else if (text.includes('صباح')) msg = 'صباح النور، تفضل؟'
+    return { shouldReply: true, action: 'reply', reason: 'greeting_first_contact', message: msg }
+  }
 
   if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
     return { shouldReply: true, action: 'reply', reason: 'fallback_no_api_key', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
-  const client = new OpenAI({ 
+  const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined
+    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
   })
 
-  // Format history to proper OpenAI message roles
-  const messageHistory = history.map(m => ({
-    role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
-    content: String(m.content)
-  }))
-
-  // Determine Intent (Router Logic)
+  // ── Intent router ──
   type AgentIntent = 'INTRODUCTION' | 'NEGOTIATION' | 'DISPUTE' | 'GENERAL'
   let intent: AgentIntent = 'GENERAL'
-  
-  const historyText = history.map(h => String(h.content)).join(' ')
-  const balance = debtContext.debt?.current_balance ? String(debtContext.debt.current_balance) : null
-  const creditor = debtContext.debt?.creditor_name ? String(debtContext.debt.creditor_name) : null
-  
+
+  const balance = ctx.verified_debt_data?.current_balance != null ? String(ctx.verified_debt_data.current_balance) : null
+  const creditor = ctx.verified_debt_data?.creditor_name ?? null
+  const historyText = chronological.map(h => h.content).join(' ')
   const hasMentionedDebt = (balance && historyText.includes(balance)) || (creditor && historyText.includes(creditor))
-  
-  if (!hasMentionedDebt && history.length <= 4 && !signals.angry && !signals.dispute) {
+
+  if (!hasMentionedDebt && chronological.length <= 3 && !signals.angry && !signals.dispute) {
     intent = 'INTRODUCTION'
   } else if (signals.angry || signals.dispute || signals.wrongNumber) {
     intent = 'DISPUTE'
@@ -172,122 +275,93 @@ export async function runCollectorAgent(args: {
     intent = 'NEGOTIATION'
   }
 
-  // Specialized Prompts
-  let specializedPrompt = ''
-
-  if (intent === 'INTRODUCTION') {
-    specializedPrompt = `
-=== وكيل التقديم (Introduction Agent) ===
-الهدف: أنت تتحدث مع العميل لأول مرة (بعد التحية).
-المهمة:
-- اذكر بوضوح أنك من طرف الشركة الدائنة (creditor_name) بخصوص مديونية قدرها (current_balance).
-- اسأل العميل مباشرة وبكل لباقة عن الموعد الذي يقدر فيه سداد هذا المبلغ.
-- اذكر المبلغ واسم الشركة مرة واحدة فقط في رسالتك، ولا تسأل أكثر من سؤال واحد.
-`
-  } else if (intent === 'DISPUTE') {
-    specializedPrompt = `
-=== وكيل معالجة الاعتراضات (Dispute & De-escalation Agent) ===
-الهدف: العميل إما غاضب، أو ينكر المديونية، أو يقول أن الرقم خطأ.
-المهمة:
-- إذا كان العميل غاضباً، امتص غضبه بكلمة واحدة (مثل: أقدر انزعاجك، أو حقك تزعل) ثم اطلب منه الهدوء لنراجع الملف.
-- إذا أنكر المديونية أو قال الرقم خطأ، اطلب منه الإثبات أو قل له أنك سترفع ملاحظته للإدارة للمراجعة.
-- 🔴 تحذير هام: يمنع منعاً باتاً تكرار ذكر مبلغ المديونية الآن. مهمتك فقط معالجة الاعتراض أو امتصاص الغضب بهدوء.
-`
-  } else if (intent === 'NEGOTIATION') {
-    specializedPrompt = `
-=== وكيل التفاوض والوعود (Negotiation & Promise Agent) ===
-الهدف: العميل يقدم أعذاراً، أو يطلب أقساطاً، أو يعد بالسداد لاحقاً.
-المهمة:
-- إذا أعطى عذراً (مثل: ظروفي صعبة)، تعاطف معه بكلمة واحدة (الله يعينك، مقدر ظرفك) ثم فاوضه على موعد للسداد الجزئي أو الكلي.
-- إذا طلب تقسيط ولم يكن لديه تقسيط معتمد في النظام: أخبره أن الأقساط تحتاج موافقة وسنرفع طلباً، ولا توافق من نفسك أبداً.
-- إذا وعد بالسداد لكن بدون تاريخ، اسأله عن التاريخ الدقيق للسداد.
-- 🔴 تحذير هام: لا تكرر إجمالي المبلغ في كل رسالة، العميل يعرفه مسبقاً. ركز فقط على التفاوض وموعد السداد.
-`
-  } else {
-    specializedPrompt = `
-=== الوكيل العام (General Collection Agent) ===
-الهدف: متابعة المحادثة بشكل عام.
-المهمة:
-- رد بشكل طبيعي وحازم بناءً على كلام العميل الأخير.
-- إذا كان قد ذكر أنه سدد، اطلب منه إرسال الإيصال.
-- 🔴 تحذير هام: يُمنع منعاً باتاً تكرار ذكر إجمالي المبلغ أو اسم الشركة في ردك الحالي، لأن العميل يعرفه مسبقاً. اكتفِ بسؤاله عن الخطوة القادمة.
-`
+  const intentPrompts: Record<AgentIntent, string> = {
+    INTRODUCTION: `【 مهمتك الآن: التقديم 】
+- تتحدث مع العميل لأول مرة. عرّفه أنك من طرف الجهة الدائنة بخصوص المديونية القائمة.
+- اذكر اسم الجهة والمبلغ مرة واحدة فقط، ثم اسأله مباشرة: متى يقدر يسدد؟
+- سؤال واحد فقط، لا أكثر.`,
+    DISPUTE: `【 مهمتك الآن: معالجة اعتراض / امتصاص غضب 】
+- العميل غاضب أو ينكر المديونية أو يقول الرقم خطأ.
+- إن كان غاضباً: امتص غضبه بكلمة واحدة (أقدّر انزعاجك / حقك تزعل) ثم اطلب التهدئة لمراجعة الملف.
+- إن أنكر أو قال الرقم خطأ: اطلب إثباتاً أو قل إنك سترفع ملاحظته للإدارة للمراجعة.
+- 🔴 ممنوع منعاً باتاً تكرار ذكر المبلغ الآن. مهمتك معالجة الاعتراض فقط.`,
+    NEGOTIATION: `【 مهمتك الآن: التفاوض والوعود 】
+- العميل يعطي عذراً أو يطلب أقساطاً أو يعد بالسداد لاحقاً.
+- لو أعطى عذراً: تعاطف بكلمة واحدة (الله يعينك / مقدّر ظرفك) ثم فاوضه على موعد سداد محدد.
+- لو طلب تقسيطاً ولا يوجد تقسيط معتمد: قل إن الأقساط تحتاج موافقة وسترفع طلباً — لا توافق من نفسك أبداً.
+- لو وعد بدون تاريخ: اطلب التاريخ الدقيق.
+- 🔴 لا تكرر إجمالي المبلغ، العميل يعرفه. ركّز على موعد السداد.`,
+    GENERAL: `【 مهمتك الآن: متابعة عامة 】
+- رد طبيعي وحازم بناءً على آخر كلام للعميل وما اتُّفق عليه سابقاً.
+- لو ذكر أنه سدّد: اطلب الإيصال.
+- 🔴 ممنوع تكرار ذكر المبلغ أو اسم الجهة، اكتفِ بسؤاله عن الخطوة القادمة.`,
   }
 
-  // Check active states and override if necessary
-  const activeInstallmentApproval = debtContext.recent_approvals?.find(a => a.approval_type === 'installment' && a.status === 'approved')
-  const activePromise = debtContext.recent_promises?.find(p => p.status === 'pending')
+  const caseFile = buildCaseFile(ctx)
+  const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
+  const np = ctx.negotiation_profile ?? {}
 
-  if (activeInstallmentApproval) {
-    specializedPrompt += `
-- 🔴 حالة خاصة جداً: العميل لديه خطة تقسيط معتمدة بالفعل! لا ترفض التقسيط، بل أكد له الأقساط واطلب منه سداد الدفعة الأولى أو القسط القادم.
-`
-  }
-  if (activePromise) {
-    specializedPrompt += `
-- 🔴 حالة خاصة جداً: العميل لديه وعد سداد مسجل بمبلغ ${activePromise.promised_amount} في تاريخ ${activePromise.promised_date}. ذكّره بهذا الوعد وألزمه به.
-`
-  }
+  // Conversation as real message turns (chronological), capped to last 10.
+  const turns = chronological.slice(-10).map(m => ({
+    role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
+    content: m.content,
+  }))
 
-  const systemRulesText = customerBrain.strict_rules ? customerBrain.strict_rules.join('\n') : ''
+  const systemPrompt = `أنت "خالد"، محصّل ديون سعودي محترف عمرك 45 سنة. تتحدث بلهجة سعودية بيضاء طبيعية جداً عبر الواتساب، كأنك إنسان حقيقي.
 
-  const useOpenRouter = !!process.env.OPENROUTER_API_KEY
-  const modelId = useOpenRouter ? 'anthropic/claude-sonnet-4' : 'gpt-4o'
+═══════════════ القواعد الحرجة (التزم بها حرفياً) ═══════════════
+${strictRules}
 
-  const ai = await client.chat.completions.create({
-    model: modelId,
-    temperature: 0.28,
-    max_tokens: 260,
-    response_format: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content: `
-أنت "خالد"، محصّل ديون سعودي عمرك 45 سنة.
-تتحدث بلهجة سعودية بيضاء، طبيعية جداً، وكأنك تتحدث في الواتساب مع شخص حقيقي.
+═══════════════ ملف القضية (راجعه كاملاً قبل أن ترد) ═══════════════
+${caseFile}
 
-=== القواعد الأساسية للبيانات (STRICT RULES) ===
-${systemRulesText}
+قراءة سلوك العميل: النوع=${np.behavior_type ?? 'غير محدد'} | الاستراتيجية المقترحة=${np.recommended_strategy ?? 'غير محدد'}
 
-${specializedPrompt}
+═══════════════ ${intentPrompts[intent].split('\n')[0].replace(/【|】/g, '').trim()} ═══════════════
+${intentPrompts[intent]}
 
-=== تعليمات عامة للمحادثة ===
-1. تصرف كإنسان طبيعي تماماً (لا تقل "عزيزي العميل" أو "كيف أقدر أخدمك").
-2. يُمنع منعاً باتاً تكرار سؤال سألته سابقاً، أو إعادة المطالبة بشيء وافق عليه العميل للتو.
-3. ردودك يجب أن تكون قصيرة جداً (جملة أو جملتين كحد أقصى).
-4. إذا انتهت المحادثة (العميل أنهى النقاش أو ودّعك)، ابق صامتاً (اختر silent).
+═══════════════ قائمة تحقّق إلزامية قبل كل رد ═══════════════
+1. اقرأ المحادثة السابقة كاملة: ما آخر سؤال سألته أنت؟ هل أجاب العميل عليه؟ لا تعد طرح سؤال مُجاب.
+2. راجع "ما تم الاتفاق عليه": لا تتجاهل وعداً قائماً أو تقسيطاً معتمداً.
+3. لا تخترع أي رقم/اسم/تاريخ غير موجود في ملف القضية. إن لم تجد المعلومة، قل إنك ستراجع الإدارة.
+4. لا تكرر ذكر المبلغ إلا إذا كان هذا أول تعريف بالمديونية.
+5. تكلم كإنسان: لا "عزيزي العميل"، لا "كيف أقدر أخدمك"، لا عبارات آلية.
+6. الرد جملة أو جملتين كحد أقصى. لو العميل أنهى النقاش أو ودّعك، اختر action=silent.
 
-
-Return JSON only:
+═══════════════ صيغة الإخراج ═══════════════
+أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:
 {
   "shouldReply": true,
   "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
-  "reason": "short reason",
-  "message": "WhatsApp reply or empty"
+  "reason": "سبب مختصر",
+  "message": "رد الواتساب أو فارغ"
 }
-        `.trim(),
-      },
-      ...messageHistory,
+
+🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
+
+  const ai = await client.chat.completions.create({
+    model: process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o',
+    temperature: 0.3,
+    max_tokens: 400,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...turns,
       {
         role: 'user',
-        content: `
-Current customer message:
+        content: `رسالة العميل الحالية:
 ${text}
 
-Important Context:
-- Detected signals: ${JSON.stringify(signals)}
-- Last agent message: ${lastAgentMessage}
-- Customer & Debt Summary: ${JSON.stringify(customerBrain.summary)}
-- Negotiation Strategy: ${JSON.stringify(customerBrain.negotiation_profile)}
+(للسياق فقط — لا تردده حرفياً)
+- إشارات مكتشفة: ${JSON.stringify(signals)}
+- آخر رسالة أرسلتها أنت للعميل: ${lastAgentMessage || 'لا يوجد'}
 
-If the last agent message was a question and the customer just answered it, do not ask the same question again. Move the conversation forward naturally.
-        `.trim(),
+إن كانت رسالتك الأخيرة سؤالاً وقد أجاب العميل عليه الآن، لا تعد السؤال — انتقل بالمحادثة للأمام.`,
       },
     ],
   })
 
   let parsed: CollectorDecision
-
   try {
     parsed = JSON.parse(ai.choices[0]?.message?.content ?? '{}')
   } catch {
@@ -300,7 +374,7 @@ If the last agent message was a question and the customer just answered it, do n
     return { ...parsed, shouldReply: false, message: '' }
   }
 
-  if (isRobotic(parsed.message) || isRepeated(parsed.message, history)) {
+  if (isRobotic(parsed.message) || isRepeated(parsed.message, prevOutbound)) {
     const fallbacks = [
       'طيب، وش تبي نسوي بخصوص الموضوع؟',
       'تمام، خلنا نمشي قدام. وش الخطوة الجاية من عندك؟',

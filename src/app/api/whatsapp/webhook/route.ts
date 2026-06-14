@@ -150,24 +150,18 @@ export async function POST(request: NextRequest) {
               const { runCollectorAgent } = await import('@/lib/ai-collector-agent')
               const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
               const { processEvent } = await import('@/lib/automation-pipeline')
-              const { buildCustomerDebtContext } = await import('@/lib/customer-debt-context')
 
               const company_id = (customer as { company_id: string }).company_id
               const customer_id = (customer as { id: string }).id
               const debt_id = (latestDebt as { id: string } | null)?.id ?? undefined
 
-              const debtContext = await buildCustomerDebtContext({
-                company_id,
-                customer_id,
-                debt_id: debt_id ?? null,
-              })
-
+              // The agent reviews the full case file + conversation history from
+              // the DB internally, so no need to pre-build context here.
               const aiDecision = await runCollectorAgent({
                 company_id,
                 customer_id,
                 debt_id: debt_id ?? null,
                 message: text,
-                conversation_history: debtContext.recent_messages || []
               })
 
               if (aiDecision.shouldReply && aiDecision.message) {

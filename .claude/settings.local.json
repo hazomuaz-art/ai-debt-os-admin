@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C D:/ai-debt-os-admin status)",
+      "Bash(P=\"/c/Users/moham/.gemini/antigravity-ide/scratch/ai-debt-os-admin\"; echo \"===ROOT===\"; ls -la \"$P\" 2>/dev/null | head -40; echo \"===GIT===\"; git -C \"$P\" status 2>&1 | head -5)",
+      "Bash(git -C /c/Users/moham/.gemini/antigravity-ide/scratch/ai-debt-os-admin remote -v)",
+      "Bash(git -C /c/Users/moham/.gemini/antigravity-ide/scratch/ai-debt-os-admin log --oneline -5)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=6 root@72.62.30.109 \"echo OK; pm2 list 2>/dev/null | head -20; echo '---'; ls /root/ai-debt-os-admin 2>/dev/null | head\")",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('D:/ai-debt-os-admin/package.json'\\).scripts,null,1\\)\\)\")",
+      "Bash(sed -E 's/\\(=.{6}\\).*/\\\\1.../' D:/ai-debt-os-admin/.env.local)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@72.62.30.109 ' *)",
+      "Bash(ssh -o BatchMode=yes root@72.62.30.109 ' *)",
+      "Bash(git -C /c/Users/moham/.gemini/antigravity-ide/scratch/ai-debt-os-admin remote get-url vps)",
+      "Bash(command -v rsync)",
+      "Bash(echo \"rsync: $\\(command -v rsync || echo MISSING\\)\")",
+      "Bash(command -v ssh)",
+      "Bash(echo \"ssh: $\\(command -v ssh\\)\")",
+      "Bash(command -v git)",
+      "Bash(ssh -o BatchMode=yes root@72.62.30.109 'wc -l < /root/ai-debt-os-admin/.env.local; echo \"keys:\"; grep -oE \"^[A-Z_]+=\" /root/ai-debt-os-admin/.env.local')",
+      "Bash(ssh -o BatchMode=yes root@72.62.30.109 'cat /root/ai-debt-os-admin/.env.local')",
+      "Bash(sed -E 's/\\(=.{8}\\).*/\\\\1.../' D:/ai-debt-os-admin/.env.local)",
+      "Bash(cmd.exe /c 'robocopy \"D:\\\\ai-debt-os-admin\" \"C:\\\\Users\\\\moham\\\\.gemini\\\\antigravity-ide\\\\scratch\\\\ai-debt-os-admin\" /MIR /XD node_modules .next .git .vercel out dist /XF .env.local tsconfig.tsbuildinfo /L /NFL /NDL /NP /NJH')",
+      "Bash(cmd.exe /c 'robocopy \"D:\\\\ai-debt-os-admin\" \"C:\\\\Users\\\\moham\\\\.gemini\\\\antigravity-ide\\\\scratch\\\\ai-debt-os-admin\" /MIR /XD node_modules .next .git .vercel out dist /XF .env.local tsconfig.tsbuildinfo /L /NP /NDL /NFL > %TEMP%\\\\rc.txt 2>&1 & type %TEMP%\\\\rc.txt')",
+      "Bash(wc -l ai-collector-agent.ts ai-whatsapp-reply.ts customer-brain.ts customer-debt-context.ts negotiation-*.ts smart-response.ts)",
+      "Bash(wc -l ../app/api/whatsapp/webhook/route.ts)",
+      "Bash(npx tsc *)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File D:\\\\ai-debt-os-admin\\\\deploy.ps1 \"fix: AI agent reviews full case file + history before reply; fix context-injection, ordering, encoding bugs\")"
+    ]
+  }
+}
