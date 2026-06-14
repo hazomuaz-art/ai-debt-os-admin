@@ -232,7 +232,7 @@ export async function runCollectorAgent(args: {
   const systemRulesText = customerBrain.strict_rules ? customerBrain.strict_rules.join('\n') : ''
 
   const useOpenRouter = !!process.env.OPENROUTER_API_KEY
-  const modelId = useOpenRouter ? 'anthropic/claude-3.5-sonnet' : 'gpt-4o'
+  const modelId = useOpenRouter ? 'anthropic/claude-sonnet-4' : 'gpt-4o'
 
   const ai = await client.chat.completions.create({
     model: modelId,
