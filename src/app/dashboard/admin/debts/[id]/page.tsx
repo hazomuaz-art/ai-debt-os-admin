@@ -12,6 +12,33 @@ import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldA
 import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 
+// Translate AI-generated score factor names (free-form English) to Arabic by keyword.
+function factorAr(name: string): string {
+  const n = String(name ?? '').toLowerCase()
+  if (/overdue|past due|days? late|تأخر/.test(n)) return 'أيام التأخر'
+  if (/payment history|سداد.*سابق|history/.test(n)) return 'سجل السداد'
+  if (/dti|debt[- ]?to[- ]?income|نسبة الدخل/.test(n)) return 'نسبة الدين إلى الدخل'
+  if (/disput|نزاع|اعتراض/.test(n)) return 'حالة النزاع'
+  if (/income|salary|راتب|دخل/.test(n)) return 'الدخل الشهري'
+  if (/balance|amount|outstanding|رصيد|مبلغ/.test(n)) return 'حجم المديونية'
+  if (/risk|خطورة|مخاطر/.test(n)) return 'مستوى الخطورة'
+  if (/promise|وعد/.test(n)) return 'الوعود السابقة'
+  if (/contact|response|تواصل|استجاب/.test(n)) return 'مدى التجاوب'
+  if (/employ|وظيف|عمل/.test(n)) return 'الوضع الوظيفي'
+  if (/credit|ائتمان/.test(n)) return 'السجل الائتماني'
+  return name
+}
+
+function riskAr(r: string): string {
+  switch (String(r ?? '').toLowerCase()) {
+    case 'low': return 'خطورة منخفضة'
+    case 'medium': return 'خطورة متوسطة'
+    case 'high': return 'خطورة عالية'
+    case 'critical': return 'خطورة حرجة'
+    default: return r
+  }
+}
+
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
 
@@ -388,7 +415,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     <span className="text-4xl font-bold font-mono">{latestScore.score}</span>
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white mb-1">{latestScore.risk_classification}</p>
+                    <p className="text-sm font-bold text-white mb-1">{riskAr(latestScore.risk_classification)}</p>
                     <p className="text-xs text-[#8b95a7] flex items-center gap-1">
                       <Target size={12} className="text-indigo-400" />
                       احتمالية التحصيل: <strong className="text-white">{Math.round(latestScore.collection_probability * 100)}%</strong>
@@ -407,7 +434,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     <div className="space-y-2">
                       {latestScore.factors.slice(0, 4).map((f: any, i: number) => (
                         <div key={i} className="flex items-center justify-between text-xs bg-[#0d1117] p-2 rounded-lg border border-[#222a36]">
-                          <span className="text-slate-300 font-bold">{f.name}</span>
+                          <span className="text-slate-300 font-bold">{factorAr(f.name)}</span>
                           <span className={`font-bold px-2 py-0.5 rounded ${f.impact === 'positive' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                             {f.impact === 'positive' ? '+' : '−'}{f.weight}
                           </span>
