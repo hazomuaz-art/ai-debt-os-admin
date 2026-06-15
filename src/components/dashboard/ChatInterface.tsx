@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Send, Bot, User, Clock, Phone, MessageSquare } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { Search, Send, Bot, User, Phone, MessageSquare } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 
 interface ChatMessage {
   id: string
@@ -34,6 +35,8 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
+  const { t } = useTranslation()
+  const m = t.pages.messages
 
   // Group messages by customer
   const groupedByCustomer = useMemo(() => {
@@ -101,7 +104,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
             <Search className="absolute end-3 top-2.5 text-[#5f6b7e]" size={18} />
             <input 
               type="text" 
-              placeholder="البحث عن عميل أو رقم..." 
+              placeholder={m.search_customer}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-[#0d1117] border-none text-white rounded-xl pe-10 ps-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
@@ -111,7 +114,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
 
         <div className="flex-1 overflow-y-auto">
           {filteredCustomers.length === 0 ? (
-            <div className="p-6 text-center text-[#5f6b7e] text-sm">لا توجد محادثات مطابقة</div>
+            <div className="p-6 text-center text-[#5f6b7e] text-sm">{m.no_conversations}</div>
           ) : (
             filteredCustomers.map(item => {
               const lastMsg = item.messages[item.messages.length - 1]
@@ -121,7 +124,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                 <div 
                   key={item.customer.id}
                   onClick={() => setSelectedCustomerId(item.customer.id)}
-                  className={`p-4 border-b border-slate-50 cursor-pointer transition-colors ${isSelected ? 'bg-[#0d1117]' : 'hover:bg-[#1a212c]'}`}
+                  className={`p-4 border-b border-[#1c2330] cursor-pointer transition-colors ${isSelected ? 'bg-[#0d1117]' : 'hover:bg-[#1a212c]'}`}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <h4 className="font-bold text-white text-sm truncate">{item.customer.full_name}</h4>
@@ -129,7 +132,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                   </div>
                   <div className="flex justify-between items-center">
                     <p className="text-xs text-[#8b95a7] truncate ps-4">
-                      {lastMsg.direction === 'outbound' ? 'Ã¢Å“â€œ ' : ''}{lastMsg.content}
+                      {lastMsg.direction === 'outbound' ? '✓ ' : ''}{lastMsg.content}
                     </p>
                     {lastMsg.direction === 'inbound' && (
                       <div className="w-2 h-2 bg-rose-500 rounded-full shrink-0"></div>
@@ -143,7 +146,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
       </div>
 
       {/* ── Main Chat Area ── */}
-      <div className="flex-1 flex flex-col bg-[#eaf0f6] relative">
+      <div className="flex-1 flex flex-col bg-[#0b0e14] relative">
         {selectedChat ? (
           <>
             {/* Chat Header */}
@@ -156,15 +159,15 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                   <h3 className="font-bold text-white">{selectedChat.customer.full_name}</h3>
                   <div className="text-xs text-[#8b95a7] flex items-center gap-2">
                     <span>{selectedChat.customer.whatsapp || selectedChat.customer.phone}</span>
-                    <span>Ã¢â‚¬Â¢</span>
-                    <span className="font-mono text-blue-600 font-semibold">{selectedChat.debt?.reference_number}</span>
+                    <span>•</span>
+                    <span className="font-mono text-blue-400 font-semibold">{selectedChat.debt?.reference_number}</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-start">
-                  <div className="text-xs text-[#5f6b7e]">المبلغ المستحق</div>
-                  <div className="font-bold text-rose-600">
+                  <div className="text-xs text-[#5f6b7e]">{m.amount_due}</div>
+                  <div className="font-bold text-rose-400">
                     {formatCurrency(selectedChat.debt?.current_balance || 0, selectedChat.debt?.currency || 'SAR')}
                   </div>
                 </div>
@@ -177,8 +180,8 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="text-center mb-6">
-                <span className="bg-slate-200/50 text-[#8b95a7] text-xs px-3 py-1 rounded-full">
-                  بداية المحادثة
+                <span className="bg-[#222a36] text-[#8b95a7] text-xs px-3 py-1 rounded-full">
+                  {m.conversation_start}
                 </span>
               </div>
               
@@ -192,11 +195,11 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                         : 'bg-[#0e7a54] text-white rounded-tl-sm shadow-md'
                     }`}>
                       <div className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</div>
-                      <div className={`text-[10px] mt-1 flex justify-end items-center gap-1 ${isOutbound ? 'text-[#5f6b7e]' : 'text-blue-200'}`}>
+                      <div className={`text-[10px] mt-1 flex justify-end items-center gap-1 ${isOutbound ? 'text-blue-100/70' : 'text-blue-100/80'}`}>
                         {formatTime(msg.sent_at || msg.created_at)}
                         {isOutbound && (
                           <span className="text-[10px]">
-                            {msg.status === 'delivered' ? 'Ã¢Å“â€œÃ¢Å“â€œ' : msg.status === 'read' ? 'Ã¢Å“â€œÃ¢Å“â€œ' : 'Ã¢Å“â€œ'}
+                            {msg.status === 'delivered' || msg.status === 'read' ? '✓✓' : '✓'}
                           </span>
                         )}
                       </div>
@@ -209,7 +212,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
             {/* Message Input */}
             <div className="p-4 bg-[#151a23] border-t border-[#222a36]">
               <div className="flex items-center gap-2">
-                <button className="p-3 text-[#5f6b7e] hover:text-rose-500 bg-[#222a36] hover:bg-rose-50 rounded-xl transition-colors" title="إيقاف الذكاء الاصطناعي مؤقتاً">
+                <button className="p-3 text-[#5f6b7e] hover:text-rose-400 bg-[#222a36] hover:bg-rose-500/10 rounded-xl transition-colors" title={m.pause_ai}>
                   <Bot size={20} />
                 </button>
                 <div className="flex-1 relative">
@@ -217,7 +220,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     type="text" 
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
-                    placeholder="اكتب رسالة للرد المباشر..." 
+                    placeholder={m.write_reply}
                     className="w-full bg-[#0d1117] border-none text-white rounded-xl ps-12 pe-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && replyText.trim()) {
@@ -239,7 +242,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-[#5f6b7e]">
             <MessageSquare size={48} className="mb-4 opacity-20" />
-            <p>اختر محادثة للبدء</p>
+            <p>{m.choose_conversation}</p>
           </div>
         )}
       </div>

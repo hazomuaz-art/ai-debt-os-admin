@@ -1,11 +1,14 @@
 'use client'
 
 import { Search, Bell, Globe } from 'lucide-react'
+import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n'
 
 export function Topbar({ profile }: { profile: any }) {
   const { t, locale, toggleLocale } = useTranslation()
   const name = profile?.full_name?.split(' ')[0] || 'المدير'
+  const role = profile?.role || 'admin'
+  const alertsHref = role === 'admin' ? '/dashboard/admin/alerts' : `/dashboard/${role}`
 
   return (
     <header className="bg-[#0d1117] border-b border-[#1c2330] py-4 px-8 flex justify-between items-center shrink-0 z-10">
@@ -34,10 +37,10 @@ export function Topbar({ profile }: { profile: any }) {
           <span className="text-sm font-semibold">{locale === 'ar' ? 'EN' : 'عربي'}</span>
         </button>
 
-        <button className="relative p-2 text-[#8b95a7] hover:text-white bg-[#161b22] rounded-full border border-[#222a36]">
+        <Link href={alertsHref} aria-label={t.nav.alerts} className="relative p-2 text-[#8b95a7] hover:text-white bg-[#161b22] rounded-full border border-[#222a36] inline-flex">
           <Bell size={18} />
           <span className="absolute top-1 end-1 w-2 h-2 bg-rose-500 rounded-full border border-[#0d1117]"></span>
-        </button>
+        </Link>
       </div>
     </header>
   )

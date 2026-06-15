@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { MessageSquare } from 'lucide-react'
 import { ChatInterface } from '@/components/dashboard/ChatInterface'
+import { getServerTranslation } from '@/lib/i18n/server'
 
 export default async function MessagesPage() {
   const supabase = createClient()
@@ -27,26 +27,27 @@ export default async function MessagesPage() {
     .limit(300)
 
   const inbound = messages?.filter(m => m.direction === 'inbound').length ?? 0
-  const outbound = messages?.filter(m => m.direction === 'outbound').length ?? 0
   const whatsapp = messages?.filter(m => m.channel === 'whatsapp').length ?? 0
+  const { t, dir } = getServerTranslation()
+  const m = t.pages.messages
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
-      
+    <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
+
       {/* Header */}
       <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex justify-between items-center mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-2">المحادثات المباشرة</h1>
-          <p className="text-[#8b95a7] text-sm">مراقبة محادثات الذكاء الاصطناعي وإدارة المفاوضات مع العملاء</p>
+          <h1 className="text-2xl font-bold text-white mb-2">{m.title}</h1>
+          <p className="text-[#8b95a7] text-sm">{m.subtitle}</p>
         </div>
         <div className="flex gap-4">
-          <div className="bg-[#0d1117] px-4 py-2 rounded-xl border border-blue-100 text-center">
+          <div className="bg-[#0d1117] px-4 py-2 rounded-xl border border-[#222a36] text-center">
             <div className="text-2xl font-bold text-white">{whatsapp}</div>
-            <div className="text-[10px] text-[#8b95a7] font-bold">رسائل الواتساب</div>
+            <div className="text-[10px] text-[#8b95a7] font-bold">{m.whatsapp_msgs}</div>
           </div>
-          <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 text-center">
-            <div className="text-2xl font-bold text-emerald-600">{inbound}</div>
-            <div className="text-[10px] text-[#8b95a7] font-bold">واردة من العملاء</div>
+          <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 text-center">
+            <div className="text-2xl font-bold text-emerald-400">{inbound}</div>
+            <div className="text-[10px] text-[#8b95a7] font-bold">{m.inbound_from_customers}</div>
           </div>
         </div>
       </div>
