@@ -44,11 +44,16 @@ export function StartConversationButton({
         body: JSON.stringify({ phone, message, customer_id: customerId }),
       })
       const d = await r.json()
-      if (!r.ok) throw new Error(d.error || 'failed')
+      const rawErr = typeof d.error === 'string' ? d.error : ''
+      if (!r.ok || rawErr) {
+        // Friendly mapping instead of raw Evolution JSON
+        if (/exists"?\s*:\s*false|not.*whatsapp|غير مسجّل/i.test(rawErr)) throw new Error(s.not_registered)
+        throw new Error(s.send_failed)
+      }
       setDone(true)
       setTimeout(() => setOpen(false), 1200)
     } catch (e: any) {
-      setError(e.message || 'error')
+      setError(e.message || s.send_failed)
     } finally { setSending(false) }
   }
 
