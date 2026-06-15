@@ -91,16 +91,16 @@ export function scoringFallback(input: DebtScoringInput): ScoreResult {
     risk_classification:    risk,
     collection_probability: Math.round(score * 0.85),
     recommended_strategy:   daysOverdue > 180
-      ? 'Legal action or write-off assessment required'
+      ? 'يُنصح بالتصعيد القانوني أو دراسة إعدام الدين'
       : daysOverdue > 90
-        ? 'Escalate with settlement offer'
+        ? 'التصعيد مع عرض تسوية'
         : hasPayments
-          ? 'Maintain contact and negotiate payment plan'
-          : 'Initiate direct contact and assess willingness to pay',
+          ? 'مواصلة التواصل والتفاوض على خطة سداد'
+          : 'بدء تواصل مباشر وتقييم مدى الاستعداد للسداد',
     factors: [
-      { name: 'Days overdue',     impact: daysOverdue === 0 ? 'positive' : daysOverdue > 90 ? 'negative' : 'neutral', weight: Math.min(10, Math.floor(daysOverdue / 18) + 1), description: daysOverdue === 0 ? 'Not overdue' : `${daysOverdue} days overdue` },
-      { name: 'Payment history',  impact: hasPayments ? 'positive' : 'negative', weight: hasPayments ? 7 : 4, description: hasPayments ? `${input.total_payments_made} payment(s)` : 'No payments' },
-      { name: 'Debt-to-income',   impact: dti < 0.5 ? 'positive' : dti > 1.0 ? 'negative' : 'neutral', weight: 5, description: income > 0 ? `DTI: ${(dti * 100).toFixed(0)}%` : 'Income unknown' },
+      { name: 'أيام التأخر',          impact: daysOverdue === 0 ? 'positive' : daysOverdue > 90 ? 'negative' : 'neutral', weight: Math.min(10, Math.floor(daysOverdue / 18) + 1), description: daysOverdue === 0 ? 'غير متأخر' : `متأخر ${daysOverdue} يوم` },
+      { name: 'سجل السداد',           impact: hasPayments ? 'positive' : 'negative', weight: hasPayments ? 7 : 4, description: hasPayments ? `${input.total_payments_made} دفعة` : 'لا توجد دفعات' },
+      { name: 'نسبة الدين إلى الدخل', impact: dti < 0.5 ? 'positive' : dti > 1.0 ? 'negative' : 'neutral', weight: 5, description: income > 0 ? `النسبة: ${(dti * 100).toFixed(0)}%` : 'الدخل غير معروف' },
     ],
   }
 }
@@ -245,10 +245,11 @@ export async function scoreDebt(input: DebtScoringInput): Promise<ScoreResult> {
   const recentPayments = input.payment_history.slice(0, 3).map(p => `${p.date}: ${p.amount} (${p.status})`).join('; ') || 'None'
 
   const prompt = `Analyze this debt and score it. Return ONLY valid JSON.
+IMPORTANT: write "recommended_strategy", every factor "name", and every factor "description" in ARABIC. Keep "risk_classification" and "impact" in English enum values.
 DEBT: amount=${input.debt.original_amount} ${input.debt.currency}, balance=${input.debt.current_balance}, status=${input.debt.status}, overdue=${input.days_overdue}d
 CUSTOMER: employer=${input.customer.employer ?? 'Unknown'}, DTI=${dti}
 PAYMENTS: count=${input.total_payments_made}, recent=${recentPayments}
-Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","collection_probability":<0-100>,"recommended_strategy":"<100chars>","factors":[{"name":"<30chars>","impact":"<positive|negative|neutral>","weight":<1-10>,"description":"<80chars>"}]}`
+Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","collection_probability":<0-100>,"recommended_strategy":"<استراتيجية بالعربية، 100 حرف>","factors":[{"name":"<اسم العامل بالعربية، 30 حرف>","impact":"<positive|negative|neutral>","weight":<1-10>,"description":"<وصف بالعربية، 80 حرف>"}]}`
 
   try {
     const response = await log.time('openai-score', () =>
