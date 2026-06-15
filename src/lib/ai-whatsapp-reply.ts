@@ -539,7 +539,8 @@ export async function generateProactiveReminder(args: {
   company_id: string
   customer_id: string
   debt_id?: string | null
-  promise_details: any
+  promise_details?: any
+  reason?: string
 }): Promise<string> {
   const debtContext = await buildCustomerDebtContext({
     company_id: args.company_id,
@@ -547,32 +548,41 @@ export async function generateProactiveReminder(args: {
     debt_id: args.debt_id,
   })
 
-  const ai = new OpenAI({ 
-    apiKey: process.env.OPENAI_API_KEY,
-    // baseURL removed
+  const fallback = 'السلام عليكم، للتذكير بموعد السداد المتفق عليه، طمّنا إذا تم الإيداع.'
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) return fallback
+
+  const ai = new OpenAI({
+    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
   })
 
-  const res = await ai.chat.completions.create({
-    model: 'gpt-5.5',
-    messages: [
-      {
-        role: 'system',
-        content: `You are "أبو فهد" (Abu Fahad), a 45-year-old professional and respectful Saudi debt collector.
-Your task is to send a proactive, friendly reminder to the customer about their promise to pay today.
-DO NOT BE AGGRESSIVE. Be very polite, using appropriate Saudi greetings.
-The promise details are: ${JSON.stringify(args.promise_details)}.
-Mention the promised amount and ask if they have managed to transfer the amount today.
-KEEP IT VERY SHORT AND NATURAL. (1-2 sentences).
-NEVER mention the internal promise ID.`,
-      },
-      {
-        role: 'user',
-        content: JSON.stringify({
-          customerDebtContext: debtContext
-        }, null, 2)
-      }
-    ]
-  })
+  const context = args.promise_details ?? args.reason ?? ''
 
-  return res.choices[0]?.message?.content ?? 'السلام عليكم، للتذكير بموعد السداد المتفق عليه اليوم، طمنا إذا تم الإيداع.'
+  try {
+    const res = await ai.chat.completions.create({
+      model: process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o',
+      temperature: 0.4,
+      max_tokens: 160,
+      messages: [
+        {
+          role: 'system',
+          content: `أنت "خالد"، محصّل ديون سعودي مهذّب بلهجة سعودية بيضاء عبر الواتساب.
+مهمتك: تذكير ودّي ومختصر للعميل بموعد سداد سبق أن وعد به.
+السياق: ${typeof context === 'string' ? context : JSON.stringify(context)}
+- كن مهذباً وغير عدواني، حيّه بتحية مناسبة.
+- اذكر الموعد/المبلغ إن توفّر واسأله إن كان قد حوّل المبلغ.
+- جملة أو جملتين فقط. لا تذكر أي أرقام مرجعية داخلية.
+أعد نص الرسالة فقط.`,
+        },
+        {
+          role: 'user',
+          content: `بيانات العميل والدين للسياق: ${JSON.stringify(debtContext?.summary ?? {})}`,
+        },
+      ],
+    })
+    const txt = (res.choices[0]?.message?.content ?? '').trim()
+    return txt.length > 1 ? txt : fallback
+  } catch {
+    return fallback
+  }
 }

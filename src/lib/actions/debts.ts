@@ -165,6 +165,14 @@ export async function createDebtAction(formData: FormData) {
       return { error: error.message }
     }
 
+    // Auto-assign the debt to a portfolio based on its creditor
+    if (data && parsed.data.creditor_name) {
+      const portfolioId = await ensurePortfolioForCreditor(supabase, profile.company_id, parsed.data.creditor_name)
+      if (portfolioId) {
+        await supabase.from('debts').update({ portfolio_id: portfolioId }).eq('id', data.id)
+      }
+    }
+
     // Enqueue background AI scoring (non-fatal â€” function may not exist yet)
     try {
       await supabase.rpc('enqueue_job', {
@@ -242,6 +250,21 @@ export async function deleteCustomerFullyAction(customerId: string) {
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Unknown error' }
   }
+}
+
+// Ensures a portfolio exists for a creditor (per company) and returns its id.
+export async function ensurePortfolioForCreditor(supabase: any, companyId: string, creditor: string): Promise<string | null> {
+  const name = creditor.trim()
+  if (!name) return null
+  const { data: existing } = await supabase
+    .from('portfolios').select('id')
+    .eq('company_id', companyId).eq('name', name).maybeSingle()
+  if (existing) return existing.id
+  const { data: created } = await supabase
+    .from('portfolios')
+    .insert({ company_id: companyId, name, name_ar: name, is_active: true, source_system: 'auto_creditor' })
+    .select('id').single()
+  return created?.id ?? null
 }
 
 // Unified "case" creation: creates the customer then their debt in one step.

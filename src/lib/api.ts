@@ -224,6 +224,7 @@ export const createDebtSchema = z.object({
   priority:        debtPrioritySchema.default('medium'),
   due_date:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   product_type:    z.string().max(100).optional(),
+  creditor_name:   z.string().max(200).optional(),
   account_number:  z.string().max(100).optional(),
   assigned_to:     uuidSchema.optional(),
   interest_rate:   z.number().min(0).max(100).default(0),
