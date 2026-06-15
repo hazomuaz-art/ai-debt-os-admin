@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Syne, JetBrains_Mono, IBM_Plex_Sans_Arabic } from 'next/font/google'
 import { LanguageProvider } from '@/lib/i18n'
+import { getServerLocale } from '@/lib/i18n/server'
 import './globals.css'
 
 const inter = Inter({
@@ -38,8 +39,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const locale = getServerLocale()
+  const dir = locale === 'ar' ? 'rtl' : 'ltr'
   return (
-    <html lang="en">
+    <html lang={locale} dir={dir}>
       <body className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} font-sans bg-slate-950 text-slate-100 antialiased`}>
         <LanguageProvider>
           {children}

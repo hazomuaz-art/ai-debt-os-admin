@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
+import { getServerTranslation } from '@/lib/i18n/server'
+import Link from 'next/link'
 import {
   Wallet, BrainCircuit, CheckCircle, AlertTriangle,
   TrendingUp, MessageCircle, ArrowUpRight, ArrowDownRight
@@ -91,6 +93,8 @@ export default async function AdminDashboard() {
   if (!profile?.company_id || profile.role !== 'admin') redirect('/dashboard/collector')
 
   const s = await getStats(profile.company_id)
+  const { t, dir } = getServerTranslation()
+  const h = t.pages.home
 
   // Real collection rate from available figures (no hardcoded number)
   const collectionRate = (s.totalCollected + s.totalBalance) > 0
@@ -100,16 +104,19 @@ export default async function AdminDashboard() {
   const ringOffset = Math.round(ringCirc * (1 - collectionRate / 100))
 
   const kpis = [
-    { title: 'المحصّل هذا الشهر', value: formatCurrency(s.totalCollected, 'SAR'), icon: Wallet, chip: 'bg-emerald-500/15 text-emerald-400', change: s.collectedMoM, sub: 'عن الشهر الماضي' },
-    { title: 'رسائل AI اليوم', value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, chip: 'bg-blue-500/15 text-blue-400', sub: 'اليوم' },
-    { title: 'وعود السداد', value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, chip: 'bg-indigo-500/15 text-indigo-400', sub: 'وعود نشطة' },
-    { title: 'مطالبات متأخرة', value: String(s.overdueDebts ?? 0), icon: AlertTriangle, chip: 'bg-rose-500/15 text-rose-400', sub: 'تتطلب تدخّل', alert: true },
+    { title: h.collected_this_month, value: formatCurrency(s.totalCollected, 'SAR'), icon: Wallet, chip: 'bg-emerald-500/15 text-emerald-400', change: s.collectedMoM, sub: h.vs_last_month },
+    { title: h.ai_messages_today, value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, chip: 'bg-blue-500/15 text-blue-400', sub: t.ui.today },
+    { title: h.payment_promises, value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, chip: 'bg-indigo-500/15 text-indigo-400', sub: h.active_promises },
+    { title: h.overdue_claims, value: String(s.overdueDebts ?? 0), icon: AlertTriangle, chip: 'bg-rose-500/15 text-rose-400', sub: h.needs_action, alert: true },
   ]
 
   // Status distribution (real data)
-  const statusLabels: Record<string, string> = {
+  const statusLabels: Record<string, string> = dir === 'rtl' ? {
     active: 'نشط', overdue: 'متأخر', payment_plan: 'خطة تقسيط', promised: 'وعد سداد',
     settled: 'مسدد', disputed: 'معترض', legal: 'قانوني', new: 'جديد', written_off: 'مشطوب',
+  } : {
+    active: 'Active', overdue: 'Overdue', payment_plan: 'Payment plan', promised: 'Promised',
+    settled: 'Settled', disputed: 'Disputed', legal: 'Legal', new: 'New', written_off: 'Written off',
   }
   const statusEntries = Object.entries(s.statusCount).sort((a, b) => b[1] - a[1]).slice(0, 5)
   const maxStatus = Math.max(1, ...statusEntries.map(([, n]) => n))
@@ -126,25 +133,25 @@ export default async function AdminDashboard() {
   const linePts = coords.join(' ')
   const areaPts = `0,${CH} ${linePts} ${CW},${CH}`
 
-  const firstName = (profile.full_name ?? '').split(' ')[0] || 'بك'
+  const firstName = (profile.full_name ?? '').split(' ')[0] || (dir === 'rtl' ? 'بك' : 'there')
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
+    <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
 
       {/* Welcome banner */}
-      <div className="relative overflow-hidden rounded-2xl mt-6 px-7 py-7 bg-gradient-to-l from-[#0e7a54] via-[#0c5a45] to-[#0d1117]">
-        <div className="absolute left-0 bottom-0 w-1/2 h-full bg-gradient-to-l from-transparent to-black/10"></div>
+      <div className={`relative overflow-hidden rounded-2xl mt-6 px-7 py-7 ${dir === 'rtl' ? 'bg-gradient-to-l' : 'bg-gradient-to-r'} from-[#0e7a54] via-[#0c5a45] to-[#0d1117]`}>
         <div className="relative flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">مرحباً، {firstName}</h1>
+            <h1 className="text-2xl font-bold text-white">{h.welcome.replace('{name}', firstName)}</h1>
             <p className="text-sm text-white/80 mt-1.5">
-              لديك <span className="font-bold text-white">{s.messagesToday || s.aiActionsToday || 0}</span> رسالة و
-              <span className="font-bold text-white"> {formatCurrency(s.totalCollected, 'SAR')}</span> محصّل هذا الشهر
+              {h.welcome_sub
+                .replace('{msgs}', String(s.messagesToday || s.aiActionsToday || 0))
+                .replace('{amount}', formatCurrency(s.totalCollected, 'SAR'))}
             </p>
           </div>
-          <button className="hidden sm:flex items-center gap-2 bg-[#0d1117]/60 hover:bg-[#0d1117] border border-white/15 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
-            عرض التحليلات <TrendingUp size={16} />
-          </button>
+          <Link href="/dashboard/admin/analytics" className="hidden sm:flex items-center gap-2 bg-[#0d1117]/60 hover:bg-[#0d1117] border border-white/15 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
+            {t.ui.view_analytics} <TrendingUp size={16} />
+          </Link>
         </div>
       </div>
 
@@ -164,7 +171,7 @@ export default async function AdminDashboard() {
             {k.change !== undefined ? (
               <div className={`text-xs font-bold flex items-center gap-1 ${k.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {k.change >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                {Math.abs(k.change)}٪ {k.sub}
+                {Math.abs(k.change)}% {k.sub}
               </div>
             ) : (
               <div className="text-xs text-[#5f6b7e]">{k.sub}</div>
@@ -178,10 +185,10 @@ export default async function AdminDashboard() {
         <div className="lg:col-span-2 bg-[#151a23] rounded-2xl p-6 border border-[#222a36]">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-bold text-white">تدفّق التحصيل</h3>
+              <h3 className="text-base font-bold text-white">{h.collection_flow}</h3>
               <div className="text-xl font-bold font-mono text-white mt-1">{formatCurrency(s.totalCollected, 'SAR')}</div>
             </div>
-            <span className="text-xs text-[#8b95a7] bg-[#0d1117] px-3 py-1.5 rounded-lg">هذا الشهر</span>
+            <span className="text-xs text-[#8b95a7] bg-[#0d1117] px-3 py-1.5 rounded-lg">{t.ui.this_month}</span>
           </div>
           <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="w-full h-44">
             <polygon points={areaPts} fill="#10b981" opacity="0.12" />
@@ -191,14 +198,14 @@ export default async function AdminDashboard() {
 
         {/* Collection goal / balance panel */}
         <div className="bg-[#151a23] rounded-2xl p-6 border border-[#222a36] flex flex-col items-center justify-center text-center">
-          <h3 className="text-sm font-bold text-[#8b95a7] mb-4">نسبة التحصيل</h3>
+          <h3 className="text-sm font-bold text-[#8b95a7] mb-4">{h.collection_rate}</h3>
           <svg viewBox="0 0 100 100" className="w-32 h-32">
             <circle cx="50" cy="50" r="40" fill="none" stroke="#222a36" strokeWidth="11" />
             <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="11" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} strokeLinecap="round" transform="rotate(-90 50 50)" />
             <text x="50" y="56" textAnchor="middle" fontSize="22" fontWeight="700" fill="#ffffff">{collectionRate}%</text>
           </svg>
           <div className="mt-4 text-sm font-bold text-white">{formatCurrency(s.totalBalance, 'SAR')}</div>
-          <div className="text-xs text-[#5f6b7e] mt-1">إجمالي المديونيات · {s.totalDebts} ملف</div>
+          <div className="text-xs text-[#5f6b7e] mt-1">{h.total_debts} · {h.file_count.replace('{n}', String(s.totalDebts))}</div>
         </div>
       </div>
 
@@ -208,28 +215,28 @@ export default async function AdminDashboard() {
           <div className="p-6 border-b border-[#222a36] flex justify-between items-center">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              العمليات اللحظية
+              {h.live_ops}
             </h2>
-            <button className="text-sm text-emerald-400 hover:text-emerald-300 font-bold bg-emerald-500/10 hover:bg-emerald-500/20 px-4 py-2 rounded-xl transition-colors">عرض السجل الكامل</button>
+            <Link href="/dashboard/admin/activity" className="text-sm text-emerald-400 hover:text-emerald-300 font-bold bg-emerald-500/10 hover:bg-emerald-500/20 px-4 py-2 rounded-xl transition-colors">{t.ui.view_full_log}</Link>
           </div>
           <div className="overflow-x-auto flex-1 p-2">
             <table className="w-full text-start">
               <thead className="text-[#5f6b7e] text-xs font-bold border-b border-[#222a36]">
                 <tr>
-                  <th className="px-5 py-4">العميل</th>
-                  <th className="px-5 py-4">المبلغ</th>
-                  <th className="px-5 py-4">نوع الإجراء (AI)</th>
-                  <th className="px-5 py-4">الوقت</th>
-                  <th className="px-5 py-4">الحالة</th>
+                  <th className="px-5 py-4">{t.ui.customer}</th>
+                  <th className="px-5 py-4">{t.ui.amount}</th>
+                  <th className="px-5 py-4">{t.nav.ai_actions}</th>
+                  <th className="px-5 py-4">{t.ui.time}</th>
+                  <th className="px-5 py-4">{t.ui.status}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1c2330]">
                 {s.recentActions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-[#5f6b7e] font-bold">لا توجد عمليات مسجلة اليوم</td>
+                    <td colSpan={5} className="py-12 text-center text-[#5f6b7e] font-bold">{h.no_ops_today}</td>
                   </tr>
                 ) : s.recentActions.map((action) => {
-                  const clientName = (action.customer as { full_name?: string } | null)?.full_name ?? 'عميل غير معروف'
+                  const clientName = (action.customer as { full_name?: string } | null)?.full_name ?? t.ui.unknown_customer
                   const balance = (action.debt as { current_balance?: number } | null)?.current_balance ?? 0
                   const currency = (action.debt as { currency?: string } | null)?.currency ?? 'SAR'
                   const formattedTime = new Date(action.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
@@ -241,15 +248,15 @@ export default async function AdminDashboard() {
                       <td className="px-5 py-4">
                         {action.action_type === 'whatsapp' ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            محادثة واتساب
+                            {h.whatsapp_chat}
                           </span>
                         ) : action.action_type === 'call' ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                            مكالمة صوتية
+                            {h.voice_call}
                           </span>
                         ) : action.action_type === 'email' ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            بريد إلكتروني
+                            {h.email_action}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#222a36] text-[#8b95a7] border border-[#2c3543]">
@@ -260,7 +267,7 @@ export default async function AdminDashboard() {
                       <td className="px-5 py-4 text-sm font-bold text-[#5f6b7e] font-mono">{formattedTime}</td>
                       <td className="px-5 py-4">
                         <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${action.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                          {action.status === 'completed' ? 'نجح الإرسال' : 'قيد المعالجة'}
+                          {action.status === 'completed' ? h.sent_ok : h.processing}
                         </span>
                       </td>
                     </tr>
@@ -273,9 +280,9 @@ export default async function AdminDashboard() {
 
         {/* Status distribution */}
         <div className="bg-[#151a23] border border-[#222a36] rounded-2xl p-6">
-          <h3 className="text-base font-bold text-white mb-5">توزيع حالات الملفات</h3>
+          <h3 className="text-base font-bold text-white mb-5">{h.status_distribution}</h3>
           {statusEntries.length === 0 ? (
-            <div className="text-sm text-[#5f6b7e] py-8 text-center">لا توجد بيانات</div>
+            <div className="text-sm text-[#5f6b7e] py-8 text-center">{t.ui.no_data}</div>
           ) : (
             <div className="space-y-4">
               {statusEntries.map(([key, n]) => (
@@ -294,8 +301,8 @@ export default async function AdminDashboard() {
           <div className="mt-6 pt-5 border-t border-[#222a36] flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center"><MessageCircle size={20} /></div>
             <div>
-              <div className="text-sm font-bold text-white">{s.messagesToday || s.aiActionsToday || 0} رسالة اليوم</div>
-              <div className="text-xs text-[#5f6b7e]">عبر الوكيل الذكي</div>
+              <div className="text-sm font-bold text-white">{h.messages_today_via_ai.replace('{n}', String(s.messagesToday || s.aiActionsToday || 0))}</div>
+              <div className="text-xs text-[#5f6b7e]">{h.via_ai_agent}</div>
             </div>
           </div>
         </div>

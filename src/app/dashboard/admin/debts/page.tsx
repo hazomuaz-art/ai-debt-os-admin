@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getServerTranslation } from '@/lib/i18n/server'
 import { CreateDebtModal } from '@/components/debt/CreateDebtModal'
 import { CreateCustomerModal } from '@/components/debt/CreateCustomerModal'
 import ImportDebtsModal from '@/components/debt/ImportDebtsModal'
@@ -34,12 +35,12 @@ function getRiskColor(risk: string) {
   }
 }
 
-function translateRisk(risk: string) {
+function translateRisk(risk: string, isAr: boolean) {
   switch (risk?.toLowerCase()) {
-    case 'high': return 'مرتفع'
-    case 'medium': return 'متوسط'
-    case 'low': return 'منخفض'
-    default: return 'غير محدد'
+    case 'high': return isAr ? 'مرتفع' : 'High'
+    case 'medium': return isAr ? 'متوسط' : 'Medium'
+    case 'low': return isAr ? 'منخفض' : 'Low'
+    default: return isAr ? 'غير محدد' : 'N/A'
   }
 }
 
@@ -60,16 +61,18 @@ export default async function AdminDebtsPage({
 
   if (!profile?.company_id) redirect('/login')
 
+  const { t, dir } = getServerTranslation()
+  const p = t.pages.debts
   const view = searchParams.view === 'customers' ? 'customers' : 'debts'
   const tabBase = '/dashboard/admin/debts'
 
   const tabs = (
     <div className="inline-flex items-center gap-1 bg-[#151a23] border border-[#222a36] rounded-xl p-1">
       <Link href={tabBase} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${view === 'debts' ? 'bg-[#10b981] text-white' : 'text-[#8b95a7] hover:text-white'}`}>
-        <WalletCards size={16} /> الديون
+        <WalletCards size={16} /> {p.tab_debts}
       </Link>
       <Link href={`${tabBase}?view=customers`} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${view === 'customers' ? 'bg-[#10b981] text-white' : 'text-[#8b95a7] hover:text-white'}`}>
-        <Users size={16} /> العملاء
+        <Users size={16} /> {p.tab_customers}
       </Link>
     </div>
   )
@@ -84,11 +87,11 @@ export default async function AdminDebtsPage({
       .limit(50)
 
     return (
-      <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
+      <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
         <div className="bg-[#151a23] rounded-2xl p-6 border border-[#222a36] flex items-center justify-between mt-6 flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">العملاء والمديونيات</h1>
-            <p className="text-[#8b95a7] text-sm">إجمالي العملاء المسجلين: <span className="font-bold text-emerald-400">{count ?? 0}</span></p>
+            <h1 className="text-2xl font-bold text-white mb-1">{p.title}</h1>
+            <p className="text-[#8b95a7] text-sm">{p.total_customers_registered} <span className="font-bold text-emerald-400">{count ?? 0}</span></p>
           </div>
           <div className="flex items-center gap-3">{tabs}<CreateCustomerModal /></div>
         </div>
@@ -98,17 +101,17 @@ export default async function AdminDebtsPage({
             <table className="w-full text-sm">
               <thead className="bg-[#0d1117] border-b border-[#222a36]">
                 <tr>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">اسم العميل</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">معلومات التواصل</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">الهوية الوطنية</th>
-                  <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">مستوى الخطورة</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">المدينة</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">تاريخ الإضافة</th>
+                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.customer_name}</th>
+                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.contact_info}</th>
+                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.national_id}</th>
+                  <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{p.risk_level}</th>
+                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.city}</th>
+                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.added_date}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1c2330]">
                 {(customers ?? []).length === 0 ? (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center text-[#5f6b7e]">لا يوجد عملاء مسجلين حتى الآن.</td></tr>
+                  <tr><td colSpan={6} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_customers}</td></tr>
                 ) : (customers ?? []).map(c => (
                   <tr key={c.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="px-6 py-4">
@@ -122,7 +125,7 @@ export default async function AdminDebtsPage({
                       {c.whatsapp && <div className="text-xs text-emerald-400 bg-emerald-500/10 inline-block px-2 py-0.5 rounded-full font-mono">WA: {c.whatsapp}</div>}
                     </td>
                     <td className="px-6 py-4"><span className="font-mono text-[#8b95a7] bg-[#222a36] px-2 py-1 rounded-md border border-[#2c3543]">{c.national_id ?? '—'}</span></td>
-                    <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getRiskColor(c.risk_level)}`}>{translateRisk(c.risk_level)}</span></td>
+                    <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getRiskColor(c.risk_level)}`}>{translateRisk(c.risk_level, dir === 'rtl')}</span></td>
                     <td className="px-6 py-4 text-slate-300">{c.city ?? '—'}</td>
                     <td className="px-6 py-4 text-[#5f6b7e] text-xs">{formatDate(c.created_at)}</td>
                   </tr>
@@ -177,18 +180,23 @@ export default async function AdminDebtsPage({
   const productTypes = Array.from(new Set((productsData || []).map(p => p.product_type)))
   const creditors = Array.from(new Set((creditorsData || []).map(c => c.creditor_name)))
 
-  const statusLabels: Record<string, string> = {
+  const isAr = dir === 'rtl'
+  const statusLabels: Record<string, string> = isAr ? {
     active: 'نشط', in_progress: 'قيد التنفيذ', promised: 'وعود سداد',
     partial: 'سداد جزئي', settled: 'مُسدد', written_off: 'معدوم',
     legal: 'إجراء قانوني', disputed: 'متنازع عليه', payment_plan: 'خطة تقسيط',
+  } : {
+    active: 'Active', in_progress: 'In progress', promised: 'Promised',
+    partial: 'Partial', settled: 'Settled', written_off: 'Written off',
+    legal: 'Legal', disputed: 'Disputed', payment_plan: 'Payment plan',
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
+    <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
       <div className="bg-[#151a23] rounded-2xl p-6 border border-[#222a36] flex items-center justify-between mt-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">العملاء والمديونيات</h1>
-          <p className="text-[#8b95a7] text-sm">إجمالي الديون المسجلة: <span className="font-bold text-emerald-400">{count ?? 0}</span></p>
+          <h1 className="text-2xl font-bold text-white mb-1">{p.title}</h1>
+          <p className="text-[#8b95a7] text-sm">{p.total_debts_registered} <span className="font-bold text-emerald-400">{count ?? 0}</span></p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {tabs}
@@ -205,19 +213,19 @@ export default async function AdminDebtsPage({
           <table className="w-full text-sm">
             <thead className="bg-[#0d1117] border-b border-[#222a36]">
               <tr>
-                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">رقم المرجع</th>
-                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">العميل</th>
-                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">المبلغ المستحق</th>
-                <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">الحالة</th>
-                <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">تقييم الذكاء</th>
-                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">المحصّل</th>
-                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">تاريخ الاستحقاق</th>
-                <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">الإجراءات</th>
+                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.ref_number}</th>
+                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{t.ui.customer}</th>
+                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.due_amount}</th>
+                <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.status}</th>
+                <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{p.ai_score}</th>
+                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.collector}</th>
+                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.due_date}</th>
+                <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1c2330]">
               {(debts ?? []).length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-12 text-center text-[#5f6b7e]">لا توجد ديون. قم بإضافة الدين الأول للبدء.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_debts}</td></tr>
               ) : (debts ?? []).map((debt: any) => {
                 const latestScore = debt.ai_scores?.[0]
                 return (
@@ -229,7 +237,7 @@ export default async function AdminDebtsPage({
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-bold text-rose-400">{formatCurrency(debt.current_balance, debt.currency)}</div>
-                      <div className="text-[#5f6b7e] text-xs mt-0.5">من {formatCurrency(debt.original_amount, debt.currency)}</div>
+                      <div className="text-[#5f6b7e] text-xs mt-0.5">{p.from_amount.replace('{amount}', formatCurrency(debt.original_amount, debt.currency))}</div>
                     </td>
                     <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(debt.status)}`}>{statusLabels[debt.status] ?? debt.status}</span></td>
                     <td className="px-6 py-4 text-center">
@@ -240,10 +248,10 @@ export default async function AdminDebtsPage({
                         </div>
                       ) : <span className="text-[#5f6b7e] font-bold">—</span>}
                     </td>
-                    <td className="px-6 py-4"><span className="text-sm font-medium text-slate-300 bg-[#222a36] px-2 py-1 rounded-md">{debt.assigned_collector?.full_name ?? 'غير معين'}</span></td>
+                    <td className="px-6 py-4"><span className="text-sm font-medium text-slate-300 bg-[#222a36] px-2 py-1 rounded-md">{debt.assigned_collector?.full_name ?? t.ui.unassigned}</span></td>
                     <td className="px-6 py-4"><span className="text-sm text-[#8b95a7] font-mono">{debt.due_date ? formatDate(debt.due_date) : '—'}</span></td>
                     <td className="px-6 py-4 text-center">
-                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-4 py-1.5 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-lg text-xs transition-colors">عرض التفاصيل</Link>
+                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-4 py-1.5 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-lg text-xs transition-colors">{t.ui.view_details}</Link>
                     </td>
                   </tr>
                 )
@@ -254,10 +262,10 @@ export default async function AdminDebtsPage({
 
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-[#222a36] flex items-center justify-between bg-[#0d1117]">
-            <span className="text-[#8b95a7] text-sm font-medium">صفحة <span className="font-bold text-white">{page}</span> من <span className="font-bold text-white">{totalPages}</span></span>
+            <span className="text-[#8b95a7] text-sm font-medium">{t.ui.page} <span className="font-bold text-white">{page}</span> {t.ui.of} <span className="font-bold text-white">{totalPages}</span></span>
             <div className="flex gap-2">
-              {page < totalPages && <Link href={`/dashboard/admin/debts?page=${page + 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-xl text-sm transition-colors">التالي ←</Link>}
-              {page > 1 && <Link href={`/dashboard/admin/debts?page=${page - 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-xl text-sm transition-colors">→ السابق</Link>}
+              {page < totalPages && <Link href={`/dashboard/admin/debts?page=${page + 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-xl text-sm transition-colors">{t.ui.next} {isAr ? '←' : '→'}</Link>}
+              {page > 1 && <Link href={`/dashboard/admin/debts?page=${page - 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-xl text-sm transition-colors">{isAr ? '→' : '←'} {t.ui.previous}</Link>}
             </div>
           </div>
         )}

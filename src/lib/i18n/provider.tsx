@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { translations, type Locale, type TranslationKeys } from './translations'
 
 type TranslationContextType = {
@@ -19,12 +20,15 @@ const TranslationContext = createContext<TranslationContextType | null>(null)
 
 function getStoredLocale(): Locale {
   if (typeof window === 'undefined') return 'ar'
+  const cookieMatch = document.cookie.match(/(?:^|; )locale=(ar|en)/)
+  if (cookieMatch) return cookieMatch[1] as Locale
   return (localStorage.getItem('ai-debt-os-locale') as Locale) || 'ar'
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('ar')
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     setLocaleState(getStoredLocale())
@@ -34,9 +38,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale)
     localStorage.setItem('ai-debt-os-locale', newLocale)
+    // Cookie lets Server Components read the locale; refresh re-renders them.
+    document.cookie = `locale=${newLocale}; path=/; max-age=31536000`
     document.documentElement.lang = newLocale
     document.documentElement.dir = newLocale === 'ar' ? 'rtl' : 'ltr'
-  }, [])
+    router.refresh()
+  }, [router])
 
   const toggleLocale = useCallback(() => {
     setLocale(locale === 'ar' ? 'en' : 'ar')
