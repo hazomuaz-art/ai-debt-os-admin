@@ -20,6 +20,7 @@ export default function ApprovalsPage() {
     large_settlement: ap.t_large_settlement, discount: ap.t_discount, legal_escalation: ap.t_legal_escalation,
     stop_followup: ap.t_stop_followup, write_off: ap.t_write_off, ai_learning: ap.t_ai_learning,
     campaign_launch: ap.t_campaign_launch, custom: ap.t_custom,
+    dispute: 'اعتراض على المديونية',
   }
 
   const [items,   setItems]   = useState<Approval[]>([])

@@ -151,6 +151,36 @@ export async function PATCH(req: NextRequest) {
             }
           }
           }
+
+          // ── Dispute decision automation ──
+          if (approval.approval_type === 'dispute') {
+            const debtId = approval.entity_id
+            const { data: di } = await ctx.supabase
+              .from('debts').select('*, customers(id, phone, whatsapp, full_name)').eq('id', debtId).single()
+            if (di && di.customers) {
+              const phone = di.customers.whatsapp || di.customers.phone
+              const accepted = status === 'approved'
+              // Accepted dispute → mark disputed + hand to human; rejected → resume collection
+              await ctx.supabase.from('debts').update({ status: accepted ? 'disputed' : 'active' }).eq('id', debtId)
+              await ctx.supabase.from('customers').update({ ai_paused: accepted }).eq('id', di.customers.id)
+              await ctx.supabase.from('disputes')
+                .update({ status: accepted ? 'accepted' : 'rejected', resolved_by: ctx.user.id, resolved_at: new Date().toISOString() })
+                .eq('debt_id', debtId).eq('status', 'pending')
+              if (phone) {
+                const message = accepted
+                  ? `مرحباً ${di.customers.full_name}، تمت دراسة اعتراضك وقبوله مبدئياً. تم تعليق المطالبة الآلية وسيتواصل معك موظف مختص لاستكمال المراجعة.`
+                  : `مرحباً ${di.customers.full_name}، راجعنا اعتراضك ولم يثبت ما يلغي المديونية. يرجى سداد الرصيد المستحق (${di.current_balance} ${di.currency}) أو التواصل لترتيب حل.`
+                const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
+                const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
+                await ctx.supabase.from('messages').insert({
+                  company_id: ctx.profile.company_id, customer_id: di.customers.id, debt_id: debtId,
+                  channel: 'whatsapp', direction: 'outbound', content: message,
+                  status: wr.status === 'sent' ? 'sent' : 'failed', whatsapp_message_id: wr.message_id || null,
+                  metadata: { sender: 'admin', action_type: 'dispute_decision', error: wr.error }, sent_at: new Date().toISOString(),
+                })
+              }
+            }
+          }
         }
       } catch (err) {
         console.error('[approvals PATCH] Post-decision automation failed:', err)

@@ -199,6 +199,28 @@ export async function POST(request: NextRequest) {
                   }).catch(e => log.error('pipeline processing failed', e))
                 }
               }
+
+              // Customer raised a dispute → open a dispute + an admin approval (dedup)
+              if (aiDecision.action === 'record_dispute' && debt_id) {
+                const svc = createServiceClient()
+                const { data: existing } = await svc.from('approvals')
+                  .select('id').eq('company_id', company_id).eq('entity_id', debt_id)
+                  .eq('approval_type', 'dispute').eq('status', 'pending').limit(1).maybeSingle()
+                if (!existing) {
+                  const { data: disp } = await svc.from('disputes').insert({
+                    company_id, customer_id, debt_id,
+                    dispute_type: 'customer_claim', description: text, status: 'pending',
+                    priority: 'high', source: 'whatsapp_ai',
+                  }).select('id').single()
+                  await svc.from('approvals').insert({
+                    company_id, approval_type: 'dispute', entity_type: 'debt', entity_id: debt_id,
+                    title: `اعتراض عميل: ${(customer as { full_name?: string }).full_name ?? ''}`,
+                    description: `سبب العميل: ${text}`,
+                    status: 'pending', priority: 'high',
+                    requested_data: { customer_id, dispute_id: disp?.id ?? null, reason: text },
+                  })
+                }
+              }
             })().catch(err => log.error('AI Processing Error', err))
           }
         }
