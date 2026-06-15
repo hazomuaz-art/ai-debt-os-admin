@@ -29,3 +29,27 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ data })
   })
 }
+
+// DELETE one alert ({ id }) or all of this company's alerts ({ all: true })
+export async function DELETE(req: NextRequest) {
+  return withAuth(async (ctx) => {
+    let body: { id?: string; all?: boolean }
+    try { body = await req.json() } catch { return errors.badRequest('Invalid JSON') }
+
+    if (body.all) {
+      const { error } = await ctx.supabase
+        .from('system_alerts').delete()
+        .eq('company_id', ctx.profile.company_id)
+      if (error) return errors.internal(error.message)
+      return NextResponse.json({ ok: true })
+    }
+
+    if (!body.id) return errors.badRequest('id or all required')
+    const { error } = await ctx.supabase
+      .from('system_alerts').delete()
+      .eq('id', String(body.id))
+      .or(`company_id.eq.${ctx.profile.company_id},company_id.is.null`)
+    if (error) return errors.internal(error.message)
+    return NextResponse.json({ ok: true })
+  })
+}

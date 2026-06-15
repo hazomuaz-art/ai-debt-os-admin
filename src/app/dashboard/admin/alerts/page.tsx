@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { SystemAlert, AlertSeverity } from '@/types'
-import { BellRing, Check, Info, AlertTriangle, XCircle, AlertOctagon, RefreshCw } from 'lucide-react'
+import { BellRing, Check, Info, AlertTriangle, XCircle, AlertOctagon, RefreshCw, Trash2 } from 'lucide-react'
 
 const SEV: Record<AlertSeverity, string> = {
-  info:     'bg-blue-50 text-blue-600 border-blue-200',
-  warning:  'bg-amber-50 text-amber-600 border-amber-200',
-  error:    'bg-orange-50 text-orange-600 border-orange-200',
-  critical: 'bg-rose-50 text-rose-600 border-rose-200',
+  info:     'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  warning:  'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  error:    'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  critical: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
 }
 
 const SEV_ARABIC: Record<AlertSeverity, string> = {
@@ -41,22 +41,30 @@ export default function AlertsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  async function markRead(id: string) {
-    await fetch('/api/modules/alerts', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, is_read: true }),
-    })
-    setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_read: true } : a))
-  }
-
   async function resolve(id: string) {
+    setAlerts(prev => prev.filter(a => a.id !== id))
     await fetch('/api/modules/alerts', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, is_resolved: true, resolved_at: new Date().toISOString() }),
     })
-    await load()
+  }
+
+  async function remove(id: string) {
+    setAlerts(prev => prev.filter(a => a.id !== id))
+    await fetch('/api/modules/alerts', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+  }
+
+  async function removeAll() {
+    if (!confirm('حذف جميع التنبيهات؟')) return
+    setAlerts([])
+    await fetch('/api/modules/alerts', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    })
   }
 
   const filtered = filter === 'all' ? alerts : alerts.filter(a => a.severity === filter)
@@ -77,9 +85,16 @@ export default function AlertsPage() {
             <p className="text-[#8b95a7] text-sm">مراقبة صحة النظام، الأخطاء التقنية، وتنبيهات الذكاء الاصطناعي</p>
           </div>
         </div>
-        <button onClick={load} className="bg-[#151a23] hover:bg-[#1a212c] border border-[#222a36] text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {loading ? 'جاري التحديث...' : 'تحديث السجل'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={load} className="bg-[#151a23] hover:bg-[#1a212c] border border-[#222a36] text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {loading ? 'جاري التحديث...' : 'تحديث'}
+          </button>
+          {alerts.length > 0 && (
+            <button onClick={() => void removeAll()} className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+              <Trash2 size={16} /> حذف الكل
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Severity counters */}
@@ -120,7 +135,7 @@ export default function AlertsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-16 text-center">
-          <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={40} />
           </div>
           <div className="font-bold text-xl text-white mb-2">لا توجد تنبيهات نشطة حالياً</div>
@@ -162,15 +177,13 @@ export default function AlertsPage() {
                 </div>
 
                 <div className="flex flex-row md:flex-col gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 pt-4 md:pt-0 border-t border-[#222a36] md:border-0">
-                  {!alert.is_read && (
-                    <button onClick={() => void markRead(alert.id)}
-                      className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-[#151a23] text-[#8b95a7] border border-[#222a36] hover:text-white hover:bg-[#1a212c] transition-colors">
-                      تحديد كمقروء
-                    </button>
-                  )}
                   <button onClick={() => void resolve(alert.id)}
-                    className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-500 hover:text-white transition-colors flex items-center justify-center gap-1.5">
+                    className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-colors flex items-center justify-center gap-1.5">
                     <Check size={14} /> تم الحل
+                  </button>
+                  <button onClick={() => void remove(alert.id)}
+                    className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-[#151a23] text-[#8b95a7] border border-[#222a36] hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition-colors flex items-center justify-center gap-1.5">
+                    <Trash2 size={14} /> حذف
                   </button>
                 </div>
                 
