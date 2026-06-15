@@ -60,7 +60,7 @@ interface Props {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-4 text-sm shadow-xl font-bold text-[#1e3e50] text-start" >
+    <div className="bg-white border border-slate-100 rounded-xl p-4 text-sm shadow-xl font-bold text-[#0e7a54] text-start" >
       {label && <p className="text-slate-400 mb-2 border-b border-slate-50 pb-2">{label}</p>}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }} className="flex justify-between gap-4 mt-1">
@@ -98,7 +98,7 @@ export default function AnalyticsCharts({
     <div className="space-y-6" >
       {/* Monthly Collection Bar Chart */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-[#1e3e50] mb-6">التحصيلات الشهرية (بالريال السعودي)</h2>
+        <h2 className="text-lg font-bold text-[#0e7a54] mb-6">التحصيلات الشهرية (بالريال السعودي)</h2>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 16, bottom: 4 }} style={{ direction: 'ltr' }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -113,7 +113,7 @@ export default function AnalyticsCharts({
 
       {/* New Debts per Month */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-[#1e3e50] mb-6">الديون الجديدة المضافة شهرياً</h2>
+        <h2 className="text-lg font-bold text-[#0e7a54] mb-6">الديون الجديدة المضافة شهرياً</h2>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }} style={{ direction: 'ltr' }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -129,7 +129,7 @@ export default function AnalyticsCharts({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Status Breakdown */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#1e3e50] mb-4">توزيع حالات الديون</h2>
+          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">توزيع حالات الديون</h2>
           {statusChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -162,7 +162,7 @@ export default function AnalyticsCharts({
 
         {/* Priority Breakdown */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#1e3e50] mb-4">توزيع الأهمية (الأولويات)</h2>
+          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">توزيع الأهمية (الأولويات)</h2>
           {priorityChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -195,7 +195,7 @@ export default function AnalyticsCharts({
 
         {/* Channel Breakdown */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#1e3e50] mb-4">قنوات التواصل المستخدمة</h2>
+          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">قنوات التواصل المستخدمة</h2>
           {channelChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -227,7 +227,7 @@ export default function AnalyticsCharts({
 
         {/* AI Risk Classification */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#1e3e50] mb-4">تصنيف الذكاء الاصطناعي للمخاطر</h2>
+          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">تصنيف الذكاء الاصطناعي للمخاطر</h2>
           {riskChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={riskChartData} layout="vertical" margin={{ left: 16, right: 16 }} style={{ direction: 'ltr' }}>

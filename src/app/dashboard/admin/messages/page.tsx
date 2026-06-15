@@ -31,17 +31,17 @@ export default async function MessagesPage() {
   const whatsapp = messages?.filter(m => m.channel === 'whatsapp').length ?? 0
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex justify-between items-center mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3e50] mb-2">المحادثات المباشرة</h1>
+          <h1 className="text-2xl font-bold text-[#0e7a54] mb-2">المحادثات المباشرة</h1>
           <p className="text-slate-500 text-sm">مراقبة محادثات الذكاء الاصطناعي وإدارة المفاوضات مع العملاء</p>
         </div>
         <div className="flex gap-4">
-          <div className="bg-[#e6f0f9] px-4 py-2 rounded-xl border border-blue-100 text-center">
-            <div className="text-2xl font-bold text-[#1e3e50]">{whatsapp}</div>
+          <div className="bg-[#f6f8fa] px-4 py-2 rounded-xl border border-blue-100 text-center">
+            <div className="text-2xl font-bold text-[#0e7a54]">{whatsapp}</div>
             <div className="text-[10px] text-slate-500 font-bold">رسائل الواتساب</div>
           </div>
           <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 text-center">

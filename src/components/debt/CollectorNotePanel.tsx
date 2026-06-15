@@ -49,7 +49,7 @@ export default function CollectorNotePanel({
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
         <FileText className="text-blue-500" size={20} />
-        <h2 className="text-lg font-bold text-[#1e3e50]">إفادة المحصل وتاريخ المتابعة</h2>
+        <h2 className="text-lg font-bold text-[#0e7a54]">إفادة المحصل وتاريخ المتابعة</h2>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">
@@ -63,7 +63,7 @@ export default function CollectorNotePanel({
             type="datetime-local" 
             value={followUpDate}
             onChange={e => setFollowUpDate(e.target.value)}
-            className="w-full bg-[#f0f4f8] border border-slate-200 text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+            className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
           />
         </div>
 
@@ -75,7 +75,7 @@ export default function CollectorNotePanel({
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder="مثال: العميل طلب مهلة ليوم الخميس القادم لتدبير المبلغ..."
-            className="w-full bg-[#f0f4f8] border border-slate-200 text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed" 
+            className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed" 
           />
         </div>
 
@@ -83,7 +83,7 @@ export default function CollectorNotePanel({
           <button 
             type="submit" 
             disabled={loading}
-            className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold py-2.5 px-6 rounded-xl transition-colors text-sm flex justify-center items-center gap-2 disabled:opacity-50"
+            className="bg-[#0e7a54] hover:bg-slate-800 text-white font-bold py-2.5 px-6 rounded-xl transition-colors text-sm flex justify-center items-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             حفظ البيانات والإفادة

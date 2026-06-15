@@ -104,7 +104,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
               placeholder="البحث عن عميل أو رقم..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl pe-10 ps-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
             />
           </div>
         </div>
@@ -121,10 +121,10 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                 <div 
                   key={item.customer.id}
                   onClick={() => setSelectedCustomerId(item.customer.id)}
-                  className={`p-4 border-b border-slate-50 cursor-pointer transition-colors ${isSelected ? 'bg-[#e6f0f9]' : 'hover:bg-slate-50'}`}
+                  className={`p-4 border-b border-slate-50 cursor-pointer transition-colors ${isSelected ? 'bg-[#f6f8fa]' : 'hover:bg-slate-50'}`}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-bold text-[#1e3e50] text-sm truncate">{item.customer.full_name}</h4>
+                    <h4 className="font-bold text-[#0e7a54] text-sm truncate">{item.customer.full_name}</h4>
                     <span className="text-xs text-slate-400 shrink-0">{formatTime(lastMsg.sent_at || lastMsg.created_at)}</span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -149,11 +149,11 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
             {/* Chat Header */}
             <div className="bg-white px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#1e3e50] rounded-full flex items-center justify-center text-white">
+                <div className="w-10 h-10 bg-[#0e7a54] rounded-full flex items-center justify-center text-white">
                   <User size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-[#1e3e50]">{selectedChat.customer.full_name}</h3>
+                  <h3 className="font-bold text-[#0e7a54]">{selectedChat.customer.full_name}</h3>
                   <div className="text-xs text-slate-500 flex items-center gap-2">
                     <span>{selectedChat.customer.whatsapp || selectedChat.customer.phone}</span>
                     <span>Ã¢â‚¬Â¢</span>
@@ -168,7 +168,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     {formatCurrency(selectedChat.debt?.current_balance || 0, selectedChat.debt?.currency || 'SAR')}
                   </div>
                 </div>
-                <button className="p-2 text-slate-400 hover:text-[#1e3e50] bg-slate-50 rounded-full transition-colors">
+                <button className="p-2 text-slate-400 hover:text-[#0e7a54] bg-slate-50 rounded-full transition-colors">
                   <Phone size={18} />
                 </button>
               </div>
@@ -188,8 +188,8 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                   <div key={msg.id} className={`flex ${isOutbound ? 'justify-start' : 'justify-end'}`}>
                     <div className={`max-w-[70%] rounded-2xl px-4 py-2 ${
                       isOutbound 
-                        ? 'bg-white text-[#1e3e50] rounded-tr-sm border border-slate-100 shadow-sm' 
-                        : 'bg-[#1e3e50] text-white rounded-tl-sm shadow-md'
+                        ? 'bg-white text-[#0e7a54] rounded-tr-sm border border-slate-100 shadow-sm' 
+                        : 'bg-[#0e7a54] text-white rounded-tl-sm shadow-md'
                     }`}>
                       <div className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</div>
                       <div className={`text-[10px] mt-1 flex justify-end items-center gap-1 ${isOutbound ? 'text-slate-400' : 'text-blue-200'}`}>
@@ -218,7 +218,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
                     placeholder="اكتب رسالة للرد المباشر..." 
-                    className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl ps-12 pe-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+                    className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl ps-12 pe-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && replyText.trim()) {
                         // Dummy send
@@ -227,7 +227,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     }}
                   />
                   <button 
-                    className="absolute start-2 top-1.5 p-1.5 bg-[#1e3e50] text-white rounded-lg hover:bg-[#152e3b] transition-colors"
+                    className="absolute start-2 top-1.5 p-1.5 bg-[#0e7a54] text-white rounded-lg hover:bg-[#152e3b] transition-colors"
                     onClick={() => setReplyText('')}
                   >
                     <Send size={16} className="transform rotate-180" />

@@ -117,16 +117,16 @@ export default async function AnalyticsPage() {
   const riskChartData = Object.entries(riskCounts).map(([name, value]) => ({ name, value }))
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <BarChart3 size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">التحليلات والمؤشرات (Analytics)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">التحليلات والمؤشرات (Analytics)</h1>
             <p className="text-slate-500 text-sm">أداء المحفظة الاستثمارية وذكاء التحصيل المالي</p>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default async function AnalyticsPage() {
             <div className="text-slate-500 text-sm font-bold">إجمالي المطالبات</div>
             <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center"><BarChart3 size={20} /></div>
           </div>
-          <div className="text-3xl font-bold text-[#1e3e50] font-mono">{totalDebts.toLocaleString()}</div>
+          <div className="text-3xl font-bold text-[#0e7a54] font-mono">{totalDebts.toLocaleString()}</div>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">

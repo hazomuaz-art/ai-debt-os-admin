@@ -29,7 +29,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#e6f0f9] p-4 sm:p-8 font-sans" >
+    <div className="min-h-screen flex items-center justify-center bg-[#f6f8fa] p-4 sm:p-8 font-sans" >
       
       <div className="flex w-full max-w-5xl bg-white rounded-3xl overflow-hidden shadow-2xl ring-1 ring-slate-900/5">
         
@@ -37,36 +37,36 @@ export default function LoginPage() {
         <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-16">
           <div className="w-full max-w-sm">
             <div className="flex items-center gap-3 mb-10">
-              <div className="w-10 h-10 bg-[#1e3e50] rounded-xl flex items-center justify-center text-white font-bold">
+              <div className="w-10 h-10 bg-[#0e7a54] rounded-xl flex items-center justify-center text-white font-bold">
                 <BrainCircuit size={20} />
               </div>
-              <span className="font-bold text-xl text-[#1e3e50]">Max Automation</span>
+              <span className="font-bold text-xl text-[#0e7a54]">Max Automation</span>
             </div>
 
-            <h2 className="text-3xl font-bold mb-2 text-[#1e3e50]">مرحباً بك مجدداً</h2>
+            <h2 className="text-3xl font-bold mb-2 text-[#0e7a54]">مرحباً بك مجدداً</h2>
             <p className="text-slate-500 mb-8 font-medium">قم بتسجيل الدخول للوصول إلى لوحة التحكم</p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-[#1e3e50] mb-2">البريد الإلكتروني</label>
+                <label className="block text-sm font-bold text-[#0e7a54] mb-2">البريد الإلكتروني</label>
                 <input
                   name="email"
                   type="email"
                   required
                   autoComplete="email"
-                  className="w-full bg-[#f0f4f8] border border-slate-200 text-[#1e3e50] rounded-xl px-4 py-3 focus:outline-none focus:border-[#1e3e50] focus:ring-1 focus:ring-[#1e3e50] transition-colors"
+                  className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0e7a54] focus:ring-1 focus:ring-[#0e7a54] transition-colors"
                   placeholder="admin@max.com"
                   dir="ltr"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-[#1e3e50] mb-2">كلمة المرور</label>
+                <label className="block text-sm font-bold text-[#0e7a54] mb-2">كلمة المرور</label>
                 <input
                   name="password"
                   type="password"
                   required
                   autoComplete="current-password"
-                  className="w-full bg-[#f0f4f8] border border-slate-200 text-[#1e3e50] rounded-xl px-4 py-3 focus:outline-none focus:border-[#1e3e50] focus:ring-1 focus:ring-[#1e3e50] transition-colors"
+                  className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-3 focus:outline-none focus:border-[#0e7a54] focus:ring-1 focus:ring-[#0e7a54] transition-colors"
                   placeholder="••••••••"
                   dir="ltr"
                 />
@@ -78,7 +78,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <button type="submit" disabled={loading} className="w-full bg-[#1e3e50] hover:bg-[#152e3b] text-white font-bold py-3.5 rounded-xl transition-colors mt-4">
+              <button type="submit" disabled={loading} className="w-full bg-[#0e7a54] hover:bg-[#152e3b] text-white font-bold py-3.5 rounded-xl transition-colors mt-4">
                 {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
               </button>
             </form>
@@ -90,7 +90,7 @@ export default function LoginPage() {
         </div>
 
         {/* Left panel (Image/Info) - in RTL this is on the left */}
-        <div className="hidden lg:flex w-1/2 bg-[#1e3e50] flex-col justify-center items-center p-16 relative overflow-hidden">
+        <div className="hidden lg:flex w-1/2 bg-[#0e7a54] flex-col justify-center items-center p-16 relative overflow-hidden">
           {/* Abstract background shapes */}
           <div className="absolute top-0 end-0 -mt-20 -me-20 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 start-0 -mb-20 -ms-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl"></div>

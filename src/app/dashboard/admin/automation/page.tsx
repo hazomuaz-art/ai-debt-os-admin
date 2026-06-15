@@ -71,16 +71,16 @@ export default function AutomationPage() {
   const mc   = MODE_CONFIG[mode]
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <Settings size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إعدادات الأتمتة والتحكم</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إعدادات الأتمتة والتحكم</h1>
             <p className="text-slate-500 text-sm">التحكم في أوضاع التشغيل، إيقاف الطوارئ، وضبط موديولات الذكاء الاصطناعي</p>
           </div>
         </div>
@@ -97,8 +97,8 @@ export default function AutomationPage() {
           {/* Mode selector */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-              <Cpu className="text-[#1e3e50]" size={20} />
-              <h2 className="text-lg font-bold text-[#1e3e50]">وضع التشغيل الحالي (Mode)</h2>
+              <Cpu className="text-[#0e7a54]" size={20} />
+              <h2 className="text-lg font-bold text-[#0e7a54]">وضع التشغيل الحالي (Mode)</h2>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -149,8 +149,8 @@ export default function AutomationPage() {
           {/* Module toggles */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-              <Activity className="text-[#1e3e50]" size={20} />
-              <h2 className="text-lg font-bold text-[#1e3e50]">الوحدات الذكية (Smart Modules)</h2>
+              <Activity className="text-[#0e7a54]" size={20} />
+              <h2 className="text-lg font-bold text-[#0e7a54]">الوحدات الذكية (Smart Modules)</h2>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -160,12 +160,12 @@ export default function AutomationPage() {
                   <div key={key}
                     className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
                       enabled
-                        ? 'bg-[#e6f0f9]/50 border-blue-200'
+                        ? 'bg-[#f6f8fa]/50 border-blue-200'
                         : 'bg-[#fbfdfd] border-slate-200'
                     }`}
                   >
                     <div>
-                      <div className={`font-bold text-sm ${enabled ? 'text-[#1e3e50]' : 'text-slate-500'}`}>{labels.en}</div>
+                      <div className={`font-bold text-sm ${enabled ? 'text-[#0e7a54]' : 'text-slate-500'}`}>{labels.en}</div>
                       <div className={`text-xs mt-0.5 ${enabled ? 'text-blue-600/70' : 'text-slate-400'}`}>{labels.ar}</div>
                     </div>
                     
@@ -222,8 +222,8 @@ export default function AutomationPage() {
           {/* Usage limits */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-              <Activity className="text-[#1e3e50]" size={20} />
-              <h2 className="text-lg font-bold text-[#1e3e50]">حدود الاستخدام (Cost Shield)</h2>
+              <Activity className="text-[#0e7a54]" size={20} />
+              <h2 className="text-lg font-bold text-[#0e7a54]">حدود الاستخدام (Cost Shield)</h2>
             </div>
             
             <div className="flex flex-col gap-4">
@@ -238,7 +238,7 @@ export default function AutomationPage() {
                   <input 
                     type="number" 
                     min="0" 
-                    className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+                    className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                     value={String(config[key] ?? '')}
                     onChange={e => setConfig(p => ({ ...p, [key]: Number(e.target.value) }))}
                     onBlur={() => void save({})}

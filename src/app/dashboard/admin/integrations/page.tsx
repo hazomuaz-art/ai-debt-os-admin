@@ -11,19 +11,19 @@ const INTEGRATIONS = [
     key:         'evolution_whatsapp',
     label:       'Evolution WhatsApp',
     description: 'ربط واتساب عبر Evolution API لاستقبال وإرسال الرسائل والمفاوضات.',
-    icon:        <MessageCircle size={24} className="text-[#1e3e50]" />,
+    icon:        <MessageCircle size={24} className="text-[#0e7a54]" />,
   },
   {
     key:         'n8n_automation',
     label:       'n8n Automation',
     description: 'ربط خوادم الأتمتة n8n لبرمجة مسارات العمل المتكررة وتزامن البيانات.',
-    icon:        <Settings size={24} className="text-[#1e3e50]" />,
+    icon:        <Settings size={24} className="text-[#0e7a54]" />,
   },
   {
     key:         'collection_api',
     label:       'أنظمة التحصيل والمحاسبة (ERP)',
     description: 'ربط ثنائي الاتجاه لمزامنة الديون والعملاء وسجلات السداد.',
-    icon:        <LinkIcon size={24} className="text-[#1e3e50]" />,
+    icon:        <LinkIcon size={24} className="text-[#0e7a54]" />,
   },
 ]
 
@@ -55,18 +55,18 @@ export default async function IntegrationsPage() {
   const enabledCount  = (settings ?? []).filter(s => s.enabled).length
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3e50] mb-2">إدارة الربط (Integrations)</h1>
+          <h1 className="text-2xl font-bold text-[#0e7a54] mb-2">إدارة الربط (Integrations)</h1>
           <p className="text-slate-500 text-sm">
             قم بربط الأنظمة الخارجية لتفعيل الذكاء الاصطناعي والمراسلات وأتمتة المهام بكل سهولة.
           </p>
         </div>
-        <div className="bg-[#e6f0f9] px-4 py-3 rounded-xl border border-blue-100 flex items-center gap-2">
-          <div className="w-3 h-3 bg-[#1e3e50] rounded-full animate-pulse"></div>
-          <span className="text-[#1e3e50] font-bold text-sm">
+        <div className="bg-[#f6f8fa] px-4 py-3 rounded-xl border border-blue-100 flex items-center gap-2">
+          <div className="w-3 h-3 bg-[#0e7a54] rounded-full animate-pulse"></div>
+          <span className="text-[#0e7a54] font-bold text-sm">
             {enabledCount} من {INTEGRATIONS.length} قيد التشغيل
           </span>
         </div>
@@ -88,7 +88,7 @@ export default async function IntegrationsPage() {
       </div>
       
       {/* Docs footer */}
-      <div className="bg-[#1e3e50] text-white rounded-2xl p-6 shadow-md flex items-center justify-between">
+      <div className="bg-[#0e7a54] text-white rounded-2xl p-6 shadow-md flex items-center justify-between">
         <div>
           <h3 className="font-bold text-lg mb-1">تحتاج مساعدة في الربط؟</h3>
           <p className="text-blue-200 text-sm">
@@ -97,7 +97,7 @@ export default async function IntegrationsPage() {
         </div>
         <a
           href="#"
-          className="px-6 py-2 bg-white text-[#1e3e50] hover:bg-blue-50 font-bold rounded-xl text-sm transition-colors shrink-0"
+          className="px-6 py-2 bg-white text-[#0e7a54] hover:bg-blue-50 font-bold rounded-xl text-sm transition-colors shrink-0"
         >
           تصفح الوثائق ↗
         </a>

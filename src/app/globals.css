@@ -4,9 +4,9 @@
 
 @layer base {
   :root {
-    --background: #e6f0f9; /* The soft light blue background of the whole app */
+    --background: #f6f8fa; /* Clean neutral light background of the whole app */
     --foreground: #334155;
-    --sidebar: #1e3e50; /* The dark teal of the sidebar */
+    --sidebar: #0e7a54; /* Emerald sidebar (fintech-trust theme) */
   }
 
   body {

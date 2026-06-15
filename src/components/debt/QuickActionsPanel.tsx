@@ -139,9 +139,9 @@ export default function QuickActionsPanel({
 
       {/* Promise Modal */}
       {showPromiseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
           <form onSubmit={submitPromise} className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
-            <h3 className="font-bold text-[#1e3e50] text-lg mb-4 flex items-center gap-2">
+            <h3 className="font-bold text-[#0e7a54] text-lg mb-4 flex items-center gap-2">
               <Handshake className="text-emerald-500" />
               تسجيل وعد بالسداد
             </h3>
@@ -153,7 +153,7 @@ export default function QuickActionsPanel({
                 required
                 value={promiseDate}
                 onChange={e => setPromiseDate(e.target.value)}
-                className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
               />
             </div>
             
@@ -165,7 +165,7 @@ export default function QuickActionsPanel({
                 min={1}
                 value={promiseAmount}
                 onChange={e => setPromiseAmount(e.target.value)}
-                className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
               />
             </div>
 
@@ -191,9 +191,9 @@ export default function QuickActionsPanel({
 
       {/* Dispute Modal */}
       {showDisputeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
           <form onSubmit={submitDispute} className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
-            <h3 className="font-bold text-[#1e3e50] text-lg mb-4 flex items-center gap-2">
+            <h3 className="font-bold text-[#0e7a54] text-lg mb-4 flex items-center gap-2">
               <ShieldAlert className="text-rose-500" />
               تسجيل اعتراض (Dispute)
             </h3>
@@ -210,7 +210,7 @@ export default function QuickActionsPanel({
                 value={disputeReason}
                 onChange={e => setDisputeReason(e.target.value)}
                 placeholder="مثال: العميل يدعي سداد المبلغ قبل شهر..."
-                className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none resize-none" 
+                className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none resize-none" 
               />
             </div>
 

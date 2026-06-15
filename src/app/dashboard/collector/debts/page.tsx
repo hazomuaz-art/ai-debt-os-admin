@@ -66,7 +66,7 @@ export default async function CollectorDebtsPage({
   const totalBalance = (debts ?? []).reduce((s, d) => s + Number(d.current_balance ?? 0), 0)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
@@ -75,7 +75,7 @@ export default async function CollectorDebtsPage({
             <Wallet size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">ملفات الديون</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">ملفات الديون</h1>
             <p className="text-slate-500 text-sm font-medium">إجمالي {count ?? 0} ملف مسند إليك بقيمة {formatCurrency(totalBalance, 'SAR')}</p>
           </div>
         </div>
@@ -114,17 +114,17 @@ export default async function CollectorDebtsPage({
               ) : (debts ?? []).map(debt => (
                 <tr key={debt.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-[#1e3e50] text-sm mb-1">{(debt.customer as {full_name?: string} | null)?.full_name ?? 'غير معروف'}</div>
+                    <div className="font-bold text-[#0e7a54] text-sm mb-1">{(debt.customer as {full_name?: string} | null)?.full_name ?? 'غير معروف'}</div>
                     <div className="text-slate-400 text-xs font-mono" dir="ltr">{(debt.customer as {phone?: string} | null)?.phone ?? '—'}</div>
                   </td>
                   
                   <td className="px-6 py-4">
-                    <div className="font-bold text-[#1e3e50] font-mono text-base">{formatCurrency(debt.current_balance, debt.currency)}</div>
+                    <div className="font-bold text-[#0e7a54] font-mono text-base">{formatCurrency(debt.current_balance, debt.currency)}</div>
                     <div className="text-slate-400 text-xs mt-0.5">من أصل {formatCurrency(debt.original_amount, debt.currency)}</div>
                   </td>
                   
                   <td className="px-6 py-4 text-center">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#f0f4f8] text-slate-600">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#e7f6ef] text-slate-600">
                       <span className={`w-1.5 h-1.5 rounded-full ${
                         debt.status === 'active' ? 'bg-blue-500' :
                         debt.status === 'promised' ? 'bg-amber-500' :

@@ -68,14 +68,14 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+      <button onClick={() => setOpen(true)} className="bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
         <Plus size={18} /> إضافة محفظة
       </button>
     )
   }
 
   return (
-    <div className="fixed inset-0 bg-[#1e3e50]/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in" >
+    <div className="fixed inset-0 bg-[#0e7a54]/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in" >
       <div className="bg-white border border-slate-100 rounded-2xl w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom-4">
         
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-[#fbfdfd] rounded-t-2xl">
@@ -83,7 +83,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
             <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
               <FolderKanban size={20} />
             </div>
-            <h2 className="font-bold text-[#1e3e50] text-lg">إضافة محفظة / مشروع جديد</h2>
+            <h2 className="font-bold text-[#0e7a54] text-lg">إضافة محفظة / مشروع جديد</h2>
           </div>
           <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors">
             <XCircle size={20} />
@@ -94,24 +94,24 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الاسم (عربي) *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" 
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54]" 
                 value={form.name_ar} onChange={e => setForm(p => ({ ...p, name_ar: e.target.value }))} placeholder="موبايلي"  />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الاسم (إنجليزي) *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" 
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54] text-end" 
                 value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Mobily" dir="ltr" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الرمز القصير *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" 
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#0e7a54] text-end" 
                 value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="MOB" maxLength={10} dir="ltr" />
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">تصنيف المحفظة *</label>
-              <select required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]"
+              <select required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54]"
                 value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value as PortfolioCategory }))}>
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
@@ -121,7 +121,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">اللون المميز للمحفظة</label>
-            <div className="flex gap-3 items-center bg-[#f0f4f8] p-2 rounded-xl">
+            <div className="flex gap-3 items-center bg-[#e7f6ef] p-2 rounded-xl">
               <input type="color" value={form.color} onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
                 className="w-10 h-10 rounded-lg cursor-pointer bg-white border border-slate-200" />
               <span className="text-slate-500 text-sm font-mono font-bold">{form.color}</span>
@@ -129,7 +129,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">ملاحظات داخلية (اختياري)</label>
-            <textarea className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" 
+            <textarea className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54]" 
               rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="أي معلومات إضافية عن شروط العقد أو المحفظة..." />
           </div>
           
@@ -137,7 +137,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
           
           <div className="flex gap-3 pt-4 border-t border-slate-100">
             <button type="button" onClick={() => setOpen(false)} className="flex-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold text-sm px-6 py-3 rounded-xl transition-colors">إلغاء</button>
-            <button type="submit" disabled={saving} className="flex-1 bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving} className="flex-1 bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors disabled:opacity-50">
               {saving ? 'جارٍ الحفظ…' : 'حفظ المحفظة'}
             </button>
           </div>
@@ -186,16 +186,16 @@ export default function PortfoliosPage() {
   }, {} as Record<string, Portfolio[]>)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <FolderKanban size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">المحافظ والمشاريع (Portfolios)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">المحافظ والمشاريع (Portfolios)</h1>
             <p className="text-slate-500 text-sm">إدارة الشركات والمشاريع المرتبطة بعمليات التحصيل، وتصنيف الديون</p>
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function PortfoliosPage() {
             <Search className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              className="w-full md:w-64 bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
+              className="w-full md:w-64 bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl pe-10 ps-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-slate-400"
               placeholder="ابحث باسم المحفظة أو الرمز…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -219,7 +219,7 @@ export default function PortfoliosPage() {
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="text-slate-500 text-xs font-bold mb-2">إجمالي المحافظ</div>
           <div className="flex items-end justify-between">
-            <div className="font-bold text-3xl text-[#1e3e50] font-mono">{portfolios.length}</div>
+            <div className="font-bold text-3xl text-[#0e7a54] font-mono">{portfolios.length}</div>
             <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><FolderKanban size={16}/></div>
           </div>
         </div>
@@ -246,14 +246,14 @@ export default function PortfoliosPage() {
       {/* Portfolio grid */}
       {loading ? (
         <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
           <div className="w-20 h-20 bg-blue-50 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
             <FolderKanban size={40} />
           </div>
-          <div className="font-bold text-xl text-[#1e3e50] mb-2">لا توجد محافظ مطابقة</div>
+          <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد محافظ مطابقة</div>
           <p className="text-slate-500 text-sm">أضف محفظة جديدة للبدء في ربط الديون والعملاء بها.</p>
         </div>
       ) : (
@@ -268,7 +268,7 @@ export default function PortfoliosPage() {
                     {portfolio.code.slice(0, 3)}
                   </div>
                   <div>
-                    <div className="font-bold text-[#1e3e50] text-lg mb-1">{portfolio.name_ar || portfolio.name}</div>
+                    <div className="font-bold text-[#0e7a54] text-lg mb-1">{portfolio.name_ar || portfolio.name}</div>
                     {portfolio.name_ar && <div className="text-slate-400 text-xs font-mono" dir="ltr">{portfolio.name}</div>}
                   </div>
                 </div>
@@ -279,7 +279,7 @@ export default function PortfoliosPage() {
                   {CATEGORY_ICONS[portfolio.category]}
                   {CATEGORY_LABELS[portfolio.category]}
                 </span>
-                <span className="bg-[#f0f4f8] text-slate-500 text-xs font-bold px-3 py-1.5 rounded-lg font-mono flex items-center gap-1.5">
+                <span className="bg-[#e7f6ef] text-slate-500 text-xs font-bold px-3 py-1.5 rounded-lg font-mono flex items-center gap-1.5">
                   <Settings size={14} /> {portfolio.source_system === 'manual' ? 'يدوي' : portfolio.source_system}
                 </span>
               </div>

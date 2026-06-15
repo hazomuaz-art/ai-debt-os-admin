@@ -67,7 +67,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       className={[
         'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none',
         'disabled:opacity-40 disabled:cursor-not-allowed',
-        checked ? 'bg-[#1e3e50] border-[#1e3e50]' : 'bg-slate-200 border-slate-200',
+        checked ? 'bg-[#0e7a54] border-[#0e7a54]' : 'bg-slate-200 border-slate-200',
       ].join(' ')}
       dir="ltr"
     >
@@ -170,12 +170,12 @@ export function IntegrationCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-50 bg-[#fbfdfd]">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             {icon}
           </div>
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="font-bold text-[#1e3e50] text-lg">{label}</h3>
+              <h3 className="font-bold text-[#0e7a54] text-lg">{label}</h3>
               <StatusBadge enabled={enabled} lastError={lastError} />
             </div>
             <p className="text-slate-500 text-sm">{description}</p>
@@ -188,7 +188,7 @@ export function IntegrationCard({
       <div className="p-6 space-y-5 flex-1">
         {fields.map(field => (
           <div key={field.key}>
-            <label className="block text-sm font-bold text-[#1e3e50] mb-2">
+            <label className="block text-sm font-bold text-[#0e7a54] mb-2">
               {field.label}
               {field.hint && <span className="text-slate-400 font-normal me-2">— {field.hint}</span>}
             </label>
@@ -198,7 +198,7 @@ export function IntegrationCard({
               onChange={e => handleField(field.key, e.target.value)}
               placeholder={field.placeholder}
               autoComplete={field.type === 'password' ? 'new-password' : 'off'}
-              className="w-full bg-[#f0f4f8] border border-slate-200 text-[#1e3e50] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#1e3e50] focus:ring-1 focus:ring-[#1e3e50] transition-colors font-mono"
+              className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#0e7a54] focus:ring-1 focus:ring-[#0e7a54] transition-colors font-mono"
               dir="ltr"
             />
           </div>
@@ -218,7 +218,7 @@ export function IntegrationCard({
           type="button"
           onClick={handleTest}
           disabled={testState === 'testing' || !isConfigured}
-          className="px-4 py-2 text-[#1e3e50] bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
+          className="px-4 py-2 text-[#0e7a54] bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
         >
           {testState === 'testing' ? 'جاري الفحص...' : 'فحص الاتصال'}
         </button>
@@ -227,7 +227,7 @@ export function IntegrationCard({
           type="button"
           onClick={handleSave}
           disabled={saveState === 'saving'}
-          className="px-6 py-2 bg-[#1e3e50] hover:bg-[#152e3b] text-white font-bold rounded-xl text-sm transition-colors"
+          className="px-6 py-2 bg-[#0e7a54] hover:bg-[#152e3b] text-white font-bold rounded-xl text-sm transition-colors"
         >
           {saveState === 'saving'  ? 'جاري الحفظ...' :
            saveState === 'saved'   ? 'تم الحفظ ✔'   :

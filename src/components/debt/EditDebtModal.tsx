@@ -61,7 +61,7 @@ export default function EditDebtModal({ debt, customer }: { debt: any, customer:
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" >
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h2 className="text-lg font-bold text-[#1e3e50]">تعديل بيانات العميل والمديونية</h2>
+              <h2 className="text-lg font-bold text-[#0e7a54]">تعديل بيانات العميل والمديونية</h2>
               <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={20} />
               </button>
@@ -108,7 +108,7 @@ export default function EditDebtModal({ debt, customer }: { debt: any, customer:
                 <button type="button" onClick={() => setIsOpen(false)} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50">
                   إلغاء
                 </button>
-                <button type="submit" disabled={loading} className="flex-1 bg-[#1e3e50] text-white px-4 py-2 rounded-xl font-bold hover:bg-[#2a5268] flex items-center justify-center gap-2">
+                <button type="submit" disabled={loading} className="flex-1 bg-[#0e7a54] text-white px-4 py-2 rounded-xl font-bold hover:bg-[#2a5268] flex items-center justify-center gap-2">
                   {loading ? <Loader2 size={18} className="animate-spin" /> : 'حفظ التعديلات'}
                 </button>
               </div>

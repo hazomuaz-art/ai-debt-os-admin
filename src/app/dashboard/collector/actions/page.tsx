@@ -60,7 +60,7 @@ export default async function CollectorActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -68,7 +68,7 @@ export default async function CollectorActionsPage() {
             <Clock size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إجراءات اليوم</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إجراءات اليوم</h1>
             <p className="text-slate-500 text-sm font-medium">المهام الواجب تنفيذها لليوم: {done} مكتملة، و {pending} قيد الانتظار</p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default async function CollectorActionsPage() {
             <div className="w-20 h-20 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 size={40} />
             </div>
-            <div className="font-bold text-xl text-[#1e3e50] mb-2">لا توجد أي مهام مجدولة لليوم</div>
+            <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد أي مهام مجدولة لليوم</div>
             <p className="text-slate-500 text-sm">عمل رائع! لقد أنهيت جميع المهام المسندة إليك.</p>
           </div>
         ) : (actions ?? []).map(action => (
@@ -120,7 +120,7 @@ export default async function CollectorActionsPage() {
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 flex-wrap mb-2">
-                    <span className="font-bold text-[#1e3e50] text-lg">{(action.customer as {full_name?: string} | null)?.full_name}</span>
+                    <span className="font-bold text-[#0e7a54] text-lg">{(action.customer as {full_name?: string} | null)?.full_name}</span>
                     <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${getPriorityStyle(action.priority)}`}>
                       {getPriorityLabel(action.priority)}
                     </span>
@@ -134,7 +134,7 @@ export default async function CollectorActionsPage() {
                   </div>
                   
                   {action.suggested_message && (
-                    <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-[#1e3e50] text-sm relative">
+                    <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-[#0e7a54] text-sm relative">
                       <span className="absolute -top-2.5 end-4 bg-white px-2 text-[10px] font-bold text-blue-500 border border-blue-100 rounded-md">رسالة مقترحة</span>
                       {action.suggested_message}
                     </div>

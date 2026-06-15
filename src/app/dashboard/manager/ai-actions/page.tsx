@@ -43,7 +43,7 @@ export default async function ManagerAIActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -51,7 +51,7 @@ export default async function ManagerAIActionsPage() {
             <Bot size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إجراءات الذكاء الاصطناعي</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إجراءات الذكاء الاصطناعي</h1>
             <p className="text-slate-500 text-sm">مراقبة المهام والتوصيات التلقائية الصادرة اليوم لفريقك.</p>
           </div>
         </div>
@@ -66,7 +66,7 @@ export default async function ManagerAIActionsPage() {
           </div>
           <div>
             <h3 className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wide">المهام قيد الانتظار</h3>
-            <p className="text-3xl font-bold text-[#1e3e50] font-mono">{pending}</p>
+            <p className="text-3xl font-bold text-[#0e7a54] font-mono">{pending}</p>
           </div>
         </div>
         
@@ -76,14 +76,14 @@ export default async function ManagerAIActionsPage() {
           </div>
           <div>
             <h3 className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wide">المهام المنجزة</h3>
-            <p className="text-3xl font-bold text-[#1e3e50] font-mono">{completed}</p>
+            <p className="text-3xl font-bold text-[#0e7a54] font-mono">{completed}</p>
           </div>
         </div>
       </div>
 
       {/* Actions List */}
       <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm p-6">
-        <h3 className="font-bold text-[#1e3e50] text-sm mb-4 border-b border-slate-100 pb-3 flex items-center gap-2">
+        <h3 className="font-bold text-[#0e7a54] text-sm mb-4 border-b border-slate-100 pb-3 flex items-center gap-2">
           <Zap size={16} className="text-amber-500" /> الإجراءات المقترحة لليوم
         </h3>
         
@@ -102,7 +102,7 @@ export default async function ManagerAIActionsPage() {
                         <ActionIcon size={18} />
                       </div>
                       <div>
-                        <p className="font-bold text-[#1e3e50] text-sm">{action.debt?.customer?.full_name}</p>
+                        <p className="font-bold text-[#0e7a54] text-sm">{action.debt?.customer?.full_name}</p>
                         <p className="text-[11px] text-slate-400 font-mono mt-0.5">ملف: {action.debt?.reference_number}</p>
                         <p className="text-xs text-slate-600 mt-2 font-bold bg-slate-50 px-2 py-1 rounded-md inline-block border border-slate-100">{action.reason}</p>
                         {action.suggested_message && (

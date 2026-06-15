@@ -60,16 +60,16 @@ export default async function AdminTeamPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <Users size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إدارة فريق العمل (Team)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إدارة فريق العمل (Team)</h1>
             <p className="text-slate-500 text-sm">إدارة الموظفين، الصلاحيات، ومتابعة الأداء الشهري</p>
           </div>
         </div>
@@ -84,11 +84,11 @@ export default async function AdminTeamPage() {
             
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-100 text-[#1e3e50] rounded-full flex items-center justify-center font-bold text-xl shrink-0">
+                <div className="w-12 h-12 bg-slate-100 text-[#0e7a54] rounded-full flex items-center justify-center font-bold text-xl shrink-0">
                   {member.full_name?.charAt(0) ?? member.email.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-bold text-[#1e3e50] text-lg">{member.full_name ?? 'بدون اسم'}</div>
+                  <div className="font-bold text-[#0e7a54] text-lg">{member.full_name ?? 'بدون اسم'}</div>
                   <div className="text-slate-400 text-xs font-mono">{member.email}</div>
                 </div>
               </div>
@@ -98,17 +98,17 @@ export default async function AdminTeamPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="bg-[#f0f4f8] rounded-xl p-3 text-center">
+              <div className="bg-[#e7f6ef] rounded-xl p-3 text-center">
                 <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Activity size={12}/> المسندة</div>
-                <div className="font-bold text-[#1e3e50] text-xl font-mono">{member.assignedDebts}</div>
+                <div className="font-bold text-[#0e7a54] text-xl font-mono">{member.assignedDebts}</div>
               </div>
-              <div className="bg-[#f0f4f8] rounded-xl p-3 text-center">
+              <div className="bg-[#e7f6ef] rounded-xl p-3 text-center">
                 <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Wallet size={12}/> تم التحصيل</div>
                 <div className="font-bold text-emerald-600 text-xl font-mono">
                   {formatCurrency(member.collectedThisMonth, 'SAR').replace('SAR', '').trim()}
                 </div>
               </div>
-              <div className="bg-[#f0f4f8] rounded-xl p-3 text-center">
+              <div className="bg-[#e7f6ef] rounded-xl p-3 text-center">
                 <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><CheckCircle size={12}/> أُنجزت اليوم</div>
                 <div className="font-bold text-blue-600 text-xl font-mono">{member.actionsCompletedToday}</div>
               </div>

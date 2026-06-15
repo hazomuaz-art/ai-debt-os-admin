@@ -86,7 +86,7 @@ function CostSettingsPanel() {
         <span className="text-slate-400 text-sm font-bold">$</span>
         <input
           type="number" step="0.0001" min="0"
-          className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1e3e50]"
+          className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0e7a54]"
           value={String(settings[key] ?? '')}
           onChange={e => setSettings(p => ({ ...p, [key]: Number(e.target.value) }))}
           placeholder="0.0000" dir="ltr"
@@ -98,13 +98,13 @@ function CostSettingsPanel() {
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(p => !p)} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#1e3e50] font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+      <button onClick={() => setOpen(p => !p)} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#0e7a54] font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
         <Settings2 size={18} /> إعدادات التسعير
       </button>
       
       {open && (
         <div className="absolute start-0 top-full mt-2 w-[400px] sm:w-[500px] z-50 bg-white border border-slate-100 rounded-2xl shadow-2xl p-6 animate-in slide-in-from-top-2">
-          <div className="font-bold text-lg text-[#1e3e50] mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
+          <div className="font-bold text-lg text-[#0e7a54] mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
             <span>تعديل أسعار التكلفة للـ API</span>
             <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-50 px-3 py-1 rounded-lg">إغلاق</button>
           </div>
@@ -120,7 +120,7 @@ function CostSettingsPanel() {
               {field('external_api_per_call', 'طلبات API خارجية', '/ طلب')}
             </div>
             
-            <button type="submit" disabled={saving} className="w-full bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50 flex items-center justify-center gap-2">
+            <button type="submit" disabled={saving} className="w-full bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50 flex items-center justify-center gap-2">
               {saved ? <><CheckCircle2 size={18}/> تم الحفظ بنجاح</> : saving ? 'جارٍ الحفظ…' : 'حفظ الإعدادات'}
             </button>
           </form>
@@ -155,28 +155,28 @@ export default function CostCenterPage() {
   const maxPortfolio = Math.max(...(data?.byPortfolio.map(r => r.cost) ?? [0]), 0.000001)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <DollarSign size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">مركز التكلفة (Cost Center)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">مركز التكلفة (Cost Center)</h1>
             <p className="text-slate-500 text-sm">التكلفة الحقيقية لجميع عمليات الذكاء الاصطناعي واستهلاك واجهات برمجة التطبيقات (APIs)</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4 relative">
-          <div className="flex bg-[#f0f4f8] rounded-xl p-1 border border-slate-100">
+          <div className="flex bg-[#e7f6ef] rounded-xl p-1 border border-slate-100">
             {(['today', 'month', 'all'] as const).map(r => (
               <button
                 key={r}
                 onClick={() => setRange(r)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                  range === r ? 'bg-white text-[#1e3e50] shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                  range === r ? 'bg-white text-[#0e7a54] shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
                 }`}
               >
                 {r === 'today' ? 'اليوم' : r === 'month' ? 'هذا الشهر' : 'الكل'}
@@ -189,14 +189,14 @@ export default function CostCenterPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : !data ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
           <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
             <DollarSign size={40} />
           </div>
-          <div className="font-bold text-xl text-[#1e3e50] mb-2">لا توجد بيانات تكلفة مسجلة حتى الآن</div>
+          <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد بيانات تكلفة مسجلة حتى الآن</div>
           <p className="text-slate-500 text-sm">ستظهر هنا تكاليف عمليات النظام بمجرد البدء باستخدامه.</p>
         </div>
       ) : (
@@ -208,7 +208,7 @@ export default function CostCenterPage() {
               <div className="font-bold text-2xl text-blue-600 font-mono" dir="ltr">{fmt(data.summary.todayCost)}</div>
             </div>
             
-            <div className="bg-[#1e3e50] rounded-2xl border border-slate-700 shadow-lg p-5 col-span-1 sm:col-span-2 relative overflow-hidden">
+            <div className="bg-[#0e7a54] rounded-2xl border border-slate-700 shadow-lg p-5 col-span-1 sm:col-span-2 relative overflow-hidden">
               <div className="absolute top-0 start-0 w-32 h-32 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-y-1/2 -translate-x-1/2"></div>
               <div className="relative z-10">
                 <div className="text-blue-200 text-xs font-bold mb-2 flex items-center gap-1.5"><DollarSign size={14}/> إجمالي التكلفة ({range === 'today' ? 'لليوم' : range === 'month' ? 'للشهر' : 'للإجمالي'})</div>
@@ -218,12 +218,12 @@ export default function CostCenterPage() {
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="text-slate-500 text-xs font-bold mb-2 flex items-center gap-1.5"><Database size={14}/> الرموز المستهلكة (Tokens)</div>
-              <div className="font-bold text-2xl text-[#1e3e50] font-mono">{(data.summary.totalTokens / 1000).toFixed(1)}K</div>
+              <div className="font-bold text-2xl text-[#0e7a54] font-mono">{(data.summary.totalTokens / 1000).toFixed(1)}K</div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
               <div className="text-slate-500 text-xs font-bold mb-2 flex items-center gap-1.5"><Zap size={14}/> إجمالي العمليات</div>
-              <div className="font-bold text-2xl text-[#1e3e50] font-mono">{data.summary.totalOps}</div>
+              <div className="font-bold text-2xl text-[#0e7a54] font-mono">{data.summary.totalOps}</div>
               {data.summary.failedOps > 0 && (
                 <div className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-50 px-2 py-0.5 rounded-md inline-block">{data.summary.failedOps} عملية فاشلة</div>
               )}
@@ -235,14 +235,14 @@ export default function CostCenterPage() {
 
             {/* By Provider */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-[#1e3e50] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Server size={16} className="text-emerald-500"/> التكلفة حسب المزود</h3>
+              <h3 className="font-bold text-[#0e7a54] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Server size={16} className="text-emerald-500"/> التكلفة حسب المزود</h3>
               <div className="space-y-4">
                 {data.byProvider.map(row => (
                   <div key={row.name} className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${PROVIDER_COLORS[row.name] ?? 'bg-slate-300'}`} />
-                        <span className="font-mono text-[#1e3e50]">{row.name}</span>
+                        <span className="font-mono text-[#0e7a54]">{row.name}</span>
                         <span className="text-slate-400 font-mono px-2 py-0.5 bg-slate-50 rounded-md">{row.ops} عملية</span>
                       </div>
                       <span className="text-slate-600 font-mono">{fmt(row.cost)}</span>
@@ -258,13 +258,13 @@ export default function CostCenterPage() {
 
             {/* By Portfolio */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-[#1e3e50] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><BarChart2 size={16} className="text-blue-500"/> حسب المحفظة (المشروع)</h3>
+              <h3 className="font-bold text-[#0e7a54] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><BarChart2 size={16} className="text-blue-500"/> حسب المحفظة (المشروع)</h3>
               <div className="space-y-4">
                 {data.byPortfolio.map(row => (
                   <div key={row.name} className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
                       <div className="flex items-center gap-2">
-                        <span className="truncate max-w-[120px] text-[#1e3e50]">{row.name}</span>
+                        <span className="truncate max-w-[120px] text-[#0e7a54]">{row.name}</span>
                         <span className="text-slate-400 font-mono bg-slate-50 px-2 py-0.5 rounded-md">{row.ops}</span>
                       </div>
                       <span className="text-slate-600 font-mono">{fmt(row.cost)}</span>
@@ -280,13 +280,13 @@ export default function CostCenterPage() {
 
             {/* By Action */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-[#1e3e50] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Activity size={16} className="text-purple-500"/> حسب نوع العملية</h3>
+              <h3 className="font-bold text-[#0e7a54] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Activity size={16} className="text-purple-500"/> حسب نوع العملية</h3>
               <div className="space-y-4">
                 {data.byAction.map(row => (
                   <div key={row.name} className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[#1e3e50] truncate max-w-[130px]">{row.name}</span>
+                        <span className="font-mono text-[#0e7a54] truncate max-w-[130px]">{row.name}</span>
                         <span className="text-slate-400 font-mono bg-slate-50 px-2 py-0.5 rounded-md">{row.ops}</span>
                       </div>
                       <span className="text-slate-600 font-mono">{fmt(row.cost)}</span>
@@ -303,7 +303,7 @@ export default function CostCenterPage() {
 
           {/* Recent operations table */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bold text-[#1e3e50] text-sm mb-4">سجل تفاصيل العمليات الأخيرة</h3>
+            <h3 className="font-bold text-[#0e7a54] text-sm mb-4">سجل تفاصيل العمليات الأخيرة</h3>
             <div className="overflow-x-auto border border-slate-100 rounded-xl">
               <table className="w-full text-sm text-start">
                 <thead className="bg-[#fcfdfd] border-b border-slate-100 text-slate-500 text-xs font-bold">
@@ -323,7 +323,7 @@ export default function CostCenterPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${PROVIDER_COLORS[r.provider] ?? 'bg-slate-300'}`} />
-                          <span className="font-mono text-xs font-bold text-[#1e3e50]">{r.provider}</span>
+                          <span className="font-mono text-xs font-bold text-[#0e7a54]">{r.provider}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-slate-500 font-bold">{r.action_type}</td>

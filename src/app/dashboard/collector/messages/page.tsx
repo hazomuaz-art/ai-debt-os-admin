@@ -44,7 +44,7 @@ export default async function CollectorMessagesPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-4 mt-6">
@@ -52,7 +52,7 @@ export default async function CollectorMessagesPage() {
           <MessageSquare size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">سجل المراسلات</h1>
+          <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">سجل المراسلات</h1>
           <p className="text-slate-500 text-sm font-medium">سجل التواصل لجميع ملفات الديون المسندة إليك</p>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default async function CollectorMessagesPage() {
                       {formatDate(msg.sent_at || msg.created_at)}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-[#1e3e50] text-sm mb-0.5">{(msg.debt as any)?.customer?.full_name || '—'}</div>
+                      <div className="font-bold text-[#0e7a54] text-sm mb-0.5">{(msg.debt as any)?.customer?.full_name || '—'}</div>
                       <div className="text-slate-400 text-xs font-mono">{(msg.debt as any)?.reference_number || '—'}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -114,7 +114,7 @@ export default async function CollectorMessagesPage() {
             <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
               <MessageSquare size={32} />
             </div>
-            <h3 className="font-bold text-lg text-[#1e3e50] mb-2">لا توجد رسائل مسجلة</h3>
+            <h3 className="font-bold text-lg text-[#0e7a54] mb-2">لا توجد رسائل مسجلة</h3>
             <p className="text-slate-500 text-sm">لم يتم إرسال أو استقبال أي رسائل للديون المسندة إليك بعد.</p>
           </div>
         )}

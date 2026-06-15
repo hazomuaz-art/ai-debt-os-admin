@@ -252,25 +252,25 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <Megaphone size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">محرك الحملات التسويقية (Campaign Engine)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">محرك الحملات التسويقية (Campaign Engine)</h1>
             <p className="text-slate-500 text-sm">إدارة حملات التحصيل، أرقام الواتساب للمشاريع، وتنظيم طوابير الإرسال.</p>
           </div>
         </div>
 
         <div className="flex gap-3">
-          <button onClick={() => setShowNumberForm(p => !p)} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#1e3e50] font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+          <button onClick={() => setShowNumberForm(p => !p)} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#0e7a54] font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
             {showNumberForm ? 'إلغاء الرقم' : <><LinkIcon size={18} /> ربط رقم واتساب</>}
           </button>
-          <button onClick={() => setShowCampaignForm(p => !p)} className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+          <button onClick={() => setShowCampaignForm(p => !p)} className="bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
             {showCampaignForm ? 'إلغاء الحملة' : <><Plus size={18} /> حملة جديدة</>}
           </button>
         </div>
@@ -279,7 +279,7 @@ export default function CampaignsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
           <div className="text-slate-500 text-sm font-bold mb-1">إجمالي الحملات</div>
-          <div className="text-3xl font-bold text-[#1e3e50]">{campaigns.length}</div>
+          <div className="text-3xl font-bold text-[#0e7a54]">{campaigns.length}</div>
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
           <div className="text-slate-500 text-sm font-bold mb-1">حملات نشطة (جارية)</div>
@@ -301,7 +301,7 @@ export default function CampaignsPage() {
 
       {showNumberForm && (
         <form onSubmit={handleAddNumber} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
-          <div className="font-bold text-lg text-[#1e3e50] border-b border-slate-100 pb-3 flex items-center gap-2">
+          <div className="font-bold text-lg text-[#0e7a54] border-b border-slate-100 pb-3 flex items-center gap-2">
             <MessageSquare size={18} className="text-emerald-500" />
             ربط رقم واتساب جديد بمحفظة (Portfolio)
           </div>
@@ -309,7 +309,7 @@ export default function CampaignsPage() {
           <div className="grid md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">المشروع / المحفظة *</label>
-              <select required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <select required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.portfolio_id}
                 onChange={e => setNumberForm(p => ({ ...p, portfolio_id: e.target.value }))}>
                 <option value="">اختر المشروع...</option>
@@ -323,7 +323,7 @@ export default function CampaignsPage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">الاسم الرمزي (اختياري)</label>
-              <input className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <input className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.display_name}
                 onChange={e => setNumberForm(p => ({ ...p, display_name: e.target.value }))}
                 placeholder="مثال: واتساب موبايلي" />
@@ -331,7 +331,7 @@ export default function CampaignsPage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">رقم الهاتف *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.phone_number}
                 onChange={e => setNumberForm(p => ({ ...p, phone_number: e.target.value }))}
                 placeholder="9665XXXXXXXX" dir="ltr" />
@@ -339,21 +339,21 @@ export default function CampaignsPage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">اسم خادم Evolution *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.instance_name}
                 onChange={e => setNumberForm(p => ({ ...p, instance_name: e.target.value }))} dir="ltr" />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">رابط الخادم (Evolution API URL)</label>
-              <input className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <input className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.api_url}
                 onChange={e => setNumberForm(p => ({ ...p, api_url: e.target.value }))} dir="ltr" />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">الحد الأقصى للإرسال اليومي</label>
-              <input type="number" min={1} max={5000} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <input type="number" min={1} max={5000} className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.daily_limit}
                 onChange={e => setNumberForm(p => ({ ...p, daily_limit: Number(e.target.value) }))} />
             </div>
@@ -369,7 +369,7 @@ export default function CampaignsPage() {
 
       {showCampaignForm && (
         <form onSubmit={handleAddCampaign} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
-          <div className="font-bold text-lg text-[#1e3e50] border-b border-slate-100 pb-3 flex items-center gap-2">
+          <div className="font-bold text-lg text-[#0e7a54] border-b border-slate-100 pb-3 flex items-center gap-2">
             <Megaphone size={18} className="text-blue-500" />
             صياغة مسودة حملة جديدة
           </div>
@@ -377,7 +377,7 @@ export default function CampaignsPage() {
           <div className="grid md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">اسم الحملة *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={campaignForm.name}
                 onChange={e => setCampaignForm(p => ({ ...p, name: e.target.value }))}
                 placeholder="حملة العيد، حملة الرواتب..." />
@@ -385,7 +385,7 @@ export default function CampaignsPage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">نوع الحملة</label>
-              <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              <select className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={campaignForm.campaign_type}
                 onChange={e => setCampaignForm(p => ({ ...p, campaign_type: e.target.value }))}>
                 {Object.entries(TYPE_LABELS).map(([key, label]) => (
@@ -396,7 +396,7 @@ export default function CampaignsPage() {
 
             <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-bold text-slate-500 ps-2">قالب الرسالة الافتتاحية</label>
-              <textarea rows={3} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50] resize-none"
+              <textarea rows={3} className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] resize-none"
                 placeholder="اكتب رسالة الواتساب الأولى التي سيبدأ بها الذكاء الاصطناعي محادثته..."
                 value={campaignForm.message_template}
                 onChange={e => setCampaignForm(p => ({ ...p, message_template: e.target.value }))} />
@@ -418,15 +418,15 @@ export default function CampaignsPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
-            <Smartphone className="text-[#1e3e50]" size={20} />
+            <Smartphone className="text-[#0e7a54]" size={20} />
             <div>
-              <h2 className="text-lg font-bold text-[#1e3e50]">أرقام الواتساب المرتبطة بالمشاريع</h2>
+              <h2 className="text-lg font-bold text-[#0e7a54]">أرقام الواتساب المرتبطة بالمشاريع</h2>
               <div className="text-slate-500 text-xs mt-0.5">يمكن تخصيص رقم منفصل وحد إرسال لكل محفظة.</div>
             </div>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div></div>
+            <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div></div>
           ) : numbers.length === 0 ? (
             <div className="text-slate-400 text-sm py-8 text-center font-bold">لا توجد أرقام واتساب مرتبطة بعد.</div>
           ) : (
@@ -435,7 +435,7 @@ export default function CampaignsPage() {
                 <div key={number.id} className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-bold text-[#1e3e50] text-base">{number.display_name || number.phone_number}</div>
+                      <div className="font-bold text-[#0e7a54] text-base">{number.display_name || number.phone_number}</div>
                       <div className="text-slate-500 text-sm mt-1">
                         {number.portfolio?.code ? `${number.portfolio.code} - ` : ''}
                         {number.portfolio?.name_ar || number.portfolio?.name || 'محفظة غير معروفة'}
@@ -458,11 +458,11 @@ export default function CampaignsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mt-5 text-sm">
-                    <div className="rounded-xl bg-[#f0f4f8] border border-slate-100 p-3 text-center">
+                    <div className="rounded-xl bg-[#e7f6ef] border border-slate-100 p-3 text-center">
                       <div className="text-slate-500 font-bold text-xs mb-1">الحد اليومي</div>
-                      <div className="font-bold text-[#1e3e50] text-lg font-mono">{String(Number(number.daily_limit ?? 0))}</div>
+                      <div className="font-bold text-[#0e7a54] text-lg font-mono">{String(Number(number.daily_limit ?? 0))}</div>
                     </div>
-                    <div className="rounded-xl bg-[#f0f4f8] border border-slate-100 p-3 text-center">
+                    <div className="rounded-xl bg-[#e7f6ef] border border-slate-100 p-3 text-center">
                       <div className="text-slate-500 font-bold text-xs mb-1">تم الإرسال</div>
                       <div className="font-bold text-blue-600 text-lg font-mono">{String(Number(number.sent_today ?? 0))}</div>
                     </div>
@@ -491,9 +491,9 @@ export default function CampaignsPage() {
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
-            <Activity className="text-[#1e3e50]" size={20} />
+            <Activity className="text-[#0e7a54]" size={20} />
             <div>
-              <h2 className="text-lg font-bold text-[#1e3e50]">بنية الطوابير والقواعد (Queue Foundation)</h2>
+              <h2 className="text-lg font-bold text-[#0e7a54]">بنية الطوابير والقواعد (Queue Foundation)</h2>
               <div className="text-slate-500 text-xs mt-0.5">ضمان التوزيع العادل وحماية النظام من الحظر.</div>
             </div>
           </div>
@@ -502,21 +502,21 @@ export default function CampaignsPage() {
             <div className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">🛑</div>
               <div>
-                <div className="font-bold text-[#1e3e50]">قواعد الإيقاف التلقائي</div>
+                <div className="font-bold text-[#0e7a54]">قواعد الإيقاف التلقائي</div>
                 <div className="text-slate-500 text-xs mt-1 leading-relaxed">يتوقف الواتساب فوراً عن إرسال الرسائل التلقائية إذا قام العميل بالرد، ادعاء الدفع، تقديم اعتراض، أو الدخول في وعد سداد.</div>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">⏳</div>
               <div>
-                <div className="font-bold text-[#1e3e50]">التدفق الآمن (Throttling)</div>
+                <div className="font-bold text-[#0e7a54]">التدفق الآمن (Throttling)</div>
                 <div className="text-slate-500 text-xs mt-1 leading-relaxed">جدولة الرسائل بفاصل زمني ديناميكي يمنع حظر الواتساب ويتوافق مع سياسات شركة Meta للرسائل التسويقية.</div>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-[#fbfdfd] p-5 flex items-start gap-3">
               <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0">🗂️</div>
               <div>
-                <div className="font-bold text-[#1e3e50]">العزل الذكي للمحافظ</div>
+                <div className="font-bold text-[#0e7a54]">العزل الذكي للمحافظ</div>
                 <div className="text-slate-500 text-xs mt-1 leading-relaxed">لا تتداخل بيانات الحملات الخاصة بالاتصالات مع البنوك، كل محفظة تعمل باستقلال تام برقم واتساب مخصص لها.</div>
               </div>
             </div>
@@ -526,15 +526,15 @@ export default function CampaignsPage() {
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
-          <PlayCircle className="text-[#1e3e50]" size={20} />
+          <PlayCircle className="text-[#0e7a54]" size={20} />
           <div>
-            <h2 className="text-lg font-bold text-[#1e3e50]">سجل الحملات (Campaigns Log)</h2>
+            <h2 className="text-lg font-bold text-[#0e7a54]">سجل الحملات (Campaigns Log)</h2>
             <div className="text-slate-500 text-xs mt-0.5">المسودات، الحملات المجدولة، ونتائج التحصيل المالية المباشرة.</div>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div></div>
+          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div></div>
         ) : (
           <div className="space-y-4">
             {campaigns.length === 0 && (
@@ -546,11 +546,11 @@ export default function CampaignsPage() {
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap mb-3">
-                      <span className="font-bold text-[#1e3e50] text-base">{campaign.name}</span>
+                      <span className="font-bold text-[#0e7a54] text-base">{campaign.name}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${STATUS_STYLES[campaign.status]}`}>
                         {STATUS_ARABIC[campaign.status] ?? campaign.status}
                       </span>
-                      <span className="bg-[#f0f4f8] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">
+                      <span className="bg-[#e7f6ef] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">
                         {TYPE_LABELS[campaign.campaign_type] ?? campaign.campaign_type}
                       </span>
                     </div>
@@ -576,29 +576,29 @@ export default function CampaignsPage() {
           </div>
           <div className="rounded-xl border border-slate-100 bg-[#fbfdfd] p-4 text-center">
             <div className="text-slate-500 font-bold text-xs mb-1">حالة المعالجة في الخلفية</div>
-            <div className="font-bold text-[#1e3e50]">جاهز لإدارة الطوابير</div>
+            <div className="font-bold text-[#0e7a54]">جاهز لإدارة الطوابير</div>
           </div>
           <div className="rounded-xl border border-slate-100 bg-[#fbfdfd] p-4 text-center">
             <div className="text-slate-500 font-bold text-xs mb-1">استقرار خوادم الإرسال</div>
-            <div className="font-bold text-[#1e3e50] flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> مستقر 100%</div>
+            <div className="font-bold text-[#0e7a54] flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> مستقر 100%</div>
           </div>
         </div>
       </div>
 
       {/* QR Code Modal for linking */}
       {activeQr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white border border-slate-100 rounded-3xl w-full max-w-sm shadow-2xl p-8 text-center space-y-5">
             <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-2">
               <QrCode size={32} />
             </div>
-            <h2 className="font-bold text-[#1e3e50] text-xl">مسح الباركود لربط الواتساب</h2>
+            <h2 className="font-bold text-[#0e7a54] text-xl">مسح الباركود لربط الواتساب</h2>
             <p className="text-slate-500 text-sm leading-relaxed">افتح تطبيق الواتساب في هاتفك، اذهب إلى "الأجهزة المرتبطة"، وقم بمسح هذا الرمز.</p>
 
             <div className="w-64 h-64 mx-auto flex items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-white overflow-hidden p-2">
               {qrLoading ? (
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-4 border-[#1e3e50] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-4 border-[#0e7a54] border-t-transparent rounded-full animate-spin" />
                   <span className="text-slate-400 text-sm font-bold">جاري توليد الباركود...</span>
                 </div>
               ) : activeQr.qrCode ? (
@@ -613,9 +613,9 @@ export default function CampaignsPage() {
             </div>
 
             {activeQr.pairingCode && (
-              <div className="bg-[#f0f4f8] rounded-xl p-3 text-sm">
+              <div className="bg-[#e7f6ef] rounded-xl p-3 text-sm">
                 <span className="text-slate-500 font-bold">أو أدخل كود الربط: </span>
-                <span className="font-mono font-bold text-lg tracking-widest text-[#1e3e50] block mt-1">{activeQr.pairingCode}</span>
+                <span className="font-mono font-bold text-lg tracking-widest text-[#0e7a54] block mt-1">{activeQr.pairingCode}</span>
               </div>
             )}
 
@@ -626,7 +626,7 @@ export default function CampaignsPage() {
 
             <button
               onClick={() => setActiveQr(null)}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-[#1e3e50] font-bold text-sm px-6 py-3 rounded-xl transition-colors"
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-[#0e7a54] font-bold text-sm px-6 py-3 rounded-xl transition-colors"
             >
               إلغاء وإغلاق
             </button>

@@ -56,7 +56,7 @@ export default function DebtFilters({
   return (
     <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-[#1e3e50] text-sm flex items-center gap-2">
+        <h3 className="font-bold text-[#0e7a54] text-sm flex items-center gap-2">
           <Filter size={16} className="text-blue-500" /> الفرز والتصفية المتقدمة
         </h3>
         {hasActiveFilters && (
@@ -77,7 +77,7 @@ export default function DebtFilters({
             placeholder="بحث برقم المرجع أو العقد..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl ps-10 pe-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium"
+            className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl ps-10 pe-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium"
           />
           <button type="submit" className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500">
             <Search size={16} />
@@ -88,7 +88,7 @@ export default function DebtFilters({
         <select 
           value={currentCreditor}
           onChange={(e) => handleFilterChange('creditor', e.target.value)}
-          className="bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+          className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
         >
           <option value="">كل الشركات / الجهات</option>
           {creditors.map(c => (
@@ -100,7 +100,7 @@ export default function DebtFilters({
         <select 
           value={currentProduct}
           onChange={(e) => handleFilterChange('product', e.target.value)}
-          className="bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+          className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
         >
           <option value="">كل أنواع المنتجات</option>
           {productTypes.map(p => (
@@ -112,7 +112,7 @@ export default function DebtFilters({
         <select 
           value={currentStatus}
           onChange={(e) => handleFilterChange('status', e.target.value)}
-          className="bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+          className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
         >
           <option value="">كل الحالات التشغيلية</option>
           <option value="active">جديد / نشط</option>
@@ -127,7 +127,7 @@ export default function DebtFilters({
           <select 
             value={currentCollector}
             onChange={(e) => handleFilterChange('collector', e.target.value)}
-            className="bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+            className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
           >
             <option value="">كل المحصلين</option>
             {collectors.map(c => (

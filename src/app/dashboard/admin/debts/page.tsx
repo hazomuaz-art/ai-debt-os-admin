@@ -101,17 +101,17 @@ export default async function AdminDebtsPage({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <WalletCards size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">الديون والمطالبات</h1>
-            <p className="text-slate-500 text-sm">إجمالي الديون المسجلة: <span className="font-bold text-[#1e3e50]">{count ?? 0}</span></p>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">الديون والمطالبات</h1>
+            <p className="text-slate-500 text-sm">إجمالي الديون المسجلة: <span className="font-bold text-[#0e7a54]">{count ?? 0}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -134,14 +134,14 @@ export default async function AdminDebtsPage({
           <table className="w-full text-sm">
             <thead className="bg-[#fbfdfd] border-b border-slate-100">
               <tr>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">رقم المرجع</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">العميل</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">المبلغ المستحق</th>
-                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">الحالة</th>
-                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">تقييم الذكاء الاصطناعي</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">المسؤول (المحصل)</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">تاريخ الاستحقاق</th>
-                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">الإجراءات</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">رقم المرجع</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">العميل</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">المبلغ المستحق</th>
+                <th className="px-6 py-4 text-center font-bold text-[#0e7a54]">الحالة</th>
+                <th className="px-6 py-4 text-center font-bold text-[#0e7a54]">تقييم الذكاء الاصطناعي</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">المسؤول (المحصل)</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">تاريخ الاستحقاق</th>
+                <th className="px-6 py-4 text-center font-bold text-[#0e7a54]">الإجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -159,7 +159,7 @@ export default async function AdminDebtsPage({
                       <span className="font-mono text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">{debt.reference_number}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-[#1e3e50]">{debt.customer?.full_name ?? '—'}</div>
+                      <div className="font-semibold text-[#0e7a54]">{debt.customer?.full_name ?? '—'}</div>
                       <div className="text-slate-400 text-xs mt-0.5">{debt.customer?.phone ?? ''}</div>
                     </td>
                     <td className="px-6 py-4">
@@ -175,7 +175,7 @@ export default async function AdminDebtsPage({
                       {latestScore ? (
                         <div className="flex items-center justify-center gap-1.5">
                           <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${latestScore.score! >= 70 ? 'bg-emerald-400' : latestScore.score! >= 40 ? 'bg-amber-400' : 'bg-rose-400'}`} />
-                          <span className="font-mono font-bold text-[#1e3e50]">{latestScore.score}</span>
+                          <span className="font-mono font-bold text-[#0e7a54]">{latestScore.score}</span>
                         </div>
                       ) : (
                         <span className="text-slate-300 font-bold">—</span>
@@ -188,7 +188,7 @@ export default async function AdminDebtsPage({
                       <span className="text-sm text-slate-500 font-mono">{debt.due_date ? formatDate(debt.due_date) : '—'}</span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-4 py-1.5 bg-white border border-slate-200 text-[#1e3e50] hover:bg-slate-50 font-bold rounded-lg text-xs transition-colors shadow-sm">
+                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-4 py-1.5 bg-white border border-slate-200 text-[#0e7a54] hover:bg-slate-50 font-bold rounded-lg text-xs transition-colors shadow-sm">
                         عرض التفاصيل
                       </Link>
                     </td>
@@ -203,16 +203,16 @@ export default async function AdminDebtsPage({
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-[#fbfdfd]">
             <span className="text-slate-500 text-sm font-medium">
-              صفحة <span className="font-bold text-[#1e3e50]">{page}</span> من <span className="font-bold text-[#1e3e50]">{totalPages}</span>
+              صفحة <span className="font-bold text-[#0e7a54]">{page}</span> من <span className="font-bold text-[#0e7a54]">{totalPages}</span>
             </span>
             <div className="flex gap-2">
               {page < totalPages && (
-                <Link href={`/dashboard/admin/debts?page=${page + 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-white border border-slate-200 text-[#1e3e50] hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors shadow-sm">
+                <Link href={`/dashboard/admin/debts?page=${page + 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-white border border-slate-200 text-[#0e7a54] hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors shadow-sm">
                   التالي ←
                 </Link>
               )}
               {page > 1 && (
-                <Link href={`/dashboard/admin/debts?page=${page - 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-white border border-slate-200 text-[#1e3e50] hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors shadow-sm">
+                <Link href={`/dashboard/admin/debts?page=${page - 1}${searchParams.status ? `&status=${searchParams.status}` : ''}`} className="px-4 py-2 bg-white border border-slate-200 text-[#0e7a54] hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors shadow-sm">
                   → السابق
                 </Link>
               )}

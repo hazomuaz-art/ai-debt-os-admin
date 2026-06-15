@@ -62,7 +62,7 @@ export default function ApprovalsPage() {
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -70,7 +70,7 @@ export default function ApprovalsPage() {
             <ShieldCheck size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">الموافقات والتدخل الإداري</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">الموافقات والتدخل الإداري</h1>
             <p className="text-slate-500 text-sm">مراجعة العمليات الحساسة واعتمادها قبل التنفيذ الآلي</p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function ApprovalsPage() {
               <AlertTriangle size={20} />
             </div>
             <div>
-              <p className="font-bold text-[#1e3e50]">طلبات بانتظار المراجعة ({pending.length})</p>
+              <p className="font-bold text-[#0e7a54]">طلبات بانتظار المراجعة ({pending.length})</p>
               <p className="text-xs text-amber-700 mt-0.5">يوجد عمليات معلقة تتطلب اتخاذ قرار إداري للحفاظ على سير العمل.</p>
             </div>
           </div>
@@ -100,7 +100,7 @@ export default function ApprovalsPage() {
           const labels: any = { all: 'الكل', pending: `انتظار (${pending.length})`, approved: 'موافق عليها', rejected: 'مرفوضة' }
           return (
             <button key={s} onClick={() => setFilter(s)}
-              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${isActive ? 'bg-[#1e3e50] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-[#1e3e50]'}`}>
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${isActive ? 'bg-[#0e7a54] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-[#0e7a54]'}`}>
               {labels[s]}
             </button>
           )
@@ -109,7 +109,7 @@ export default function ApprovalsPage() {
 
       {/* List */}
       {loading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div></div>
+        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div></div>
       ) : (
         <div className="grid gap-4">
           {filtered.length === 0 && (
@@ -130,11 +130,11 @@ export default function ApprovalsPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-3 flex-wrap mb-1.5">
-                        <span className="font-bold text-[#1e3e50] text-lg">{item.title}</span>
+                        <span className="font-bold text-[#0e7a54] text-lg">{item.title}</span>
                         <span className={`px-2.5 py-0.5 rounded-md text-xs font-bold border ${priorityConf.color}`}>
                           {priorityConf.label}
                         </span>
-                        <span className="bg-[#f0f4f8] text-slate-600 text-xs px-2.5 py-0.5 rounded-md font-bold">
+                        <span className="bg-[#e7f6ef] text-slate-600 text-xs px-2.5 py-0.5 rounded-md font-bold">
                           {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
                         </span>
                       </div>
@@ -178,7 +178,7 @@ export default function ApprovalsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6">
-              <h3 className="text-xl font-bold text-[#1e3e50] mb-1">تحديد خطة التقسيط</h3>
+              <h3 className="text-xl font-bold text-[#0e7a54] mb-1">تحديد خطة التقسيط</h3>
               <p className="text-sm text-slate-500 mb-6">يرجى إدخال تفاصيل الدفع لاعتمادها وإرسالها للعميل.</p>
 
               <div className="space-y-5">
@@ -187,7 +187,7 @@ export default function ApprovalsPage() {
                   <select 
                     value={planData.count} 
                     onChange={e => setPlanData({ ...planData, count: Number(e.target.value) })}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1e3e50]/20"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#0e7a54]/20"
                   >
                     {[2,3,4,6,12].map(n => <option key={n} value={n}>{n} أقساط</option>)}
                   </select>
@@ -198,7 +198,7 @@ export default function ApprovalsPage() {
                   <select 
                     value={planData.frequency} 
                     onChange={e => setPlanData({ ...planData, frequency: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1e3e50]/20"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#0e7a54]/20"
                   >
                     <option value="شهري">شهري</option>
                     <option value="أسبوعي">أسبوعي</option>
@@ -213,7 +213,7 @@ export default function ApprovalsPage() {
                       placeholder="مثال: 500"
                       value={planData.firstPayment}
                       onChange={e => setPlanData({ ...planData, firstPayment: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 pe-12 focus:outline-none focus:ring-2 focus:ring-[#1e3e50]/20"
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 pe-12 focus:outline-none focus:ring-2 focus:ring-[#0e7a54]/20"
                     />
                     <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
                       SAR
@@ -230,7 +230,7 @@ export default function ApprovalsPage() {
               <button 
                 disabled={!planData.firstPayment}
                 onClick={() => act(planModalItem.id, 'approved', planData)} 
-                className="px-6 py-2.5 rounded-xl font-bold bg-[#1e3e50] text-white hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 rounded-xl font-bold bg-[#0e7a54] text-white hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 تأكيد واعتماد
               </button>

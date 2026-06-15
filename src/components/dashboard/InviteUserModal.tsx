@@ -53,7 +53,7 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+      <button onClick={() => setOpen(true)} className="bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
         <UserPlus size={18} /> دعوة عضو جديد
       </button>
     )
@@ -62,7 +62,7 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
   if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#1e3e50]/40 backdrop-blur-sm animate-in fade-in" >
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in" >
       <div className="bg-white border border-slate-100 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom-4">
         
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-[#fbfdfd] rounded-t-2xl">
@@ -70,7 +70,7 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
             <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
               <UserPlus size={20} />
             </div>
-            <h2 className="font-bold text-[#1e3e50] text-lg">إضافة موظف جديد</h2>
+            <h2 className="font-bold text-[#0e7a54] text-lg">إضافة موظف جديد</h2>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors">
             <X size={20} />
@@ -96,25 +96,25 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
           <div>
             <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الاسم الكامل</label>
             <input name="full_name" type="text" required placeholder="مثال: أحمد محمد"
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]" />
+              className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54]" />
           </div>
 
           <div>
             <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">البريد الإلكتروني للعمل</label>
             <input name="email" type="email" required placeholder="employee@company.com" dir="ltr"
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" />
+              className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54] text-end" />
           </div>
 
           <div>
             <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">كلمة مرور مؤقتة</label>
             <input name="password" type="password" required minLength={8} placeholder="8 أحرف كحد أدنى" dir="ltr"
-              className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50] text-end" />
+              className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54] text-end" />
             <p className="text-xs text-slate-400 font-medium mt-2">سيُطلب من الموظف تغيير كلمة المرور عند أول تسجيل دخول.</p>
           </div>
 
           <div>
             <label className="block text-sm font-bold text-slate-600 mb-2 ps-2">الدور (الصلاحية)</label>
-            <select name="role" className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1e3e50]">
+            <select name="role" className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54]">
               <option value="collector">موظف تحصيل (Collector)</option>
               <option value="manager">مشرف تحصيل (Manager)</option>
               <option value="admin">مدير نظام (Admin)</option>
@@ -127,7 +127,7 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
               إلغاء
             </button>
             <button type="submit" disabled={loading} 
-              className="flex-1 bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors disabled:opacity-50">
+              className="flex-1 bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors disabled:opacity-50">
               {loading ? 'جاري الإنشاء...' : 'إنشاء حساب الموظف'}
             </button>
           </div>

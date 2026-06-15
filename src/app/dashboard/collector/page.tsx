@@ -61,7 +61,7 @@ export default async function CollectorDashboard() {
 
   const stats = [
     { label: 'الملفات المسندة', value: String(totalAssigned ?? 0), icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'إجمالي المديونية', value: formatCurrency(totalBalance, 'SAR'), icon: Wallet, color: 'text-[#1e3e50]', bg: 'bg-[#e6f0f9]' },
+    { label: 'إجمالي المديونية', value: formatCurrency(totalBalance, 'SAR'), icon: Wallet, color: 'text-[#0e7a54]', bg: 'bg-[#f6f8fa]' },
     { label: 'تحصيلي (هذا الشهر)', value: formatCurrency(collectedMonth, 'SAR'), icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { label: 'إجراءات اليوم المطلوبة', value: String((todayActions ?? []).length), icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
   ]
@@ -87,13 +87,13 @@ export default async function CollectorDashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">قائمة مهامي التحصيلية</h1>
+          <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">قائمة مهامي التحصيلية</h1>
           <p className="text-slate-500 text-sm">
-            المحصل: <span className="font-bold text-[#1e3e50]">{profile.full_name ?? 'غير محدد'}</span> — {new Date().toLocaleDateString('ar-SA', { weekday: 'long', month: 'long', day: 'numeric' })}
+            المحصل: <span className="font-bold text-[#0e7a54]">{profile.full_name ?? 'غير محدد'}</span> — {new Date().toLocaleDateString('ar-SA', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
       </div>
@@ -104,7 +104,7 @@ export default async function CollectorDashboard() {
           <div key={idx} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
             <div>
               <div className="text-slate-500 text-xs font-bold mb-1">{stat.label}</div>
-              <div className="text-3xl font-bold text-[#1e3e50] font-mono">{stat.value}</div>
+              <div className="text-3xl font-bold text-[#0e7a54] font-mono">{stat.value}</div>
             </div>
             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.bg} ${stat.color}`}>
               <stat.icon size={22} />
@@ -123,7 +123,7 @@ export default async function CollectorDashboard() {
               <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
                 <Clock size={20} />
               </div>
-              <h2 className="text-lg font-bold text-[#1e3e50]">إجراءات اليوم المستحقة</h2>
+              <h2 className="text-lg font-bold text-[#0e7a54]">إجراءات اليوم المستحقة</h2>
             </div>
             <Link href="/dashboard/collector/actions" className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
               عرض الكل <ArrowLeft size={14} />
@@ -149,7 +149,7 @@ export default async function CollectorDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-bold text-[#1e3e50]">{(action.customer as {full_name?: string} | null)?.full_name}</span>
+                      <span className="text-sm font-bold text-[#0e7a54]">{(action.customer as {full_name?: string} | null)?.full_name}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getPriorityStyle(action.priority)}`}>
                         {getPriorityLabel(action.priority)}
                       </span>
@@ -169,7 +169,7 @@ export default async function CollectorDashboard() {
               <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
                 <AlertTriangle size={20} />
               </div>
-              <h2 className="text-lg font-bold text-[#1e3e50]">أعلى ملفات الديون الأولوية</h2>
+              <h2 className="text-lg font-bold text-[#0e7a54]">أعلى ملفات الديون الأولوية</h2>
             </div>
             <Link href="/dashboard/collector/debts" className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
               عرض الكل <ArrowLeft size={14} />
@@ -187,16 +187,16 @@ export default async function CollectorDashboard() {
             ) : sortedDebts.slice(0, 5).map((debt) => (
               <div key={debt.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:border-amber-200 hover:shadow-sm transition-all group">
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-[#1e3e50] mb-1">{(debt.customer as {full_name?: string} | null)?.full_name}</div>
+                  <div className="text-sm font-bold text-[#0e7a54] mb-1">{(debt.customer as {full_name?: string} | null)?.full_name}</div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-50 px-2 py-0.5 rounded">{debt.reference_number}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#f0f4f8] text-slate-500">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#e7f6ef] text-slate-500">
                       {getStatusLabel(debt.status)}
                     </span>
                   </div>
                 </div>
                 <div className="text-end flex flex-col items-end">
-                  <div className="text-sm font-bold text-[#1e3e50] font-mono mb-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-lg">
+                  <div className="text-sm font-bold text-[#0e7a54] font-mono mb-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-lg">
                     {formatCurrency(debt.current_balance, debt.currency)}
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border inline-block ${getPriorityStyle(debt.priority)}`}>

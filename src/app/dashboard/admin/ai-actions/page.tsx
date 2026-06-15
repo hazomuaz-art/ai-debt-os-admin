@@ -66,16 +66,16 @@ export default async function AIActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <BrainCircuit size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">خطة عمل الذكاء الاصطناعي (AI Action Plan)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">خطة عمل الذكاء الاصطناعي (AI Action Plan)</h1>
             <p className="text-slate-500 text-sm">
               إجراءات وتوصيات اليوم ({new Date().toLocaleDateString('ar-SA')}) — تم إنجاز {completedCount} من أصل {(actions ?? []).length}
             </p>
@@ -103,7 +103,7 @@ export default async function AIActionsPage() {
             <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
               <BrainCircuit size={40} />
             </div>
-            <div className="font-bold text-xl text-[#1e3e50] mb-2">لا توجد إجراءات مجدولة لليوم</div>
+            <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد إجراءات مجدولة لليوم</div>
             <p className="text-slate-500 text-sm mb-6">اضغط على زر (توليد الخطة) ليقوم الذكاء الاصطناعي بتحليل المحفظة واقتراح المهام.</p>
             <GenerateActionsButton />
           </div>
@@ -132,11 +132,11 @@ export default async function AIActionsPage() {
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 flex-wrap mb-2">
-                    <span className="font-bold text-[#1e3e50] text-lg">{(action.customer as {full_name?: string} | null)?.full_name ?? 'عميل غير معروف'}</span>
+                    <span className="font-bold text-[#0e7a54] text-lg">{(action.customer as {full_name?: string} | null)?.full_name ?? 'عميل غير معروف'}</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${PRIORITY_STYLES[action.priority] ?? PRIORITY_STYLES.low}`}>
                       أولوية {PRIORITY_ARABIC[action.priority] ?? action.priority}
                     </span>
-                    <span className="bg-[#f0f4f8] text-slate-500 text-xs font-bold px-2 py-1 rounded-md font-mono">
+                    <span className="bg-[#e7f6ef] text-slate-500 text-xs font-bold px-2 py-1 rounded-md font-mono">
                       ملف: {(action.debt as {reference_number?: string} | null)?.reference_number}
                     </span>
                   </div>

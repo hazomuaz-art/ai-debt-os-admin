@@ -87,22 +87,22 @@ export default function KnowledgeBasePage() {
   })
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <BookOpen size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">قاعدة المعرفة (Knowledge Base)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">قاعدة المعرفة (Knowledge Base)</h1>
             <p className="text-slate-500 text-sm">إدارة السياسات، القواعد، والسكريبتات المرجعية للذكاء الاصطناعي</p>
           </div>
         </div>
         <button 
           onClick={() => setShowAdd(p => !p)} 
-          className="bg-[#1e3e50] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2"
+          className="bg-[#0e7a54] hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2"
         >
           {showAdd ? 'إلغاء الإضافة' : <><Plus size={18} /> إضافة مقالة جديدة</>}
         </button>
@@ -113,7 +113,7 @@ export default function KnowledgeBasePage() {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center justify-between">
           <div>
             <div className="text-slate-500 text-sm font-bold mb-1">إجمالي المقالات</div>
-            <div className="text-3xl font-bold text-[#1e3e50]">{entries.length}</div>
+            <div className="text-3xl font-bold text-[#0e7a54]">{entries.length}</div>
           </div>
           <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center">
             <BookOpen size={24} />
@@ -146,19 +146,19 @@ export default function KnowledgeBasePage() {
       {/* Add form */}
       {showAdd && (
         <form onSubmit={handleAdd} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
-          <div className="font-bold text-lg text-[#1e3e50] border-b border-slate-100 pb-3">كتابة مقالة / قاعدة جديدة</div>
+          <div className="font-bold text-lg text-[#0e7a54] border-b border-slate-100 pb-3">كتابة مقالة / قاعدة جديدة</div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-bold text-slate-500 ps-2">العنوان *</label>
-              <input required className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]" 
+              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
                 value={form.title} placeholder="مثال: سياسة التقسيط المريحة..."
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-bold text-slate-500 ps-2">المحتوى *</label>
-              <textarea required rows={5} className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50] resize-none" 
+              <textarea required rows={5} className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] resize-none" 
                 value={form.content}
                 onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
                 placeholder="اكتب تفاصيل السياسة أو القاعدة ليقوم الذكاء الاصطناعي بقراءتها عند التفاوض…" />
@@ -166,7 +166,7 @@ export default function KnowledgeBasePage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">الفئة (Category)</label>
-              <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]" 
+              <select className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
                 value={form.category}
                 onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
                 {Object.entries(CAT_AR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -175,7 +175,7 @@ export default function KnowledgeBasePage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-500 ps-2">اللغة (Language)</label>
-              <select className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]" 
+              <select className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
                 value={form.language}
                 onChange={e => setForm(p => ({ ...p, language: e.target.value }))}>
                 <option value="ar">اللغة العربية</option>
@@ -197,19 +197,19 @@ export default function KnowledgeBasePage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
           <Search className="absolute end-3 top-2.5 text-slate-400" size={18} />
-          <input type="text" className="w-full bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+          <input type="text" className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl pe-10 ps-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
             placeholder="البحث في المقالات والقواعد…" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
         
         <div className="flex gap-2 flex-wrap justify-end">
           <button onClick={() => setCatFilter('all')}
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === 'all' ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-[#f0f4f8] text-slate-500 hover:bg-slate-200'}`}>
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === 'all' ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-[#e7f6ef] text-slate-500 hover:bg-slate-200'}`}>
             الكل
           </button>
           {Object.entries(CAT_AR).map(([k, v]) => (
             <button key={k} onClick={() => setCatFilter(k)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === k ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-[#f0f4f8] text-slate-500 hover:bg-slate-200'}`}>
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === k ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-[#e7f6ef] text-slate-500 hover:bg-slate-200'}`}>
               {v}
             </button>
           ))}
@@ -219,14 +219,14 @@ export default function KnowledgeBasePage() {
       {/* Entries */}
       {loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
             <BookOpen size={40} />
           </div>
-          <div className="font-bold text-xl text-[#1e3e50] mb-2">
+          <div className="font-bold text-xl text-[#0e7a54] mb-2">
             {entries.length === 0 ? 'قاعدة المعرفة فارغة' : 'لا توجد نتائج مطابقة للبحث'}
           </div>
           <p className="text-slate-500 text-sm">
@@ -244,14 +244,14 @@ export default function KnowledgeBasePage() {
                   <div className="flex items-center gap-3 flex-wrap mb-2">
                     <button
                       onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
-                      className="font-bold text-[#1e3e50] text-base hover:text-blue-600 transition-colors flex items-center gap-2">
+                      className="font-bold text-[#0e7a54] text-base hover:text-blue-600 transition-colors flex items-center gap-2">
                       {expanded === entry.id ? <ChevronDown size={18} className="text-slate-400"/> : <ChevronLeft size={18} className="text-slate-400"/>}
                       {entry.title}
                     </button>
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${CAT_STYLES[entry.category] ?? CAT_STYLES.other}`}>
                       {CAT_AR[entry.category] ?? entry.category}
                     </span>
-                    <span className="bg-[#f0f4f8] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">
+                    <span className="bg-[#e7f6ef] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">
                       {entry.language === 'ar' ? 'العربية' : entry.language === 'en' ? 'English' : 'مزدوج'}
                     </span>
                   </div>

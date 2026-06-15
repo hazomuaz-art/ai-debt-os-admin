@@ -39,7 +39,7 @@ export function Sidebar({ profile }: { profile: any }) {
   ].filter(item => item.roles.includes(role))
 
   return (
-    <aside className="w-64 bg-[#1e3e50] text-white flex flex-col shrink-0 z-0 pt-8 pb-4">
+    <aside className="w-64 bg-[#0e7a54] text-white flex flex-col shrink-0 z-0 pt-8 pb-4">
       {/* Profile Section (Matching Image) */}
       <div className="flex flex-col items-center justify-center mb-8 px-4">
         <div className="w-20 h-20 rounded-full border-4 border-white/20 p-1 mb-3">
@@ -62,7 +62,7 @@ export function Sidebar({ profile }: { profile: any }) {
               className={cn(
                 "flex items-center gap-3 px-6 py-3.5 transition-all w-full",
                 isActive 
-                  ? "bg-[#f0f4f8] text-[#1e3e50] font-bold rounded-e-full" 
+                  ? "bg-[#e7f6ef] text-[#0e7a54] font-bold rounded-e-full" 
                   : "text-slate-300 hover:bg-white/10 hover:text-white rounded-e-full"
               )}
             >

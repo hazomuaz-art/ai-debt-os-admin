@@ -57,7 +57,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -65,8 +65,8 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
             <FileText size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">جميع المطالبات</h1>
-            <p className="text-slate-500 text-sm">إجمالي الملفات: <span className="font-bold text-[#1e3e50] font-mono">{debts?.length ?? 0}</span></p>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">جميع المطالبات</h1>
+            <p className="text-slate-500 text-sm">إجمالي الملفات: <span className="font-bold text-[#0e7a54] font-mono">{debts?.length ?? 0}</span></p>
           </div>
         </div>
       </div>
@@ -75,12 +75,12 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
       <div className="flex gap-2 flex-wrap items-center bg-white p-2 rounded-2xl border border-slate-100 shadow-sm px-4">
         <Filter size={16} className="text-slate-400 ms-2" />
         <Link href="/dashboard/manager/debts"
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${!searchParams.status ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-[#1e3e50] hover:bg-slate-100'}`}>
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${!searchParams.status ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-[#0e7a54] hover:bg-slate-100'}`}>
           الكل
         </Link>
         {statuses.map(s => (
           <Link key={s.id} href={`/dashboard/manager/debts?status=${s.id}`}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${searchParams.status === s.id ? 'bg-[#1e3e50] text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-[#1e3e50] hover:bg-slate-100'}`}>
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${searchParams.status === s.id ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-slate-50 text-slate-500 hover:text-[#0e7a54] hover:bg-slate-100'}`}>
             {s.label}
           </Link>
         ))}
@@ -90,7 +90,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
       <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="bg-[#f0f4f8] text-slate-500 border-b border-slate-100 text-xs">
+            <thead className="bg-[#e7f6ef] text-slate-500 border-b border-slate-100 text-xs">
               <tr>
                 <th className="py-4 px-6 font-bold uppercase">المرجع</th>
                 <th className="py-4 px-6 font-bold uppercase">العميل</th>
@@ -110,10 +110,10 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
                     </Link>
                   </td>
                   <td className="py-4 px-6">
-                    <p className="font-bold text-[#1e3e50]">{debt.customer?.full_name}</p>
+                    <p className="font-bold text-[#0e7a54]">{debt.customer?.full_name}</p>
                     <p className="text-xs text-slate-400 font-mono mt-0.5">{debt.customer?.phone}</p>
                   </td>
-                  <td className="py-4 px-6 font-bold font-mono text-[#1e3e50]">{formatCurrency(debt.current_balance, debt.currency)}</td>
+                  <td className="py-4 px-6 font-bold font-mono text-[#0e7a54]">{formatCurrency(debt.current_balance, debt.currency)}</td>
                   <td className="py-4 px-6">
                     <span className="px-2 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
                       {getStatusLabel(debt.status)}
@@ -124,7 +124,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
                       {getPriorityLabel(debt.priority)}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-[#1e3e50] font-bold text-xs">{debt.assigned_to_profile?.full_name || 'غير مسند'}</td>
+                  <td className="py-4 px-6 text-[#0e7a54] font-bold text-xs">{debt.assigned_to_profile?.full_name || 'غير مسند'}</td>
                   <td className="py-4 px-6 text-slate-500 text-xs font-mono">{formatDate(debt.due_date)}</td>
                 </tr>
               ))}

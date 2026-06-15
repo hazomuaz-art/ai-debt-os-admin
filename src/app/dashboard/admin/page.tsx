@@ -82,11 +82,11 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Overview Section */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mt-6">
-        <h2 className="text-xl font-bold text-[#1e3e50] mb-6">نظرة عامة</h2>
+        <h2 className="text-xl font-bold text-[#0e7a54] mb-6">نظرة عامة</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat, i) => (
             <div key={i} className={`border p-5 rounded-2xl flex items-center gap-4 transition-all duration-200 hover:shadow-md ${stat.isAlert ? 'bg-[#fff5f5] border-rose-100' : 'bg-white border-slate-100'}`}>
@@ -94,7 +94,7 @@ export default async function AdminDashboard() {
                 <stat.icon size={28} strokeWidth={2.5} />
               </div>
               <div>
-                <div className={`text-2xl font-bold font-mono ${stat.isAlert ? 'text-rose-700' : 'text-[#1e3e50]'}`}>{stat.value}</div>
+                <div className={`text-2xl font-bold font-mono ${stat.isAlert ? 'text-rose-700' : 'text-[#0e7a54]'}`}>{stat.value}</div>
                 <div className={`text-sm mt-1 ${stat.isAlert ? 'text-rose-600 font-bold' : 'text-slate-500 font-medium'}`}>{stat.title}</div>
               </div>
             </div>
@@ -109,28 +109,28 @@ export default async function AdminDashboard() {
         <div className="col-span-1 space-y-6">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
             <div className="flex justify-between w-full mb-4 px-2">
-              <h3 className="font-bold text-[#1e3e50] text-lg">قاعدة العملاء</h3>
+              <h3 className="font-bold text-[#0e7a54] text-lg">قاعدة العملاء</h3>
             </div>
-            <div className="bg-[#e6f0f9] p-4 rounded-full mb-4">
-              <Activity className="text-[#1e3e50]" size={28} />
+            <div className="bg-[#f6f8fa] p-4 rounded-full mb-4">
+              <Activity className="text-[#0e7a54]" size={28} />
             </div>
-            <div className="text-4xl font-bold text-[#1e3e50] font-mono">{s.activeCustomers}</div>
+            <div className="text-4xl font-bold text-[#0e7a54] font-mono">{s.activeCustomers}</div>
             <div className="text-sm font-bold text-slate-500 mt-2">عميل مسجل ونشط</div>
           </div>
           
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center hover:shadow-md transition-shadow">
-             <h3 className="font-bold text-[#1e3e50] text-lg mb-6 text-center">أداء المحفظة</h3>
+             <h3 className="font-bold text-[#0e7a54] text-lg mb-6 text-center">أداء المحفظة</h3>
              <div className="flex justify-center items-center gap-8">
-               <div className="w-28 h-28 rounded-full border-[14px] border-[#1e3e50] border-t-[#a3c1e0] relative flex justify-center items-center shadow-inner">
+               <div className="w-28 h-28 rounded-full border-[14px] border-[#0e7a54] border-t-[#a3c1e0] relative flex justify-center items-center shadow-inner">
                   <span className="text-sm font-bold text-slate-500">68%</span>
                </div>
                <div className="space-y-4">
-                 <div className="flex items-center gap-3 text-sm text-[#1e3e50] font-bold">
+                 <div className="flex items-center gap-3 text-sm text-[#0e7a54] font-bold">
                    <div className="w-4 h-4 bg-[#a3c1e0] rounded-sm shadow-sm"></div>
                    تم تحصيله
                  </div>
-                 <div className="flex items-center gap-3 text-sm text-[#1e3e50] font-bold">
-                   <div className="w-4 h-4 bg-[#1e3e50] rounded-sm shadow-sm"></div>
+                 <div className="flex items-center gap-3 text-sm text-[#0e7a54] font-bold">
+                   <div className="w-4 h-4 bg-[#0e7a54] rounded-sm shadow-sm"></div>
                    المتبقي
                  </div>
                </div>
@@ -141,7 +141,7 @@ export default async function AdminDashboard() {
         {/* Middle Column (Live Feed) */}
         <div className="col-span-1 lg:col-span-2 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm flex flex-col hover:shadow-md transition-shadow">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
-            <h2 className="text-lg font-bold text-[#1e3e50] flex items-center gap-2">
+            <h2 className="text-lg font-bold text-[#0e7a54] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
               العمليات اللحظية (Live Feed)
             </h2>
@@ -171,7 +171,7 @@ export default async function AdminDashboard() {
 
                   return (
                     <tr key={action.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-4 text-sm font-bold text-[#1e3e50]">{clientName}</td>
+                      <td className="px-5 py-4 text-sm font-bold text-[#0e7a54]">{clientName}</td>
                       <td className="px-5 py-4 text-sm font-bold text-emerald-600 font-mono">{formatCurrency(balance, currency)}</td>
                       <td className="px-5 py-4">
                         {action.action_type === 'whatsapp' ? (

@@ -44,17 +44,17 @@ export default async function AdminCustomersPage() {
     .limit(50)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <Users size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">إدارة العملاء</h1>
-            <p className="text-slate-500 text-sm">إجمالي العملاء المسجلين في النظام: <span className="font-bold text-[#1e3e50]">{count ?? 0}</span></p>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إدارة العملاء</h1>
+            <p className="text-slate-500 text-sm">إجمالي العملاء المسجلين في النظام: <span className="font-bold text-[#0e7a54]">{count ?? 0}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -63,7 +63,7 @@ export default async function AdminCustomersPage() {
             <input 
               type="text" 
               placeholder="البحث السريع..." 
-              className="w-64 bg-[#f0f4f8] border-none text-[#1e3e50] rounded-xl pe-10 ps-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3e50]"
+              className="w-64 bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl pe-10 ps-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
             />
           </div>
           <CreateCustomerModal />
@@ -76,12 +76,12 @@ export default async function AdminCustomersPage() {
           <table className="w-full text-sm">
             <thead className="bg-[#fbfdfd] border-b border-slate-100">
               <tr>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">اسم العميل</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">معلومات التواصل</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">الهوية الوطنية / الإقامة</th>
-                <th className="px-6 py-4 text-center font-bold text-[#1e3e50]">مستوى الخطورة</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">المدينة</th>
-                <th className="px-6 py-4 text-start font-bold text-[#1e3e50]">تاريخ الإضافة</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">اسم العميل</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">معلومات التواصل</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">الهوية الوطنية / الإقامة</th>
+                <th className="px-6 py-4 text-center font-bold text-[#0e7a54]">مستوى الخطورة</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">المدينة</th>
+                <th className="px-6 py-4 text-start font-bold text-[#0e7a54]">تاريخ الإضافة</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -93,10 +93,10 @@ export default async function AdminCustomersPage() {
                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-[#e6f0f9] rounded-full flex items-center justify-center text-sm font-bold text-[#1e3e50]">
+                      <div className="w-8 h-8 bg-[#f6f8fa] rounded-full flex items-center justify-center text-sm font-bold text-[#0e7a54]">
                         {c.full_name?.charAt(0) ?? '?'}
                       </div>
-                      <span className="font-semibold text-[#1e3e50]">{c.full_name || 'غير معروف'}</span>
+                      <span className="font-semibold text-[#0e7a54]">{c.full_name || 'غير معروف'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">

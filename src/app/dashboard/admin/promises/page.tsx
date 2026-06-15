@@ -31,7 +31,7 @@ export default async function PromisesPage() {
   const rate    = all.length ? Math.round((kept.length / all.length) * 100) : 0
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -39,7 +39,7 @@ export default async function PromisesPage() {
             <CheckCircle size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">تتبع وعود السداد</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">تتبع وعود السداد</h1>
             <p className="text-slate-500 text-sm">متابعة دقيقة لوعود العملاء وتحديث مخاطر السداد تلقائياً</p>
           </div>
         </div>
@@ -49,7 +49,7 @@ export default async function PromisesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center"><Hash size={20} /></div>
-          <div><p className="text-slate-500 text-xs font-bold mb-1">إجمالي الوعود</p><p className="text-2xl font-bold text-[#1e3e50]">{all.length}</p></div>
+          <div><p className="text-slate-500 text-xs font-bold mb-1">إجمالي الوعود</p><p className="text-2xl font-bold text-[#0e7a54]">{all.length}</p></div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center"><Clock size={20} /></div>
@@ -69,7 +69,7 @@ export default async function PromisesPage() {
       <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="bg-[#f0f4f8] text-slate-500 border-b border-slate-100 text-xs">
+            <thead className="bg-[#e7f6ef] text-slate-500 border-b border-slate-100 text-xs">
               <tr>
                 <th className="py-4 px-6 font-bold uppercase">العميل</th>
                 <th className="py-4 px-6 font-bold uppercase">المرجع</th>
@@ -96,13 +96,13 @@ export default async function PromisesPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><User size={14} /></div>
                         <div>
-                          <p className="font-bold text-[#1e3e50]">{p.customer?.full_name ?? '—'}</p>
+                          <p className="font-bold text-[#0e7a54]">{p.customer?.full_name ?? '—'}</p>
                           <p className="text-xs text-slate-400 font-mono mt-0.5">{p.customer?.phone}</p>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-6 font-mono text-xs font-bold text-slate-500 bg-slate-50/50">{p.debt?.reference_number ?? '—'}</td>
-                    <td className="py-4 px-6 font-bold font-mono text-[#1e3e50]">{formatCurrency(p.promised_amount, p.debt?.currency ?? 'SAR')}</td>
+                    <td className="py-4 px-6 font-bold font-mono text-[#0e7a54]">{formatCurrency(p.promised_amount, p.debt?.currency ?? 'SAR')}</td>
                     <td className="py-4 px-6 text-slate-500 font-medium">{formatDate(p.promised_date)}</td>
                     <td className="py-4 px-6 text-slate-500 text-xs">
                       <span className="bg-slate-100 px-2 py-1 rounded-md">{p.channel}</span>

@@ -84,12 +84,12 @@ export default async function ManagerDashboard() {
   ]
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">لوحة تحكم المدير</h1>
+          <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">لوحة تحكم المدير</h1>
           <p className="text-slate-500 text-sm">نظرة عامة على أداء فريق العمل ومعدلات التحصيل الحية.</p>
         </div>
       </div>
@@ -106,7 +106,7 @@ export default async function ManagerDashboard() {
             </div>
             <div>
               <h3 className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wide">{stat.title}</h3>
-              <p className="text-3xl font-bold text-[#1e3e50] font-mono">{stat.value}</p>
+              <p className="text-3xl font-bold text-[#0e7a54] font-mono">{stat.value}</p>
               <span className="text-[11px] text-slate-400 block mt-1 font-bold">{stat.subtitle}</span>
             </div>
           </div>
@@ -120,13 +120,13 @@ export default async function ManagerDashboard() {
             <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
               <Users size={20} />
             </div>
-            <h2 className="text-lg font-bold text-[#1e3e50]">مراقبة أداء المحصلين وفريق العمل</h2>
+            <h2 className="text-lg font-bold text-[#0e7a54]">مراقبة أداء المحصلين وفريق العمل</h2>
           </div>
         </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start border-collapse">
-            <thead className="bg-[#f0f4f8] text-slate-500 border-b border-slate-100">
+            <thead className="bg-[#e7f6ef] text-slate-500 border-b border-slate-100">
               <tr>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider">المحصل</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-center">الملفات المسندة</th>
@@ -146,16 +146,16 @@ export default async function ManagerDashboard() {
                   <tr key={col.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center text-sm font-bold shadow-sm shrink-0">
+                        <div className="w-10 h-10 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center text-sm font-bold shadow-sm shrink-0">
                           {col.full_name?.charAt(0) ?? '?'}
                         </div>
                         <div>
-                          <div className="font-bold text-[#1e3e50]">{col.full_name ?? 'بدون اسم'}</div>
+                          <div className="font-bold text-[#0e7a54]">{col.full_name ?? 'بدون اسم'}</div>
                           <div className="text-[11px] text-slate-500 mt-0.5 font-mono">{col.email}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center font-mono font-bold text-[#1e3e50] bg-slate-50/50">{col.assigned}</td>
+                    <td className="px-6 py-4 text-center font-mono font-bold text-[#0e7a54] bg-slate-50/50">{col.assigned}</td>
                     <td className="px-6 py-4 text-center text-emerald-600 font-mono font-bold">{formatCurrency(col.collected, 'SAR')}</td>
                     <td className="px-6 py-4 text-end ps-6 font-mono text-purple-600 font-bold bg-slate-50/50">{col.actionsToday}</td>
                   </tr>

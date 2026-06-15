@@ -64,20 +64,20 @@ export default function AlertsPage() {
   for (const a of alerts) counts[a.severity] = (counts[a.severity] ?? 0) + 1
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f0f4f8] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
       
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#e6f0f9] text-[#1e3e50] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
             <BellRing size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3e50] mb-1">سجل التنبيهات (System Alerts)</h1>
+            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">سجل التنبيهات (System Alerts)</h1>
             <p className="text-slate-500 text-sm">مراقبة صحة النظام، الأخطاء التقنية، وتنبيهات الذكاء الاصطناعي</p>
           </div>
         </div>
-        <button onClick={load} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#1e3e50] font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+        <button onClick={load} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#0e7a54] font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {loading ? 'جاري التحديث...' : 'تحديث السجل'}
         </button>
       </div>
@@ -106,7 +106,7 @@ export default function AlertsPage() {
           <button key={s} onClick={() => setFilter(s)}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
               filter === s
-                ? 'bg-[#1e3e50] text-white shadow-sm'
+                ? 'bg-[#0e7a54] text-white shadow-sm'
                 : 'bg-transparent text-slate-500 hover:bg-slate-50'
             }`}>
             {s === 'all' ? `جميع التنبيهات (${alerts.length})` : `${SEV_ARABIC[s]} (${counts[s] ?? 0})`}
@@ -116,14 +116,14 @@ export default function AlertsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1e3e50]"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
           <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={40} />
           </div>
-          <div className="font-bold text-xl text-[#1e3e50] mb-2">لا توجد تنبيهات نشطة حالياً</div>
+          <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد تنبيهات نشطة حالياً</div>
           <p className="text-slate-500 text-sm">النظام يعمل بشكل ممتاز ومستقر ✅</p>
         </div>
       ) : (
@@ -140,11 +140,11 @@ export default function AlertsPage() {
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap mb-2">
-                      <span className="font-bold text-[#1e3e50] text-base">{alert.title}</span>
+                      <span className="font-bold text-[#0e7a54] text-base">{alert.title}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${SEV[alert.severity]}`}>
                         {SEV_ARABIC[alert.severity]}
                       </span>
-                      <span className="bg-[#f0f4f8] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md font-mono">
+                      <span className="bg-[#e7f6ef] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md font-mono">
                         المصدر: {alert.alert_type}
                       </span>
                     </div>
@@ -164,7 +164,7 @@ export default function AlertsPage() {
                 <div className="flex flex-row md:flex-col gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 pt-4 md:pt-0 border-t border-slate-100 md:border-0">
                   {!alert.is_read && (
                     <button onClick={() => void markRead(alert.id)}
-                      className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-white text-slate-500 border border-slate-200 hover:text-[#1e3e50] hover:bg-slate-50 transition-colors">
+                      className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-white text-slate-500 border border-slate-200 hover:text-[#0e7a54] hover:bg-slate-50 transition-colors">
                       تحديد كمقروء
                     </button>
                   )}
