@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, Send, Bot, User, Phone, MessageSquare } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
@@ -33,12 +34,21 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
-  const [messages] = useState<ChatMessage[]>(initialMessages)
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
   const { t } = useTranslation()
   const m = t.pages.messages
+  const router = useRouter()
+
+  // Sync when the server refreshes (new messages / paused state)
+  useEffect(() => { setMessages(initialMessages) }, [initialMessages])
+  // Auto-refresh the conversation list so new inbound/outbound show without manual reload
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), 12000)
+    return () => clearInterval(id)
+  }, [router])
 
   // Group messages by customer
   const groupedByCustomer = useMemo(() => {

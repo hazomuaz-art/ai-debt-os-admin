@@ -13,6 +13,7 @@ import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
+import { StartConversationButton } from '@/components/debt/StartConversationButton'
 
 // Translate AI-generated score factor names (free-form English) to Arabic by keyword.
 function factorAr(name: string): string {
@@ -155,6 +156,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
         </div>
         <div className="flex gap-3">
           <EditDebtModal debt={debt} customer={debt.customer} />
+          {debt.customer?.id && (
+            <StartConversationButton customerId={debt.customer.id} phone={debt.customer.whatsapp ?? debt.customer.phone ?? null} />
+          )}
           <ScoreDebtButton debtId={debt.id} />
           <SendWhatsAppButton
             debtId={debt.id}
