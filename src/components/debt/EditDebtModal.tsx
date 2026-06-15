@@ -59,7 +59,7 @@ export default function EditDebtModal({ debt, customer }: { debt: any, customer:
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" >
-          <div className="bg-[#151a23] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden">
+          <div className="bg-[#151a23] rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-[#222a36] flex items-center justify-between bg-[#222a36]">
               <h2 className="text-lg font-bold text-white">تعديل بيانات العميل والمديونية</h2>
               <button onClick={() => setIsOpen(false)} className="text-[#5f6b7e] hover:text-slate-300">

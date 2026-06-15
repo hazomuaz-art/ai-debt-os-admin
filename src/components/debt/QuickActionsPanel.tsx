@@ -140,7 +140,7 @@ export default function QuickActionsPanel({
       {/* Promise Modal */}
       {showPromiseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={submitPromise} className="bg-[#151a23] rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+          <form onSubmit={submitPromise} className="bg-[#151a23] rounded-2xl p-6 w-full max-w-sm shadow-xl max-h-[90vh] overflow-y-auto space-y-4">
             <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
               <Handshake className="text-emerald-500" />
               تسجيل وعد بالسداد
@@ -192,7 +192,7 @@ export default function QuickActionsPanel({
       {/* Dispute Modal */}
       {showDisputeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={submitDispute} className="bg-[#151a23] rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+          <form onSubmit={submitDispute} className="bg-[#151a23] rounded-2xl p-6 w-full max-w-sm shadow-xl max-h-[90vh] overflow-y-auto space-y-4">
             <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
               <ShieldAlert className="text-rose-500" />
               تسجيل اعتراض (Dispute)
