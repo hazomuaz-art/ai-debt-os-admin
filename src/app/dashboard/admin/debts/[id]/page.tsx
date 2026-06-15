@@ -116,7 +116,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           <Link href="/dashboard/admin/debts" className="w-10 h-10 rounded-full bg-[#222a36] flex items-center justify-center text-[#8b95a7] hover:bg-[#222a36] hover:text-white transition-colors">
             <ArrowRight size={20} />
           </Link>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
             <User size={24} />
           </div>
           <div>
@@ -154,17 +154,17 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 <p className="text-[#8b95a7] text-xs font-bold mb-1">المبلغ الأساسي</p>
                 <p className="text-xl font-bold text-white">{formatCurrency(debt.original_amount, debt.currency)}</p>
               </div>
-              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                <p className="text-indigo-600 text-xs font-bold mb-1">الرصيد المتبقي</p>
-                <p className="text-xl font-bold text-indigo-700">{formatCurrency(debt.current_balance, debt.currency)}</p>
+              <div className="bg-indigo-500/10 p-4 rounded-xl border border-indigo-500/20">
+                <p className="text-indigo-400 text-xs font-bold mb-1">الرصيد المتبقي</p>
+                <p className="text-xl font-bold text-indigo-400">{formatCurrency(debt.current_balance, debt.currency)}</p>
               </div>
-              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                <p className="text-emerald-600 text-xs font-bold mb-1">إجمالي المسدد</p>
-                <p className="text-xl font-bold text-emerald-700">{formatCurrency(totalPaid, debt.currency)}</p>
+              <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20">
+                <p className="text-emerald-400 text-xs font-bold mb-1">إجمالي المسدد</p>
+                <p className="text-xl font-bold text-emerald-400">{formatCurrency(totalPaid, debt.currency)}</p>
               </div>
-              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100">
-                <p className="text-rose-600 text-xs font-bold mb-1">تاريخ الاستحقاق</p>
-                <p className="text-lg font-bold text-rose-700">{formatDate(debt.due_date)}</p>
+              <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/20">
+                <p className="text-rose-400 text-xs font-bold mb-1">تاريخ الاستحقاق</p>
+                <p className="text-lg font-bold text-rose-400">{formatDate(debt.due_date)}</p>
               </div>
             </div>
 
@@ -176,8 +176,8 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
                 <span className={`inline-flex px-3 py-1.5 rounded-lg text-sm font-bold border ${
-                  debt.priority === 'critical' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                  debt.priority === 'high' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                  debt.priority === 'critical' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                  debt.priority === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                   debt.priority === 'medium' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
                   'bg-[#222a36] text-slate-300 border-[#222a36]'
                 }`}>
@@ -206,7 +206,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <div className="flex items-center justify-between border-b border-[#222a36] pb-4 mb-5">
               <div className="flex items-center gap-2">
-                <Wallet className="text-emerald-600" size={20} />
+                <Wallet className="text-emerald-400" size={20} />
                 <h2 className="text-lg font-bold text-white">سجل المدفوعات</h2>
               </div>
               <RecordPaymentModal
@@ -231,7 +231,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     {debt.payments.map((p: any) => (
                       <tr key={p.id} className="hover:bg-[#1a212c] transition-colors">
                         <td className="p-3 text-slate-300">{formatDate(p.payment_date)}</td>
-                        <td className="p-3 font-bold text-emerald-600">{formatCurrency(p.amount, debt.currency)}</td>
+                        <td className="p-3 font-bold text-emerald-400">{formatCurrency(p.amount, debt.currency)}</td>
                         <td className="p-3 text-slate-300">{p.payment_method || '—'}</td>
                         <td className="p-3 text-[#8b95a7] font-mono text-xs">{p.reference_number || '—'}</td>
                         <td className="p-3 text-[#8b95a7]">{p.notes || '—'}</td>
@@ -284,7 +284,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <h2 className="text-lg font-bold text-white">الخط الزمني المباشر (Timeline)</h2>
             </div>
             {timelineEvents?.length ? (
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ms-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ms-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[#222a36] before:to-transparent">
                 {timelineEvents.map((ev: any) => (
                   <div key={ev.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-[#222a36] text-[#8b95a7] shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
@@ -357,7 +357,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               {debt.customer?.monthly_income && (
                 <div className="flex justify-between items-center">
                   <span className="text-[#8b95a7] font-bold">الدخل الشهري</span>
-                  <span className="font-bold text-emerald-600">{formatCurrency(debt.customer.monthly_income, debt.currency)}</span>
+                  <span className="font-bold text-emerald-400">{formatCurrency(debt.customer.monthly_income, debt.currency)}</span>
                 </div>
               )}
             </div>
@@ -373,17 +373,17 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           </div>
 
           {/* AI Score */}
-          <div className="bg-gradient-to-br from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
-            <div className="flex items-center gap-2 border-b border-indigo-100/50 pb-4 mb-4">
-              <BrainCircuit className="text-indigo-600" size={20} />
-              <h2 className="text-lg font-bold text-indigo-900">تقييم الذكاء الاصطناعي</h2>
+          <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+            <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
+              <BrainCircuit className="text-indigo-400" size={20} />
+              <h2 className="text-lg font-bold text-white">تقييم الذكاء الاصطناعي</h2>
             </div>
             {latestScore ? (
               <div className="space-y-5">
                 <div className="flex items-center justify-center gap-4 py-2">
-                  <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-sm bg-[#151a23] ${
-                    latestScore.score >= 70 ? 'border-emerald-400 text-emerald-600' :
-                    latestScore.score >= 40 ? 'border-amber-400 text-amber-600' : 'border-rose-400 text-rose-600'
+                  <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 bg-[#0d1117] ${
+                    latestScore.score >= 70 ? 'border-emerald-400 text-emerald-400' :
+                    latestScore.score >= 40 ? 'border-amber-400 text-amber-400' : 'border-rose-400 text-rose-400'
                   }`}>
                     <span className="text-4xl font-bold font-mono">{latestScore.score}</span>
                   </div>
@@ -395,20 +395,20 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     </p>
                   </div>
                 </div>
-                
-                <div className="bg-[#151a23] rounded-xl p-4 border border-indigo-50 shadow-sm">
+
+                <div className="bg-[#0d1117] rounded-xl p-4 border border-[#222a36]">
                   <p className="text-xs text-indigo-400 font-bold mb-1">الاستراتيجية المقترحة</p>
-                  <p className="text-sm font-bold text-indigo-900 leading-relaxed">{latestScore.recommended_strategy}</p>
+                  <p className="text-sm font-bold text-slate-200 leading-relaxed">{latestScore.recommended_strategy}</p>
                 </div>
-                
+
                 {latestScore.factors && (
                   <div>
                     <p className="text-xs text-[#5f6b7e] font-bold mb-2">العوامل المؤثرة</p>
                     <div className="space-y-2">
                       {latestScore.factors.slice(0, 4).map((f: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between text-xs bg-[#151a23] p-2 rounded-lg border border-[#222a36] shadow-sm">
+                        <div key={i} className="flex items-center justify-between text-xs bg-[#0d1117] p-2 rounded-lg border border-[#222a36]">
                           <span className="text-slate-300 font-bold">{f.name}</span>
-                          <span className={`font-bold px-2 py-0.5 rounded ${f.impact === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          <span className={`font-bold px-2 py-0.5 rounded ${f.impact === 'positive' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                             {f.impact === 'positive' ? '+' : '−'}{f.weight}
                           </span>
                         </div>
@@ -435,7 +435,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                   <div key={a.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="text-sm font-bold text-white">{a.action_type}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${a.priority === 'high' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>{a.priority}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${a.priority === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>{a.priority}</span>
                     </div>
                     <p className="text-xs text-[#8b95a7] mb-2 leading-relaxed">{a.reason}</p>
                     {a.suggested_message && <p className="text-xs bg-[#151a23] border border-[#222a36] text-slate-200 p-2 rounded-lg leading-relaxed shadow-sm">"{a.suggested_message}"</p>}
@@ -458,8 +458,8 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 {promises.map((pr: any) => (
                   <div key={pr.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-bold text-emerald-600">{formatCurrency(pr.promised_amount, debt.currency)}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${pr.status === 'kept' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : pr.status === 'broken' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}>{pr.status}</span>
+                      <span className="text-sm font-bold text-emerald-400">{formatCurrency(pr.promised_amount, debt.currency)}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${pr.status === 'kept' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : pr.status === 'broken' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}>{pr.status}</span>
                     </div>
                     <p className="text-xs text-[#8b95a7] font-bold flex justify-between">
                       <span>{formatDate(pr.promised_date)}</span>
@@ -485,7 +485,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                   <div key={ap.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-sm font-bold text-white">{ap.approval_type}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${ap.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : ap.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>{ap.status}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${ap.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : ap.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>{ap.status}</span>
                     </div>
                     <p className="text-xs text-[#8b95a7] leading-relaxed mb-1">{ap.reason}</p>
                     <p className="text-[10px] text-[#5f6b7e] font-bold">{formatDate(ap.created_at)}</p>
@@ -499,19 +499,19 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
           {/* Active Alerts */}
           {debtAlerts?.length > 0 && (
-            <div className="bg-rose-50/50 rounded-2xl p-6 shadow-sm border border-rose-100">
-              <div className="flex items-center gap-2 border-b border-rose-200/50 pb-3 mb-4">
-                <BellRing className="text-rose-600" size={18} />
-                <h2 className="text-base font-bold text-rose-900">تنبيهات نشطة</h2>
+            <div className="bg-rose-500/10/50 rounded-2xl p-6 shadow-sm border border-rose-500/20">
+              <div className="flex items-center gap-2 border-b border-rose-500/20/50 pb-3 mb-4">
+                <BellRing className="text-rose-400" size={18} />
+                <h2 className="text-base font-bold text-rose-400">تنبيهات نشطة</h2>
               </div>
               <div className="space-y-3">
                 {debtAlerts.map((al: any) => (
-                  <div key={al.id} className="bg-[#151a23] border border-rose-200 rounded-xl p-3 shadow-sm">
+                  <div key={al.id} className="bg-[#151a23] border border-rose-500/20 rounded-xl p-3 shadow-sm">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-bold text-rose-700">{al.title}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-rose-100 text-rose-600">{al.severity}</span>
+                      <span className="text-sm font-bold text-rose-400">{al.title}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-rose-500/15 text-rose-400">{al.severity}</span>
                     </div>
-                    {al.message && <p className="text-xs text-rose-600/80 leading-relaxed">{al.message}</p>}
+                    {al.message && <p className="text-xs text-rose-400/80 leading-relaxed">{al.message}</p>}
                   </div>
                 ))}
               </div>
