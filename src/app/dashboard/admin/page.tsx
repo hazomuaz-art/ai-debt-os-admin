@@ -114,9 +114,11 @@ export default async function AdminDashboard() {
   const statusLabels: Record<string, string> = dir === 'rtl' ? {
     active: 'نشط', overdue: 'متأخر', payment_plan: 'خطة تقسيط', promised: 'وعد سداد',
     settled: 'مسدد', disputed: 'معترض', legal: 'قانوني', new: 'جديد', written_off: 'مشطوب',
+    in_progress: 'قيد التنفيذ', in_negotiation: 'في التفاوض', partial: 'سداد جزئي',
   } : {
     active: 'Active', overdue: 'Overdue', payment_plan: 'Payment plan', promised: 'Promised',
     settled: 'Settled', disputed: 'Disputed', legal: 'Legal', new: 'New', written_off: 'Written off',
+    in_progress: 'In progress', in_negotiation: 'Negotiating', partial: 'Partial',
   }
   const statusEntries = Object.entries(s.statusCount).sort((a, b) => b[1] - a[1]).slice(0, 5)
   const maxStatus = Math.max(1, ...statusEntries.map(([, n]) => n))
