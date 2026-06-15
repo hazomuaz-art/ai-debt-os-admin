@@ -6,6 +6,7 @@ import { CreateDebtModal } from '@/components/debt/CreateDebtModal'
 import { CreateCustomerModal } from '@/components/debt/CreateCustomerModal'
 import ImportDebtsModal from '@/components/debt/ImportDebtsModal'
 import ExportDebtsButton from '@/components/debt/ExportDebtsButton'
+import { StartConversationButton } from '@/components/debt/StartConversationButton'
 import Link from 'next/link'
 import { WalletCards, Users } from 'lucide-react'
 import DebtFilters from '@/components/debt/DebtFilters'
@@ -107,11 +108,12 @@ export default async function AdminDebtsPage({
                   <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{p.risk_level}</th>
                   <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.city}</th>
                   <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.added_date}</th>
+                  <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1c2330]">
                 {(customers ?? []).length === 0 ? (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_customers}</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_customers}</td></tr>
                 ) : (customers ?? []).map(c => (
                   <tr key={c.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="px-6 py-4">
@@ -128,6 +130,9 @@ export default async function AdminDebtsPage({
                     <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getRiskColor(c.risk_level)}`}>{translateRisk(c.risk_level, dir === 'rtl')}</span></td>
                     <td className="px-6 py-4 text-slate-300">{c.city ?? '—'}</td>
                     <td className="px-6 py-4 text-[#5f6b7e] text-xs">{formatDate(c.created_at)}</td>
+                    <td className="px-6 py-4 text-center">
+                      <StartConversationButton customerId={c.id} phone={c.whatsapp ?? c.phone ?? null} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
