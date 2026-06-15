@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-// Customers have been merged into the unified "العملاء والمديونيات" page.
+// Customers and debts are now a single unified page.
 export default function AdminCustomersPage() {
-  redirect('/dashboard/admin/debts?view=customers')
+  redirect('/dashboard/admin/debts')
 }

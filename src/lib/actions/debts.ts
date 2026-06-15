@@ -203,6 +203,19 @@ export async function createDebtAction(formData: FormData) {
   }
 }
 
+// Unified "case" creation: creates the customer then their debt in one step.
+export async function createCaseAction(formData: FormData) {
+  const cust = await createCustomerAction(formData)
+  if (cust.error || !cust.data) return { error: cust.error || 'تعذّر إنشاء العميل' }
+
+  formData.set('customer_id', (cust.data as { id: string }).id)
+  const debt = await createDebtAction(formData)
+  if (debt.error) {
+    return { error: `تم إنشاء العميل لكن تعذّر إنشاء الدين: ${debt.error}` }
+  }
+  return { data: { customer: cust.data, debt: debt.data } }
+}
+
 export async function updateDebtStatusAction(debtId: string, status: DebtStatus) {
   try {
     const { supabase, user, profile } = await requireAuth()

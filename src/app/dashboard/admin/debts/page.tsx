@@ -2,13 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { CreateDebtModal } from '@/components/debt/CreateDebtModal'
-import { CreateCustomerModal } from '@/components/debt/CreateCustomerModal'
+import { AddCaseModal } from '@/components/debt/AddCaseModal'
 import ImportDebtsModal from '@/components/debt/ImportDebtsModal'
 import ExportDebtsButton from '@/components/debt/ExportDebtsButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
 import Link from 'next/link'
-import { WalletCards, Users } from 'lucide-react'
 import DebtFilters from '@/components/debt/DebtFilters'
 
 function getStatusColor(status: string) {
@@ -27,28 +25,10 @@ function getStatusColor(status: string) {
   }
 }
 
-function getRiskColor(risk: string) {
-  switch (risk?.toLowerCase()) {
-    case 'high':   return 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-    case 'medium': return 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-    case 'low':    return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-    default:       return 'bg-[#222a36] text-[#8b95a7] border border-[#2c3543]'
-  }
-}
-
-function translateRisk(risk: string, isAr: boolean) {
-  switch (risk?.toLowerCase()) {
-    case 'high': return isAr ? 'مرتفع' : 'High'
-    case 'medium': return isAr ? 'متوسط' : 'Medium'
-    case 'low': return isAr ? 'منخفض' : 'Low'
-    default: return isAr ? 'غير محدد' : 'N/A'
-  }
-}
-
 export default async function AdminDebtsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; page?: string; view?: string; product?: string; creditor?: string; collector?: string; q?: string }
+  searchParams: { status?: string; page?: string; product?: string; creditor?: string; collector?: string; q?: string }
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -64,86 +44,8 @@ export default async function AdminDebtsPage({
 
   const { t, dir } = getServerTranslation()
   const p = t.pages.debts
-  const view = searchParams.view === 'customers' ? 'customers' : 'debts'
-  const tabBase = '/dashboard/admin/debts'
+  const isAr = dir === 'rtl'
 
-  const tabs = (
-    <div className="inline-flex items-center gap-1 bg-[#151a23] border border-[#222a36] rounded-xl p-1">
-      <Link href={tabBase} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${view === 'debts' ? 'bg-[#10b981] text-white' : 'text-[#8b95a7] hover:text-white'}`}>
-        <WalletCards size={16} /> {p.tab_debts}
-      </Link>
-      <Link href={`${tabBase}?view=customers`} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${view === 'customers' ? 'bg-[#10b981] text-white' : 'text-[#8b95a7] hover:text-white'}`}>
-        <Users size={16} /> {p.tab_customers}
-      </Link>
-    </div>
-  )
-
-  // ════════════════ CUSTOMERS VIEW ════════════════
-  if (view === 'customers') {
-    const { data: customers, count } = await supabase
-      .from('customers')
-      .select('*', { count: 'exact' })
-      .eq('company_id', profile.company_id)
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    return (
-      <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-200">
-        <div className="bg-[#151a23] rounded-2xl p-6 border border-[#222a36] flex items-center justify-between mt-6 flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">{p.title}</h1>
-            <p className="text-[#8b95a7] text-sm">{p.total_customers_registered} <span className="font-bold text-emerald-400">{count ?? 0}</span></p>
-          </div>
-          <div className="flex items-center gap-3">{tabs}<CreateCustomerModal /></div>
-        </div>
-
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[#0d1117] border-b border-[#222a36]">
-                <tr>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.customer_name}</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.contact_info}</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.national_id}</th>
-                  <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{p.risk_level}</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.city}</th>
-                  <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.added_date}</th>
-                  <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.actions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#1c2330]">
-                {(customers ?? []).length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_customers}</td></tr>
-                ) : (customers ?? []).map(c => (
-                  <tr key={c.id} className="hover:bg-[#1a212c] transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-emerald-500/15 rounded-full flex items-center justify-center text-sm font-bold text-emerald-400">{c.full_name?.charAt(0) ?? '?'}</div>
-                        <span className="font-semibold text-white">{c.full_name || 'غير معروف'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-mono text-slate-300 mb-1">{c.phone ?? c.email ?? '—'}</div>
-                      {c.whatsapp && <div className="text-xs text-emerald-400 bg-emerald-500/10 inline-block px-2 py-0.5 rounded-full font-mono">WA: {c.whatsapp}</div>}
-                    </td>
-                    <td className="px-6 py-4"><span className="font-mono text-[#8b95a7] bg-[#222a36] px-2 py-1 rounded-md border border-[#2c3543]">{c.national_id ?? '—'}</span></td>
-                    <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getRiskColor(c.risk_level)}`}>{translateRisk(c.risk_level, dir === 'rtl')}</span></td>
-                    <td className="px-6 py-4 text-slate-300">{c.city ?? '—'}</td>
-                    <td className="px-6 py-4 text-[#5f6b7e] text-xs">{formatDate(c.created_at)}</td>
-                    <td className="px-6 py-4 text-center">
-                      <StartConversationButton customerId={c.id} phone={c.whatsapp ?? c.phone ?? null} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ════════════════ DEBTS VIEW ════════════════
   const page = parseInt(searchParams.page ?? '1')
   const limit = 20
   const offset = (page - 1) * limit
@@ -152,7 +54,7 @@ export default async function AdminDebtsPage({
     .from('debts')
     .select(`
       *,
-      customer:customers(id, full_name, phone),
+      customer:customers(id, full_name, phone, whatsapp),
       assigned_collector:profiles!debts_assigned_to_fkey(id, full_name),
       ai_scores(score, risk_classification)
     `, { count: 'exact' })
@@ -185,7 +87,6 @@ export default async function AdminDebtsPage({
   const productTypes = Array.from(new Set((productsData || []).map(p => p.product_type)))
   const creditors = Array.from(new Set((creditorsData || []).map(c => c.creditor_name)))
 
-  const isAr = dir === 'rtl'
   const statusLabels: Record<string, string> = isAr ? {
     active: 'نشط', in_progress: 'قيد التنفيذ', promised: 'وعود سداد',
     partial: 'سداد جزئي', settled: 'مُسدد', written_off: 'معدوم',
@@ -204,10 +105,9 @@ export default async function AdminDebtsPage({
           <p className="text-[#8b95a7] text-sm">{p.total_debts_registered} <span className="font-bold text-emerald-400">{count ?? 0}</span></p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {tabs}
           <ExportDebtsButton status={searchParams.status} />
           <ImportDebtsModal />
-          <CreateDebtModal />
+          <AddCaseModal />
         </div>
       </div>
 
@@ -224,21 +124,21 @@ export default async function AdminDebtsPage({
                 <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.status}</th>
                 <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{p.ai_score}</th>
                 <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.collector}</th>
-                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.due_date}</th>
                 <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1c2330]">
               {(debts ?? []).length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_debts}</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_debts}</td></tr>
               ) : (debts ?? []).map((debt: any) => {
                 const latestScore = debt.ai_scores?.[0]
+                const cust = debt.customer as { id?: string; full_name?: string; phone?: string; whatsapp?: string } | null
                 return (
                   <tr key={debt.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="px-6 py-4"><span className="font-mono text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">{debt.reference_number}</span></td>
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-white">{debt.customer?.full_name ?? '—'}</div>
-                      <div className="text-[#5f6b7e] text-xs mt-0.5">{debt.customer?.phone ?? ''}</div>
+                      <div className="font-semibold text-white">{cust?.full_name ?? '—'}</div>
+                      <div className="text-[#5f6b7e] text-xs mt-0.5 font-mono" dir="ltr">{cust?.phone ?? ''}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-bold text-rose-400">{formatCurrency(debt.current_balance, debt.currency)}</div>
@@ -254,9 +154,11 @@ export default async function AdminDebtsPage({
                       ) : <span className="text-[#5f6b7e] font-bold">—</span>}
                     </td>
                     <td className="px-6 py-4"><span className="text-sm font-medium text-slate-300 bg-[#222a36] px-2 py-1 rounded-md">{debt.assigned_collector?.full_name ?? t.ui.unassigned}</span></td>
-                    <td className="px-6 py-4"><span className="text-sm text-[#8b95a7] font-mono">{debt.due_date ? formatDate(debt.due_date) : '—'}</span></td>
-                    <td className="px-6 py-4 text-center">
-                      <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-4 py-1.5 bg-[#1a212c] border border-[#2c3543] text-emerald-400 hover:bg-[#222a36] font-bold rounded-lg text-xs transition-colors">{t.ui.view_details}</Link>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        {cust?.id && <StartConversationButton customerId={cust.id} phone={cust.whatsapp ?? cust.phone ?? null} />}
+                        <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-3 py-1.5 bg-[#1a212c] border border-[#2c3543] text-slate-200 hover:bg-[#222a36] font-bold rounded-lg text-xs transition-colors whitespace-nowrap">{t.ui.view_details}</Link>
+                      </div>
                     </td>
                   </tr>
                 )
