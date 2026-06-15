@@ -30,7 +30,7 @@ export default async function CollectorMessagesPage() {
       case 'whatsapp': return <MessageCircle size={16} className="text-emerald-500" />
       case 'sms': return <Smartphone size={16} className="text-blue-500" />
       case 'email': return <Mail size={16} className="text-rose-500" />
-      default: return <MessageSquare size={16} className="text-slate-500" />
+      default: return <MessageSquare size={16} className="text-[#8b95a7]" />
     }
   }
 
@@ -44,24 +44,24 @@ export default async function CollectorMessagesPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center gap-4 mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center gap-4 mt-6">
         <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
           <MessageSquare size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">سجل المراسلات</h1>
-          <p className="text-slate-500 text-sm font-medium">سجل التواصل لجميع ملفات الديون المسندة إليك</p>
+          <h1 className="text-2xl font-bold text-white mb-1">سجل المراسلات</h1>
+          <p className="text-[#8b95a7] text-sm font-medium">سجل التواصل لجميع ملفات الديون المسندة إليك</p>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl shadow-sm overflow-hidden">
         {messages && messages.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="bg-[#fbfdfd] border-b border-slate-100 text-slate-500">
+              <thead className="bg-[#0d1117] border-b border-[#222a36] text-[#8b95a7]">
                 <tr>
                   <th className="px-6 py-4 font-bold">التاريخ</th>
                   <th className="px-6 py-4 font-bold">العميل ورقم الملف</th>
@@ -70,20 +70,20 @@ export default async function CollectorMessagesPage() {
                   <th className="px-6 py-4 font-bold w-1/3">محتوى الرسالة</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#1c2330]">
                 {messages.map((msg: any) => (
-                  <tr key={msg.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-slate-600 font-medium whitespace-nowrap">
+                  <tr key={msg.id} className="hover:bg-[#1a212c] transition-colors">
+                    <td className="px-6 py-4 text-slate-300 font-medium whitespace-nowrap">
                       {formatDate(msg.sent_at || msg.created_at)}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-[#0e7a54] text-sm mb-0.5">{(msg.debt as any)?.customer?.full_name || '—'}</div>
-                      <div className="text-slate-400 text-xs font-mono">{(msg.debt as any)?.reference_number || '—'}</div>
+                      <div className="font-bold text-white text-sm mb-0.5">{(msg.debt as any)?.customer?.full_name || '—'}</div>
+                      <div className="text-[#5f6b7e] text-xs font-mono">{(msg.debt as any)?.reference_number || '—'}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222a36] border border-[#222a36]">
                         {getChannelIcon(msg.channel)}
-                        <span className="text-xs font-bold text-slate-600">{getChannelLabel(msg.channel)}</span>
+                        <span className="text-xs font-bold text-slate-300">{getChannelLabel(msg.channel)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -100,7 +100,7 @@ export default async function CollectorMessagesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="bg-[#fcfdfd] border border-slate-100 p-3 rounded-xl text-slate-600 text-sm leading-relaxed truncate max-w-sm hover:max-w-none hover:whitespace-normal transition-all cursor-default">
+                      <div className="bg-[#0d1117] border border-[#222a36] p-3 rounded-xl text-slate-300 text-sm leading-relaxed truncate max-w-sm hover:max-w-none hover:whitespace-normal transition-all cursor-default">
                         {msg.content}
                       </div>
                     </td>
@@ -111,11 +111,11 @@ export default async function CollectorMessagesPage() {
           </div>
         ) : (
           <div className="text-center py-16">
-            <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-20 h-20 bg-[#222a36] text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
               <MessageSquare size={32} />
             </div>
-            <h3 className="font-bold text-lg text-[#0e7a54] mb-2">لا توجد رسائل مسجلة</h3>
-            <p className="text-slate-500 text-sm">لم يتم إرسال أو استقبال أي رسائل للديون المسندة إليك بعد.</p>
+            <h3 className="font-bold text-lg text-white mb-2">لا توجد رسائل مسجلة</h3>
+            <p className="text-[#8b95a7] text-sm">لم يتم إرسال أو استقبال أي رسائل للديون المسندة إليك بعد.</p>
           </div>
         )}
       </div>

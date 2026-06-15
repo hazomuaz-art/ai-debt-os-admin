@@ -84,13 +84,13 @@ export default async function ManagerDashboard() {
   ]
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">لوحة تحكم المدير</h1>
-          <p className="text-slate-500 text-sm">نظرة عامة على أداء فريق العمل ومعدلات التحصيل الحية.</p>
+          <h1 className="text-2xl font-bold text-white mb-1">لوحة تحكم المدير</h1>
+          <p className="text-[#8b95a7] text-sm">نظرة عامة على أداء فريق العمل ومعدلات التحصيل الحية.</p>
         </div>
       </div>
 
@@ -99,34 +99,34 @@ export default async function ManagerDashboard() {
         {stats.map((stat, idx) => (
           <div 
             key={idx} 
-            className="bg-white rounded-2xl border border-slate-100 p-6 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-[#151a23] rounded-2xl border border-[#222a36] p-6 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow"
           >
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bg} ${stat.color} shadow-sm`}>
               <stat.icon size={22} />
             </div>
             <div>
-              <h3 className="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wide">{stat.title}</h3>
-              <p className="text-3xl font-bold text-[#0e7a54] font-mono">{stat.value}</p>
-              <span className="text-[11px] text-slate-400 block mt-1 font-bold">{stat.subtitle}</span>
+              <h3 className="text-[#8b95a7] text-xs font-bold mb-1 uppercase tracking-wide">{stat.title}</h3>
+              <p className="text-3xl font-bold text-white font-mono">{stat.value}</p>
+              <span className="text-[11px] text-[#5f6b7e] block mt-1 font-bold">{stat.subtitle}</span>
             </div>
           </div>
         ))}
       </div>
 
       {/* Collector performance */}
-      <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col shadow-sm">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-[#fcfdfd]">
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl overflow-hidden flex flex-col shadow-sm">
+        <div className="p-6 border-b border-[#222a36] flex justify-between items-center bg-[#0d1117]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
               <Users size={20} />
             </div>
-            <h2 className="text-lg font-bold text-[#0e7a54]">مراقبة أداء المحصلين وفريق العمل</h2>
+            <h2 className="text-lg font-bold text-white">مراقبة أداء المحصلين وفريق العمل</h2>
           </div>
         </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start border-collapse">
-            <thead className="bg-[#e7f6ef] text-slate-500 border-b border-slate-100">
+            <thead className="bg-[#0b0e14] text-[#8b95a7] border-b border-[#222a36]">
               <tr>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider">المحصل</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-center">الملفات المسندة</th>
@@ -134,30 +134,30 @@ export default async function ManagerDashboard() {
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-end ps-6">إجراءات اليوم</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[#1c2330]">
               {collectorStats.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold bg-slate-50">
+                  <td colSpan={4} className="px-6 py-12 text-center text-[#5f6b7e] font-bold bg-[#222a36]">
                     لا يوجد محصلون مسجلون حالياً
                   </td>
                 </tr>
               ) : (
                 collectorStats.sort((a, b) => b.collected - a.collected).map(col => (
-                  <tr key={col.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={col.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center text-sm font-bold shadow-sm shrink-0">
+                        <div className="w-10 h-10 bg-[#0d1117] text-white rounded-xl flex items-center justify-center text-sm font-bold shadow-sm shrink-0">
                           {col.full_name?.charAt(0) ?? '?'}
                         </div>
                         <div>
-                          <div className="font-bold text-[#0e7a54]">{col.full_name ?? 'بدون اسم'}</div>
-                          <div className="text-[11px] text-slate-500 mt-0.5 font-mono">{col.email}</div>
+                          <div className="font-bold text-white">{col.full_name ?? 'بدون اسم'}</div>
+                          <div className="text-[11px] text-[#8b95a7] mt-0.5 font-mono">{col.email}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center font-mono font-bold text-[#0e7a54] bg-slate-50/50">{col.assigned}</td>
+                    <td className="px-6 py-4 text-center font-mono font-bold text-white bg-[#222a36]/50">{col.assigned}</td>
                     <td className="px-6 py-4 text-center text-emerald-600 font-mono font-bold">{formatCurrency(col.collected, 'SAR')}</td>
-                    <td className="px-6 py-4 text-end ps-6 font-mono text-purple-600 font-bold bg-slate-50/50">{col.actionsToday}</td>
+                    <td className="px-6 py-4 text-end ps-6 font-mono text-purple-600 font-bold bg-[#222a36]/50">{col.actionsToday}</td>
                   </tr>
                 ))
               )}

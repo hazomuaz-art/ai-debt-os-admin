@@ -51,7 +51,7 @@ export default async function AIActionsPage() {
     critical: 'bg-rose-50 text-rose-600 border-rose-200',
     high: 'bg-orange-50 text-orange-600 border-orange-200',
     medium: 'bg-amber-50 text-amber-600 border-amber-200',
-    low: 'bg-slate-50 text-slate-500 border-slate-200',
+    low: 'bg-[#222a36] text-[#8b95a7] border-[#222a36]',
   }
 
   const getIconForAction = (type: string) => {
@@ -61,22 +61,22 @@ export default async function AIActionsPage() {
       case 'email': return <Mail size={20} className="text-blue-500" />
       case 'visit': return <UserCheck size={20} className="text-amber-500" />
       case 'legal': return <AlertTriangle size={20} className="text-rose-500" />
-      default: return <BrainCircuit size={20} className="text-slate-400" />
+      default: return <BrainCircuit size={20} className="text-[#5f6b7e]" />
     }
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             <BrainCircuit size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">خطة عمل الذكاء الاصطناعي (AI Action Plan)</h1>
-            <p className="text-slate-500 text-sm">
+            <h1 className="text-2xl font-bold text-white mb-1">خطة عمل الذكاء الاصطناعي (AI Action Plan)</h1>
+            <p className="text-[#8b95a7] text-sm">
               إجراءات وتوصيات اليوم ({new Date().toLocaleDateString('ar-SA')}) — تم إنجاز {completedCount} من أصل {(actions ?? []).length}
             </p>
           </div>
@@ -87,8 +87,8 @@ export default async function AIActionsPage() {
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {(['critical', 'high', 'medium', 'low'] as const).map(priority => (
-          <div key={priority} className={`bg-white rounded-2xl border p-5 flex flex-col justify-between hover:shadow-md transition-shadow ${PRIORITY_STYLES[priority].replace('bg-', 'border-').split(' ')[2] || 'border-slate-100'}`}>
-            <div className="text-slate-500 text-sm font-bold mb-2">أولوية: {PRIORITY_ARABIC[priority]}</div>
+          <div key={priority} className={`bg-[#151a23] rounded-2xl border p-5 flex flex-col justify-between hover:shadow-md transition-shadow ${PRIORITY_STYLES[priority].replace('bg-', 'border-').split(' ')[2] || 'border-[#222a36]'}`}>
+            <div className="text-[#8b95a7] text-sm font-bold mb-2">أولوية: {PRIORITY_ARABIC[priority]}</div>
             <div className={`text-3xl font-bold font-mono ${PRIORITY_STYLES[priority].split(' ')[1]}`}>
               {priorityCounts[priority] ?? 0}
             </div>
@@ -99,12 +99,12 @@ export default async function AIActionsPage() {
       {/* Actions list */}
       <div className="space-y-4">
         {(actions ?? []).length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center shadow-sm">
-            <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="bg-[#151a23] rounded-2xl border border-[#222a36] p-16 text-center shadow-sm">
+            <div className="w-20 h-20 bg-[#222a36] text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
               <BrainCircuit size={40} />
             </div>
-            <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد إجراءات مجدولة لليوم</div>
-            <p className="text-slate-500 text-sm mb-6">اضغط على زر (توليد الخطة) ليقوم الذكاء الاصطناعي بتحليل المحفظة واقتراح المهام.</p>
+            <div className="font-bold text-xl text-white mb-2">لا توجد إجراءات مجدولة لليوم</div>
+            <p className="text-[#8b95a7] text-sm mb-6">اضغط على زر (توليد الخطة) ليقوم الذكاء الاصطناعي بتحليل المحفظة واقتراح المهام.</p>
             <GenerateActionsButton />
           </div>
         ) : (actions ?? []).map((action: {
@@ -118,39 +118,39 @@ export default async function AIActionsPage() {
           customer?: { full_name?: string; phone?: string; whatsapp?: string } | null
           debt?: { reference_number?: string; current_balance?: number; currency?: string } | null
         }) => (
-          <div key={action.id} className={`bg-white rounded-2xl border border-slate-100 shadow-sm p-6 transition-all duration-200 hover:shadow-md ${action.status === 'completed' ? 'opacity-60 bg-slate-50/50' : ''}`}>
+          <div key={action.id} className={`bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 transition-all duration-200 hover:shadow-md ${action.status === 'completed' ? 'opacity-60 bg-[#222a36]/50' : ''}`}>
             <div className="flex flex-col md:flex-row items-start justify-between gap-6">
               
               <div className="flex items-start gap-4 flex-1 w-full">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
                   action.action_type === 'whatsapp' ? 'bg-emerald-50' :
                   action.action_type === 'call' ? 'bg-purple-50' :
-                  action.action_type === 'email' ? 'bg-blue-50' : 'bg-slate-50'
+                  action.action_type === 'email' ? 'bg-blue-50' : 'bg-[#222a36]'
                 }`}>
                   {getIconForAction(action.action_type)}
                 </div>
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 flex-wrap mb-2">
-                    <span className="font-bold text-[#0e7a54] text-lg">{(action.customer as {full_name?: string} | null)?.full_name ?? 'عميل غير معروف'}</span>
+                    <span className="font-bold text-white text-lg">{(action.customer as {full_name?: string} | null)?.full_name ?? 'عميل غير معروف'}</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${PRIORITY_STYLES[action.priority] ?? PRIORITY_STYLES.low}`}>
                       أولوية {PRIORITY_ARABIC[action.priority] ?? action.priority}
                     </span>
-                    <span className="bg-[#e7f6ef] text-slate-500 text-xs font-bold px-2 py-1 rounded-md font-mono">
+                    <span className="bg-[#0b0e14] text-[#8b95a7] text-xs font-bold px-2 py-1 rounded-md font-mono">
                       ملف: {(action.debt as {reference_number?: string} | null)?.reference_number}
                     </span>
                   </div>
                   
-                  <div className="text-slate-600 text-sm font-medium leading-relaxed mb-3">السبب: {action.reason}</div>
+                  <div className="text-slate-300 text-sm font-medium leading-relaxed mb-3">السبب: {action.reason}</div>
                   
                   {action.suggested_message && (
-                    <div className="p-4 bg-[#fcfdfd] rounded-xl border border-slate-100 mb-3 relative">
-                      <div className="absolute top-0 end-4 -translate-y-1/2 bg-white px-2 text-xs font-bold text-blue-500 border border-slate-100 rounded-md">الرسالة المقترحة</div>
-                      <div className="text-slate-600 text-sm font-medium leading-relaxed whitespace-pre-wrap">{action.suggested_message}</div>
+                    <div className="p-4 bg-[#0d1117] rounded-xl border border-[#222a36] mb-3 relative">
+                      <div className="absolute top-0 end-4 -translate-y-1/2 bg-[#151a23] px-2 text-xs font-bold text-blue-500 border border-[#222a36] rounded-md">الرسالة المقترحة</div>
+                      <div className="text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-wrap">{action.suggested_message}</div>
                     </div>
                   )}
                   
-                  <div className="flex items-center gap-4 text-xs font-bold text-slate-400 mt-4">
+                  <div className="flex items-center gap-4 text-xs font-bold text-[#5f6b7e] mt-4">
                     {action.best_time_to_contact && (
                       <span className="flex items-center gap-1.5"><Clock size={14}/> {action.best_time_to_contact}</span>
                     )}
@@ -163,7 +163,7 @@ export default async function AIActionsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100">
+              <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-[#222a36]">
                 {action.status !== 'completed' ? (
                   <>
                     {(action.action_type === 'whatsapp') && (action.customer as {whatsapp?: string} | null)?.whatsapp && (

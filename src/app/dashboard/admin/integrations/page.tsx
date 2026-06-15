@@ -11,19 +11,19 @@ const INTEGRATIONS = [
     key:         'evolution_whatsapp',
     label:       'Evolution WhatsApp',
     description: 'ربط واتساب عبر Evolution API لاستقبال وإرسال الرسائل والمفاوضات.',
-    icon:        <MessageCircle size={24} className="text-[#0e7a54]" />,
+    icon:        <MessageCircle size={24} className="text-white" />,
   },
   {
     key:         'n8n_automation',
     label:       'n8n Automation',
     description: 'ربط خوادم الأتمتة n8n لبرمجة مسارات العمل المتكررة وتزامن البيانات.',
-    icon:        <Settings size={24} className="text-[#0e7a54]" />,
+    icon:        <Settings size={24} className="text-white" />,
   },
   {
     key:         'collection_api',
     label:       'أنظمة التحصيل والمحاسبة (ERP)',
     description: 'ربط ثنائي الاتجاه لمزامنة الديون والعملاء وسجلات السداد.',
-    icon:        <LinkIcon size={24} className="text-[#0e7a54]" />,
+    icon:        <LinkIcon size={24} className="text-white" />,
   },
 ]
 
@@ -55,18 +55,18 @@ export default async function IntegrationsPage() {
   const enabledCount  = (settings ?? []).filter(s => s.enabled).length
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8 bg-[#0b0e14] font-sans text-slate-100" >
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#0e7a54] mb-2">إدارة الربط (Integrations)</h1>
-          <p className="text-slate-500 text-sm">
+          <h1 className="text-2xl font-bold text-white mb-2">إدارة الربط (Integrations)</h1>
+          <p className="text-[#8b95a7] text-sm">
             قم بربط الأنظمة الخارجية لتفعيل الذكاء الاصطناعي والمراسلات وأتمتة المهام بكل سهولة.
           </p>
         </div>
-        <div className="bg-[#f6f8fa] px-4 py-3 rounded-xl border border-blue-100 flex items-center gap-2">
+        <div className="bg-[#0d1117] px-4 py-3 rounded-xl border border-blue-100 flex items-center gap-2">
           <div className="w-3 h-3 bg-[#0e7a54] rounded-full animate-pulse"></div>
-          <span className="text-[#0e7a54] font-bold text-sm">
+          <span className="text-white font-bold text-sm">
             {enabledCount} من {INTEGRATIONS.length} قيد التشغيل
           </span>
         </div>
@@ -97,7 +97,7 @@ export default async function IntegrationsPage() {
         </div>
         <a
           href="#"
-          className="px-6 py-2 bg-white text-[#0e7a54] hover:bg-blue-50 font-bold rounded-xl text-sm transition-colors shrink-0"
+          className="px-6 py-2 bg-[#151a23] text-white hover:bg-blue-50 font-bold rounded-xl text-sm transition-colors shrink-0"
         >
           تصفح الوثائق ↗
         </a>

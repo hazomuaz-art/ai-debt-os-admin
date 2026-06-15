@@ -53,7 +53,7 @@ export default function Page() {
     <main className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold font-syne">AI WhatsApp Collector Test</h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-[#5f6b7e] text-sm mt-1">
           صفحة اختبار مفتوحة تكلم فيها الـ AI كأنك عميل واتساب حقيقي.
         </p>
       </div>
@@ -62,7 +62,7 @@ export default function Page() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold">Live Conversation</h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-[#8b95a7] mt-1">
               اكتب أي سيناريو: اعتراض، سداد، غضب، رقم غلط، إنجليزي، أردو، وعد سداد.
             </p>
           </div>
@@ -77,7 +77,7 @@ export default function Page() {
 
         <div className="space-y-3 min-h-[320px]">
           {chat.length === 0 ? (
-            <p className="text-slate-500 text-sm text-center py-24">
+            <p className="text-[#8b95a7] text-sm text-center py-24">
               ابدأ بكتابة رسالة العميل تحت.
             </p>
           ) : (
@@ -89,7 +89,7 @@ export default function Page() {
                 <div
                   className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-6 ${
                     item.role === 'customer'
-                      ? 'bg-slate-50 text-slate-100'
+                      ? 'bg-[#222a36] text-slate-100'
                       : 'bg-brand-600 text-slate-900'
                   }`}
                 >
@@ -103,9 +103,9 @@ export default function Page() {
           )}
         </div>
 
-        <div className="flex gap-2 pt-4 border-t border-slate-200">
+        <div className="flex gap-2 pt-4 border-t border-[#222a36]">
           <textarea
-            className="flex-1 min-h-[90px] rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm outline-none focus:border-brand-500"
+            className="flex-1 min-h-[90px] rounded-xl bg-[#222a36] border border-[#222a36] p-3 text-sm outline-none focus:border-brand-500"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="اكتب رسالة العميل هنا..."
@@ -123,7 +123,7 @@ export default function Page() {
           </button>
         </div>
 
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[#8b95a7]">
           Ctrl + Enter للإرسال
         </p>
       </div>
@@ -132,7 +132,7 @@ export default function Page() {
         <summary className="cursor-pointer text-sm text-slate-300">
           Raw API Result
         </summary>
-        <pre className="mt-4 text-xs whitespace-pre-wrap text-slate-400 overflow-auto">
+        <pre className="mt-4 text-xs whitespace-pre-wrap text-[#5f6b7e] overflow-auto">
           {raw || 'No response yet'}
         </pre>
       </details>

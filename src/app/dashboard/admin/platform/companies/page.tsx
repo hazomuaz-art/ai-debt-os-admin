@@ -5,9 +5,9 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
     <div className="card p-4">
-      <div className="text-slate-500 text-xs uppercase tracking-wider">{title}</div>
+      <div className="text-[#8b95a7] text-xs uppercase tracking-wider">{title}</div>
       <div className="text-slate-900 text-2xl font-bold mt-1">{value}</div>
-      {sub && <div className="text-slate-400 text-xs mt-1">{sub}</div>}
+      {sub && <div className="text-[#5f6b7e] text-xs mt-1">{sub}</div>}
     </div>
   )
 }
@@ -73,7 +73,7 @@ export default async function PlatformCompaniesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display font-bold text-2xl text-slate-900">Platform Companies</h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <p className="text-[#8b95a7] text-sm mt-1">
           Super-admin overview for companies, subscriptions, usage, and tenant activity.
         </p>
       </div>
@@ -86,14 +86,14 @@ export default async function PlatformCompaniesPage() {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-[#222a36]">
           <h2 className="text-slate-900 font-semibold">Companies</h2>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-slate-500 border-b border-slate-200">
+              <tr className="text-[#8b95a7] border-b border-[#222a36]">
                 <th className="text-end p-3">Company</th>
                 <th className="text-end p-3">Plan</th>
                 <th className="text-end p-3">Status</th>
@@ -109,10 +109,10 @@ export default async function PlatformCompaniesPage() {
               {companies.map((c: any) => {
                 const sub = subscription(c.id)
                 return (
-                  <tr key={c.id} className="border-b border-slate-200 text-slate-600">
+                  <tr key={c.id} className="border-b border-[#222a36] text-slate-300">
                     <td className="p-3">
                       <Link href={`/dashboard/admin/platform/companies/${c.id}`} className="text-slate-900 font-medium hover:text-brand-400">{c.name}</Link>
-                      <div className="text-slate-400 text-xs">{c.slug}</div>
+                      <div className="text-[#5f6b7e] text-xs">{c.slug}</div>
                     </td>
                     <td className="p-3">{sub?.plan_name ?? c.plan ?? 'starter'}</td>
                     <td className="p-3">
@@ -133,7 +133,7 @@ export default async function PlatformCompaniesPage() {
               })}
               {companies.length === 0 && (
                 <tr>
-                  <td className="p-6 text-slate-500 text-center" colSpan={9}>
+                  <td className="p-6 text-[#8b95a7] text-center" colSpan={9}>
                     No companies found.
                   </td>
                 </tr>

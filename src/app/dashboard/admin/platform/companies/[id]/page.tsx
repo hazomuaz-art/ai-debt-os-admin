@@ -7,9 +7,9 @@ import UserStatusButton from '@/components/dashboard/UserStatusButton'
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
     <div className="card p-4">
-      <div className="text-slate-500 text-xs uppercase tracking-wider">{title}</div>
+      <div className="text-[#8b95a7] text-xs uppercase tracking-wider">{title}</div>
       <div className="text-slate-900 text-2xl font-bold mt-1">{value}</div>
-      {sub && <div className="text-slate-400 text-xs mt-1">{sub}</div>}
+      {sub && <div className="text-[#5f6b7e] text-xs mt-1">{sub}</div>}
     </div>
   )
 }
@@ -78,7 +78,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
             {company.name}
           </h1>
 
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-[#8b95a7] text-sm mt-1">
             {company.slug} · Created {company.created_at ? new Date(company.created_at).toLocaleDateString() : '-'}
           </p>
         </div>
@@ -87,7 +87,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
           <div className={company.is_active ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
             {company.is_active ? 'Active' : 'Suspended'}
           </div>
-          <div className="text-slate-500 text-sm">
+          <div className="text-[#8b95a7] text-sm">
             {sub?.plan_name ?? company.plan ?? 'starter'} · {sub?.status ?? 'no subscription'}
           </div>
         </div>
@@ -105,13 +105,13 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
       </div>
 
       <div className="card overflow-hidden">
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-[#222a36]">
           <div className="flex items-center justify-between gap-3"><h2 className="text-slate-900 font-semibold">Users</h2><InviteUserModal companyId={company.id} /></div>
         </div>
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-slate-500 border-b border-slate-200">
+            <tr className="text-[#8b95a7] border-b border-[#222a36]">
               <th className="text-end p-3">Name</th>
               <th className="text-end p-3">Email</th>
               <th className="text-end p-3">Role</th>
@@ -120,7 +120,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
           </thead>
           <tbody>
             {users.map((u: any) => (
-              <tr key={u.id} className="border-b border-slate-200 text-slate-600">
+              <tr key={u.id} className="border-b border-[#222a36] text-slate-300">
                 <td className="p-3">{u.full_name ?? '-'}</td>
                 <td className="p-3">{u.email ?? '-'}</td>
                 <td className="p-3 font-semibold">{u.role ?? '-'}</td>
@@ -136,7 +136,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
             ))}
             {users.length === 0 && (
               <tr>
-                <td className="p-6 text-slate-500 text-center" colSpan={4}>No users found.</td>
+                <td className="p-6 text-[#8b95a7] text-center" colSpan={4}>No users found.</td>
               </tr>
             )}
           </tbody>
@@ -144,7 +144,7 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
       </div>
 
       <div className="card overflow-hidden">
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-[#222a36]">
           <h2 className="text-slate-900 font-semibold">Recent Tenant Events</h2>
         </div>
 
@@ -153,16 +153,16 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
             <div key={index} className="p-4 flex items-center justify-between text-sm">
               <div>
                 <div className="text-slate-900">{e.event_type}</div>
-                <div className="text-slate-400">{e.note ?? '-'}</div>
+                <div className="text-[#5f6b7e]">{e.note ?? '-'}</div>
               </div>
-              <div className="text-slate-400">
+              <div className="text-[#5f6b7e]">
                 {e.created_at ? new Date(e.created_at).toLocaleString() : '-'}
               </div>
             </div>
           ))}
 
           {events.length === 0 && (
-            <div className="p-6 text-slate-500 text-center">No events found.</div>
+            <div className="p-6 text-[#8b95a7] text-center">No events found.</div>
           )}
         </div>
       </div>

@@ -60,17 +60,17 @@ export default async function AdminTeamPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             <Users size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إدارة فريق العمل (Team)</h1>
-            <p className="text-slate-500 text-sm">إدارة الموظفين، الصلاحيات، ومتابعة الأداء الشهري</p>
+            <h1 className="text-2xl font-bold text-white mb-1">إدارة فريق العمل (Team)</h1>
+            <p className="text-[#8b95a7] text-sm">إدارة الموظفين، الصلاحيات، ومتابعة الأداء الشهري</p>
           </div>
         </div>
         
@@ -80,36 +80,36 @@ export default async function AdminTeamPage() {
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {memberStats.map(member => (
-          <div key={member.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
+          <div key={member.id} className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 hover:shadow-md transition-shadow flex flex-col">
             
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-100 text-[#0e7a54] rounded-full flex items-center justify-center font-bold text-xl shrink-0">
+                <div className="w-12 h-12 bg-[#222a36] text-white rounded-full flex items-center justify-center font-bold text-xl shrink-0">
                   {member.full_name?.charAt(0) ?? member.email.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-bold text-[#0e7a54] text-lg">{member.full_name ?? 'بدون اسم'}</div>
-                  <div className="text-slate-400 text-xs font-mono">{member.email}</div>
+                  <div className="font-bold text-white text-lg">{member.full_name ?? 'بدون اسم'}</div>
+                  <div className="text-[#5f6b7e] text-xs font-mono">{member.email}</div>
                 </div>
               </div>
-              <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold border ${roleColors[member.role as keyof typeof roleColors] ?? 'bg-slate-50 text-slate-500'}`}>
+              <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold border ${roleColors[member.role as keyof typeof roleColors] ?? 'bg-[#222a36] text-[#8b95a7]'}`}>
                 {roleArabic[member.role as keyof typeof roleArabic] ?? member.role}
               </span>
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="bg-[#e7f6ef] rounded-xl p-3 text-center">
-                <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Activity size={12}/> المسندة</div>
-                <div className="font-bold text-[#0e7a54] text-xl font-mono">{member.assignedDebts}</div>
+              <div className="bg-[#0b0e14] rounded-xl p-3 text-center">
+                <div className="text-[#8b95a7] font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Activity size={12}/> المسندة</div>
+                <div className="font-bold text-white text-xl font-mono">{member.assignedDebts}</div>
               </div>
-              <div className="bg-[#e7f6ef] rounded-xl p-3 text-center">
-                <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Wallet size={12}/> تم التحصيل</div>
+              <div className="bg-[#0b0e14] rounded-xl p-3 text-center">
+                <div className="text-[#8b95a7] font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><Wallet size={12}/> تم التحصيل</div>
                 <div className="font-bold text-emerald-600 text-xl font-mono">
                   {formatCurrency(member.collectedThisMonth, 'SAR').replace('SAR', '').trim()}
                 </div>
               </div>
-              <div className="bg-[#e7f6ef] rounded-xl p-3 text-center">
-                <div className="text-slate-500 font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><CheckCircle size={12}/> أُنجزت اليوم</div>
+              <div className="bg-[#0b0e14] rounded-xl p-3 text-center">
+                <div className="text-[#8b95a7] font-bold text-[10px] mb-1 flex items-center justify-center gap-1"><CheckCircle size={12}/> أُنجزت اليوم</div>
                 <div className="font-bold text-blue-600 text-xl font-mono">{member.actionsCompletedToday}</div>
               </div>
             </div>

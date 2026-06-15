@@ -60,16 +60,16 @@ export default async function CollectorActionsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
             <Clock size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">إجراءات اليوم</h1>
-            <p className="text-slate-500 text-sm font-medium">المهام الواجب تنفيذها لليوم: {done} مكتملة، و {pending} قيد الانتظار</p>
+            <h1 className="text-2xl font-bold text-white mb-1">إجراءات اليوم</h1>
+            <p className="text-[#8b95a7] text-sm font-medium">المهام الواجب تنفيذها لليوم: {done} مكتملة، و {pending} قيد الانتظار</p>
           </div>
         </div>
       </div>
@@ -98,55 +98,55 @@ export default async function CollectorActionsPage() {
 
       <div className="space-y-4">
         {(actions ?? []).length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
-            <div className="w-20 h-20 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-16 text-center">
+            <div className="w-20 h-20 bg-[#222a36] text-[#5f6b7e] rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 size={40} />
             </div>
-            <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد أي مهام مجدولة لليوم</div>
-            <p className="text-slate-500 text-sm">عمل رائع! لقد أنهيت جميع المهام المسندة إليك.</p>
+            <div className="font-bold text-xl text-white mb-2">لا توجد أي مهام مجدولة لليوم</div>
+            <p className="text-[#8b95a7] text-sm">عمل رائع! لقد أنهيت جميع المهام المسندة إليك.</p>
           </div>
         ) : (actions ?? []).map(action => (
-          <div key={action.id} className={`bg-white rounded-2xl border shadow-sm transition-all duration-300 p-6 ${action.status === 'completed' ? 'opacity-60 bg-slate-50/50 border-slate-100' : 'border-slate-100 hover:shadow-md'}`}>
+          <div key={action.id} className={`bg-[#151a23] rounded-2xl border shadow-sm transition-all duration-300 p-6 ${action.status === 'completed' ? 'opacity-60 bg-[#222a36]/50 border-[#222a36]' : 'border-[#222a36] hover:shadow-md'}`}>
             <div className="flex flex-col md:flex-row items-start justify-between gap-6">
               
               <div className="flex items-start gap-4 flex-1">
                 <div className={`mt-1 w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
                   action.action_type === 'whatsapp' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                   action.action_type === 'call' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                  'bg-slate-100 text-slate-500 border border-slate-200'
+                  'bg-[#222a36] text-[#8b95a7] border border-[#222a36]'
                 }`}>
                   {actionTypeIcons[action.action_type] ?? <MoreHorizontal size={24} />}
                 </div>
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 flex-wrap mb-2">
-                    <span className="font-bold text-[#0e7a54] text-lg">{(action.customer as {full_name?: string} | null)?.full_name}</span>
+                    <span className="font-bold text-white text-lg">{(action.customer as {full_name?: string} | null)?.full_name}</span>
                     <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${getPriorityStyle(action.priority)}`}>
                       {getPriorityLabel(action.priority)}
                     </span>
-                    <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md">
+                    <span className="bg-[#222a36] text-slate-300 text-[10px] font-bold px-2 py-1 rounded-md">
                       {actionTypeLabels[action.action_type] ?? action.action_type}
                     </span>
                   </div>
                   
-                  <div className="text-slate-500 text-sm font-medium mb-3 bg-[#fcfdfd] border border-slate-100 p-3 rounded-xl leading-relaxed">
+                  <div className="text-[#8b95a7] text-sm font-medium mb-3 bg-[#0d1117] border border-[#222a36] p-3 rounded-xl leading-relaxed">
                     {action.reason}
                   </div>
                   
                   {action.suggested_message && (
-                    <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-[#0e7a54] text-sm relative">
-                      <span className="absolute -top-2.5 end-4 bg-white px-2 text-[10px] font-bold text-blue-500 border border-blue-100 rounded-md">رسالة مقترحة</span>
+                    <div className="mt-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-white text-sm relative">
+                      <span className="absolute -top-2.5 end-4 bg-[#151a23] px-2 text-[10px] font-bold text-blue-500 border border-blue-100 rounded-md">رسالة مقترحة</span>
                       {action.suggested_message}
                     </div>
                   )}
                   
-                  <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-bold text-[#8b95a7]">
                     {action.best_time_to_contact && (
-                      <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                        <Clock size={14} className="text-slate-400" /> {action.best_time_to_contact}
+                      <span className="flex items-center gap-1.5 bg-[#222a36] px-3 py-1.5 rounded-lg border border-[#222a36]">
+                        <Clock size={14} className="text-[#5f6b7e]" /> {action.best_time_to_contact}
                       </span>
                     )}
-                    <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                    <span className="flex items-center gap-1.5 bg-[#222a36] px-3 py-1.5 rounded-lg border border-[#222a36]">
                       رصيد المديونية: 
                       <span className="text-emerald-600 font-mono text-sm ms-1">
                         {formatCurrency((action.debt as {current_balance: number; currency: string} | null)?.current_balance ?? 0, (action.debt as {currency: string} | null)?.currency ?? 'SAR')}
@@ -156,7 +156,7 @@ export default async function CollectorActionsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-row md:flex-col gap-3 shrink-0 w-full md:w-auto pt-4 md:pt-0 border-t border-slate-100 md:border-0 justify-end">
+              <div className="flex flex-row md:flex-col gap-3 shrink-0 w-full md:w-auto pt-4 md:pt-0 border-t border-[#222a36] md:border-0 justify-end">
                 {action.status !== 'completed' && (
                   <>
                     {action.action_type === 'whatsapp' && (action.customer as {whatsapp?: string} | null)?.whatsapp && (

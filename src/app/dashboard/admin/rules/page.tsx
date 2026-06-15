@@ -15,14 +15,14 @@ const ACTION_LABELS: Record<string, string> = {
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  skip_ai:          'bg-slate-50 text-slate-500',
+  skip_ai:          'bg-[#222a36] text-[#8b95a7]',
   use_cached_reply: 'bg-blue-500/10 text-blue-400',
   low_priority:     'bg-yellow-500/10 text-yellow-400',
   high_priority:    'bg-orange-500/10 text-orange-400',
   human_handoff:    'bg-purple-500/10 text-purple-400',
   escalate:         'bg-red-500/10 text-red-400',
   auto_settle:      'bg-green-500/10 text-green-400',
-  do_nothing:       'bg-slate-50 text-slate-400',
+  do_nothing:       'bg-[#222a36] text-[#5f6b7e]',
 }
 
 export default function RulesPage() {
@@ -73,7 +73,7 @@ export default function RulesPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">Smart Rules Engine</h1>
-          <p className="text-slate-500 text-sm mt-0.5">قواعد تحدد متى يُستخدم AI ومتى يُستخدم رد محفوظ</p>
+          <p className="text-[#8b95a7] text-sm mt-0.5">قواعد تحدد متى يُستخدم AI ومتى يُستخدم رد محفوظ</p>
         </div>
         <button onClick={() => setShowAdd(p => !p)} className="btn-primary text-sm">
           {showAdd ? 'إلغاء' : '+ إضافة قاعدة'}
@@ -115,9 +115,9 @@ export default function RulesPage() {
         </form>
       )}
 
-      {loading ? <div className="text-center text-slate-500 py-12">جارٍ التحميل…</div> : (
+      {loading ? <div className="text-center text-[#8b95a7] py-12">جارٍ التحميل…</div> : (
         <div className="space-y-2">
-          {rules.length === 0 && <div className="card p-10 text-center text-slate-500">لا توجد قواعد حتى الآن</div>}
+          {rules.length === 0 && <div className="card p-10 text-center text-[#8b95a7]">لا توجد قواعد حتى الآن</div>}
           {rules.map(rule => (
             <div key={rule.id} className={`card p-4 flex items-start justify-between gap-4 ${!rule.is_active ? 'opacity-50' : ''}`}>
               <div className="flex-1 min-w-0">
@@ -126,13 +126,13 @@ export default function RulesPage() {
                   <span className={`status-badge text-[10px] ${ACTION_COLORS[rule.action]}`}>
                     {ACTION_LABELS[rule.action]}
                   </span>
-                  <span className="text-slate-400 text-xs">أولوية: {rule.priority}</span>
+                  <span className="text-[#5f6b7e] text-xs">أولوية: {rule.priority}</span>
                 </div>
-                {rule.description && <p className="text-slate-500 text-xs">{rule.description}</p>}
-                <p className="text-slate-400 text-[10px] mt-1 font-mono">
+                {rule.description && <p className="text-[#8b95a7] text-xs">{rule.description}</p>}
+                <p className="text-[#5f6b7e] text-[10px] mt-1 font-mono">
                   {JSON.stringify(rule.condition)}
                 </p>
-                <p className="text-slate-400 text-[10px] mt-0.5">
+                <p className="text-[#5f6b7e] text-[10px] mt-0.5">
                   تفعّل {rule.trigger_count} مرة
                   {rule.last_triggered_at && ` · آخرها: ${new Date(rule.last_triggered_at).toLocaleDateString('ar-SA')}`}
                 </p>
@@ -141,7 +141,7 @@ export default function RulesPage() {
                 className={`shrink-0 text-xs px-2 py-1 rounded border transition-colors ${
                   rule.is_active
                     ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                    : 'bg-slate-50 text-slate-400 border-slate-200'
+                    : 'bg-[#222a36] text-[#5f6b7e] border-[#222a36]'
                 }`}>
                 {rule.is_active ? 'مفعّل' : 'معطّل'}
               </button>

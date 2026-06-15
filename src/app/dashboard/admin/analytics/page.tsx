@@ -117,17 +117,17 @@ export default async function AnalyticsPage() {
   const riskChartData = Object.entries(riskCounts).map(([name, value]) => ({ name, value }))
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             <BarChart3 size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">التحليلات والمؤشرات (Analytics)</h1>
-            <p className="text-slate-500 text-sm">أداء المحفظة الاستثمارية وذكاء التحصيل المالي</p>
+            <h1 className="text-2xl font-bold text-white mb-1">التحليلات والمؤشرات (Analytics)</h1>
+            <p className="text-[#8b95a7] text-sm">أداء المحفظة الاستثمارية وذكاء التحصيل المالي</p>
           </div>
         </div>
       </div>
@@ -135,33 +135,33 @@ export default async function AnalyticsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-slate-500 text-sm font-bold">إجمالي المطالبات</div>
+            <div className="text-[#8b95a7] text-sm font-bold">إجمالي المطالبات</div>
             <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center"><BarChart3 size={20} /></div>
           </div>
-          <div className="text-3xl font-bold text-[#0e7a54] font-mono">{totalDebts.toLocaleString()}</div>
+          <div className="text-3xl font-bold text-white font-mono">{totalDebts.toLocaleString()}</div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-slate-500 text-sm font-bold">إجمالي المحفظة</div>
+            <div className="text-[#8b95a7] text-sm font-bold">إجمالي المحفظة</div>
             <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center"><Wallet size={20} /></div>
           </div>
           <div className="text-3xl font-bold text-emerald-600 font-mono">{formatCurrency(totalOriginal, 'SAR')}</div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-slate-500 text-sm font-bold">معدل التحصيل العام</div>
+            <div className="text-[#8b95a7] text-sm font-bold">معدل التحصيل العام</div>
             <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center"><Target size={20} /></div>
           </div>
           <div className="text-3xl font-bold text-purple-600 font-mono">{collectionRate.toFixed(1)}%</div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-slate-500 text-sm font-bold">متوسط تقييم الذكاء الاصطناعي</div>
+            <div className="text-[#8b95a7] text-sm font-bold">متوسط تقييم الذكاء الاصطناعي</div>
             <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center"><Activity size={20} /></div>
           </div>
           <div className={`text-3xl font-bold font-mono ${avgScore >= 60 ? 'text-emerald-500' : avgScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>

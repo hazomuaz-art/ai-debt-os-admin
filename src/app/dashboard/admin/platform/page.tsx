@@ -43,9 +43,9 @@ interface SubscriptionRow {
 function Stat({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="stat-card">
-      <div className="text-slate-500 text-[10px] uppercase tracking-wider mb-1">{label}</div>
+      <div className="text-[#8b95a7] text-[10px] uppercase tracking-wider mb-1">{label}</div>
       <div className="font-display font-bold text-2xl text-slate-900">{String(value)}</div>
-      {sub && <div className="text-slate-400 text-xs mt-0.5">{sub}</div>}
+      {sub && <div className="text-[#5f6b7e] text-xs mt-0.5">{sub}</div>}
     </div>
   )
 }
@@ -66,10 +66,10 @@ function UsageRow({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-500">{label}</span>
-        <span className="font-mono text-slate-600">
+        <span className="text-[#8b95a7]">{label}</span>
+        <span className="font-mono text-slate-300">
           {used.toLocaleString()}
-          <span className="text-slate-400"> / {noLimit ? '∞' : formatLimit(limit)}</span>
+          <span className="text-[#5f6b7e]"> / {noLimit ? '∞' : formatLimit(limit)}</span>
         </span>
       </div>
       <div
@@ -104,7 +104,7 @@ function PlanCard({
         'rounded-2xl border p-5',
         current
           ? 'border-brand-500/40'
-          : 'border-slate-200',
+          : 'border-[#222a36]',
       ].join(' ')}
       style={{
         background: current
@@ -133,7 +133,7 @@ function PlanCard({
       {/* Price */}
       <div className="font-display font-bold text-2xl text-slate-900 mb-1">
         ${plan.monthly_usd}
-        <span className="text-xs font-normal text-slate-400 ms-1">/mo</span>
+        <span className="text-xs font-normal text-[#5f6b7e] ms-1">/mo</span>
       </div>
       <div className="text-[10px] text-white/25 mb-4">
         ${plan.annual_usd}/mo billed annually
@@ -148,8 +148,8 @@ function PlanCard({
           ['WhatsApp/mo',    plan.limits.monthly_whatsapp],
         ] as [string, number][]).map(([lbl, val]) => (
           <div key={lbl} className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">{lbl}</span>
-            <span className="font-mono text-slate-600">{formatLimit(val)}</span>
+            <span className="text-[#8b95a7]">{lbl}</span>
+            <span className="font-mono text-slate-300">{formatLimit(val)}</span>
           </div>
         ))}
       </div>
@@ -168,7 +168,7 @@ function PlanCard({
               'px-2 py-0.5 rounded-lg border',
               on
                 ? 'bg-green-500/8 text-green-400 border-green-500/15'
-                : 'bg-white/3 text-slate-400 border-slate-200 line-through',
+                : 'bg-[#151a23]/3 text-[#5f6b7e] border-[#222a36] line-through',
             ].join(' ')}
           >
             {on ? '✓ ' : '— '}{lbl}
@@ -283,9 +283,9 @@ export default async function PlatformPage() {
       {/* Header */}
       <div>
         <h1 className="font-display font-bold text-2xl text-slate-900">Plans &amp; Usage</h1>
-        <p className="text-slate-500 text-sm mt-0.5">
+        <p className="text-[#8b95a7] text-sm mt-0.5">
           Subscription status and usage overview for{' '}
-          <span className="text-slate-500">{company?.name ?? 'your company'}</span>
+          <span className="text-[#8b95a7]">{company?.name ?? 'your company'}</span>
         </p>
       </div>
 
@@ -306,7 +306,7 @@ export default async function PlatformPage() {
                 </span>
               )}
             </div>
-            <div className="text-slate-400 text-xs mt-1 space-y-0.5">
+            <div className="text-[#5f6b7e] text-xs mt-1 space-y-0.5">
               {sub?.billing_cycle && (
                 <div>Billing: {sub.billing_cycle}</div>
               )}
@@ -331,10 +331,10 @@ export default async function PlatformPage() {
           <div className="text-start shrink-0">
             <div className="font-display font-bold text-2xl text-slate-900">
               ${plan.monthly_usd}
-              <span className="text-sm font-normal text-slate-400">/mo</span>
+              <span className="text-sm font-normal text-[#5f6b7e]">/mo</span>
             </div>
             {sub?.mrr_usd && Number(sub.mrr_usd) > 0 && (
-              <div className="text-xs text-slate-400 mt-0.5">
+              <div className="text-xs text-[#5f6b7e] mt-0.5">
                 MRR: ${Number(sub.mrr_usd).toFixed(2)}
               </div>
             )}
@@ -371,9 +371,9 @@ export default async function PlatformPage() {
             />
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Cache / Template hits</span>
+                <span className="text-[#8b95a7]">Cache / Template hits</span>
                 <span className="font-mono">
-                  <span className="text-slate-600">{usage.ai_cache_hits.toLocaleString()}</span>
+                  <span className="text-slate-300">{usage.ai_cache_hits.toLocaleString()}</span>
                   <span className="text-green-400 ms-2 text-[10px] font-semibold">
                     {cacheRate}% saved
                   </span>

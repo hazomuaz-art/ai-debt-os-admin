@@ -32,7 +32,7 @@ function fmt(n: number, digits = 4) {
 function Bar({ value, max, color = 'bg-blue-500' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
-    <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex-1 shadow-inner">
+    <div className="h-2 bg-[#222a36] rounded-full overflow-hidden flex-1 shadow-inner">
       <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
     </div>
   )
@@ -80,33 +80,33 @@ function CostSettingsPanel() {
   }
 
   const field = (key: keyof CostSettings, label: string, hint: string) => (
-    <div className="bg-[#fcfdfd] p-3 rounded-xl border border-slate-100">
-      <label className="block text-xs font-bold text-slate-500 mb-2">{label}</label>
+    <div className="bg-[#0d1117] p-3 rounded-xl border border-[#222a36]">
+      <label className="block text-xs font-bold text-[#8b95a7] mb-2">{label}</label>
       <div className="flex items-center gap-2">
-        <span className="text-slate-400 text-sm font-bold">$</span>
+        <span className="text-[#5f6b7e] text-sm font-bold">$</span>
         <input
           type="number" step="0.0001" min="0"
-          className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0e7a54]"
+          className="w-full bg-[#0b0e14] border-none text-white rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0e7a54]"
           value={String(settings[key] ?? '')}
           onChange={e => setSettings(p => ({ ...p, [key]: Number(e.target.value) }))}
           placeholder="0.0000" dir="ltr"
         />
-        <span className="text-slate-400 text-[10px] font-bold shrink-0">{hint}</span>
+        <span className="text-[#5f6b7e] text-[10px] font-bold shrink-0">{hint}</span>
       </div>
     </div>
   )
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(p => !p)} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#0e7a54] font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+      <button onClick={() => setOpen(p => !p)} className="bg-[#151a23] hover:bg-[#1a212c] border border-[#222a36] text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
         <Settings2 size={18} /> إعدادات التسعير
       </button>
       
       {open && (
-        <div className="absolute start-0 top-full mt-2 w-[400px] sm:w-[500px] z-50 bg-white border border-slate-100 rounded-2xl shadow-2xl p-6 animate-in slide-in-from-top-2">
-          <div className="font-bold text-lg text-[#0e7a54] mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
+        <div className="absolute start-0 top-full mt-2 w-[400px] sm:w-[500px] z-50 bg-[#151a23] border border-[#222a36] rounded-2xl shadow-2xl p-6 animate-in slide-in-from-top-2">
+          <div className="font-bold text-lg text-white mb-4 border-b border-[#222a36] pb-3 flex items-center justify-between">
             <span>تعديل أسعار التكلفة للـ API</span>
-            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-50 px-3 py-1 rounded-lg">إغلاق</button>
+            <button onClick={() => setOpen(false)} className="text-[#5f6b7e] hover:text-slate-300 font-bold text-sm bg-[#222a36] px-3 py-1 rounded-lg">إغلاق</button>
           </div>
           
           <form onSubmit={handleSave} className="space-y-4">
@@ -155,28 +155,28 @@ export default function CostCenterPage() {
   const maxPortfolio = Math.max(...(data?.byPortfolio.map(r => r.cost) ?? [0]), 0.000001)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             <DollarSign size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">مركز التكلفة (Cost Center)</h1>
-            <p className="text-slate-500 text-sm">التكلفة الحقيقية لجميع عمليات الذكاء الاصطناعي واستهلاك واجهات برمجة التطبيقات (APIs)</p>
+            <h1 className="text-2xl font-bold text-white mb-1">مركز التكلفة (Cost Center)</h1>
+            <p className="text-[#8b95a7] text-sm">التكلفة الحقيقية لجميع عمليات الذكاء الاصطناعي واستهلاك واجهات برمجة التطبيقات (APIs)</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4 relative">
-          <div className="flex bg-[#e7f6ef] rounded-xl p-1 border border-slate-100">
+          <div className="flex bg-[#0b0e14] rounded-xl p-1 border border-[#222a36]">
             {(['today', 'month', 'all'] as const).map(r => (
               <button
                 key={r}
                 onClick={() => setRange(r)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                  range === r ? 'bg-white text-[#0e7a54] shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                  range === r ? 'bg-[#151a23] text-white shadow-sm' : 'text-[#8b95a7] hover:text-slate-200 hover:bg-[#151a23]/50'
                 }`}
               >
                 {r === 'today' ? 'اليوم' : r === 'month' ? 'هذا الشهر' : 'الكل'}
@@ -192,19 +192,19 @@ export default function CostCenterPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : !data ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
-          <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-16 text-center">
+          <div className="w-20 h-20 bg-[#222a36] text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
             <DollarSign size={40} />
           </div>
-          <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد بيانات تكلفة مسجلة حتى الآن</div>
-          <p className="text-slate-500 text-sm">ستظهر هنا تكاليف عمليات النظام بمجرد البدء باستخدامه.</p>
+          <div className="font-bold text-xl text-white mb-2">لا توجد بيانات تكلفة مسجلة حتى الآن</div>
+          <p className="text-[#8b95a7] text-sm">ستظهر هنا تكاليف عمليات النظام بمجرد البدء باستخدامه.</p>
         </div>
       ) : (
         <>
           {/* Summary KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-              <div className="text-slate-500 text-xs font-bold mb-2 flex items-center gap-1.5"><Clock size={14}/> تكلفة اليوم</div>
+            <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5 hover:shadow-md transition-shadow">
+              <div className="text-[#8b95a7] text-xs font-bold mb-2 flex items-center gap-1.5"><Clock size={14}/> تكلفة اليوم</div>
               <div className="font-bold text-2xl text-blue-600 font-mono" dir="ltr">{fmt(data.summary.todayCost)}</div>
             </div>
             
@@ -216,14 +216,14 @@ export default function CostCenterPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-              <div className="text-slate-500 text-xs font-bold mb-2 flex items-center gap-1.5"><Database size={14}/> الرموز المستهلكة (Tokens)</div>
-              <div className="font-bold text-2xl text-[#0e7a54] font-mono">{(data.summary.totalTokens / 1000).toFixed(1)}K</div>
+            <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5 hover:shadow-md transition-shadow">
+              <div className="text-[#8b95a7] text-xs font-bold mb-2 flex items-center gap-1.5"><Database size={14}/> الرموز المستهلكة (Tokens)</div>
+              <div className="font-bold text-2xl text-white font-mono">{(data.summary.totalTokens / 1000).toFixed(1)}K</div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-              <div className="text-slate-500 text-xs font-bold mb-2 flex items-center gap-1.5"><Zap size={14}/> إجمالي العمليات</div>
-              <div className="font-bold text-2xl text-[#0e7a54] font-mono">{data.summary.totalOps}</div>
+            <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5 hover:shadow-md transition-shadow">
+              <div className="text-[#8b95a7] text-xs font-bold mb-2 flex items-center gap-1.5"><Zap size={14}/> إجمالي العمليات</div>
+              <div className="font-bold text-2xl text-white font-mono">{data.summary.totalOps}</div>
               {data.summary.failedOps > 0 && (
                 <div className="text-rose-500 text-[10px] font-bold mt-1 bg-rose-50 px-2 py-0.5 rounded-md inline-block">{data.summary.failedOps} عملية فاشلة</div>
               )}
@@ -234,79 +234,79 @@ export default function CostCenterPage() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
             {/* By Provider */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-[#0e7a54] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Server size={16} className="text-emerald-500"/> التكلفة حسب المزود</h3>
+            <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="font-bold text-white text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Server size={16} className="text-emerald-500"/> التكلفة حسب المزود</h3>
               <div className="space-y-4">
                 {data.byProvider.map(row => (
                   <div key={row.name} className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${PROVIDER_COLORS[row.name] ?? 'bg-slate-300'}`} />
-                        <span className="font-mono text-[#0e7a54]">{row.name}</span>
-                        <span className="text-slate-400 font-mono px-2 py-0.5 bg-slate-50 rounded-md">{row.ops} عملية</span>
+                        <span className="font-mono text-white">{row.name}</span>
+                        <span className="text-[#5f6b7e] font-mono px-2 py-0.5 bg-[#222a36] rounded-md">{row.ops} عملية</span>
                       </div>
-                      <span className="text-slate-600 font-mono">{fmt(row.cost)}</span>
+                      <span className="text-slate-300 font-mono">{fmt(row.cost)}</span>
                     </div>
                     <Bar value={row.cost} max={maxProvider} color={PROVIDER_COLORS[row.name] ?? 'bg-slate-300'} />
                   </div>
                 ))}
                 {data.byProvider.length === 0 && (
-                  <p className="text-slate-400 text-xs font-bold text-center py-6 bg-slate-50 rounded-xl">لا توجد بيانات</p>
+                  <p className="text-[#5f6b7e] text-xs font-bold text-center py-6 bg-[#222a36] rounded-xl">لا توجد بيانات</p>
                 )}
               </div>
             </div>
 
             {/* By Portfolio */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-[#0e7a54] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><BarChart2 size={16} className="text-blue-500"/> حسب المحفظة (المشروع)</h3>
+            <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="font-bold text-white text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><BarChart2 size={16} className="text-blue-500"/> حسب المحفظة (المشروع)</h3>
               <div className="space-y-4">
                 {data.byPortfolio.map(row => (
                   <div key={row.name} className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
                       <div className="flex items-center gap-2">
-                        <span className="truncate max-w-[120px] text-[#0e7a54]">{row.name}</span>
-                        <span className="text-slate-400 font-mono bg-slate-50 px-2 py-0.5 rounded-md">{row.ops}</span>
+                        <span className="truncate max-w-[120px] text-white">{row.name}</span>
+                        <span className="text-[#5f6b7e] font-mono bg-[#222a36] px-2 py-0.5 rounded-md">{row.ops}</span>
                       </div>
-                      <span className="text-slate-600 font-mono">{fmt(row.cost)}</span>
+                      <span className="text-slate-300 font-mono">{fmt(row.cost)}</span>
                     </div>
                     <Bar value={row.cost} max={maxPortfolio} color="bg-blue-500" />
                   </div>
                 ))}
                 {data.byPortfolio.length === 0 && (
-                  <p className="text-slate-400 text-xs font-bold text-center py-6 bg-slate-50 rounded-xl">لا توجد بيانات</p>
+                  <p className="text-[#5f6b7e] text-xs font-bold text-center py-6 bg-[#222a36] rounded-xl">لا توجد بيانات</p>
                 )}
               </div>
             </div>
 
             {/* By Action */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <h3 className="font-bold text-[#0e7a54] text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Activity size={16} className="text-purple-500"/> حسب نوع العملية</h3>
+            <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 hover:shadow-md transition-shadow">
+              <h3 className="font-bold text-white text-sm mb-6 flex items-center gap-2 border-b border-slate-50 pb-3"><Activity size={16} className="text-purple-500"/> حسب نوع العملية</h3>
               <div className="space-y-4">
                 {data.byAction.map(row => (
                   <div key={row.name} className="space-y-2">
                     <div className="flex justify-between text-xs font-bold">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[#0e7a54] truncate max-w-[130px]">{row.name}</span>
-                        <span className="text-slate-400 font-mono bg-slate-50 px-2 py-0.5 rounded-md">{row.ops}</span>
+                        <span className="font-mono text-white truncate max-w-[130px]">{row.name}</span>
+                        <span className="text-[#5f6b7e] font-mono bg-[#222a36] px-2 py-0.5 rounded-md">{row.ops}</span>
                       </div>
-                      <span className="text-slate-600 font-mono">{fmt(row.cost)}</span>
+                      <span className="text-slate-300 font-mono">{fmt(row.cost)}</span>
                     </div>
                     <Bar value={row.cost} max={maxAction} color="bg-purple-500" />
                   </div>
                 ))}
                 {data.byAction.length === 0 && (
-                  <p className="text-slate-400 text-xs font-bold text-center py-6 bg-slate-50 rounded-xl">لا توجد بيانات</p>
+                  <p className="text-[#5f6b7e] text-xs font-bold text-center py-6 bg-[#222a36] rounded-xl">لا توجد بيانات</p>
                 )}
               </div>
             </div>
           </div>
 
           {/* Recent operations table */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bold text-[#0e7a54] text-sm mb-4">سجل تفاصيل العمليات الأخيرة</h3>
-            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+          <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+            <h3 className="font-bold text-white text-sm mb-4">سجل تفاصيل العمليات الأخيرة</h3>
+            <div className="overflow-x-auto border border-[#222a36] rounded-xl">
               <table className="w-full text-sm text-start">
-                <thead className="bg-[#fcfdfd] border-b border-slate-100 text-slate-500 text-xs font-bold">
+                <thead className="bg-[#0d1117] border-b border-[#222a36] text-[#8b95a7] text-xs font-bold">
                   <tr>
                     <th className="py-3 px-4">المزود</th>
                     <th className="py-3 px-4">نوع العملية</th>
@@ -317,18 +317,18 @@ export default function CostCenterPage() {
                     <th className="py-3 px-4">التاريخ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-[#1c2330]">
                   {data.recent.map((r, i) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                    <tr key={i} className="hover:bg-[#1a212c] transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${PROVIDER_COLORS[r.provider] ?? 'bg-slate-300'}`} />
-                          <span className="font-mono text-xs font-bold text-[#0e7a54]">{r.provider}</span>
+                          <span className="font-mono text-xs font-bold text-white">{r.provider}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-xs text-slate-500 font-bold">{r.action_type}</td>
-                      <td className="py-3 px-4 text-slate-500 text-xs font-bold">{r.portfolio_name ?? '—'}</td>
-                      <td className="py-3 px-4 text-slate-500 text-xs font-mono">{r.total_tokens?.toLocaleString() ?? '—'}</td>
+                      <td className="py-3 px-4 font-mono text-xs text-[#8b95a7] font-bold">{r.action_type}</td>
+                      <td className="py-3 px-4 text-[#8b95a7] text-xs font-bold">{r.portfolio_name ?? '—'}</td>
+                      <td className="py-3 px-4 text-[#8b95a7] text-xs font-mono">{r.total_tokens?.toLocaleString() ?? '—'}</td>
                       <td className="py-3 px-4 font-mono text-xs font-bold text-blue-600" dir="ltr">{fmt(r.estimated_cost, 6)}</td>
                       <td className="py-3 px-4">
                         <span className={`text-[10px] font-bold px-2 py-1 rounded-md border ${
@@ -339,13 +339,13 @@ export default function CostCenterPage() {
                           {r.success ? 'نجحت' : 'فشلت'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-400 text-xs font-mono font-bold" dir="ltr">
+                      <td className="py-3 px-4 text-[#5f6b7e] text-xs font-mono font-bold" dir="ltr">
                         {new Date(r.created_at).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
                       </td>
                     </tr>
                   ))}
                   {data.recent.length === 0 && (
-                    <tr><td colSpan={7} className="py-12 text-center text-slate-400 text-sm font-bold bg-slate-50/50">لا توجد عمليات مسجلة حتى الآن</td></tr>
+                    <tr><td colSpan={7} className="py-12 text-center text-[#5f6b7e] text-sm font-bold bg-[#222a36]/50">لا توجد عمليات مسجلة حتى الآن</td></tr>
                   )}
                 </tbody>
               </table>

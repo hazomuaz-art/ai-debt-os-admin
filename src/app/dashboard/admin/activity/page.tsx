@@ -28,7 +28,7 @@ export default async function ActivityPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold font-syne">Activity Log</h1>
-        <p className="text-slate-400">Automation and timeline events for your company</p>
+        <p className="text-[#5f6b7e]">Automation and timeline events for your company</p>
       </div>
 
       <div className="card">
@@ -43,12 +43,12 @@ export default async function ActivityPage() {
                       {event.event_type}
                     </span>
                     {event.source && (
-                      <span className="text-slate-500 text-xs">
+                      <span className="text-[#8b95a7] text-xs">
                         {event.source}
                       </span>
                     )}
                     {event.debt_id && (
-                      <span className="text-slate-600 text-xs font-mono truncate max-w-[140px]">
+                      <span className="text-slate-300 text-xs font-mono truncate max-w-[140px]">
                         {String(event.debt_id).slice(0, 8)}…
                       </span>
                     )}
@@ -59,12 +59,12 @@ export default async function ActivityPage() {
                   </p>
 
                   {event.description && (
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-[#5f6b7e] mt-0.5">
                       {event.description}
                     </p>
                   )}
 
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-[#8b95a7] mt-1">
                     {formatDate(event.occurred_at)}
                   </p>
                 </div>
@@ -73,8 +73,8 @@ export default async function ActivityPage() {
           </div>
         ) : (
           <div className="text-center py-12">
-            <Activity className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400">No activity yet</p>
+            <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-[#5f6b7e]">No activity yet</p>
           </div>
         )}
       </div>

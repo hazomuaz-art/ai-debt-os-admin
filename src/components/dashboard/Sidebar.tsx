@@ -29,8 +29,7 @@ export function Sidebar({ profile }: { profile: any }) {
     {
       label: isRTL ? 'العمليات' : 'Operations',
       items: [
-        { href: `/dashboard/${role}/debts`,      label: t.nav.debts, icon: Layers, roles: ['admin', 'manager', 'collector'] },
-        { href: `/dashboard/${role}/customers`,  label: t.nav.customers, icon: Users, roles: ['admin', 'manager'] },
+        { href: `/dashboard/${role}/debts`,      label: isRTL ? 'العملاء والمديونيات' : 'Customers & Debts', icon: Layers, roles: ['admin', 'manager', 'collector'] },
         { href: `/dashboard/${role}/ai-actions`, label: t.nav.ai_actions, icon: BrainCircuit, roles: ['admin', 'manager'] },
         { href: `/dashboard/${role}/actions`,    label: t.nav.ai_actions, icon: BrainCircuit, roles: ['collector'] },
         { href: `/dashboard/${role}/messages`,   label: t.nav.messages, icon: MessageCircle, roles: ['admin', 'collector'] },

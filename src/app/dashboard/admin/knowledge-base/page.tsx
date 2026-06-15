@@ -21,7 +21,7 @@ const CAT_STYLES: Record<string, string> = {
   faq:               'bg-amber-50 text-amber-600 border-amber-200',
   forbidden:         'bg-rose-50 text-rose-600 border-rose-200',
   escalation_criteria: 'bg-orange-50 text-orange-600 border-orange-200',
-  other:             'bg-slate-50 text-slate-500 border-slate-200',
+  other:             'bg-[#222a36] text-[#8b95a7] border-[#222a36]',
 }
 
 const CAT_AR: Record<string, string> = {
@@ -87,17 +87,17 @@ export default function KnowledgeBasePage() {
   })
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             <BookOpen size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">قاعدة المعرفة (Knowledge Base)</h1>
-            <p className="text-slate-500 text-sm">إدارة السياسات، القواعد، والسكريبتات المرجعية للذكاء الاصطناعي</p>
+            <h1 className="text-2xl font-bold text-white mb-1">قاعدة المعرفة (Knowledge Base)</h1>
+            <p className="text-[#8b95a7] text-sm">إدارة السياسات، القواعد، والسكريبتات المرجعية للذكاء الاصطناعي</p>
           </div>
         </div>
         <button 
@@ -110,18 +110,18 @@ export default function KnowledgeBasePage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center justify-between">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5 flex items-center justify-between">
           <div>
-            <div className="text-slate-500 text-sm font-bold mb-1">إجمالي المقالات</div>
-            <div className="text-3xl font-bold text-[#0e7a54]">{entries.length}</div>
+            <div className="text-[#8b95a7] text-sm font-bold mb-1">إجمالي المقالات</div>
+            <div className="text-3xl font-bold text-white">{entries.length}</div>
           </div>
-          <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center">
+          <div className="w-12 h-12 bg-[#222a36] text-[#5f6b7e] rounded-full flex items-center justify-center">
             <BookOpen size={24} />
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center justify-between">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5 flex items-center justify-between">
           <div>
-            <div className="text-slate-500 text-sm font-bold mb-1">المقالات النشطة</div>
+            <div className="text-[#8b95a7] text-sm font-bold mb-1">المقالات النشطة</div>
             <div className="text-3xl font-bold text-emerald-600">
               {entries.filter(e => e.is_active).length}
             </div>
@@ -130,9 +130,9 @@ export default function KnowledgeBasePage() {
             <Power size={24} />
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center justify-between">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5 flex items-center justify-between">
           <div>
-            <div className="text-slate-500 text-sm font-bold mb-1">إجمالي الفئات</div>
+            <div className="text-[#8b95a7] text-sm font-bold mb-1">إجمالي الفئات</div>
             <div className="text-3xl font-bold text-blue-600">
               {new Set(entries.map(e => e.category)).size}
             </div>
@@ -145,28 +145,28 @@ export default function KnowledgeBasePage() {
 
       {/* Add form */}
       {showAdd && (
-        <form onSubmit={handleAdd} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
-          <div className="font-bold text-lg text-[#0e7a54] border-b border-slate-100 pb-3">كتابة مقالة / قاعدة جديدة</div>
+        <form onSubmit={handleAdd} className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
+          <div className="font-bold text-lg text-white border-b border-[#222a36] pb-3">كتابة مقالة / قاعدة جديدة</div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-bold text-slate-500 ps-2">العنوان *</label>
-              <input required className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">العنوان *</label>
+              <input required className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
                 value={form.title} placeholder="مثال: سياسة التقسيط المريحة..."
                 onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-bold text-slate-500 ps-2">المحتوى *</label>
-              <textarea required rows={5} className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] resize-none" 
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">المحتوى *</label>
+              <textarea required rows={5} className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] resize-none" 
                 value={form.content}
                 onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
                 placeholder="اكتب تفاصيل السياسة أو القاعدة ليقوم الذكاء الاصطناعي بقراءتها عند التفاوض…" />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 ps-2">الفئة (Category)</label>
-              <select className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">الفئة (Category)</label>
+              <select className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
                 value={form.category}
                 onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
                 {Object.entries(CAT_AR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -174,8 +174,8 @@ export default function KnowledgeBasePage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500 ps-2">اللغة (Language)</label>
-              <select className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">اللغة (Language)</label>
+              <select className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]" 
                 value={form.language}
                 onChange={e => setForm(p => ({ ...p, language: e.target.value }))}>
                 <option value="ar">اللغة العربية</option>
@@ -194,22 +194,22 @@ export default function KnowledgeBasePage() {
       )}
 
       {/* Search + filter */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <Search className="absolute end-3 top-2.5 text-slate-400" size={18} />
-          <input type="text" className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl pe-10 ps-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
+          <Search className="absolute end-3 top-2.5 text-[#5f6b7e]" size={18} />
+          <input type="text" className="w-full bg-[#0b0e14] border-none text-white rounded-xl pe-10 ps-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
             placeholder="البحث في المقالات والقواعد…" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
         
         <div className="flex gap-2 flex-wrap justify-end">
           <button onClick={() => setCatFilter('all')}
-            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === 'all' ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-[#e7f6ef] text-slate-500 hover:bg-slate-200'}`}>
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === 'all' ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-[#0b0e14] text-[#8b95a7] hover:bg-slate-200'}`}>
             الكل
           </button>
           {Object.entries(CAT_AR).map(([k, v]) => (
             <button key={k} onClick={() => setCatFilter(k)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === k ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-[#e7f6ef] text-slate-500 hover:bg-slate-200'}`}>
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors ${catFilter === k ? 'bg-[#0e7a54] text-white shadow-sm' : 'bg-[#0b0e14] text-[#8b95a7] hover:bg-slate-200'}`}>
               {v}
             </button>
           ))}
@@ -218,18 +218,18 @@ export default function KnowledgeBasePage() {
 
       {/* Entries */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
+        <div className="flex items-center justify-center py-20 text-[#5f6b7e]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
-          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-16 text-center">
+          <div className="w-20 h-20 bg-[#222a36] rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
             <BookOpen size={40} />
           </div>
-          <div className="font-bold text-xl text-[#0e7a54] mb-2">
+          <div className="font-bold text-xl text-white mb-2">
             {entries.length === 0 ? 'قاعدة المعرفة فارغة' : 'لا توجد نتائج مطابقة للبحث'}
           </div>
-          <p className="text-slate-500 text-sm">
+          <p className="text-[#8b95a7] text-sm">
             {entries.length === 0
               ? 'أضف السياسات والقواعد التي يستخدمها الذكاء الاصطناعي لضمان تفاوض سليم.'
               : 'جرب استخدام كلمات مفتاحية أخرى أو تغيير فلتر الفئات.'}
@@ -238,31 +238,31 @@ export default function KnowledgeBasePage() {
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {filtered.map(entry => (
-            <div key={entry.id} className={`bg-white rounded-2xl border border-slate-100 shadow-sm transition-all duration-200 ${!entry.is_active ? 'opacity-60 bg-slate-50/50' : 'hover:shadow-md'}`}>
+            <div key={entry.id} className={`bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm transition-all duration-200 ${!entry.is_active ? 'opacity-60 bg-[#222a36]/50' : 'hover:shadow-md'}`}>
               <div className="p-4 flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap mb-2">
                     <button
                       onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
-                      className="font-bold text-[#0e7a54] text-base hover:text-blue-600 transition-colors flex items-center gap-2">
-                      {expanded === entry.id ? <ChevronDown size={18} className="text-slate-400"/> : <ChevronLeft size={18} className="text-slate-400"/>}
+                      className="font-bold text-white text-base hover:text-blue-600 transition-colors flex items-center gap-2">
+                      {expanded === entry.id ? <ChevronDown size={18} className="text-[#5f6b7e]"/> : <ChevronLeft size={18} className="text-[#5f6b7e]"/>}
                       {entry.title}
                     </button>
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${CAT_STYLES[entry.category] ?? CAT_STYLES.other}`}>
                       {CAT_AR[entry.category] ?? entry.category}
                     </span>
-                    <span className="bg-[#e7f6ef] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">
+                    <span className="bg-[#0b0e14] text-[#8b95a7] text-[10px] font-bold px-2 py-1 rounded-md">
                       {entry.language === 'ar' ? 'العربية' : entry.language === 'en' ? 'English' : 'مزدوج'}
                     </span>
                   </div>
                   
                   {expanded === entry.id && (
-                    <div className="mt-4 text-slate-600 text-sm leading-loose whitespace-pre-wrap bg-[#fcfdfd] rounded-xl p-4 border border-slate-100/50 me-6">
+                    <div className="mt-4 text-slate-300 text-sm leading-loose whitespace-pre-wrap bg-[#0d1117] rounded-xl p-4 border border-[#222a36]/50 me-6">
                       {entry.content}
                     </div>
                   )}
                   
-                  <div className="text-slate-400 text-xs mt-3 font-mono me-7">
+                  <div className="text-[#5f6b7e] text-xs mt-3 font-mono me-7">
                     تمت الإضافة: {new Date(entry.created_at).toLocaleDateString('ar-SA')}
                   </div>
                 </div>
@@ -271,7 +271,7 @@ export default function KnowledgeBasePage() {
                   className={`shrink-0 flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors ${
                     entry.is_active
                       ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
-                      : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                      : 'bg-[#222a36] text-[#8b95a7] border-[#222a36] hover:bg-slate-200'
                   }`}>
                   {entry.is_active ? <><Power size={14} /> فعال</> : <><PowerOff size={14} /> معطّل</>}
                 </button>

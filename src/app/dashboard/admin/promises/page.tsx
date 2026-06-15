@@ -31,45 +31,45 @@ export default async function PromisesPage() {
   const rate    = all.length ? Math.round((kept.length / all.length) * 100) : 0
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
             <CheckCircle size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">تتبع وعود السداد</h1>
-            <p className="text-slate-500 text-sm">متابعة دقيقة لوعود العملاء وتحديث مخاطر السداد تلقائياً</p>
+            <h1 className="text-2xl font-bold text-white mb-1">تتبع وعود السداد</h1>
+            <p className="text-[#8b95a7] text-sm">متابعة دقيقة لوعود العملاء وتحديث مخاطر السداد تلقائياً</p>
           </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center"><Hash size={20} /></div>
-          <div><p className="text-slate-500 text-xs font-bold mb-1">إجمالي الوعود</p><p className="text-2xl font-bold text-[#0e7a54]">{all.length}</p></div>
+        <div className="bg-[#151a23] p-6 rounded-2xl border border-[#222a36] shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#222a36] text-[#8b95a7] flex items-center justify-center"><Hash size={20} /></div>
+          <div><p className="text-[#8b95a7] text-xs font-bold mb-1">إجمالي الوعود</p><p className="text-2xl font-bold text-white">{all.length}</p></div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-[#151a23] p-6 rounded-2xl border border-[#222a36] shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center"><Clock size={20} /></div>
           <div><p className="text-yellow-600 text-xs font-bold mb-1">قيد الانتظار</p><p className="text-2xl font-bold text-yellow-600">{pending.length}</p></div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-[#151a23] p-6 rounded-2xl border border-[#222a36] shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle size={20} /></div>
           <div><p className="text-emerald-600 text-xs font-bold mb-1">تم الالتزام</p><p className="text-2xl font-bold text-emerald-600">{kept.length}</p></div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-[#151a23] p-6 rounded-2xl border border-[#222a36] shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><AlertTriangle size={20} /></div>
           <div><p className="text-indigo-600 text-xs font-bold mb-1">نسبة الالتزام</p><p className="text-2xl font-bold text-indigo-600">{rate}%</p></div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="bg-[#e7f6ef] text-slate-500 border-b border-slate-100 text-xs">
+            <thead className="bg-[#0b0e14] text-[#8b95a7] border-b border-[#222a36] text-xs">
               <tr>
                 <th className="py-4 px-6 font-bold uppercase">العميل</th>
                 <th className="py-4 px-6 font-bold uppercase">المرجع</th>
@@ -79,11 +79,11 @@ export default async function PromisesPage() {
                 <th className="py-4 px-6 font-bold uppercase">الحالة</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[#1c2330]">
               {all.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 bg-slate-50/50">
-                    <div className="text-slate-400 text-sm font-bold">لا توجد وعود مسجّلة حالياً</div>
+                  <td colSpan={6} className="text-center py-12 bg-[#222a36]/50">
+                    <div className="text-[#5f6b7e] text-sm font-bold">لا توجد وعود مسجّلة حالياً</div>
                   </td>
                 </tr>
               )}
@@ -91,21 +91,21 @@ export default async function PromisesPage() {
                 const conf = STATUS_CONFIG[p.status] || STATUS_CONFIG.pending;
                 const StatusIcon = conf.icon;
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={p.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><User size={14} /></div>
+                        <div className="w-8 h-8 rounded-full bg-[#222a36] text-[#8b95a7] flex items-center justify-center"><User size={14} /></div>
                         <div>
-                          <p className="font-bold text-[#0e7a54]">{p.customer?.full_name ?? '—'}</p>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">{p.customer?.phone}</p>
+                          <p className="font-bold text-white">{p.customer?.full_name ?? '—'}</p>
+                          <p className="text-xs text-[#5f6b7e] font-mono mt-0.5">{p.customer?.phone}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-mono text-xs font-bold text-slate-500 bg-slate-50/50">{p.debt?.reference_number ?? '—'}</td>
-                    <td className="py-4 px-6 font-bold font-mono text-[#0e7a54]">{formatCurrency(p.promised_amount, p.debt?.currency ?? 'SAR')}</td>
-                    <td className="py-4 px-6 text-slate-500 font-medium">{formatDate(p.promised_date)}</td>
-                    <td className="py-4 px-6 text-slate-500 text-xs">
-                      <span className="bg-slate-100 px-2 py-1 rounded-md">{p.channel}</span>
+                    <td className="py-4 px-6 font-mono text-xs font-bold text-[#8b95a7] bg-[#222a36]/50">{p.debt?.reference_number ?? '—'}</td>
+                    <td className="py-4 px-6 font-bold font-mono text-white">{formatCurrency(p.promised_amount, p.debt?.currency ?? 'SAR')}</td>
+                    <td className="py-4 px-6 text-[#8b95a7] font-medium">{formatDate(p.promised_date)}</td>
+                    <td className="py-4 px-6 text-[#8b95a7] text-xs">
+                      <span className="bg-[#222a36] px-2 py-1 rounded-md">{p.channel}</span>
                     </td>
                     <td className="py-4 px-6">
                       <span className={`flex items-center gap-1.5 w-fit px-3 py-1.5 rounded-lg text-xs font-bold border ${conf.color}`}>

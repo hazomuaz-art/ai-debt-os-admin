@@ -66,17 +66,17 @@ export default async function CollectorDebtsPage({
   const totalBalance = (debts ?? []).reduce((s, d) => s + Number(d.current_balance ?? 0), 0)
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
             <Wallet size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">ملفات الديون</h1>
-            <p className="text-slate-500 text-sm font-medium">إجمالي {count ?? 0} ملف مسند إليك بقيمة {formatCurrency(totalBalance, 'SAR')}</p>
+            <h1 className="text-2xl font-bold text-white mb-1">ملفات الديون</h1>
+            <p className="text-[#8b95a7] text-sm font-medium">إجمالي {count ?? 0} ملف مسند إليك بقيمة {formatCurrency(totalBalance, 'SAR')}</p>
           </div>
         </div>
       </div>
@@ -88,10 +88,10 @@ export default async function CollectorDebtsPage({
       />
 
       {/* Debts List */}
-      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="bg-[#fbfdfd] border-b border-slate-100 text-slate-500">
+            <thead className="bg-[#0d1117] border-b border-[#222a36] text-[#8b95a7]">
               <tr>
                 <th className="px-6 py-4 font-bold">العميل</th>
                 <th className="px-6 py-4 font-bold">رصيد المديونية</th>
@@ -101,30 +101,30 @@ export default async function CollectorDebtsPage({
                 <th className="px-6 py-4 font-bold text-center">الإجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#1c2330]">
               {(debts ?? []).length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center">
-                    <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <div className="w-16 h-16 bg-[#222a36] text-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
                       <Wallet size={24} />
                     </div>
-                    <div className="text-slate-500 font-bold">لا توجد ديون مسندة لك بعد</div>
+                    <div className="text-[#8b95a7] font-bold">لا توجد ديون مسندة لك بعد</div>
                   </td>
                 </tr>
               ) : (debts ?? []).map(debt => (
-                <tr key={debt.id} className="hover:bg-slate-50/50 transition-colors group">
+                <tr key={debt.id} className="hover:bg-[#1a212c] transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-[#0e7a54] text-sm mb-1">{(debt.customer as {full_name?: string} | null)?.full_name ?? 'غير معروف'}</div>
-                    <div className="text-slate-400 text-xs font-mono" dir="ltr">{(debt.customer as {phone?: string} | null)?.phone ?? '—'}</div>
+                    <div className="font-bold text-white text-sm mb-1">{(debt.customer as {full_name?: string} | null)?.full_name ?? 'غير معروف'}</div>
+                    <div className="text-[#5f6b7e] text-xs font-mono" dir="ltr">{(debt.customer as {phone?: string} | null)?.phone ?? '—'}</div>
                   </td>
                   
                   <td className="px-6 py-4">
-                    <div className="font-bold text-[#0e7a54] font-mono text-base">{formatCurrency(debt.current_balance, debt.currency)}</div>
-                    <div className="text-slate-400 text-xs mt-0.5">من أصل {formatCurrency(debt.original_amount, debt.currency)}</div>
+                    <div className="font-bold text-white font-mono text-base">{formatCurrency(debt.current_balance, debt.currency)}</div>
+                    <div className="text-[#5f6b7e] text-xs mt-0.5">من أصل {formatCurrency(debt.original_amount, debt.currency)}</div>
                   </td>
                   
                   <td className="px-6 py-4 text-center">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#e7f6ef] text-slate-600">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#0b0e14] text-slate-300">
                       <span className={`w-1.5 h-1.5 rounded-full ${
                         debt.status === 'active' ? 'bg-blue-500' :
                         debt.status === 'promised' ? 'bg-amber-500' :
@@ -141,15 +141,15 @@ export default async function CollectorDebtsPage({
                   </td>
                   
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5 text-slate-600 font-medium">
-                      <Clock size={14} className="text-slate-400" />
+                    <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                      <Clock size={14} className="text-[#5f6b7e]" />
                       {debt.due_date ? formatDate(debt.due_date) : '—'}
                     </div>
                   </td>
                   
                   <td className="px-6 py-4 text-center">
                     <Link href={`/dashboard/collector/debts/${debt.id}`} 
-                      className="inline-flex items-center gap-1 bg-white border border-slate-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:border-blue-200 text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm group-hover:shadow">
+                      className="inline-flex items-center gap-1 bg-[#151a23] border border-[#222a36] text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:border-blue-200 text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm group-hover:shadow">
                       التفاصيل <ArrowLeft size={14} />
                     </Link>
                   </td>
@@ -160,11 +160,11 @@ export default async function CollectorDebtsPage({
         </div>
         
         {/* Pagination placeholder if needed */}
-        <div className="bg-[#fbfdfd] border-t border-slate-100 p-4 flex items-center justify-between text-sm text-slate-500 font-medium">
+        <div className="bg-[#0d1117] border-t border-[#222a36] p-4 flex items-center justify-between text-sm text-[#8b95a7] font-medium">
           <div>عرض 1 إلى {(debts ?? []).length} من أصل {count ?? 0} ملف</div>
           <div className="flex gap-2">
-            <button disabled className="px-3 py-1.5 border border-slate-200 rounded-lg opacity-50 bg-slate-50">السابق</button>
-            <button disabled className="px-3 py-1.5 border border-slate-200 rounded-lg opacity-50 bg-slate-50">التالي</button>
+            <button disabled className="px-3 py-1.5 border border-[#222a36] rounded-lg opacity-50 bg-[#222a36]">السابق</button>
+            <button disabled className="px-3 py-1.5 border border-[#222a36] rounded-lg opacity-50 bg-[#222a36]">التالي</button>
           </div>
         </div>
       </div>

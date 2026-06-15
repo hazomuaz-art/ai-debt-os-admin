@@ -64,20 +64,20 @@ export default function AlertsPage() {
   for (const a of alerts) counts[a.severity] = (counts[a.severity] ?? 0) + 1
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             <BellRing size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">سجل التنبيهات (System Alerts)</h1>
-            <p className="text-slate-500 text-sm">مراقبة صحة النظام، الأخطاء التقنية، وتنبيهات الذكاء الاصطناعي</p>
+            <h1 className="text-2xl font-bold text-white mb-1">سجل التنبيهات (System Alerts)</h1>
+            <p className="text-[#8b95a7] text-sm">مراقبة صحة النظام، الأخطاء التقنية، وتنبيهات الذكاء الاصطناعي</p>
           </div>
         </div>
-        <button onClick={load} className="bg-white hover:bg-slate-50 border border-slate-200 text-[#0e7a54] font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
+        <button onClick={load} className="bg-[#151a23] hover:bg-[#1a212c] border border-[#222a36] text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-2">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {loading ? 'جاري التحديث...' : 'تحديث السجل'}
         </button>
       </div>
@@ -85,9 +85,9 @@ export default function AlertsPage() {
       {/* Severity counters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {(['critical','error','warning','info'] as AlertSeverity[]).map(sev => (
-          <div key={sev} className={`bg-white rounded-2xl border p-5 flex items-center justify-between shadow-sm transition-shadow hover:shadow-md ${SEV[sev].replace('bg-', 'border-').split(' ')[2] || 'border-slate-100'}`}>
+          <div key={sev} className={`bg-[#151a23] rounded-2xl border p-5 flex items-center justify-between shadow-sm transition-shadow hover:shadow-md ${SEV[sev].replace('bg-', 'border-').split(' ')[2] || 'border-[#222a36]'}`}>
             <div>
-              <div className="text-slate-500 text-sm font-bold mb-1">{SEV_ARABIC[sev]}</div>
+              <div className="text-[#8b95a7] text-sm font-bold mb-1">{SEV_ARABIC[sev]}</div>
               <div className={`text-3xl font-bold font-mono ${SEV[sev].split(' ')[1]}`}>
                 {counts[sev] ?? 0}
               </div>
@@ -100,14 +100,14 @@ export default function AlertsPage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-2 flex gap-2 flex-wrap items-center overflow-x-auto">
-        <span className="text-slate-400 font-bold text-sm px-2">تصفية حسب:</span>
+      <div className="bg-[#151a23] rounded-xl border border-[#222a36] shadow-sm p-2 flex gap-2 flex-wrap items-center overflow-x-auto">
+        <span className="text-[#5f6b7e] font-bold text-sm px-2">تصفية حسب:</span>
         {(['all','critical','error','warning','info'] as const).map(s => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
               filter === s
                 ? 'bg-[#0e7a54] text-white shadow-sm'
-                : 'bg-transparent text-slate-500 hover:bg-slate-50'
+                : 'bg-transparent text-[#8b95a7] hover:bg-[#1a212c]'
             }`}>
             {s === 'all' ? `جميع التنبيهات (${alerts.length})` : `${SEV_ARABIC[s]} (${counts[s] ?? 0})`}
           </button>
@@ -119,18 +119,18 @@ export default function AlertsPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-16 text-center">
           <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={40} />
           </div>
-          <div className="font-bold text-xl text-[#0e7a54] mb-2">لا توجد تنبيهات نشطة حالياً</div>
-          <p className="text-slate-500 text-sm">النظام يعمل بشكل ممتاز ومستقر ✅</p>
+          <div className="font-bold text-xl text-white mb-2">لا توجد تنبيهات نشطة حالياً</div>
+          <p className="text-[#8b95a7] text-sm">النظام يعمل بشكل ممتاز ومستقر ✅</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map(alert => (
             <div key={alert.id}
-              className={`bg-white rounded-2xl border shadow-sm transition-all duration-300 ${alert.is_read ? 'opacity-60 bg-slate-50/50 border-slate-100' : SEV[alert.severity].replace('bg-', 'border-').split(' ')[2]}`}>
+              className={`bg-[#151a23] rounded-2xl border shadow-sm transition-all duration-300 ${alert.is_read ? 'opacity-60 bg-[#222a36]/50 border-[#222a36]' : SEV[alert.severity].replace('bg-', 'border-').split(' ')[2]}`}>
               <div className="p-5 flex flex-col md:flex-row items-start justify-between gap-4">
                 
                 <div className="flex items-start gap-4 flex-1">
@@ -140,31 +140,31 @@ export default function AlertsPage() {
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap mb-2">
-                      <span className="font-bold text-[#0e7a54] text-base">{alert.title}</span>
+                      <span className="font-bold text-white text-base">{alert.title}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${SEV[alert.severity]}`}>
                         {SEV_ARABIC[alert.severity]}
                       </span>
-                      <span className="bg-[#e7f6ef] text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md font-mono">
+                      <span className="bg-[#0b0e14] text-[#8b95a7] text-[10px] font-bold px-2 py-1 rounded-md font-mono">
                         المصدر: {alert.alert_type}
                       </span>
                     </div>
                     
                     {alert.message && (
-                      <p className="text-slate-600 text-sm font-medium leading-relaxed bg-[#fcfdfd] border border-slate-100 p-3 rounded-xl mt-2 mb-3">
+                      <p className="text-slate-300 text-sm font-medium leading-relaxed bg-[#0d1117] border border-[#222a36] p-3 rounded-xl mt-2 mb-3">
                         {alert.message}
                       </p>
                     )}
                     
-                    <p className="text-slate-400 text-xs font-mono font-bold mt-1" dir="ltr">
+                    <p className="text-[#5f6b7e] text-xs font-mono font-bold mt-1" dir="ltr">
                       {new Date(alert.created_at).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-row md:flex-col gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 pt-4 md:pt-0 border-t border-slate-100 md:border-0">
+                <div className="flex flex-row md:flex-col gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 pt-4 md:pt-0 border-t border-[#222a36] md:border-0">
                   {!alert.is_read && (
                     <button onClick={() => void markRead(alert.id)}
-                      className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-white text-slate-500 border border-slate-200 hover:text-[#0e7a54] hover:bg-slate-50 transition-colors">
+                      className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-[#151a23] text-[#8b95a7] border border-[#222a36] hover:text-white hover:bg-[#1a212c] transition-colors">
                       تحديد كمقروء
                     </button>
                   )}

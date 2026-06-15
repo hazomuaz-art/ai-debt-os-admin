@@ -61,7 +61,7 @@ export default async function CollectorDashboard() {
 
   const stats = [
     { label: 'الملفات المسندة', value: String(totalAssigned ?? 0), icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'إجمالي المديونية', value: formatCurrency(totalBalance, 'SAR'), icon: Wallet, color: 'text-[#0e7a54]', bg: 'bg-[#f6f8fa]' },
+    { label: 'إجمالي المديونية', value: formatCurrency(totalBalance, 'SAR'), icon: Wallet, color: 'text-white', bg: 'bg-[#0d1117]' },
     { label: 'تحصيلي (هذا الشهر)', value: formatCurrency(collectedMonth, 'SAR'), icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { label: 'إجراءات اليوم المطلوبة', value: String((todayActions ?? []).length), icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
   ]
@@ -87,13 +87,13 @@ export default async function CollectorDashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-center justify-between mt-6">
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#0e7a54] mb-1">قائمة مهامي التحصيلية</h1>
-          <p className="text-slate-500 text-sm">
-            المحصل: <span className="font-bold text-[#0e7a54]">{profile.full_name ?? 'غير محدد'}</span> — {new Date().toLocaleDateString('ar-SA', { weekday: 'long', month: 'long', day: 'numeric' })}
+          <h1 className="text-2xl font-bold text-white mb-1">قائمة مهامي التحصيلية</h1>
+          <p className="text-[#8b95a7] text-sm">
+            المحصل: <span className="font-bold text-white">{profile.full_name ?? 'غير محدد'}</span> — {new Date().toLocaleDateString('ar-SA', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
       </div>
@@ -101,10 +101,10 @@ export default async function CollectorDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, idx) => (
-          <div key={idx} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+          <div key={idx} className="bg-[#151a23] rounded-2xl border border-[#222a36] p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
             <div>
-              <div className="text-slate-500 text-xs font-bold mb-1">{stat.label}</div>
-              <div className="text-3xl font-bold text-[#0e7a54] font-mono">{stat.value}</div>
+              <div className="text-[#8b95a7] text-xs font-bold mb-1">{stat.label}</div>
+              <div className="text-3xl font-bold text-white font-mono">{stat.value}</div>
             </div>
             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.bg} ${stat.color}`}>
               <stat.icon size={22} />
@@ -117,13 +117,13 @@ export default async function CollectorDashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         
         {/* Today's Actions */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex flex-col shadow-sm">
-          <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+        <div className="bg-[#151a23] border border-[#222a36] rounded-2xl p-6 flex flex-col shadow-sm">
+          <div className="flex items-center justify-between mb-6 border-b border-[#222a36] pb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
                 <Clock size={20} />
               </div>
-              <h2 className="text-lg font-bold text-[#0e7a54]">إجراءات اليوم المستحقة</h2>
+              <h2 className="text-lg font-bold text-white">إجراءات اليوم المستحقة</h2>
             </div>
             <Link href="/dashboard/collector/actions" className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
               عرض الكل <ArrowLeft size={14} />
@@ -132,29 +132,29 @@ export default async function CollectorDashboard() {
 
           <div className="space-y-3 flex-1">
             {(todayActions ?? []).length === 0 ? (
-              <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-100">
-                <div className="w-16 h-16 bg-slate-200/50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <div className="bg-[#222a36] rounded-xl p-8 text-center border border-[#222a36]">
+                <div className="w-16 h-16 bg-slate-200/50 rounded-full flex items-center justify-center mx-auto mb-3 text-[#5f6b7e]">
                   <CheckCircle size={24} />
                 </div>
-                <div className="text-slate-500 font-bold text-sm">لا توجد مهام أو إجراءات مجدولة لليوم</div>
+                <div className="text-[#8b95a7] font-bold text-sm">لا توجد مهام أو إجراءات مجدولة لليوم</div>
               </div>
             ) : (todayActions ?? []).map((action) => {
               const ActionIcon = actionTypeIcons[action.action_type] || FileText
-              const iconColorClass = action.action_type === 'whatsapp' ? 'text-emerald-500 bg-emerald-50' : action.action_type === 'call' ? 'text-blue-500 bg-blue-50' : 'text-slate-500 bg-slate-100'
+              const iconColorClass = action.action_type === 'whatsapp' ? 'text-emerald-500 bg-emerald-50' : action.action_type === 'call' ? 'text-blue-500 bg-blue-50' : 'text-[#8b95a7] bg-[#222a36]'
               
               return (
-                <div key={action.id} className="flex items-start gap-4 p-4 bg-white border border-slate-100 rounded-xl hover:border-blue-200 hover:shadow-sm transition-all group">
+                <div key={action.id} className="flex items-start gap-4 p-4 bg-[#151a23] border border-[#222a36] rounded-xl hover:border-blue-200 hover:shadow-sm transition-all group">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconColorClass}`}>
                     <ActionIcon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-bold text-[#0e7a54]">{(action.customer as {full_name?: string} | null)?.full_name}</span>
+                      <span className="text-sm font-bold text-white">{(action.customer as {full_name?: string} | null)?.full_name}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getPriorityStyle(action.priority)}`}>
                         {getPriorityLabel(action.priority)}
                       </span>
                     </div>
-                    <div className="text-slate-500 text-xs mt-1 leading-relaxed bg-[#fcfdfd] border border-slate-50 p-2 rounded-lg">{action.reason}</div>
+                    <div className="text-[#8b95a7] text-xs mt-1 leading-relaxed bg-[#0d1117] border border-slate-50 p-2 rounded-lg">{action.reason}</div>
                   </div>
                 </div>
               )
@@ -163,13 +163,13 @@ export default async function CollectorDashboard() {
         </div>
 
         {/* Assigned debts */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex flex-col shadow-sm">
-          <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+        <div className="bg-[#151a23] border border-[#222a36] rounded-2xl p-6 flex flex-col shadow-sm">
+          <div className="flex items-center justify-between mb-6 border-b border-[#222a36] pb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
                 <AlertTriangle size={20} />
               </div>
-              <h2 className="text-lg font-bold text-[#0e7a54]">أعلى ملفات الديون الأولوية</h2>
+              <h2 className="text-lg font-bold text-white">أعلى ملفات الديون الأولوية</h2>
             </div>
             <Link href="/dashboard/collector/debts" className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
               عرض الكل <ArrowLeft size={14} />
@@ -178,25 +178,25 @@ export default async function CollectorDashboard() {
 
           <div className="space-y-3 flex-1">
             {sortedDebts.length === 0 ? (
-              <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-100">
-                <div className="w-16 h-16 bg-slate-200/50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <div className="bg-[#222a36] rounded-xl p-8 text-center border border-[#222a36]">
+                <div className="w-16 h-16 bg-slate-200/50 rounded-full flex items-center justify-center mx-auto mb-3 text-[#5f6b7e]">
                   <Wallet size={24} />
                 </div>
-                <div className="text-slate-500 font-bold text-sm">لا توجد ديون مسندة لك حالياً</div>
+                <div className="text-[#8b95a7] font-bold text-sm">لا توجد ديون مسندة لك حالياً</div>
               </div>
             ) : sortedDebts.slice(0, 5).map((debt) => (
-              <div key={debt.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:border-amber-200 hover:shadow-sm transition-all group">
+              <div key={debt.id} className="flex items-center justify-between p-4 bg-[#151a23] border border-[#222a36] rounded-xl hover:border-amber-200 hover:shadow-sm transition-all group">
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-[#0e7a54] mb-1">{(debt.customer as {full_name?: string} | null)?.full_name}</div>
+                  <div className="text-sm font-bold text-white mb-1">{(debt.customer as {full_name?: string} | null)?.full_name}</div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-50 px-2 py-0.5 rounded">{debt.reference_number}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#e7f6ef] text-slate-500">
+                    <span className="font-mono text-[10px] text-[#5f6b7e] font-bold bg-[#222a36] px-2 py-0.5 rounded">{debt.reference_number}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#0b0e14] text-[#8b95a7]">
                       {getStatusLabel(debt.status)}
                     </span>
                   </div>
                 </div>
                 <div className="text-end flex flex-col items-end">
-                  <div className="text-sm font-bold text-[#0e7a54] font-mono mb-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-lg">
+                  <div className="text-sm font-bold text-white font-mono mb-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-lg">
                     {formatCurrency(debt.current_balance, debt.currency)}
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border inline-block ${getPriorityStyle(debt.priority)}`}>
