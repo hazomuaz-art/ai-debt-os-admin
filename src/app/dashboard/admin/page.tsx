@@ -27,7 +27,7 @@ async function getStats(companyId: string) {
   ] = await Promise.all([
     supabase.from('debts').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
     supabase.from('debts').select('current_balance').eq('company_id', companyId).neq('status', 'settled'),
-    supabase.from('payments').select('amount').eq('company_id', companyId).gte('payment_date', monthStart),
+    supabase.from('payments').select('amount, payment_date').eq('company_id', companyId).gte('payment_date', monthStart),
     supabase.from('customers').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
     supabase.from('debts').select('*', { count: 'exact', head: true }).eq('company_id', companyId).lt('due_date', today).not('status', 'in', '("settled","written_off")'),
     supabase.from('ai_actions').select('*', { count: 'exact', head: true }).eq('company_id', companyId).eq('scheduled_for', today),
@@ -48,9 +48,18 @@ async function getStats(companyId: string) {
     statusCount[d.status] = (statusCount[d.status] ?? 0) + 1
   }
 
+  // Daily collected series for the current month (real money-flow chart)
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const dailySeries = Array.from({ length: daysInMonth }, () => 0)
+  for (const p of collectedData ?? []) {
+    if (!p.payment_date) continue
+    const day = new Date(p.payment_date).getDate()
+    if (day >= 1 && day <= daysInMonth) dailySeries[day - 1] += Number(p.amount ?? 0)
+  }
+
   return {
-    totalBalance, 
-    totalCollected, 
+    totalBalance,
+    totalCollected,
     totalDebts: totalDebts ?? 0,
     activeCustomers: activeCustomers ?? 0,
     overdueDebts: overdueDebts ?? 0,
@@ -58,6 +67,7 @@ async function getStats(companyId: string) {
     messagesToday: messagesToday ?? 0,
     recentActions: recentActions ?? [],
     statusCount,
+    dailySeries,
   }
 }
 
@@ -82,10 +92,10 @@ export default async function AdminDashboard() {
   const ringOffset = Math.round(ringCirc * (1 - collectionRate / 100))
 
   const kpis = [
-    { title: 'رسائل AI اليوم', value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, chip: 'bg-blue-50 text-blue-600' },
-    { title: 'العملاء النشطون', value: String(s.activeCustomers), icon: Users, chip: 'bg-indigo-50 text-indigo-600' },
-    { title: 'وعود السداد', value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, chip: 'bg-emerald-50 text-emerald-600' },
-    { title: 'مطالبات متأخرة', value: String(s.overdueDebts ?? 0), icon: AlertTriangle, chip: 'bg-rose-50 text-rose-600', alert: true },
+    { title: 'المحصّل هذا الشهر', value: formatCurrency(s.totalCollected, 'SAR'), icon: Wallet, chip: 'bg-emerald-50 text-emerald-600', pill: 'هذا الشهر' },
+    { title: 'رسائل AI اليوم', value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, chip: 'bg-blue-50 text-blue-600', pill: 'اليوم' },
+    { title: 'وعود السداد', value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, chip: 'bg-indigo-50 text-indigo-600', pill: 'نشطة' },
+    { title: 'مطالبات متأخرة', value: String(s.overdueDebts ?? 0), icon: AlertTriangle, chip: 'bg-rose-50 text-rose-600', pill: 'تدخّل', alert: true },
   ]
 
   // Status distribution (real data)
@@ -96,54 +106,71 @@ export default async function AdminDashboard() {
   const statusEntries = Object.entries(s.statusCount).sort((a, b) => b[1] - a[1]).slice(0, 5)
   const maxStatus = Math.max(1, ...statusEntries.map(([, n]) => n))
 
+  // Money-flow area chart geometry (real daily series)
+  const series = s.dailySeries.length ? s.dailySeries : [0]
+  const maxV = Math.max(1, ...series)
+  const CW = 600, CH = 150
+  const coords = series.map((v, i) => {
+    const x = series.length > 1 ? (i / (series.length - 1)) * CW : 0
+    const y = CH - (v / maxV) * (CH - 24) - 12
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+  const linePts = coords.join(' ')
+  const areaPts = `0,${CH} ${linePts} ${CW},${CH}`
+
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#f7f8fa] font-sans text-slate-800">
 
-      {/* Header */}
-      <div className="flex items-center justify-between pt-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#0e7a54]">الرئيسية</h1>
-          <p className="text-sm text-slate-500 mt-1">نظرة شاملة على التحصيل</p>
-        </div>
-      </div>
-
-      {/* Featured + collection ring */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 relative overflow-hidden rounded-3xl p-7 text-white bg-gradient-to-l from-[#0b8f63] to-[#0e9f6e] shadow-sm">
-          <div className="absolute -left-6 -bottom-10 w-40 h-40 rounded-full bg-white/10"></div>
-          <div className="absolute left-16 -top-12 w-28 h-28 rounded-full bg-white/5"></div>
-          <div className="relative">
-            <div className="text-sm text-white/85">المحصّل هذا الشهر</div>
-            <div className="text-4xl font-bold font-mono mt-2">{formatCurrency(s.totalCollected, 'SAR')}</div>
-            <div className="flex items-center gap-5 mt-4 text-xs text-white/90">
-              <span className="inline-flex items-center gap-1.5"><TrendingUp size={15} /> إجمالي المديونيات: {formatCurrency(s.totalBalance, 'SAR')}</span>
-              <span className="inline-flex items-center gap-1.5"><Wallet size={15} /> {s.totalDebts} ملف</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
-          <h3 className="text-sm font-bold text-[#0e7a54] mb-3">نسبة التحصيل</h3>
-          <svg viewBox="0 0 100 100" className="w-28 h-28">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#eef0f4" strokeWidth="11" />
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#0e9f6e" strokeWidth="11" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} strokeLinecap="round" transform="rotate(-90 50 50)" />
-            <text x="50" y="56" textAnchor="middle" fontSize="20" fontWeight="700" fill="#0e7a54">{collectionRate}%</text>
-          </svg>
-          <div className="text-xs text-slate-500 mt-3">من إجمالي المحفظة</div>
-        </div>
-      </div>
-
-      {/* KPI tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI cards (SmilePay style) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 pt-6">
         {kpis.map((k, i) => (
-          <div key={i} className={`bg-white rounded-2xl p-5 border ${k.alert ? 'border-rose-100' : 'border-slate-100'} shadow-sm hover:shadow-md transition-shadow`}>
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${k.chip}`}>
-              <k.icon size={22} strokeWidth={2.4} />
+          <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100">
+            <div className="flex items-start justify-between mb-4">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${k.chip}`}>
+                <k.icon size={22} strokeWidth={2.4} />
+              </div>
+              <span className={`text-[11px] font-bold px-2 py-1 rounded-md ${k.alert ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-600'}`}>{k.pill}</span>
             </div>
-            <div className={`text-2xl font-bold font-mono ${k.alert ? 'text-rose-600' : 'text-[#0e7a54]'}`}>{k.value}</div>
-            <div className="text-sm text-slate-500 mt-1">{k.title}</div>
+            <div className="text-sm text-slate-500">{k.title}</div>
+            <div className={`text-2xl font-bold font-mono mt-1 ${k.alert ? 'text-rose-600' : 'text-slate-800'}`}>{k.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Money Flow chart + balance side panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-100">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-slate-800">تدفّق التحصيل</h3>
+            <span className="text-xs text-slate-400 bg-[#f7f8fa] px-3 py-1.5 rounded-lg">هذا الشهر</span>
+          </div>
+          <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" className="w-full h-44">
+            <polygon points={areaPts} fill="#0e9f6e" opacity="0.08" />
+            <polyline points={linePts} fill="none" stroke="#0e9f6e" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+          </svg>
+        </div>
+
+        {/* Balance panel (mirrors the reference card area) */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 flex flex-col">
+          <div className="rounded-2xl p-5 text-white bg-gradient-to-l from-[#0b8f63] to-[#0e9f6e] relative overflow-hidden">
+            <div className="absolute -left-4 -bottom-8 w-28 h-28 rounded-full bg-white/10"></div>
+            <div className="relative">
+              <div className="text-xs text-white/80">إجمالي المديونيات</div>
+              <div className="text-2xl font-bold font-mono mt-1">{formatCurrency(s.totalBalance, 'SAR')}</div>
+              <div className="text-xs text-white/85 mt-3">{s.totalDebts} ملف · {s.activeCustomers} عميل</div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-5">
+            <div>
+              <div className="text-xs text-slate-400">نسبة التحصيل</div>
+              <div className="text-xl font-bold text-[#0e7a54] font-mono">{collectionRate}%</div>
+            </div>
+            <svg viewBox="0 0 100 100" className="w-16 h-16">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#eef0f4" strokeWidth="12" />
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#0e9f6e" strokeWidth="12" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} strokeLinecap="round" transform="rotate(-90 50 50)" />
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* Live feed + status distribution */}
