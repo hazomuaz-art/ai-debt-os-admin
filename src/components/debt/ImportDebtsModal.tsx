@@ -98,7 +98,7 @@ export default function ImportDebtsModal() {
                 <h2 className="text-lg font-semibold font-syne">Import Debts from CSV</h2>
                 <p className="text-[#5f6b7e] text-sm mt-0.5">Bulk import customers and debts</p>
               </div>
-              <button onClick={handleClose}><X className="w-5 h-5 text-[#5f6b7e] hover:text-slate-900" /></button>
+              <button onClick={handleClose}><X className="w-5 h-5 text-[#5f6b7e] hover:text-white" /></button>
             </div>
 
             {!result ? (
