@@ -203,6 +203,28 @@ export async function createDebtAction(formData: FormData) {
   }
 }
 
+// Permanently deletes a customer + all their debts/data (conversation archived first).
+export async function deleteCustomerFullyAction(customerId: string) {
+  try {
+    const { supabase, profile } = await requireAuth()
+    if (!['admin', 'manager'].includes(profile.role)) return { error: 'صلاحيات غير كافية' }
+
+    const { data: customer } = await supabase
+      .from('customers').select('id')
+      .eq('id', customerId).eq('company_id', profile.company_id).maybeSingle()
+    if (!customer) return { error: 'العميل غير موجود' }
+
+    const { error } = await supabase.rpc('delete_customer_fully', { p_customer_id: customerId })
+    if (error) return { error: error.message }
+
+    revalidatePath('/dashboard/admin/debts')
+    revalidatePath('/dashboard/admin/messages')
+    return { ok: true }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 // Unified "case" creation: creates the customer then their debt in one step.
 export async function createCaseAction(formData: FormData) {
   const cust = await createCustomerAction(formData)

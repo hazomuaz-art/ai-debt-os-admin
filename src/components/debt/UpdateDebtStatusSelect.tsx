@@ -18,16 +18,16 @@ const STATUSES = [
 ]
 
 const STATUS_LABELS: Record<string, string> = {
-  active: 'Active',
-  in_progress: 'In Progress',
-  promised: 'Promised',
-  in_negotiation: 'In Negotiation',
-  payment_plan: 'Payment Plan',
-  partial: 'Partial Payment',
-  settled: 'Settled',
-  legal: 'Legal',
-  disputed: 'Disputed',
-  written_off: 'Written Off',
+  active: 'نشط',
+  in_progress: 'قيد التنفيذ',
+  promised: 'وعد بالسداد',
+  in_negotiation: 'قيد التفاوض',
+  payment_plan: 'خطة تقسيط',
+  partial: 'سداد جزئي',
+  settled: 'مُسدد',
+  legal: 'إجراء قانوني',
+  disputed: 'متنازع عليه',
+  written_off: 'معدوم',
 }
 
 export default function UpdateDebtStatusSelect({
