@@ -6,6 +6,7 @@ import { AddCaseModal } from '@/components/debt/AddCaseModal'
 import ImportDebtsModal from '@/components/debt/ImportDebtsModal'
 import ExportDebtsButton from '@/components/debt/ExportDebtsButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
+import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import Link from 'next/link'
 import DebtFilters from '@/components/debt/DebtFilters'
 
@@ -54,7 +55,7 @@ export default async function AdminDebtsPage({
     .from('debts')
     .select(`
       *,
-      customer:customers(id, full_name, phone, whatsapp),
+      customer:customers(id, full_name, phone, whatsapp, ai_paused),
       assigned_collector:profiles!debts_assigned_to_fkey(id, full_name),
       ai_scores(score, risk_classification)
     `, { count: 'exact' })
@@ -132,7 +133,7 @@ export default async function AdminDebtsPage({
                 <tr><td colSpan={7} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_debts}</td></tr>
               ) : (debts ?? []).map((debt: any) => {
                 const latestScore = debt.ai_scores?.[0]
-                const cust = debt.customer as { id?: string; full_name?: string; phone?: string; whatsapp?: string } | null
+                const cust = debt.customer as { id?: string; full_name?: string; phone?: string; whatsapp?: string; ai_paused?: boolean } | null
                 return (
                   <tr key={debt.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="px-6 py-4"><span className="font-mono text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">{debt.reference_number}</span></td>
@@ -156,6 +157,7 @@ export default async function AdminDebtsPage({
                     <td className="px-6 py-4"><span className="text-sm font-medium text-slate-300 bg-[#222a36] px-2 py-1 rounded-md">{debt.assigned_collector?.full_name ?? t.ui.unassigned}</span></td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        {cust?.id && <AiToggleButton customerId={cust.id} paused={!!cust.ai_paused} variant="icon" />}
                         {cust?.id && <StartConversationButton customerId={cust.id} phone={cust.whatsapp ?? cust.phone ?? null} />}
                         <Link href={`/dashboard/admin/debts/${debt.id}`} className="inline-block px-3 py-1.5 bg-[#1a212c] border border-[#2c3543] text-slate-200 hover:bg-[#222a36] font-bold rounded-lg text-xs transition-colors whitespace-nowrap">{t.ui.view_details}</Link>
                       </div>

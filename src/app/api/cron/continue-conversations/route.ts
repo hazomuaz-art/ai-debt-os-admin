@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
 
     // Resolve customer + open debt
     const { data: customer } = await supabase
-      .from('customers').select('id, whatsapp, phone').eq('id', customerId).maybeSingle()
+      .from('customers').select('id, whatsapp, phone, ai_paused').eq('id', customerId).maybeSingle()
+    if (customer?.ai_paused) { results.skipped++; continue }   // human is handling this one
     const phone = customer?.whatsapp || customer?.phone
     if (!phone) { results.skipped++; continue }
 

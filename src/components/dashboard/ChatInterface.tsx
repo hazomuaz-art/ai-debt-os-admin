@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { Search, Send, Bot, User, Phone, MessageSquare } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
+import { AiToggleButton } from '@/components/debt/AiToggleButton'
 
 interface ChatMessage {
   id: string
@@ -22,6 +23,7 @@ interface ChatMessage {
       full_name: string
       phone: string
       whatsapp?: string
+      ai_paused?: boolean
     }
   }
 }
@@ -171,6 +173,9 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                     {formatCurrency(selectedChat.debt?.current_balance || 0, selectedChat.debt?.currency || 'SAR')}
                   </div>
                 </div>
+                {selectedChat.customer?.id && (
+                  <AiToggleButton customerId={selectedChat.customer.id} paused={!!selectedChat.customer.ai_paused} />
+                )}
                 <button className="p-2 text-[#5f6b7e] hover:text-white bg-[#222a36] rounded-full transition-colors">
                   <Phone size={18} />
                 </button>

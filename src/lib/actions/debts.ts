@@ -203,6 +203,25 @@ export async function createDebtAction(formData: FormData) {
   }
 }
 
+// Pause/resume the AI agent for a customer (pausing = hand off to a human).
+export async function setCustomerAiPausedAction(customerId: string, paused: boolean) {
+  try {
+    const { supabase, profile } = await requireAuth()
+    const { error } = await supabase
+      .from('customers')
+      .update({ ai_paused: paused })
+      .eq('id', customerId)
+      .eq('company_id', profile.company_id)
+    if (error) return { error: error.message }
+    revalidatePath('/dashboard/admin/debts')
+    revalidatePath('/dashboard/admin/messages')
+    revalidatePath(`/dashboard/admin/debts`)
+    return { ok: true, paused }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 // Permanently deletes a customer + all their debts/data (conversation archived first).
 export async function deleteCustomerFullyAction(customerId: string) {
   try {

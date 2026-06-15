@@ -19,7 +19,7 @@ export default async function MessagesPage() {
       id, content, direction, channel, status, sent_at, created_at,
       debt:debts(
         reference_number, current_balance, currency,
-        customer:customers(id, full_name, phone, whatsapp)
+        customer:customers(id, full_name, phone, whatsapp, ai_paused)
       )
     `)
     .eq('company_id', profile.company_id)

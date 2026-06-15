@@ -12,6 +12,7 @@ import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldA
 import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
+import { AiToggleButton } from '@/components/debt/AiToggleButton'
 
 // Translate AI-generated score factor names (free-form English) to Arabic by keyword.
 function factorAr(name: string): string {
@@ -160,6 +161,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             phone={debt.customer?.whatsapp || debt.customer?.phone}
             customerName={debt.customer?.full_name}
           />
+          {debt.customer?.id && (
+            <AiToggleButton customerId={debt.customer.id} paused={!!debt.customer.ai_paused} />
+          )}
           {debt.customer?.id && (
             <DeleteCustomerButton customerId={debt.customer.id} customerName={debt.customer.full_name ?? ''} />
           )}

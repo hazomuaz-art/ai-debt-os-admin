@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         if (phoneRaw && text) {
           const { data: customer } = await supabase
             .from('customers')
-            .select('id, company_id, full_name')
+            .select('id, company_id, full_name, ai_paused')
             .or([
               `whatsapp.eq.${phoneRaw}`,
               `whatsapp.eq.+${phoneRaw}`,
@@ -145,8 +145,13 @@ export async function POST(request: NextRequest) {
               data: { message: text, from: phoneRaw, message_id: String(evo.data.key.id ?? '') },
             }).catch(() => {})
 
-            // Process AI decision natively instead of n8n
+            // Process AI decision natively instead of n8n — unless AI is paused
+            // (customer handed off to a human agent).
             ;(async () => {
+              if ((customer as { ai_paused?: boolean }).ai_paused) {
+                log.info('AI paused for customer — skipping auto-reply', { customer_id: (customer as { id: string }).id })
+                return
+              }
               const { runCollectorAgent } = await import('@/lib/ai-collector-agent')
               const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
               const { processEvent } = await import('@/lib/automation-pipeline')
