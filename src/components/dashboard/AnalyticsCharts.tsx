@@ -5,6 +5,16 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
+
+const STATUS_EN: Record<string, string> = {
+  active: 'Active', in_progress: 'In progress', promised: 'Promised', partial: 'Partial',
+  in_negotiation: 'Negotiating', payment_plan: 'Payment plan', settled: 'Settled',
+  written_off: 'Written off', legal: 'Legal', disputed: 'Disputed',
+}
+const PRIORITY_EN: Record<string, string> = {
+  critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low',
+}
 
 // Light Theme Harmonized Colors
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4']
@@ -57,14 +67,16 @@ interface Props {
   riskChartData: { name: string; value: number }[]
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label, isRTL }: any) {
   if (!active || !payload?.length) return null
+  const collectedLabel = isRTL ? 'المحصل:' : 'Collected:'
+  const newDebtsLabel = isRTL ? 'الديون الجديدة:' : 'New debts:'
   return (
     <div className="bg-[#151a23] border border-[#222a36] rounded-xl p-4 text-sm shadow-xl font-bold text-white text-start" >
-      {label && <p className="text-[#5f6b7e] mb-2 border-b border-slate-50 pb-2">{label}</p>}
+      {label && <p className="text-[#5f6b7e] mb-2 border-b border-[#222a36] pb-2">{label}</p>}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }} className="flex justify-between gap-4 mt-1">
-          <span>{p.name === 'Collected' ? 'المحصل:' : p.name === 'New Debts' ? 'الديون الجديدة:' : p.name}</span>
+          <span>{p.name === 'Collected' ? collectedLabel : p.name === 'New Debts' ? newDebtsLabel : p.name}</span>
           <span className="font-mono">
             {typeof p.value === 'number' && p.value > 1000 && p.name === 'Collected'
               ? formatCurrency(p.value, 'SAR')
@@ -76,10 +88,12 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-function PieTooltip({ active, payload }: any) {
+function PieTooltip({ active, payload, isRTL }: any) {
   if (!active || !payload?.length) return null
   const entry = payload[0]
-  const name = STATUS_ARABIC[entry.name] || PRIORITY_ARABIC[entry.name] || entry.name
+  const name = isRTL
+    ? (STATUS_ARABIC[entry.name] || PRIORITY_ARABIC[entry.name] || entry.name)
+    : (STATUS_EN[entry.name] || PRIORITY_EN[entry.name] || entry.name)
   return (
     <div className="bg-[#151a23] border border-[#222a36] rounded-xl p-3 text-sm shadow-xl font-bold text-start" >
       <p style={{ color: entry.payload.fill }}>{name}: <span className="font-mono">{entry.value}</span></p>
@@ -94,18 +108,23 @@ export default function AnalyticsCharts({
   priorityChartData,
   riskChartData,
 }: Props) {
+  const { t, isRTL } = useTranslation()
+  const an = t.pages.analytics
+  const statusLabel = (v: string) => (isRTL ? STATUS_ARABIC[v] : STATUS_EN[v]) || v.replace(/_/g, ' ')
+  const priorityLabel = (v: string) => (isRTL ? PRIORITY_ARABIC[v] : PRIORITY_EN[v]) || v
+  const legendDir = isRTL ? 'rtl' : 'ltr'
   return (
     <div className="space-y-6" >
       {/* Monthly Collection Bar Chart */}
       <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-        <h2 className="text-lg font-bold text-white mb-6">التحصيلات الشهرية (بالريال السعودي)</h2>
+        <h2 className="text-lg font-bold text-white mb-6">{an.monthly_collection_sar}</h2>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 16, bottom: 4 }} style={{ direction: 'ltr' }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#222a36" vertical={false} />
             <XAxis dataKey="month" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false}
               tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1a212c' }} />
+            <Tooltip content={<CustomTooltip isRTL={isRTL} />} cursor={{ fill: '#1a212c' }} />
             <Bar dataKey="collected" name="Collected" fill="#3b82f6" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -113,13 +132,13 @@ export default function AnalyticsCharts({
 
       {/* New Debts per Month */}
       <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-        <h2 className="text-lg font-bold text-white mb-6">الديون الجديدة المضافة شهرياً</h2>
+        <h2 className="text-lg font-bold text-white mb-6">{an.new_debts_added}</h2>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }} style={{ direction: 'ltr' }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#222a36" vertical={false} />
             <XAxis dataKey="month" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1a212c' }} />
+            <Tooltip content={<CustomTooltip isRTL={isRTL} />} cursor={{ fill: '#1a212c' }} />
             <Bar dataKey="newDebts" name="New Debts" fill="#10b981" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -129,7 +148,7 @@ export default function AnalyticsCharts({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Status Breakdown */}
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-          <h2 className="text-lg font-bold text-white mb-4">توزيع حالات الديون</h2>
+          <h2 className="text-lg font-bold text-white mb-4">{an.status_dist}</h2>
           {statusChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -148,21 +167,21 @@ export default function AnalyticsCharts({
                     <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<PieTooltip />} />
+                <Tooltip content={<PieTooltip isRTL={isRTL} />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1">{STATUS_ARABIC[value] || value.replace(/_/g, ' ')}</span>}
-                  wrapperStyle={{ direction: 'rtl' }}
+                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1">{statusLabel(value)}</span>}
+                  wrapperStyle={{ direction: legendDir }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لا توجد بيانات للديون حتى الآن</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">{an.no_debt_data}</p>
           )}
         </div>
 
         {/* Priority Breakdown */}
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-          <h2 className="text-lg font-bold text-white mb-4">توزيع الأهمية (الأولويات)</h2>
+          <h2 className="text-lg font-bold text-white mb-4">{an.priority_dist}</h2>
           {priorityChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -181,21 +200,21 @@ export default function AnalyticsCharts({
                     <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name] ?? '#94a3b8'} />
                   ))}
                 </Pie>
-                <Tooltip content={<PieTooltip />} />
+                <Tooltip content={<PieTooltip isRTL={isRTL} />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1">{PRIORITY_ARABIC[value] || value}</span>}
-                  wrapperStyle={{ direction: 'rtl' }}
+                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1">{priorityLabel(value)}</span>}
+                  wrapperStyle={{ direction: legendDir }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لا توجد بيانات للأولويات</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">{an.no_priority_data}</p>
           )}
         </div>
 
         {/* Channel Breakdown */}
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-          <h2 className="text-lg font-bold text-white mb-4">قنوات التواصل المستخدمة</h2>
+          <h2 className="text-lg font-bold text-white mb-4">{an.channels_used}</h2>
           {channelChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -213,33 +232,33 @@ export default function AnalyticsCharts({
                     <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<PieTooltip />} />
+                <Tooltip content={<PieTooltip isRTL={isRTL} />} />
                 <Legend
                   formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1 capitalize">{value}</span>}
-                  wrapperStyle={{ direction: 'rtl' }}
+                  wrapperStyle={{ direction: legendDir }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لم يتم إرسال أي رسائل بعد</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">{an.no_messages_sent}</p>
           )}
         </div>
 
         {/* AI Risk Classification */}
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-          <h2 className="text-lg font-bold text-white mb-4">تصنيف الذكاء الاصطناعي للمخاطر</h2>
+          <h2 className="text-lg font-bold text-white mb-4">{an.ai_risk}</h2>
           {riskChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={riskChartData} layout="vertical" margin={{ left: 16, right: 16 }} style={{ direction: 'ltr' }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222a36" horizontal={false} />
                 <XAxis type="number" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                 <YAxis dataKey="name" type="category" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={80} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1a212c' }} />
+                <Tooltip content={<CustomTooltip isRTL={isRTL} />} cursor={{ fill: '#1a212c' }} />
                 <Bar dataKey="value" name="Debts" fill="#8b5cf6" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لا يوجد تقييم مخاطر مسجل بعد</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">{an.no_risk_data}</p>
           )}
         </div>
       </div>

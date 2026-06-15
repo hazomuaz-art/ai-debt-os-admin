@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import AnalyticsCharts from '@/components/dashboard/AnalyticsCharts'
 import { BarChart3, Wallet, Target, Activity } from 'lucide-react'
+import { getServerTranslation } from '@/lib/i18n/server'
 
 export default async function AnalyticsPage() {
   const supabase = createClient()
@@ -116,9 +117,12 @@ export default async function AnalyticsPage() {
   const priorityChartData = Object.entries(priorityCounts).map(([name, value]) => ({ name, value }))
   const riskChartData = Object.entries(riskCounts).map(([name, value]) => ({ name, value }))
 
+  const { t, dir } = getServerTranslation()
+  const an = t.pages.analytics
+
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
-      
+    <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
+
       {/* Header */}
       <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -126,45 +130,45 @@ export default async function AnalyticsPage() {
             <BarChart3 size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">التحليلات والمؤشرات (Analytics)</h1>
-            <p className="text-[#8b95a7] text-sm">أداء المحفظة الاستثمارية وذكاء التحصيل المالي</p>
+            <h1 className="text-2xl font-bold text-white mb-1">{an.title}</h1>
+            <p className="text-[#8b95a7] text-sm">{an.subtitle}</p>
           </div>
         </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-[#8b95a7] text-sm font-bold">إجمالي المطالبات</div>
-            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center"><BarChart3 size={20} /></div>
+            <div className="text-[#8b95a7] text-sm font-bold">{an.total_claims}</div>
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center"><BarChart3 size={20} /></div>
           </div>
           <div className="text-3xl font-bold text-white font-mono">{totalDebts.toLocaleString()}</div>
         </div>
 
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-[#8b95a7] text-sm font-bold">إجمالي المحفظة</div>
-            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center"><Wallet size={20} /></div>
+            <div className="text-[#8b95a7] text-sm font-bold">{an.total_portfolio}</div>
+            <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center"><Wallet size={20} /></div>
           </div>
-          <div className="text-3xl font-bold text-emerald-600 font-mono">{formatCurrency(totalOriginal, 'SAR')}</div>
+          <div className="text-3xl font-bold text-emerald-400 font-mono">{formatCurrency(totalOriginal, 'SAR')}</div>
         </div>
 
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-[#8b95a7] text-sm font-bold">معدل التحصيل العام</div>
-            <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center"><Target size={20} /></div>
+            <div className="text-[#8b95a7] text-sm font-bold">{an.collection_rate}</div>
+            <div className="w-10 h-10 rounded-full bg-purple-500/10 text-purple-400 flex items-center justify-center"><Target size={20} /></div>
           </div>
-          <div className="text-3xl font-bold text-purple-600 font-mono">{collectionRate.toFixed(1)}%</div>
+          <div className="text-3xl font-bold text-purple-400 font-mono">{collectionRate.toFixed(1)}%</div>
         </div>
 
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] p-6 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-4">
-            <div className="text-[#8b95a7] text-sm font-bold">متوسط تقييم الذكاء الاصطناعي</div>
-            <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center"><Activity size={20} /></div>
+            <div className="text-[#8b95a7] text-sm font-bold">{an.avg_ai_score}</div>
+            <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center"><Activity size={20} /></div>
           </div>
-          <div className={`text-3xl font-bold font-mono ${avgScore >= 60 ? 'text-emerald-500' : avgScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
+          <div className={`text-3xl font-bold font-mono ${avgScore >= 60 ? 'text-emerald-400' : avgScore >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>
             {avgScore || '—'}
           </div>
         </div>
