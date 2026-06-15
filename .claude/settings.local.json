@@ -46,7 +46,9 @@
       "Bash(git -C /c/Users/moham/.gemini/antigravity-ide/scratch/ai-debt-os-admin config user.name hazomuaz-art)",
       "Bash(git -C /c/Users/moham/.gemini/antigravity-ide/scratch/ai-debt-os-admin commit --amend --reset-author --no-edit)",
       "mcp__visualize__read_me",
-      "mcp__visualize__show_widget"
+      "mcp__visualize__show_widget",
+      "WebSearch",
+      "WebFetch(domain:dribbble.com)"
     ]
   }
 }

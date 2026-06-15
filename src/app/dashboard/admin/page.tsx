@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import { 
-  Wallet, BrainCircuit, CheckCircle, AlertTriangle, 
-  Activity, Clock, MessageCircle, FileText, ArrowLeftRight, Package
+import { formatCurrency } from '@/lib/utils'
+import {
+  Wallet, BrainCircuit, CheckCircle, AlertTriangle,
+  Users, TrendingUp, MessageCircle
 } from 'lucide-react'
 
 // ── Stats fetch ──────────────────────────────────────────────────────────
@@ -74,78 +74,87 @@ export default async function AdminDashboard() {
 
   const s = await getStats(profile.company_id)
 
-  const stats = [
-    { title: 'إجمالي المحصل (هذا الشهر)', value: formatCurrency(s.totalCollected, 'SAR'), icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-50 border-emerald-100' },
-    { title: 'رسائل AI اليومية', value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, color: 'text-blue-500', bg: 'bg-blue-50 border-blue-100' },
-    { title: 'وعود السداد', value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, color: 'text-purple-500', bg: 'bg-purple-50 border-purple-100' },
-    { title: 'مطالبات متأخرة (تتطلب تدخلاً)', value: String(s.overdueDebts ?? 0), icon: AlertTriangle, color: 'text-rose-500', bg: 'bg-rose-50 border-rose-200', isAlert: true },
-  ];
+  // Real collection rate from available figures (no hardcoded number)
+  const collectionRate = (s.totalCollected + s.totalBalance) > 0
+    ? Math.round((s.totalCollected / (s.totalCollected + s.totalBalance)) * 100)
+    : 0
+  const ringCirc = 251
+  const ringOffset = Math.round(ringCirc * (1 - collectionRate / 100))
+
+  const kpis = [
+    { title: 'رسائل AI اليوم', value: String(s.messagesToday || s.aiActionsToday || 0), icon: BrainCircuit, chip: 'bg-blue-50 text-blue-600' },
+    { title: 'العملاء النشطون', value: String(s.activeCustomers), icon: Users, chip: 'bg-indigo-50 text-indigo-600' },
+    { title: 'وعود السداد', value: String(s.statusCount['promised'] ?? 0), icon: CheckCircle, chip: 'bg-emerald-50 text-emerald-600' },
+    { title: 'مطالبات متأخرة', value: String(s.overdueDebts ?? 0), icon: AlertTriangle, chip: 'bg-rose-50 text-rose-600', alert: true },
+  ]
+
+  // Status distribution (real data)
+  const statusLabels: Record<string, string> = {
+    active: 'نشط', overdue: 'متأخر', payment_plan: 'خطة تقسيط', promised: 'وعد سداد',
+    settled: 'مسدد', disputed: 'معترض', legal: 'قانوني', new: 'جديد', written_off: 'مشطوب',
+  }
+  const statusEntries = Object.entries(s.statusCount).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const maxStatus = Math.max(1, ...statusEntries.map(([, n]) => n))
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800" >
-      
-      {/* Overview Section */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mt-6">
-        <h2 className="text-xl font-bold text-[#0e7a54] mb-6">نظرة عامة</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, i) => (
-            <div key={i} className={`border p-5 rounded-2xl flex items-center gap-4 transition-all duration-200 hover:shadow-md ${stat.isAlert ? 'bg-[#fff5f5] border-rose-100' : 'bg-white border-slate-100'}`}>
-              <div className={`p-4 rounded-xl shrink-0 ${stat.bg} ${stat.color}`}>
-                <stat.icon size={28} strokeWidth={2.5} />
-              </div>
-              <div>
-                <div className={`text-2xl font-bold font-mono ${stat.isAlert ? 'text-rose-700' : 'text-[#0e7a54]'}`}>{stat.value}</div>
-                <div className={`text-sm mt-1 ${stat.isAlert ? 'text-rose-600 font-bold' : 'text-slate-500 font-medium'}`}>{stat.title}</div>
-              </div>
-            </div>
-          ))}
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#e7f6ef] font-sans text-slate-800">
+
+      {/* Header */}
+      <div className="flex items-center justify-between pt-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0e7a54]">الرئيسية</h1>
+          <p className="text-sm text-slate-500 mt-1">نظرة شاملة على التحصيل</p>
         </div>
       </div>
 
-      {/* Main Grid Area */}
+      {/* Featured + collection ring */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column */}
-        <div className="col-span-1 space-y-6">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
-            <div className="flex justify-between w-full mb-4 px-2">
-              <h3 className="font-bold text-[#0e7a54] text-lg">قاعدة العملاء</h3>
+        <div className="lg:col-span-2 relative overflow-hidden rounded-3xl p-7 text-white bg-gradient-to-l from-[#0b8f63] to-[#0e9f6e] shadow-sm">
+          <div className="absolute -left-6 -bottom-10 w-40 h-40 rounded-full bg-white/10"></div>
+          <div className="absolute left-16 -top-12 w-28 h-28 rounded-full bg-white/5"></div>
+          <div className="relative">
+            <div className="text-sm text-white/85">المحصّل هذا الشهر</div>
+            <div className="text-4xl font-bold font-mono mt-2">{formatCurrency(s.totalCollected, 'SAR')}</div>
+            <div className="flex items-center gap-5 mt-4 text-xs text-white/90">
+              <span className="inline-flex items-center gap-1.5"><TrendingUp size={15} /> إجمالي المديونيات: {formatCurrency(s.totalBalance, 'SAR')}</span>
+              <span className="inline-flex items-center gap-1.5"><Wallet size={15} /> {s.totalDebts} ملف</span>
             </div>
-            <div className="bg-[#f6f8fa] p-4 rounded-full mb-4">
-              <Activity className="text-[#0e7a54]" size={28} />
-            </div>
-            <div className="text-4xl font-bold text-[#0e7a54] font-mono">{s.activeCustomers}</div>
-            <div className="text-sm font-bold text-slate-500 mt-2">عميل مسجل ونشط</div>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center hover:shadow-md transition-shadow">
-             <h3 className="font-bold text-[#0e7a54] text-lg mb-6 text-center">أداء المحفظة</h3>
-             <div className="flex justify-center items-center gap-8">
-               <div className="w-28 h-28 rounded-full border-[14px] border-[#0e7a54] border-t-[#a3c1e0] relative flex justify-center items-center shadow-inner">
-                  <span className="text-sm font-bold text-slate-500">68%</span>
-               </div>
-               <div className="space-y-4">
-                 <div className="flex items-center gap-3 text-sm text-[#0e7a54] font-bold">
-                   <div className="w-4 h-4 bg-[#a3c1e0] rounded-sm shadow-sm"></div>
-                   تم تحصيله
-                 </div>
-                 <div className="flex items-center gap-3 text-sm text-[#0e7a54] font-bold">
-                   <div className="w-4 h-4 bg-[#0e7a54] rounded-sm shadow-sm"></div>
-                   المتبقي
-                 </div>
-               </div>
-             </div>
           </div>
         </div>
 
-        {/* Middle Column (Live Feed) */}
-        <div className="col-span-1 lg:col-span-2 bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm flex flex-col hover:shadow-md transition-shadow">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+          <h3 className="text-sm font-bold text-[#0e7a54] mb-3">نسبة التحصيل</h3>
+          <svg viewBox="0 0 100 100" className="w-28 h-28">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#eef0f4" strokeWidth="11" />
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#0e9f6e" strokeWidth="11" strokeDasharray={ringCirc} strokeDashoffset={ringOffset} strokeLinecap="round" transform="rotate(-90 50 50)" />
+            <text x="50" y="56" textAnchor="middle" fontSize="20" fontWeight="700" fill="#0e7a54">{collectionRate}%</text>
+          </svg>
+          <div className="text-xs text-slate-500 mt-3">من إجمالي المحفظة</div>
+        </div>
+      </div>
+
+      {/* KPI tiles */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpis.map((k, i) => (
+          <div key={i} className={`bg-white rounded-2xl p-5 border ${k.alert ? 'border-rose-100' : 'border-slate-100'} shadow-sm hover:shadow-md transition-shadow`}>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${k.chip}`}>
+              <k.icon size={22} strokeWidth={2.4} />
+            </div>
+            <div className={`text-2xl font-bold font-mono ${k.alert ? 'text-rose-600' : 'text-[#0e7a54]'}`}>{k.value}</div>
+            <div className="text-sm text-slate-500 mt-1">{k.title}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Live feed + status distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
             <h2 className="text-lg font-bold text-[#0e7a54] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-              العمليات اللحظية (Live Feed)
+              العمليات اللحظية
             </h2>
-            <button className="text-sm text-blue-600 hover:text-blue-700 font-bold bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl transition-colors">عرض السجل الكامل</button>
+            <button className="text-sm text-[#0e7a54] hover:text-[#0b8f63] font-bold bg-[#e7f6ef] hover:bg-[#d9f0e6] px-4 py-2 rounded-xl transition-colors">عرض السجل الكامل</button>
           </div>
           <div className="overflow-x-auto flex-1 p-2">
             <table className="w-full text-start">
@@ -206,6 +215,34 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
+        {/* Status distribution */}
+        <div className="bg-white border border-slate-100 rounded-3xl shadow-sm p-6">
+          <h3 className="text-lg font-bold text-[#0e7a54] mb-5">توزيع حالات الملفات</h3>
+          {statusEntries.length === 0 ? (
+            <div className="text-sm text-slate-400 py-8 text-center">لا توجد بيانات</div>
+          ) : (
+            <div className="space-y-4">
+              {statusEntries.map(([key, n]) => (
+                <div key={key}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="text-slate-600">{statusLabels[key] ?? key}</span>
+                    <span className="font-bold text-[#0e7a54] font-mono">{n}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[#eef0f4] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#0e9f6e]" style={{ width: `${Math.round((n / maxStatus) * 100)}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><MessageCircle size={20} /></div>
+            <div>
+              <div className="text-sm font-bold text-[#0e7a54]">{s.messagesToday || s.aiActionsToday || 0} رسالة اليوم</div>
+              <div className="text-xs text-slate-500">عبر الوكيل الذكي</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
