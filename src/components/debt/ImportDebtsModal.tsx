@@ -96,9 +96,9 @@ export default function ImportDebtsModal() {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-lg font-semibold font-syne">Import Debts from CSV</h2>
-                <p className="text-slate-400 text-sm mt-0.5">Bulk import customers and debts</p>
+                <p className="text-[#5f6b7e] text-sm mt-0.5">Bulk import customers and debts</p>
               </div>
-              <button onClick={handleClose}><X className="w-5 h-5 text-slate-400 hover:text-slate-900" /></button>
+              <button onClick={handleClose}><X className="w-5 h-5 text-[#5f6b7e] hover:text-slate-900" /></button>
             </div>
 
             {!result ? (
@@ -109,7 +109,7 @@ export default function ImportDebtsModal() {
                   onDragOver={e => e.preventDefault()}
                   onClick={() => inputRef.current?.click()}
                   className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
-                    file ? 'border-brand-500 bg-brand-500/5' : 'border-slate-200 hover:border-slate-200'
+                    file ? 'border-brand-500 bg-brand-500/5' : 'border-[#222a36] hover:border-[#222a36]'
                   }`}
                 >
                   <input
@@ -123,13 +123,13 @@ export default function ImportDebtsModal() {
                     <div className="flex flex-col items-center gap-2">
                       <FileText className="w-10 h-10 text-brand-400" />
                       <p className="font-medium text-slate-900">{file.name}</p>
-                      <p className="text-slate-400 text-sm">{(file.size / 1024).toFixed(1)} KB</p>
+                      <p className="text-[#5f6b7e] text-sm">{(file.size / 1024).toFixed(1)} KB</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <Upload className="w-10 h-10 text-slate-500" />
+                      <Upload className="w-10 h-10 text-[#8b95a7]" />
                       <p className="text-slate-300">Drop your CSV here or click to browse</p>
-                      <p className="text-slate-500 text-xs">Max 10MB</p>
+                      <p className="text-[#8b95a7] text-xs">Max 10MB</p>
                     </div>
                   )}
                 </div>
@@ -142,9 +142,9 @@ export default function ImportDebtsModal() {
                 )}
 
                 {/* Column reference */}
-                <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                  <p className="text-xs text-slate-400 mb-2">Required columns: <span className="text-slate-900">Name, Amount</span></p>
-                  <p className="text-xs text-slate-500">
+                <div className="mt-4 p-3 bg-[#222a36] rounded-lg">
+                  <p className="text-xs text-[#5f6b7e] mb-2">Required columns: <span className="text-slate-900">Name, Amount</span></p>
+                  <p className="text-xs text-[#8b95a7]">
                     Optional: Phone, WhatsApp, National ID, City, Employer, Monthly Income, Current Balance, Currency, Due Date, Status, Priority, Product Type, Account Number, Notes
                   </p>
                 </div>
@@ -160,7 +160,7 @@ export default function ImportDebtsModal() {
                   >
                     {loading ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-slate-200 border-t-white rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-[#222a36] border-t-white rounded-full animate-spin" />
                         Importing...
                       </>
                     ) : (
@@ -179,7 +179,7 @@ export default function ImportDebtsModal() {
                   <div>
                     <p className="font-semibold text-green-400">{result.imported} debts imported</p>
                     {result.skipped > 0 && (
-                      <p className="text-slate-400 text-sm">{result.skipped} rows skipped</p>
+                      <p className="text-[#5f6b7e] text-sm">{result.skipped} rows skipped</p>
                     )}
                   </div>
                 </div>

@@ -53,9 +53,9 @@ export default function RecordPaymentModal({
           <div className="card w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold font-syne">Record Payment</h2>
-              <button onClick={() => setOpen(false)}><X className="w-5 h-5 text-slate-400" /></button>
+              <button onClick={() => setOpen(false)}><X className="w-5 h-5 text-[#5f6b7e]" /></button>
             </div>
-            <p className="text-sm text-slate-400 mb-4">
+            <p className="text-sm text-[#5f6b7e] mb-4">
               Outstanding balance: <span className="text-slate-900 font-medium">{formatCurrency(currentBalance, currency)}</span>
             </p>
 

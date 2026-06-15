@@ -31,10 +31,10 @@ export function CreateCustomerModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-[#222a36]">
           <h2 className="font-display font-semibold text-lg">Add Customer</h2>
-          <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900 text-xl">×</button>
+          <button onClick={() => setOpen(false)} className="text-[#8b95a7] hover:text-slate-900 text-xl">×</button>
         </div>
         <form ref={formRef} onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (

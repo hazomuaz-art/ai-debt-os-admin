@@ -46,36 +46,36 @@ export default function CollectorNotePanel({
   }
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+    <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+      <div className="flex items-center gap-2 border-b border-[#222a36] pb-3 mb-4">
         <FileText className="text-blue-500" size={20} />
-        <h2 className="text-lg font-bold text-[#0e7a54]">إفادة المحصل وتاريخ المتابعة</h2>
+        <h2 className="text-lg font-bold text-white">إفادة المحصل وتاريخ المتابعة</h2>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">
         
         {/* Next Call Date */}
         <div className="space-y-2">
-          <label className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
+          <label className="text-sm font-bold text-[#8b95a7] flex items-center gap-1.5">
             <CalendarClock size={16} /> موعد المكالمة / المتابعة القادمة
           </label>
           <input 
             type="datetime-local" 
             value={followUpDate}
             onChange={e => setFollowUpDate(e.target.value)}
-            className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+            className="w-full bg-[#0d1117] border border-[#222a36] text-white rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
           />
         </div>
 
         {/* Note Textarea */}
         <div className="space-y-2">
-          <label className="text-sm font-bold text-slate-500">ملاحظة المتابعة الأخيرة (يقرأها الذكاء الاصطناعي لفهم السياق)</label>
+          <label className="text-sm font-bold text-[#8b95a7]">ملاحظة المتابعة الأخيرة (يقرأها الذكاء الاصطناعي لفهم السياق)</label>
           <textarea 
             rows={5}
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder="مثال: العميل طلب مهلة ليوم الخميس القادم لتدبير المبلغ..."
-            className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed" 
+            className="w-full bg-[#0d1117] border border-[#222a36] text-white rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed" 
           />
         </div>
 

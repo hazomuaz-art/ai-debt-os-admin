@@ -91,8 +91,8 @@ export default function QuickActionsPanel({
   }
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
-      <h2 className="text-sm font-bold text-slate-500 mb-4">إجراءات سريعة (Quick Actions)</h2>
+    <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] mb-6">
+      <h2 className="text-sm font-bold text-[#8b95a7] mb-4">إجراءات سريعة (Quick Actions)</h2>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Promise to Pay */}
@@ -140,32 +140,32 @@ export default function QuickActionsPanel({
       {/* Promise Modal */}
       {showPromiseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={submitPromise} className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
-            <h3 className="font-bold text-[#0e7a54] text-lg mb-4 flex items-center gap-2">
+          <form onSubmit={submitPromise} className="bg-[#151a23] rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+            <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
               <Handshake className="text-emerald-500" />
               تسجيل وعد بالسداد
             </h3>
             
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500">تاريخ الوعد</label>
+              <label className="text-sm font-bold text-[#8b95a7]">تاريخ الوعد</label>
               <input 
                 type="date" 
                 required
                 value={promiseDate}
                 onChange={e => setPromiseDate(e.target.value)}
-                className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                className="w-full bg-[#0d1117] border-none text-white rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
               />
             </div>
             
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500">المبلغ المتفق عليه (SAR)</label>
+              <label className="text-sm font-bold text-[#8b95a7]">المبلغ المتفق عليه (SAR)</label>
               <input 
                 type="number" 
                 required
                 min={1}
                 value={promiseAmount}
                 onChange={e => setPromiseAmount(e.target.value)}
-                className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                className="w-full bg-[#0d1117] border-none text-white rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
               />
             </div>
 
@@ -173,7 +173,7 @@ export default function QuickActionsPanel({
               <button 
                 type="button" 
                 onClick={() => setShowPromiseModal(false)}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors text-sm"
+                className="flex-1 bg-[#222a36] hover:bg-slate-200 text-slate-200 font-bold py-3 rounded-xl transition-colors text-sm"
               >
                 إلغاء
               </button>
@@ -192,8 +192,8 @@ export default function QuickActionsPanel({
       {/* Dispute Modal */}
       {showDisputeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0e7a54]/40 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={submitDispute} className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
-            <h3 className="font-bold text-[#0e7a54] text-lg mb-4 flex items-center gap-2">
+          <form onSubmit={submitDispute} className="bg-[#151a23] rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+            <h3 className="font-bold text-white text-lg mb-4 flex items-center gap-2">
               <ShieldAlert className="text-rose-500" />
               تسجيل اعتراض (Dispute)
             </h3>
@@ -203,14 +203,14 @@ export default function QuickActionsPanel({
             </p>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-500">سبب الاعتراض / ملاحظات</label>
+              <label className="text-sm font-bold text-[#8b95a7]">سبب الاعتراض / ملاحظات</label>
               <textarea 
                 required
                 rows={4}
                 value={disputeReason}
                 onChange={e => setDisputeReason(e.target.value)}
                 placeholder="مثال: العميل يدعي سداد المبلغ قبل شهر..."
-                className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none resize-none" 
+                className="w-full bg-[#0d1117] border-none text-white rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none resize-none" 
               />
             </div>
 
@@ -218,7 +218,7 @@ export default function QuickActionsPanel({
               <button 
                 type="button" 
                 onClick={() => setShowDisputeModal(false)}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors text-sm"
+                className="flex-1 bg-[#222a36] hover:bg-slate-200 text-slate-200 font-bold py-3 rounded-xl transition-colors text-sm"
               >
                 إلغاء
               </button>

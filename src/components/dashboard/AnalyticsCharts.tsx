@@ -60,8 +60,8 @@ interface Props {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-4 text-sm shadow-xl font-bold text-[#0e7a54] text-start" >
-      {label && <p className="text-slate-400 mb-2 border-b border-slate-50 pb-2">{label}</p>}
+    <div className="bg-[#151a23] border border-[#222a36] rounded-xl p-4 text-sm shadow-xl font-bold text-white text-start" >
+      {label && <p className="text-[#5f6b7e] mb-2 border-b border-slate-50 pb-2">{label}</p>}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }} className="flex justify-between gap-4 mt-1">
           <span>{p.name === 'Collected' ? 'المحصل:' : p.name === 'New Debts' ? 'الديون الجديدة:' : p.name}</span>
@@ -81,7 +81,7 @@ function PieTooltip({ active, payload }: any) {
   const entry = payload[0]
   const name = STATUS_ARABIC[entry.name] || PRIORITY_ARABIC[entry.name] || entry.name
   return (
-    <div className="bg-white border border-slate-100 rounded-xl p-3 text-sm shadow-xl font-bold text-start" >
+    <div className="bg-[#151a23] border border-[#222a36] rounded-xl p-3 text-sm shadow-xl font-bold text-start" >
       <p style={{ color: entry.payload.fill }}>{name}: <span className="font-mono">{entry.value}</span></p>
     </div>
   )
@@ -97,29 +97,29 @@ export default function AnalyticsCharts({
   return (
     <div className="space-y-6" >
       {/* Monthly Collection Bar Chart */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-[#0e7a54] mb-6">التحصيلات الشهرية (بالريال السعودي)</h2>
+      <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+        <h2 className="text-lg font-bold text-white mb-6">التحصيلات الشهرية (بالريال السعودي)</h2>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 16, bottom: 4 }} style={{ direction: 'ltr' }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-            <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false}
+            <CartesianGrid strokeDasharray="3 3" stroke="#222a36" vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false}
               tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1a212c' }} />
             <Bar dataKey="collected" name="Collected" fill="#3b82f6" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* New Debts per Month */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-[#0e7a54] mb-6">الديون الجديدة المضافة شهرياً</h2>
+      <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+        <h2 className="text-lg font-bold text-white mb-6">الديون الجديدة المضافة شهرياً</h2>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }} style={{ direction: 'ltr' }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-            <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#222a36" vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1a212c' }} />
             <Bar dataKey="newDebts" name="New Debts" fill="#10b981" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -128,8 +128,8 @@ export default function AnalyticsCharts({
       {/* Pie charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Status Breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">توزيع حالات الديون</h2>
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+          <h2 className="text-lg font-bold text-white mb-4">توزيع حالات الديون</h2>
           {statusChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -150,19 +150,19 @@ export default function AnalyticsCharts({
                 </Pie>
                 <Tooltip content={<PieTooltip />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-600 text-xs font-bold me-1">{STATUS_ARABIC[value] || value.replace(/_/g, ' ')}</span>}
+                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1">{STATUS_ARABIC[value] || value.replace(/_/g, ' ')}</span>}
                   wrapperStyle={{ direction: 'rtl' }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16 font-bold text-sm">لا توجد بيانات للديون حتى الآن</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لا توجد بيانات للديون حتى الآن</p>
           )}
         </div>
 
         {/* Priority Breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">توزيع الأهمية (الأولويات)</h2>
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+          <h2 className="text-lg font-bold text-white mb-4">توزيع الأهمية (الأولويات)</h2>
           {priorityChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -183,19 +183,19 @@ export default function AnalyticsCharts({
                 </Pie>
                 <Tooltip content={<PieTooltip />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-600 text-xs font-bold me-1">{PRIORITY_ARABIC[value] || value}</span>}
+                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1">{PRIORITY_ARABIC[value] || value}</span>}
                   wrapperStyle={{ direction: 'rtl' }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16 font-bold text-sm">لا توجد بيانات للأولويات</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لا توجد بيانات للأولويات</p>
           )}
         </div>
 
         {/* Channel Breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">قنوات التواصل المستخدمة</h2>
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+          <h2 className="text-lg font-bold text-white mb-4">قنوات التواصل المستخدمة</h2>
           {channelChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -215,31 +215,31 @@ export default function AnalyticsCharts({
                 </Pie>
                 <Tooltip content={<PieTooltip />} />
                 <Legend
-                  formatter={(value) => <span className="text-slate-600 text-xs font-bold me-1 capitalize">{value}</span>}
+                  formatter={(value) => <span className="text-slate-300 text-xs font-bold me-1 capitalize">{value}</span>}
                   wrapperStyle={{ direction: 'rtl' }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16 font-bold text-sm">لم يتم إرسال أي رسائل بعد</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لم يتم إرسال أي رسائل بعد</p>
           )}
         </div>
 
         {/* AI Risk Classification */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-[#0e7a54] mb-4">تصنيف الذكاء الاصطناعي للمخاطر</h2>
+        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
+          <h2 className="text-lg font-bold text-white mb-4">تصنيف الذكاء الاصطناعي للمخاطر</h2>
           {riskChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={riskChartData} layout="vertical" margin={{ left: 16, right: 16 }} style={{ direction: 'ltr' }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={80} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#222a36" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" tick={{ fill: '#8b95a7', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={80} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1a212c' }} />
                 <Bar dataKey="value" name="Debts" fill="#8b5cf6" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-slate-400 text-center py-16 font-bold text-sm">لا يوجد تقييم مخاطر مسجل بعد</p>
+            <p className="text-[#5f6b7e] text-center py-16 font-bold text-sm">لا يوجد تقييم مخاطر مسجل بعد</p>
           )}
         </div>
       </div>

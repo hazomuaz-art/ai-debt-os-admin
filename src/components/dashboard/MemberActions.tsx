@@ -74,7 +74,7 @@ export function MemberActions({
   }
 
   return (
-    <div className="flex items-center justify-between w-full mt-4 pt-4 border-t border-slate-100">
+    <div className="flex items-center justify-between w-full mt-4 pt-4 border-t border-[#222a36]">
       
       {/* Active Status Toggle */}
       <div className="flex items-center gap-2">
@@ -82,10 +82,10 @@ export function MemberActions({
           onClick={toggleStatus}
           disabled={loading || isSelf}
           className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
-            isSelf ? 'opacity-50 cursor-not-allowed bg-slate-50 text-slate-400' :
+            isSelf ? 'opacity-50 cursor-not-allowed bg-[#222a36] text-[#5f6b7e]' :
             isActive 
               ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 group' 
-              : 'bg-white text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
+              : 'bg-[#151a23] text-[#8b95a7] border-[#222a36] hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
           }`}
         >
           <Power size={14} className={isActive && !isSelf ? 'group-hover:hidden' : ''} />
@@ -107,15 +107,15 @@ export function MemberActions({
             onClick={() => !isSelf && setEditingRole(true)}
             disabled={isSelf}
             className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-              isSelf ? 'text-slate-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+              isSelf ? 'text-[#5f6b7e] cursor-not-allowed' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
             }`}
           >
             <Settings2 size={14} /> تعديل الصلاحية
           </button>
         ) : (
-          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 absolute start-0 bottom-0 min-w-max z-10 animate-in fade-in zoom-in-95">
+          <div className="flex items-center gap-1 bg-[#222a36] p-1 rounded-lg border border-[#222a36] absolute start-0 bottom-0 min-w-max z-10 animate-in fade-in zoom-in-95">
             <select 
-              className="text-xs border-none bg-white rounded-md py-1 px-2 font-bold text-slate-700 focus:ring-1 focus:ring-blue-500"
+              className="text-xs border-none bg-[#151a23] rounded-md py-1 px-2 font-bold text-slate-200 focus:ring-1 focus:ring-blue-500"
               defaultValue={currentRole}
               onChange={(e) => updateRole(e.target.value)}
               disabled={loading}
@@ -127,7 +127,7 @@ export function MemberActions({
             </select>
             <button 
               onClick={() => setEditingRole(false)}
-              className="text-slate-400 hover:text-slate-600 p-1"
+              className="text-[#5f6b7e] hover:text-slate-300 p-1"
             >
               <XCircle size={14} />
             </button>
@@ -142,7 +142,7 @@ export function MemberActions({
           disabled={loading || isSelf}
           title="حذف الموظف نهائياً"
           className={`flex items-center justify-center p-2 rounded-lg border transition-all ${
-            isSelf ? 'opacity-0 cursor-default' : 'text-rose-500 bg-white border-rose-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
+            isSelf ? 'opacity-0 cursor-default' : 'text-rose-500 bg-[#151a23] border-rose-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
           }`}
         >
           <Trash2 size={16} />

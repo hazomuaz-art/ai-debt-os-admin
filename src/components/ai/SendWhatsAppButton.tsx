@@ -115,21 +115,21 @@ export function SendWhatsAppButton(props: Props) {
 
       {showModal && (
         <div className="fixed inset-0 bg-[#0e7a54]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" >
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+          <div className="bg-[#151a23] rounded-2xl p-6 w-full max-w-md shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-[#0e7a54] flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <MessageSquare className="text-emerald-500" /> إرسال رسالة واتساب
               </h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:bg-slate-100 p-1 rounded-md transition-colors"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowModal(false)} className="text-[#5f6b7e] hover:bg-[#222a36] p-1 rounded-md transition-colors"><X className="w-5 h-5" /></button>
             </div>
             {!isActionProps(props) && (
-              <p className="text-sm text-slate-500 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                المرسل إليه: <strong className="text-[#0e7a54]">{props.customerName}</strong> <br/>
+              <p className="text-sm text-[#8b95a7] mb-4 bg-[#222a36] p-3 rounded-lg border border-[#222a36]">
+                المرسل إليه: <strong className="text-white">{props.customerName}</strong> <br/>
                 <span className="font-mono text-xs mt-1 inline-block" dir="ltr">{props.phone || 'رقم الهاتف غير مسجل'}</span>
               </p>
             )}
             <textarea
-              className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none mb-4 resize-none"
+              className="w-full bg-[#0d1117] border-none text-white rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none mb-4 resize-none"
               rows={5}
               placeholder="اكتب رسالتك هنا..."
               value={customMessage}
@@ -137,7 +137,7 @@ export function SendWhatsAppButton(props: Props) {
             />
             {status === 'error' && <p className="text-rose-500 text-sm font-bold mb-3">فشل الإرسال. تأكد من إعدادات الواتساب والرقم.</p>}
             <div className="flex gap-3">
-              <button onClick={() => setShowModal(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors text-sm">إلغاء</button>
+              <button onClick={() => setShowModal(false)} className="flex-1 bg-[#222a36] hover:bg-slate-200 text-slate-200 font-bold py-3 rounded-xl transition-colors text-sm">إلغاء</button>
               <button onClick={handleDirectSend} disabled={loading || !customMessage.trim()} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                 إرسال

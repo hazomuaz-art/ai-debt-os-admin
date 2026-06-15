@@ -66,7 +66,7 @@ export function GenerateActionsButton() {
       >
         {loading ? (
           <>
-            <span className="w-3.5 h-3.5 border-2 border-slate-200 border-t-white rounded-full animate-spin" />
+            <span className="w-3.5 h-3.5 border-2 border-[#222a36] border-t-white rounded-full animate-spin" />
             Generating…
           </>
         ) : (

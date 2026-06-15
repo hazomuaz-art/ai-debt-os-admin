@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useCallback } from 'react'
 import { Search, Filter, X } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 export default function DebtFilters({
   collectors,
@@ -15,6 +16,8 @@ export default function DebtFilters({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { t } = useTranslation()
+  const f = t.pages.debts
 
   const [q, setQ] = useState(searchParams.get('q') || '')
   
@@ -53,18 +56,20 @@ export default function DebtFilters({
 
   const hasActiveFilters = currentStatus || currentCreditor || currentProduct || currentCollector || q
 
+  const selectCls = "bg-[#0d1117] border border-[#222a36] text-slate-200 rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-[#10b981] outline-none font-bold"
+
   return (
-    <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+    <div className="bg-[#151a23] p-4 rounded-2xl border border-[#222a36] space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-[#0e7a54] text-sm flex items-center gap-2">
-          <Filter size={16} className="text-blue-500" /> الفرز والتصفية المتقدمة
+        <h3 className="font-bold text-white text-sm flex items-center gap-2">
+          <Filter size={16} className="text-[#10b981]" /> {f.f_title}
         </h3>
         {hasActiveFilters && (
-          <button 
+          <button
             onClick={clearFilters}
-            className="text-xs font-bold text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+            className="text-xs font-bold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
           >
-            <X size={12} /> مسح الفلاتر
+            <X size={12} /> {f.f_clear}
           </button>
         )}
       </div>
@@ -74,66 +79,44 @@ export default function DebtFilters({
         <form onSubmit={handleSearch} className="relative lg:col-span-1">
           <input
             type="text"
-            placeholder="بحث برقم المرجع أو العقد..."
+            placeholder={f.f_search}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl ps-10 pe-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium"
+            className="w-full bg-[#0d1117] border border-[#222a36] text-slate-200 rounded-xl ps-10 pe-4 py-2.5 text-xs focus:ring-2 focus:ring-[#10b981] outline-none placeholder:text-[#5f6b7e] font-medium"
           />
-          <button type="submit" className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500">
+          <button type="submit" className="absolute start-3 top-1/2 -translate-y-1/2 text-[#5f6b7e] hover:text-[#10b981]">
             <Search size={16} />
           </button>
         </form>
 
-        {/* Creditor / Client Filter */}
-        <select 
-          value={currentCreditor}
-          onChange={(e) => handleFilterChange('creditor', e.target.value)}
-          className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-        >
-          <option value="">كل الشركات / الجهات</option>
-          {creditors.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
+        {/* Creditor Filter */}
+        <select value={currentCreditor} onChange={(e) => handleFilterChange('creditor', e.target.value)} className={selectCls}>
+          <option value="">{f.f_all_creditors}</option>
+          {creditors.map(c => (<option key={c} value={c}>{c}</option>))}
         </select>
 
         {/* Product Type Filter */}
-        <select 
-          value={currentProduct}
-          onChange={(e) => handleFilterChange('product', e.target.value)}
-          className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-        >
-          <option value="">كل أنواع المنتجات</option>
-          {productTypes.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+        <select value={currentProduct} onChange={(e) => handleFilterChange('product', e.target.value)} className={selectCls}>
+          <option value="">{f.f_all_products}</option>
+          {productTypes.map(p => (<option key={p} value={p}>{p}</option>))}
         </select>
 
         {/* Operational Status Filter */}
-        <select 
-          value={currentStatus}
-          onChange={(e) => handleFilterChange('status', e.target.value)}
-          className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-        >
-          <option value="">كل الحالات التشغيلية</option>
-          <option value="active">جديد / نشط</option>
-          <option value="in_progress">قيد المتابعة</option>
-          <option value="promised">وعد بالسداد</option>
-          <option value="disputed">اعتراض / مراجعة</option>
-          <option value="human_handoff">تدخل بشري</option>
+        <select value={currentStatus} onChange={(e) => handleFilterChange('status', e.target.value)} className={selectCls}>
+          <option value="">{f.f_all_statuses}</option>
+          <option value="active">{f.f_s_active}</option>
+          <option value="in_progress">{f.f_s_in_progress}</option>
+          <option value="promised">{f.f_s_promised}</option>
+          <option value="disputed">{f.f_s_disputed}</option>
+          <option value="human_handoff">{f.f_s_handoff}</option>
         </select>
 
         {/* Collector Filter */}
         {collectors.length > 0 && (
-          <select 
-            value={currentCollector}
-            onChange={(e) => handleFilterChange('collector', e.target.value)}
-            className="bg-[#e7f6ef] border-none text-[#0e7a54] rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-          >
-            <option value="">كل المحصلين</option>
-            {collectors.map(c => (
-              <option key={c.id} value={c.id}>{c.full_name}</option>
-            ))}
-            <option value="unassigned">غير مسند</option>
+          <select value={currentCollector} onChange={(e) => handleFilterChange('collector', e.target.value)} className={selectCls}>
+            <option value="">{f.f_all_collectors}</option>
+            {collectors.map(c => (<option key={c.id} value={c.id}>{c.full_name}</option>))}
+            <option value="unassigned">{f.f_unassigned}</option>
           </select>
         )}
 

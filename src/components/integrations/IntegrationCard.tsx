@@ -35,7 +35,7 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
 function StatusBadge({ enabled, lastError }: { enabled: boolean; lastError: string | null }) {
   if (!enabled) {
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#222a36] text-[#8b95a7] border border-[#222a36]">
         غير مفعل
       </span>
     )
@@ -67,13 +67,13 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       className={[
         'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors duration-200 focus:outline-none',
         'disabled:opacity-40 disabled:cursor-not-allowed',
-        checked ? 'bg-[#0e7a54] border-[#0e7a54]' : 'bg-slate-200 border-slate-200',
+        checked ? 'bg-[#0e7a54] border-[#0e7a54]' : 'bg-slate-200 border-[#222a36]',
       ].join(' ')}
       dir="ltr"
     >
       <span
         className={[
-          'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm',
+          'pointer-events-none inline-block h-5 w-5 rounded-full bg-[#151a23] shadow-sm',
           'transition-transform duration-200 transform',
           checked ? 'translate-x-5' : 'translate-x-0',
         ].join(' ')}
@@ -166,19 +166,19 @@ export function IntegrationCard({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-50 bg-[#fbfdfd]">
+      <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-50 bg-[#0d1117]">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#f6f8fa] text-[#0e7a54] rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-[#0d1117] text-white rounded-xl flex items-center justify-center shrink-0">
             {icon}
           </div>
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="font-bold text-[#0e7a54] text-lg">{label}</h3>
+              <h3 className="font-bold text-white text-lg">{label}</h3>
               <StatusBadge enabled={enabled} lastError={lastError} />
             </div>
-            <p className="text-slate-500 text-sm">{description}</p>
+            <p className="text-[#8b95a7] text-sm">{description}</p>
           </div>
         </div>
         <Toggle checked={enabled} onChange={setEnabled} />
@@ -188,9 +188,9 @@ export function IntegrationCard({
       <div className="p-6 space-y-5 flex-1">
         {fields.map(field => (
           <div key={field.key}>
-            <label className="block text-sm font-bold text-[#0e7a54] mb-2">
+            <label className="block text-sm font-bold text-white mb-2">
               {field.label}
-              {field.hint && <span className="text-slate-400 font-normal me-2">— {field.hint}</span>}
+              {field.hint && <span className="text-[#5f6b7e] font-normal me-2">— {field.hint}</span>}
             </label>
             <input
               type={field.type ?? 'text'}
@@ -198,7 +198,7 @@ export function IntegrationCard({
               onChange={e => handleField(field.key, e.target.value)}
               placeholder={field.placeholder}
               autoComplete={field.type === 'password' ? 'new-password' : 'off'}
-              className="w-full bg-[#e7f6ef] border border-slate-200 text-[#0e7a54] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#0e7a54] focus:ring-1 focus:ring-[#0e7a54] transition-colors font-mono"
+              className="w-full bg-[#0d1117] border border-[#222a36] text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#0e7a54] focus:ring-1 focus:ring-[#0e7a54] transition-colors font-mono"
               dir="ltr"
             />
           </div>
@@ -213,12 +213,12 @@ export function IntegrationCard({
       </div>
       
       {/* Footer Actions */}
-      <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+      <div className="p-6 bg-[#222a36] border-t border-[#222a36] flex items-center justify-between">
         <button
           type="button"
           onClick={handleTest}
           disabled={testState === 'testing' || !isConfigured}
-          className="px-4 py-2 text-[#0e7a54] bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
+          className="px-4 py-2 text-white bg-[#151a23] border border-[#222a36] hover:bg-[#1a212c] font-bold rounded-xl text-sm transition-colors disabled:opacity-50"
         >
           {testState === 'testing' ? 'جاري الفحص...' : 'فحص الاتصال'}
         </button>
