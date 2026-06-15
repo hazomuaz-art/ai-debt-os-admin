@@ -23,7 +23,7 @@ const content = {
         "ghcr.io/github/github-mcp-server"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${process.env.GITHUB_PERSONAL_ACCESS_TOKEN || ""}"
       }
     },
     "supabase": {
