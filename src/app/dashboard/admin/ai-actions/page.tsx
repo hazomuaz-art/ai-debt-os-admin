@@ -5,6 +5,7 @@ import { GenerateActionsButton } from '@/components/ai/GenerateActionsButton'
 import { CompleteActionButton } from '@/components/ai/CompleteActionButton'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import { BrainCircuit, CheckCircle2, Clock, MessageSquare, PhoneCall, Mail, UserCheck, AlertTriangle } from 'lucide-react'
+import { getServerTranslation } from '@/lib/i18n/server'
 
 export default async function AIActionsPage() {
   const supabase = createClient()
@@ -40,34 +41,34 @@ export default async function AIActionsPage() {
 
   const completedCount = (actions ?? []).filter(a => a.status === 'completed').length
 
-  const PRIORITY_ARABIC: Record<string, string> = {
-    critical: 'حرج جداً',
-    high: 'عالي',
-    medium: 'متوسط',
-    low: 'منخفض'
+  const { t, dir, locale } = getServerTranslation()
+  const a = t.pages.ai_actions
+
+  const PRIORITY_LABEL: Record<string, string> = {
+    critical: a.p_critical, high: a.p_high, medium: a.p_medium, low: a.p_low,
   }
 
   const PRIORITY_STYLES: Record<string, string> = {
-    critical: 'bg-rose-50 text-rose-600 border-rose-200',
-    high: 'bg-orange-50 text-orange-600 border-orange-200',
-    medium: 'bg-amber-50 text-amber-600 border-amber-200',
-    low: 'bg-[#222a36] text-[#8b95a7] border-[#222a36]',
+    critical: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    high: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+    medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    low: 'bg-[#222a36] text-[#8b95a7] border-[#2c3543]',
   }
 
   const getIconForAction = (type: string) => {
     switch (type) {
-      case 'call': return <PhoneCall size={20} className="text-purple-500" />
-      case 'whatsapp': return <MessageSquare size={20} className="text-emerald-500" />
-      case 'email': return <Mail size={20} className="text-blue-500" />
-      case 'visit': return <UserCheck size={20} className="text-amber-500" />
-      case 'legal': return <AlertTriangle size={20} className="text-rose-500" />
+      case 'call': return <PhoneCall size={20} className="text-purple-400" />
+      case 'whatsapp': return <MessageSquare size={20} className="text-emerald-400" />
+      case 'email': return <Mail size={20} className="text-blue-400" />
+      case 'visit': return <UserCheck size={20} className="text-amber-400" />
+      case 'legal': return <AlertTriangle size={20} className="text-rose-400" />
       default: return <BrainCircuit size={20} className="text-[#5f6b7e]" />
     }
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
-      
+    <div dir={dir} className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
+
       {/* Header */}
       <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
@@ -75,9 +76,12 @@ export default async function AIActionsPage() {
             <BrainCircuit size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">خطة عمل الذكاء الاصطناعي (AI Action Plan)</h1>
+            <h1 className="text-2xl font-bold text-white mb-1">{a.title}</h1>
             <p className="text-[#8b95a7] text-sm">
-              إجراءات وتوصيات اليوم ({new Date().toLocaleDateString('ar-SA')}) — تم إنجاز {completedCount} من أصل {(actions ?? []).length}
+              {a.subtitle
+                .replace('{date}', new Date().toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-GB'))
+                .replace('{done}', String(completedCount))
+                .replace('{total}', String((actions ?? []).length))}
             </p>
           </div>
         </div>
@@ -87,8 +91,8 @@ export default async function AIActionsPage() {
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {(['critical', 'high', 'medium', 'low'] as const).map(priority => (
-          <div key={priority} className={`bg-[#151a23] rounded-2xl border p-5 flex flex-col justify-between hover:shadow-md transition-shadow ${PRIORITY_STYLES[priority].replace('bg-', 'border-').split(' ')[2] || 'border-[#222a36]'}`}>
-            <div className="text-[#8b95a7] text-sm font-bold mb-2">أولوية: {PRIORITY_ARABIC[priority]}</div>
+          <div key={priority} className="bg-[#151a23] rounded-2xl border border-[#222a36] p-5 flex flex-col justify-between">
+            <div className="text-[#8b95a7] text-sm font-bold mb-2">{a.priority}: {PRIORITY_LABEL[priority]}</div>
             <div className={`text-3xl font-bold font-mono ${PRIORITY_STYLES[priority].split(' ')[1]}`}>
               {priorityCounts[priority] ?? 0}
             </div>
@@ -103,8 +107,8 @@ export default async function AIActionsPage() {
             <div className="w-20 h-20 bg-[#222a36] text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
               <BrainCircuit size={40} />
             </div>
-            <div className="font-bold text-xl text-white mb-2">لا توجد إجراءات مجدولة لليوم</div>
-            <p className="text-[#8b95a7] text-sm mb-6">اضغط على زر (توليد الخطة) ليقوم الذكاء الاصطناعي بتحليل المحفظة واقتراح المهام.</p>
+            <div className="font-bold text-xl text-white mb-2">{a.none_title}</div>
+            <p className="text-[#8b95a7] text-sm mb-6">{a.none_sub}</p>
             <GenerateActionsButton />
           </div>
         ) : (actions ?? []).map((action: {
@@ -123,29 +127,29 @@ export default async function AIActionsPage() {
               
               <div className="flex items-start gap-4 flex-1 w-full">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                  action.action_type === 'whatsapp' ? 'bg-emerald-50' :
-                  action.action_type === 'call' ? 'bg-purple-50' :
-                  action.action_type === 'email' ? 'bg-blue-50' : 'bg-[#222a36]'
+                  action.action_type === 'whatsapp' ? 'bg-emerald-500/10' :
+                  action.action_type === 'call' ? 'bg-purple-500/10' :
+                  action.action_type === 'email' ? 'bg-blue-500/10' : 'bg-[#222a36]'
                 }`}>
                   {getIconForAction(action.action_type)}
                 </div>
-                
+
                 <div className="flex-1">
                   <div className="flex items-center gap-3 flex-wrap mb-2">
-                    <span className="font-bold text-white text-lg">{(action.customer as {full_name?: string} | null)?.full_name ?? 'عميل غير معروف'}</span>
+                    <span className="font-bold text-white text-lg">{(action.customer as {full_name?: string} | null)?.full_name ?? t.ui.unknown_customer}</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${PRIORITY_STYLES[action.priority] ?? PRIORITY_STYLES.low}`}>
-                      أولوية {PRIORITY_ARABIC[action.priority] ?? action.priority}
+                      {a.priority} {PRIORITY_LABEL[action.priority] ?? action.priority}
                     </span>
                     <span className="bg-[#0b0e14] text-[#8b95a7] text-xs font-bold px-2 py-1 rounded-md font-mono">
-                      ملف: {(action.debt as {reference_number?: string} | null)?.reference_number}
+                      {a.file_label} {(action.debt as {reference_number?: string} | null)?.reference_number}
                     </span>
                   </div>
-                  
-                  <div className="text-slate-300 text-sm font-medium leading-relaxed mb-3">السبب: {action.reason}</div>
-                  
+
+                  <div className="text-slate-300 text-sm font-medium leading-relaxed mb-3">{a.reason_label} {action.reason}</div>
+
                   {action.suggested_message && (
                     <div className="p-4 bg-[#0d1117] rounded-xl border border-[#222a36] mb-3 relative">
-                      <div className="absolute top-0 end-4 -translate-y-1/2 bg-[#151a23] px-2 text-xs font-bold text-blue-500 border border-[#222a36] rounded-md">الرسالة المقترحة</div>
+                      <div className="absolute top-0 end-4 -translate-y-1/2 bg-[#151a23] px-2 text-xs font-bold text-blue-400 border border-[#222a36] rounded-md">{a.suggested_message}</div>
                       <div className="text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-wrap">{action.suggested_message}</div>
                     </div>
                   )}
@@ -156,7 +160,7 @@ export default async function AIActionsPage() {
                     )}
                     {(action.debt as {current_balance?: number; currency?: string} | null)?.current_balance && (
                       <span className="flex items-center gap-1.5 font-mono">
-                        المبلغ: {formatCurrency((action.debt as {current_balance: number; currency: string}).current_balance, (action.debt as {currency: string}).currency)}
+                        {a.amount_label} {formatCurrency((action.debt as {current_balance: number; currency: string}).current_balance, (action.debt as {currency: string}).currency)}
                       </span>
                     )}
                   </div>
@@ -178,8 +182,8 @@ export default async function AIActionsPage() {
                     <CompleteActionButton actionId={action.id} />
                   </>
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl border border-emerald-100 text-sm">
-                    <CheckCircle2 size={18} /> تم التنفيذ بنجاح
+                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 font-bold rounded-xl border border-emerald-500/20 text-sm">
+                    <CheckCircle2 size={18} /> {a.done_success}
                   </div>
                 )}
               </div>
