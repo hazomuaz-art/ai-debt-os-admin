@@ -17,10 +17,8 @@ export default async function MessagesPage() {
     .from('messages')
     .select(`
       id, content, direction, channel, status, sent_at, created_at,
-      debt:debts(
-        reference_number, current_balance, currency,
-        customer:customers(id, full_name, phone, whatsapp, ai_paused)
-      )
+      customer:customers(id, full_name, phone, whatsapp, ai_paused),
+      debt:debts(reference_number, current_balance, currency)
     `)
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })

@@ -15,17 +15,17 @@ interface ChatMessage {
   status: string
   sent_at: string
   created_at: string
+  customer?: {
+    id: string
+    full_name: string
+    phone: string
+    whatsapp?: string
+    ai_paused?: boolean
+  }
   debt?: {
-    reference_number: string
+    reference_number?: string
     current_balance?: number
     currency?: string
-    customer?: {
-      id: string
-      full_name: string
-      phone: string
-      whatsapp?: string
-      ai_paused?: boolean
-    }
   }
 }
 
@@ -56,13 +56,16 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
     const map = new Map<string, { customer: any, debt: any, messages: ChatMessage[] }>()
     
     messages.forEach(msg => {
-      const cust = msg.debt?.customer
+      const cust = msg.customer
       if (!cust) return
-      
+
       if (!map.has(cust.id)) {
-        map.set(cust.id, { customer: cust, debt: msg.debt, messages: [] })
+        map.set(cust.id, { customer: cust, debt: msg.debt ?? null, messages: [] })
       }
-      map.get(cust.id)!.messages.push(msg)
+      const entry = map.get(cust.id)!
+      // keep the most complete debt info we encounter for this customer
+      if (msg.debt && (msg.debt.current_balance != null || msg.debt.reference_number)) entry.debt = msg.debt
+      entry.messages.push(msg)
     })
 
     // Sort messages inside each customer and sort customers by latest message
