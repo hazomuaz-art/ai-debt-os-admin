@@ -229,6 +229,23 @@ function buildCaseFile(ctx: any): string {
     agreed.forEach(a => lines.push(`- ${a}`))
   }
 
+  // 3b) Payment method (give to the customer when they agree to pay)
+  const acc = ctx.collection_account
+  if (acc) {
+    const payLines: string[] = []
+    if (acc.method_type === 'sadad_biller' && acc.biller_code) {
+      payLines.push(`طريقة السداد المعتمدة: سداد المفوتر "${acc.biller_name ?? ''}" رمز ${acc.biller_code}. وجّه العميل يسدد عبر تطبيق بنكه بهذا المفوتر.`)
+    } else if (acc.iban) {
+      payLines.push(`طريقة السداد المعتمدة: تحويل بنكي على الآيبان ${acc.iban}${acc.account_name ? ` باسم ${acc.account_name}` : ''}${acc.bank_name ? ` - ${acc.bank_name}` : ''}. اطلب من العميل إرسال صورة الإيصال بعد التحويل.`)
+    }
+    if (acc.instructions) payLines.push(`تعليمات إضافية: ${acc.instructions}`)
+    if (payLines.length) {
+      lines.push('')
+      lines.push('【 طريقة الدفع (أعطها للعميل فقط عند اتفاقه على السداد) 】')
+      payLines.forEach(l => lines.push(`- ${l}`))
+    }
+  }
+
   // 4) Dashboard notes (collector / admin notes added in the panel)
   const notes: string[] = []
   if (ctx.customer?.notes) notes.push(`ملاحظة على العميل: ${ctx.customer.notes}`)
@@ -389,7 +406,8 @@ ${intentPrompts[intent]}
 3. لا تخترع أي رقم/اسم/تاريخ غير موجود في ملف القضية. إن لم تجد المعلومة، قل إنك ستراجع الإدارة.
 4. لا تكرر ذكر المبلغ إلا إذا كان هذا أول تعريف بالمديونية.
 5. تكلم كإنسان: لا "عزيزي العميل"، لا "كيف أقدر أخدمك"، لا عبارات آلية.
-6. الرد جملة أو جملتين كحد أقصى. لو العميل أنهى النقاش أو ودّعك، اختر action=silent.
+6. لو وافق العميل على السداد أو سأل "كيف أدفع/وين أحوّل": أعطه طريقة الدفع من "ملف القضية" (الآيبان أو المفوتر) واطلب منه إرسال صورة الإيصال بعد التحويل. لا تخترع آيباناً غير الموجود.
+7. الرد جملة أو جملتين كحد أقصى. لو العميل أنهى النقاش أو ودّعك، اختر action=silent.
 
 ═══════════════ صيغة الإخراج ═══════════════
 أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:

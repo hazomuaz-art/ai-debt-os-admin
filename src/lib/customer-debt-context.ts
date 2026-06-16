@@ -241,7 +241,20 @@ export async function buildCustomerDebtContext(params: {
     ],
   }
 
+  // Collection account (where the customer transfers) — portfolio-specific or company default
+  const portfolioId = (debt as any)?.portfolio_id ?? null
+  const { data: collAccounts } = await supabase
+    .from('collection_accounts')
+    .select('method_type, iban, account_name, bank_name, biller_code, biller_name, instructions, portfolio_id')
+    .eq('company_id', params.company_id)
+    .eq('is_active', true)
+  const collectionAccount =
+    (collAccounts ?? []).find((a: any) => portfolioId && a.portfolio_id === portfolioId) ??
+    (collAccounts ?? []).find((a: any) => !a.portfolio_id) ??
+    (collAccounts ?? [])[0] ?? null
+
   return {
+    collection_account: collectionAccount,
     // ══════════════════════════════════════════════════════════════
     // ⛔ STRICT RULES — MUST be injected into the AI prompt
     // ══════════════════════════════════════════════════════════════

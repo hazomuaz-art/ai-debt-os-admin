@@ -224,6 +224,77 @@ export async function POST(request: NextRequest) {
             })().catch(err => log.error('AI Processing Error', err))
           }
         }
+
+        // ── Image messages = payment receipts → OCR verification ──
+        const imageMsg = evo.data.message?.imageMessage
+        if (phoneRaw && imageMsg && !text) {
+          ;(async () => {
+            const svc = createServiceClient()
+            const { data: customer } = await svc.from('customers')
+              .select('id, company_id, full_name')
+              .or([`whatsapp.eq.${phoneRaw}`, `whatsapp.eq.+${phoneRaw}`, `phone.eq.${phoneRaw}`, `phone.eq.+${phoneRaw}`].join(','))
+              .limit(1).maybeSingle()
+            if (!customer) return
+            const company_id = (customer as any).company_id
+            const customer_id = (customer as any).id
+            const { data: latestDebt } = await svc.from('debts')
+              .select('id, current_balance, currency')
+              .eq('customer_id', customer_id).not('status', 'in', '("settled","written_off")')
+              .order('created_at', { ascending: false }).limit(1).maybeSingle()
+            const debt_id = (latestDebt as any)?.id ?? null
+
+            await svc.from('messages').insert({
+              company_id, customer_id, debt_id, channel: 'whatsapp', direction: 'inbound',
+              content: '📎 إيصال دفع (صورة)', status: 'delivered',
+              whatsapp_message_id: String(evo.data.key.id ?? ''), sent_at: new Date().toISOString(),
+              metadata: { provider: 'evolution', from: phoneRaw, type: 'image' },
+            })
+
+            const { getMediaBase64, sendWhatsAppMessage } = await import('@/lib/whatsapp')
+            const { extractReceipt } = await import('@/lib/receipt-ocr')
+            const b64 = await getMediaBase64({ messageKey: evo.data.key, company_id })
+            if (!b64) return
+            const ocr = await extractReceipt(b64)
+            if (!ocr || !ocr.is_receipt || !ocr.amount) return  // not a receipt → leave for human/agent
+
+            const balance = Number((latestDebt as any)?.current_balance ?? 0)
+            const currency = (latestDebt as any)?.currency ?? 'SAR'
+            const autoVerify = ocr.confidence >= 70 && ocr.amount > 0 && ocr.amount <= balance * 1.2 + 1
+
+            await svc.from('payments').insert({
+              company_id, customer_id, debt_id, amount: ocr.amount, currency,
+              status: autoVerify ? 'completed' : 'pending',
+              payment_date: (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date)) ? ocr.date : new Date().toISOString().slice(0, 10),
+              verification_status: autoVerify ? 'verified' : 'pending',
+              ocr_data: ocr, notes: 'إيصال عبر الواتساب (قراءة آلية)',
+            })
+
+            let reply: string
+            if (autoVerify && debt_id) {
+              const newBal = Math.max(0, balance - ocr.amount)
+              const upd: Record<string, unknown> = { current_balance: newBal }
+              if (newBal <= 0) upd.status = 'settled'
+              await svc.from('debts').update(upd).eq('id', debt_id)
+              reply = `تم استلام إيصالك وتأكيد مبلغ ${ocr.amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
+            } else {
+              reply = 'استلمنا إيصالك، جاري التحقق منه وسنؤكد لك قريباً. شكراً.'
+              await svc.from('system_alerts').insert({
+                company_id, severity: 'info', alert_type: 'payment_review',
+                title: 'إيصال دفع يحتاج مراجعة',
+                message: `العميل ${(customer as any).full_name} أرسل إيصالاً بمبلغ ${ocr.amount ?? '؟'} ${currency} (ثقة ${ocr.confidence}%)`,
+                metadata: { debt_id, customer_id }, is_resolved: false,
+              })
+            }
+            const wr = await sendWhatsAppMessage({ to: phoneRaw, message: reply, company_id })
+            await svc.from('messages').insert({
+              company_id, customer_id, debt_id, channel: 'whatsapp', direction: 'outbound',
+              content: reply, status: wr.status === 'sent' ? 'sent' : 'failed',
+              whatsapp_message_id: wr.message_id || null,
+              metadata: { sender: 'ai', action_type: 'reply', source: 'receipt_verification' },
+              sent_at: new Date().toISOString(),
+            })
+          })().catch(err => log.error('receipt processing error', err))
+        }
       }
 
       return NextResponse.json({ status: 'ok' })

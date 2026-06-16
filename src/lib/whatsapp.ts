@@ -224,6 +224,36 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
   }
 }
 
+// Fetches the base64 of a media (image) message from Evolution API.
+export async function getMediaBase64(args: {
+  instance?: string
+  messageKey: any
+  company_id?: string
+}): Promise<string | null> {
+  let url = process.env.EVOLUTION_API_URL
+  let key = process.env.EVOLUTION_API_KEY
+  let instance = args.instance || process.env.EVOLUTION_INSTANCE_NAME
+  if (args.company_id) {
+    const supabase = createServiceClient()
+    const { data } = await supabase.from('integration_settings').select('config')
+      .eq('company_id', args.company_id).eq('integration_name', 'evolution_whatsapp').eq('enabled', true).maybeSingle()
+    const c = data?.config as Record<string, string> | undefined
+    if (c) { url = c.api_url || url; key = c.api_key || key; instance = c.instance_name || instance }
+  }
+  if (!url || !key || !instance) return null
+  try {
+    const r = await fetch(`${url.replace(/\/$/, '')}/chat/getBase64FromMediaMessage/${instance}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key },
+      body: JSON.stringify({ message: { key: args.messageKey }, convertToMp4: false }),
+    })
+    const d = await r.json().catch(() => ({} as any))
+    return (d?.base64 as string) || null
+  } catch {
+    return null
+  }
+}
+
 export interface ParsedMessage {
   from:      string
   id:        string
