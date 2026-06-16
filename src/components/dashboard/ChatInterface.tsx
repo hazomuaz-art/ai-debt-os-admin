@@ -38,6 +38,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
+  const [sending, setSending] = useState(false)
   const { t } = useTranslation()
   const m = t.pages.messages
   const router = useRouter()
@@ -103,6 +104,33 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
       return new Date(dateString).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
     } catch (e) {
       return ''
+    }
+  }
+
+  async function sendReply() {
+    const text = replyText.trim()
+    const cust = selectedChat?.customer
+    if (!text || !cust?.id || sending) return
+    const phone = cust.whatsapp || cust.phone
+    if (!phone) return
+    setSending(true)
+    try {
+      const r = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, message: text, customer_id: cust.id }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) {
+        setReplyText('')
+        router.refresh()
+      } else {
+        alert(typeof d.error === 'string' && /exists"?\s*:\s*false/i.test(d.error) ? 'هذا الرقم غير مسجّل على واتساب' : (d.error || 'تعذّر الإرسال'))
+      }
+    } catch {
+      alert('تعذّر الإرسال، حاول مرة أخرى')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -231,22 +259,21 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                   <Bot size={20} />
                 </button>
                 <div className="flex-1 relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
                     placeholder={m.write_reply}
-                    className="w-full bg-[#0d1117] border-none text-white rounded-xl ps-12 pe-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
+                    disabled={sending}
+                    className="w-full bg-[#0d1117] border-none text-white rounded-xl ps-12 pe-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] disabled:opacity-60"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && replyText.trim()) {
-                        // Dummy send
-                        setReplyText('')
-                      }
+                      if (e.key === 'Enter') { e.preventDefault(); void sendReply() }
                     }}
                   />
-                  <button 
-                    className="absolute start-2 top-1.5 p-1.5 bg-[#0e7a54] text-white rounded-lg hover:bg-[#152e3b] transition-colors"
-                    onClick={() => setReplyText('')}
+                  <button
+                    className="absolute start-2 top-1.5 p-1.5 bg-[#0e7a54] text-white rounded-lg hover:bg-[#0b8f63] transition-colors disabled:opacity-50"
+                    onClick={() => void sendReply()}
+                    disabled={sending || !replyText.trim()}
                   >
                     <Send size={16} className="transform rotate-180" />
                   </button>
