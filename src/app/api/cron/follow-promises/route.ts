@@ -57,10 +57,26 @@ export async function GET(req: NextRequest) {
         const sendResult = await sendWhatsAppMessage({
           to: phone,
           message: reminderMsg,
+          company_id: promise.company_id,
+        })
+
+        // Always record the outbound message in the conversation (so it shows in the dashboard),
+        // even if delivery failed (status reflects that).
+        await supabase.from('messages').insert({
+          company_id: promise.company_id,
+          customer_id: customer.id,
+          debt_id: debt.id,
+          channel: 'whatsapp',
+          direction: 'outbound',
+          content: reminderMsg,
+          status: sendResult.status === 'sent' ? 'sent' : 'failed',
+          whatsapp_message_id: sendResult.message_id || null,
+          metadata: { sender: 'ai', action_type: 'reply', source: 'promise_followup', error: sendResult.error ?? null },
+          sent_at: new Date().toISOString(),
         })
 
         if (sendResult.status === 'sent') {
-          // Update promise status to 'followed_up' (or we can just leave it pending and add a note, but 'followed_up' prevents spamming)
+          // Mark as followed_up to avoid re-spamming the same promise
           await supabase
             .from('promises')
             .update({ status: 'followed_up' })
