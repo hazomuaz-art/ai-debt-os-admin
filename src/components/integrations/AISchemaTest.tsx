@@ -65,7 +65,7 @@ export function AISchemaTest() {
       <div>
         <div className="font-display text-lg font-semibold">AI Schema Test</div>
         <p className="text-[#8b95a7] text-sm mt-0.5">
-          Paste columns and statuses from any collection system. AI Debt OS will detect fields, project type, and status meanings.
+          Paste columns and statuses from any collection system. AI DEBT OS will detect fields, project type, and status meanings.
         </p>
       </div>
 

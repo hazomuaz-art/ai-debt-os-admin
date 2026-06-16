@@ -68,7 +68,7 @@ export function DashboardFooter() {
         </div>
 
         <div className="text-[11px] text-white/25 text-start">
-          <div>© 2025 AI Debt OS. All rights reserved.</div>
+          <div>© 2025 AI DEBT OS. All rights reserved.</div>
           <div  className="text-white/15">جميع الحقوق محفوظة</div>
         </div>
       </div>

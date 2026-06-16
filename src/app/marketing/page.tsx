@@ -29,7 +29,7 @@ export default function MarketingPage() {
         <div className="relative max-w-7xl mx-auto px-6 py-7">
           <nav className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-black tracking-tight">AI Debt OS</div>
+              <div className="text-2xl font-black tracking-tight">AI DEBT OS</div>
               <div className="text-xs text-white/45">Enterprise Collection Intelligence Platform</div>
             </div>
 
@@ -41,7 +41,7 @@ export default function MarketingPage() {
             </div>
 
             <a
-              href="mailto:hazomuaz@gmail.com?subject=AI Debt OS Demo Request"
+              href="mailto:hazomuaz@gmail.com?subject=AI DEBT OS Demo Request"
               className="rounded-full bg-white text-black px-5 py-2 text-sm font-bold"
             >
               Contact Sales
@@ -59,7 +59,7 @@ export default function MarketingPage() {
               </h1>
 
               <p className="mt-6 text-xl text-slate-600 leading-relaxed">
-                AI Debt OS يساعد شركات التحصيل على رفع الإنتاجية، إدارة آلاف العملاء،
+                AI DEBT OS يساعد شركات التحصيل على رفع الإنتاجية، إدارة آلاف العملاء،
                 فهم تاريخ كل عميل، متابعة الوعود، وتحويل العمليات اليدوية إلى تشغيل
                 ذكي مدعوم بالذكاء الاصطناعي.
               </p>
@@ -72,7 +72,7 @@ export default function MarketingPage() {
 
               <div className="flex flex-wrap gap-4 mt-9">
                 <a
-                  href="mailto:hazomuaz@gmail.com?subject=Book AI Debt OS Demo"
+                  href="mailto:hazomuaz@gmail.com?subject=Book AI DEBT OS Demo"
                   className="rounded-2xl bg-[#3b82f6] px-8 py-4 font-black shadow-2xl shadow-blue-600/30"
                 >
                   احجز عرض توضيحي
@@ -99,7 +99,7 @@ export default function MarketingPage() {
               <div className="absolute -inset-8 rounded-full bg-blue-500/20 blur-3xl" />
               <img
                 src={photos.hero}
-                alt="AI Debt OS enterprise collection team"
+                alt="AI DEBT OS enterprise collection team"
                 className="relative w-full h-[560px] object-cover rounded-[2rem] border border-slate-200 shadow-2xl"
               />
 
@@ -184,9 +184,9 @@ export default function MarketingPage() {
       <section className="px-6 py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-14 items-center">
           <div>
-            <h2 className="text-4xl md:text-5xl font-black">How AI Debt OS Works</h2>
+            <h2 className="text-4xl md:text-5xl font-black">How AI DEBT OS Works</h2>
             <p className="mt-5 text-slate-500 text-lg">
-              من لحظة ربط نظام التحصيل، يبدأ AI Debt OS في تنظيم البيانات، تحليل
+              من لحظة ربط نظام التحصيل، يبدأ AI DEBT OS في تنظيم البيانات، تحليل
               العملاء، اقتراح الإجراءات، وتسجيل كل تفاعل داخل Timeline وAI Memory.
             </p>
 
@@ -270,12 +270,12 @@ export default function MarketingPage() {
             جاهز تحول عمليات التحصيل إلى نظام ذكي؟
           </h2>
           <p className="mt-6 text-slate-600 text-xl max-w-3xl mx-auto">
-            احجز عرض توضيحي وشوف كيف AI Debt OS يساعد شركتك على تحسين الإنتاجية،
+            احجز عرض توضيحي وشوف كيف AI DEBT OS يساعد شركتك على تحسين الإنتاجية،
             تنظيم العملاء، وتحقيق رؤية أوضح لعمليات التحصيل.
           </p>
 
           <a
-            href="mailto:hazomuaz@gmail.com?subject=AI Debt OS Sales Inquiry"
+            href="mailto:hazomuaz@gmail.com?subject=AI DEBT OS Sales Inquiry"
             className="inline-flex mt-10 rounded-2xl bg-white text-black px-10 py-5 font-black"
           >
             Contact Sales
@@ -287,7 +287,7 @@ export default function MarketingPage() {
 
       <footer className="px-6 py-10 border-t border-slate-200">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-4 text-sm text-slate-500">
-          <div>© 2026 AI Debt OS. Enterprise Collection Intelligence Platform.</div>
+          <div>© 2026 AI DEBT OS. Enterprise Collection Intelligence Platform.</div>
           <div>Security • Privacy • Integrations • Contact</div>
         </div>
       </footer>

@@ -64,7 +64,7 @@ export function Sidebar({ profile }: { profile: any }) {
         <div className="w-9 h-9 rounded-xl bg-[#10b981] flex items-center justify-center text-white">
           <ShieldCheck size={20} />
         </div>
-        <span className="font-bold text-base text-white">ديون أو إس</span>
+        <span className="font-bold text-base text-white tracking-tight">AI DEBT OS</span>
       </div>
 
       {/* Navigation (grouped) */}

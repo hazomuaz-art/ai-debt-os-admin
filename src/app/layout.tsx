@@ -30,7 +30,7 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 })
 
 export const metadata: Metadata = {
-  title: 'AI Debt OS — Intelligent Debt Collection Platform',
+  title: 'AI DEBT OS — Intelligent Debt Collection Platform',
   description: 'AI-powered debt collection and management platform for modern financial institutions',
 }
 
