@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       return errors.badRequest('Invalid phone number format')
     }
 
-    const result = await sendWhatsAppMessage({ to: phone, message: body.message })
+    const result = await sendWhatsAppMessage({ to: phone, message: body.message, company_id: ctx.profile.company_id })
 
     const { data: savedMessage, error: msgErr } = await ctx.supabase
       .from('messages')
