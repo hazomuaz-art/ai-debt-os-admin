@@ -48,7 +48,14 @@
       "mcp__visualize__read_me",
       "mcp__visualize__show_widget",
       "WebSearch",
-      "WebFetch(domain:dribbble.com)"
+      "WebFetch(domain:dribbble.com)",
+      "PowerShell(ollama list 2>$null)",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\\)\")",
+      "Bash(sed 's/=//')",
+      "Read(//c/Users/moham/.ssh/**)",
+      "Bash(curl -s -m 8 -o /dev/null -w \"VPS HTTP: %{http_code}\\\\n\" http://72.62.30.109)",
+      "Bash(timeout 25 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@72.62.30.109 \"pm2 list && echo '=== last 30 log lines ===' && pm2 logs --nostream --lines 30 2>&1 | tail -40\")",
+      "Bash(timeout 25 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@72.62.30.109 \"echo '=== ERROR log tail ===' && tail -40 /root/.pm2/logs/ai-debt-os-admin-error.log\")"
     ]
   }
 }

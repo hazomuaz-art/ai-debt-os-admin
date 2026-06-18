@@ -78,6 +78,32 @@ export async function POST(request: NextRequest) {
         instance: evo.instance,
       })
 
+      // ── Delivery acknowledgements: track whether our outbound messages
+      // actually reached the recipient. Lets us detect a "silent block" where
+      // WhatsApp accepts messages but never delivers them.
+      if (evo.event === 'messages.update' || evo.event === 'messages.ack') {
+        const updates = Array.isArray(evo.data) ? evo.data : [evo.data]
+        const rank: Record<string, number> = { sent: 1, delivered: 2, read: 3 }
+        const mapStatus = (s: string): string | null => {
+          const v = String(s || '').toUpperCase()
+          if (v === 'SERVER_ACK' || v === 'PENDING') return 'sent'
+          if (v === 'DELIVERY_ACK') return 'delivered'
+          if (v === 'READ' || v === 'PLAYED') return 'read'
+          return null
+        }
+        for (const u of updates) {
+          const msgId = u?.keyId ?? u?.key?.id ?? u?.messageId
+          const newStatus = mapStatus(u?.status ?? u?.update?.status)
+          if (!msgId || !newStatus) continue
+          const { data: row } = await supabase
+            .from('messages').select('status').eq('whatsapp_message_id', String(msgId)).maybeSingle()
+          // only upgrade status (don't overwrite read with sent)
+          if (row && (rank[newStatus] ?? 0) <= (rank[(row as { status: string }).status] ?? 0)) continue
+          await supabase.from('messages').update({ status: newStatus }).eq('whatsapp_message_id', String(msgId))
+        }
+        return NextResponse.json({ status: 'ok' })
+      }
+
       if (evo.event === 'messages.upsert' && evo.data?.key?.fromMe === false) {
         const remoteJid = String(evo.data.key.remoteJid ?? '')
         const phoneRaw = normalizePhone(remoteJid.split('@')[0] ?? '')
