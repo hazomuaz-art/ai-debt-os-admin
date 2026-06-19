@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     .order('sent_at', { ascending: true })
     .limit(MAX_PER_RUN)
 
-  const result = { checked: stuck?.length ?? 0, retried: 0, markedFailed: 0, skipped: 0 }
+  const result = { checked: stuck?.length ?? 0, retried: 0, markedFailed: 0, correctedToFailed: 0, skipped: 0 }
 
   for (const m of stuck ?? []) {
     const meta = (m as { metadata?: Record<string, unknown> }).metadata ?? {}
@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
         metadata: { ...meta, delivery_unconfirmed: true },
       }).eq('id', (m as { id: string }).id)
       result.markedFailed++
+      result.correctedToFailed++
       continue
     }
 
@@ -64,11 +65,13 @@ export async function GET(req: NextRequest) {
       company_id: (m as { company_id: string }).company_id,
     })
 
-    // Mark the original honestly — it was never confirmed delivered.
+    // Mark the original honestly — it was never confirmed delivered,
+    // regardless of whether the retry itself appears to have gone through.
     await supabase.from('messages').update({
       status: 'failed',
       metadata: { ...meta, delivery_unconfirmed: true, retry_attempted: true },
     }).eq('id', (m as { id: string }).id)
+    result.correctedToFailed++
 
     if (r.status === 'sent') {
       await supabase.from('messages').insert({
@@ -88,7 +91,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Dashboard visibility — never let undelivered messages hide silently.
-  if (result.markedFailed > 0) {
+  if (result.correctedToFailed > 0) {
     const { data: existing } = await supabase
       .from('system_alerts').select('id').eq('alert_type', 'whatsapp_delivery_unconfirmed')
       .eq('is_resolved', false).is('company_id', null).limit(1).maybeSingle()
@@ -96,7 +99,7 @@ export async function GET(req: NextRequest) {
       await supabase.from('system_alerts').insert({
         company_id: null, severity: 'warning', alert_type: 'whatsapp_delivery_unconfirmed',
         title: 'رسائل واتساب لم يتأكد تسليمها',
-        message: `${result.markedFailed} رسالة لم تصل فعلياً رغم ظهورها "مرسَلة" — تم تصحيح حالتها إلى "فشل" وإعادة محاولة الإرسال حيث أمكن.`,
+        message: `${result.correctedToFailed} رسالة لم تصل فعلياً رغم ظهورها "مرسَلة" — تم تصحيح حالتها إلى "فشل" وإعادة محاولة الإرسال حيث أمكن.`,
         metadata: result, is_read: false, is_resolved: false,
       })
     }
