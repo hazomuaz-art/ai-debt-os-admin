@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
+import { getOpenRouterBalance } from '@/lib/provider-balance'
 
 export async function GET(req: NextRequest) {
   return withAuth(
@@ -85,9 +86,12 @@ export async function GET(req: NextRequest) {
         .slice(-30)
         .map(([date, cost]) => ({ date, cost }))
 
+      const balance = await getOpenRouterBalance()
+
       return NextResponse.json({
         data: {
           summary: { totalCost, todayCost, totalTokens, totalOps, failedOps },
+          providerBalance: balance,
           byProvider:  Object.entries(byProvider).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.cost - a.cost),
           byAction:    Object.entries(byAction).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.cost - a.cost),
           byPortfolio: Object.entries(byPortfolio).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.cost - a.cost),

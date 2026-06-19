@@ -13,8 +13,10 @@ interface CostSummary {
 
 interface CostRow { name: string; cost: number; ops: number }
 interface DailyPoint { date: string; cost: number }
+interface ProviderBalance { total_credits: number; total_usage: number; remaining: number }
 interface CostData {
-  summary:     CostSummary
+  summary:         CostSummary
+  providerBalance: ProviderBalance | null
   byProvider:  CostRow[]
   byAction:    CostRow[]
   byPortfolio: CostRow[]
@@ -186,6 +188,37 @@ export default function CostCenterPage() {
           <CostSettingsPanel />
         </div>
       </div>
+
+      {/* Real OpenRouter balance — actual remaining provider credit, not an estimate */}
+      {data?.providerBalance && (() => {
+        const b = data.providerBalance
+        const pct = b.total_credits > 0 ? Math.max(0, Math.min(100, (b.remaining / b.total_credits) * 100)) : 0
+        const critical = b.remaining <= 1
+        const warning = b.remaining <= 5
+        const color = critical ? '#f87171' : warning ? '#fbbf24' : '#34d399'
+        return (
+          <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Zap size={18} style={{ color }} />
+                <span className="font-bold text-white">رصيد الذكاء الاصطناعي (OpenRouter) — فعلي ومباشر</span>
+              </div>
+              {warning && (
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: `${color}1f`, color }}>
+                  {critical ? 'رصيد على وشك النفاد' : 'رصيد منخفض'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-2xl font-bold" style={{ color }}>${b.remaining.toFixed(2)}</span>
+              <span className="text-[#5f6b7e] text-sm">متبقي من ${b.total_credits.toFixed(2)} (مستهلك ${b.total_usage.toFixed(2)})</span>
+            </div>
+            <div className="h-2 bg-[#0b0e14] rounded-full overflow-hidden mt-3">
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+            </div>
+          </div>
+        )
+      })()}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
