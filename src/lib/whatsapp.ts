@@ -114,11 +114,31 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
   const wahaKey     = process.env.WAHA_API_KEY
   const wahaSession = process.env.WAHA_SESSION || 'default'
   if (wahaUrl && wahaKey) {
+    const base = wahaUrl.replace(/\/$/, '')
+    const chatId = `${to}@c.us`
+
+    // Warm-up: WhatsApp Web silently drops the very first message(s) to a
+    // brand-new contact while it establishes the e2e encryption session,
+    // even though the send API still reports success. A typing-presence
+    // ping forces that handshake to happen BEFORE we send real content,
+    // which avoids the loss. Cheap (~1.5s) and applied to every send since
+    // there's no reliable way to know in advance which contacts are "new".
     try {
-      const response = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/sendText`, {
+      await fetch(`${base}/api/startTyping`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey },
-        body: JSON.stringify({ session: wahaSession, chatId: `${to}@c.us`, text: message }),
+        body: JSON.stringify({ session: wahaSession, chatId }),
+      })
+      await new Promise(r => setTimeout(r, 1500))
+    } catch {
+      // Non-fatal — proceed to send even if the warm-up ping itself failed.
+    }
+
+    try {
+      const response = await fetch(`${base}/api/sendText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey },
+        body: JSON.stringify({ session: wahaSession, chatId, text: message }),
       })
       const data = await response.json().catch(() => ({} as any))
       if (!response.ok) {
