@@ -74,6 +74,42 @@ function cleanReply(reply: string, customerFirstName?: string, isFirstMessage?: 
   return r
 }
 
+const ARABIC_WORD_NUM: Record<string, number> = {
+  'يوم': 1, 'يومين': 2, 'اسبوع': 7, 'أسبوع': 7, 'اسبوعين': 14, 'أسبوعين': 14,
+  'شهر': 30, 'شهرين': 60, 'شهر ونص': 45, 'شهر و نص': 45,
+  'ثلاث شهور': 90, 'تلات شهور': 90, '3 شهور': 90, 'ثلاثة اشهر': 90,
+}
+
+// Best-effort detection of a grace period the customer is asking for, in
+// days — used to deterministically stop the model from agreeing to
+// anything beyond the policy max (30 days), since it doesn't reliably
+// follow that instruction from prompt text alone.
+function detectRequestedGraceDays(text: string): number | null {
+  const t = norm(text)
+  for (const [phrase, days] of Object.entries(ARABIC_WORD_NUM)) {
+    if (t.includes(phrase)) return days
+  }
+  const numMonth = t.match(/(\d+)\s*شهر/)
+  if (numMonth) return parseInt(numMonth[1]) * 30
+  const numWeek = t.match(/(\d+)\s*اسبوع|(\d+)\s*أسبوع/)
+  if (numWeek) return parseInt(numWeek[1] || numWeek[2]) * 7
+  const numDay = t.match(/(\d+)\s*يوم/)
+  if (numDay) return parseInt(numDay[1])
+  return null
+}
+
+// Specific, checkable reasons for a dispute (as opposed to a bare "معترض"
+// with nothing behind it) — used to stop the model from escalating to
+// admin before it has even asked the customer why.
+function hasSpecificDisputeReason(text: string): boolean {
+  return hasAny(text, [
+    'سددت', 'دفعت', 'حولت', 'مش انا', 'مو انا', 'ما اشتريت', 'مش اشتريت',
+    'ليس لي', 'مش بيتي', 'مو بيتي', 'رقم غلط', 'مش دين', 'مو دين',
+    'انكر', 'أنكر', 'تامين عندي', 'كان عندي تامين', 'باعت العقار', 'بعت العقار',
+    'مالك جديد', 'مستاجر', 'مستأجر', 'خطأ في المبلغ', 'مبلغ غلط', 'زيادة في المبلغ',
+  ])
+}
+
 function detectSignals(text: string) {
   return {
     paymentClaim: hasAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']),
@@ -424,7 +460,12 @@ ${installmentRule}
     content: m.content,
   }))
 
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const todayWeekday = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' }).format(new Date())
+
   const systemPrompt = `أنت "خالد"، محصّل ديون سعودي محترف عمرك 45 سنة. تتحدث بلهجة سعودية بيضاء طبيعية جداً عبر الواتساب، كأنك إنسان حقيقي.
+
+🔴 تاريخ اليوم الحقيقي الآن هو: ${todayStr} (${todayWeekday}) بتوقيت السعودية. استخدم هذا التاريخ فقط كمرجع لأي حساب زمني (كم باقي على موعد، هل الوعد متأخر، حساب شهر/أسبوع من الآن...). لا تخمّن أو تحسب تاريخ اليوم من معلوماتك العامة — اعتمد على هذا التاريخ المعطى لك حرفياً فقط.
 
 ═══════════════ القواعد الحرجة (التزم بها حرفياً) ═══════════════
 ${strictRules}
@@ -447,6 +488,9 @@ ${intentPrompts[intent]}
 7. الرد جملة أو جملتين كحد أقصى.
 8. 🔴 ${prevOutbound.length === 0 ? 'هذه أول رسالة ترسلها لهذا العميل — يجوز ذكر اسمه مرة واحدة فقط هنا.' : 'سبق أن أرسلت لهذا العميل رسائل قبل — ممنوع ذكر اسمه كعادة أو تلطّف في ردك الآن (لا تبدأ الجملة باسمه). الاستثناء الوحيد: لو سألك صريحاً "ايش اسمي" أو "المديونية باسم مين" فاذكر اسمه كإجابة مباشرة على سؤاله فقط، ثم لا تكرره بعد ذلك.'}
 9. 🔴 shouldReply=false أو action=silent مسموح فقط إذا كانت رسالة العميل **توديعاً أو شكراً صريحاً واضحاً بلا أي سؤال أو طلب أو شكوى** (مثل "تمام شكراً" أو "خلاص يعطيك العافية"). أي رسالة فيها سؤال، شكوى، اعتراض، طلب، رفض، أو معلومة جديدة — حتى لو قصيرة أو غامضة — **يجب** أن يكون لها رد واضح. لا تستخدم silent أو close_conversation للتهرّب من رسالة صعبة أو غير واضحة؛ اطلب توضيحاً بدلاً من الصمت.
+10. 🔴 الحد الأقصى المطلق لأي مهلة أو تأجيل = 30 يوماً من تاريخ اليوم (${todayStr}) ولا يوماً أكثر تحت أي ظرف. إن طلب العميل أكثر من ذلك (شهرين، 3 شهور، أو ما شابه)، فرفضك إلزامي — لا تقل "ما عندي مشكلة" ولا توافق ضمنياً. اعرض عليه مدة أقصر بكثير (أسبوع إلى أسبوعين) وفاوضه نزولاً، ولا توافق على الشهر كاملاً إلا بعد محاولة تقصيره أولاً.
+11. 🔴 لا تختار action=record_dispute أبداً في أول رد على كلام فيه اعتراض غامض بلا سبب محدد (راجع تعليمات DISPUTE أعلاه) — اسأل عن السبب أولاً دائماً.
+12. 🔴 استخدم أساليب إقناع متنوعة فعلية لا تكرار نفس الجملة: التذكير بالعواقب بأدب، عرض حل وسط، تحديد خطوة صغيرة فورية (صورة إيصال، تاريخ محدد)، الإشارة إلى أن التأخير يزيد تعقيد الملف. إن شعرت أن العميل يرفض أو يماطل عمداً زِد الحزم والضغط ولا تستسلم أو تصمت.
 
 ═══════════════ صيغة الإخراج ═══════════════
 أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:
@@ -458,6 +502,9 @@ ${intentPrompts[intent]}
 }
 
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
+
+  const requestedGraceDays = detectRequestedGraceDays(text)
+  const disputeReasonGiven = hasSpecificDisputeReason(text)
 
   const modelId = 'anthropic/claude-sonnet-4'
   let ai
@@ -478,6 +525,9 @@ ${text}
 (للسياق فقط — لا تردده حرفياً)
 - إشارات مكتشفة: ${JSON.stringify(signals)}
 - آخر رسالة أرسلتها أنت للعميل: ${lastAgentMessage || 'لا يوجد'}
+- تاريخ اليوم الحقيقي: ${todayStr}
+${requestedGraceDays !== null ? `- 🔴 العميل يطلب مهلة تقدّر بـ${requestedGraceDays} يوماً تقريباً. ${requestedGraceDays > 30 ? `هذا يتجاوز الحد الأقصى (30 يوماً) بكثير — ممنوع الموافقة عليه، اعرض مدة أقصر بكثير وفاوضه نزولاً.` : 'هذا ضمن الحد المسموح كحد أقصى، لكن حاول تقصيره أولاً قبل الموافقة الكاملة.'}` : ''}
+${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذكر سبباً محدداً للاعتراض في هذه الرسالة — لا تصعّد، اسأله عن السبب أولاً.' : ''}
 
 إن كانت رسالتك الأخيرة سؤالاً وقد أجاب العميل عليه الآن، لا تعد السؤال — انتقل بالمحادثة للأمام.`,
         },
@@ -506,6 +556,30 @@ ${text}
 
   const customerFirstName = String(ctx.verified_customer_data?.customer_name ?? '').split(' ')[0] || undefined
   parsed.message = cleanReply(parsed.message, customerFirstName, prevOutbound.length === 0)
+
+  // ── Deterministic guards — don't just hope the model followed the prompt ──
+
+  // 1) Never let a grace period beyond the 30-day policy max slip through,
+  // even if the model's reply sounds like it agreed (e.g. "ما عندي مشكلة").
+  if (requestedGraceDays !== null && requestedGraceDays > 30) {
+    const pushesBack = hasAny(parsed.message, ['أسبوع', 'اسبوع', 'أقصر', 'اقصر', 'ما اقدر', 'ما أقدر', 'كثير', 'مو ممكن', 'غير ممكن', 'طويلة'])
+    if (!pushesBack) {
+      log.warn('grace period guard fired', { intent, requestedGraceDays, original: parsed.message.slice(0, 80) })
+      parsed.message = 'هذا وقت طويل جداً ولا أقدر أوافق عليه. أقصى مدة ممكنة أسبوعين، إيش رأيك نحدد موعد سداد خلالها؟'
+      parsed.action = 'negotiate'
+      parsed.reason = 'grace_period_guard_override'
+    }
+  }
+
+  // 2) Never let the model escalate a vague dispute to admin before it has
+  // actually asked the customer for a specific reason.
+  if (intent === 'DISPUTE' && !disputeReasonGiven && parsed.action === 'record_dispute') {
+    log.warn('premature dispute escalation guard fired', { intent, original: parsed.message.slice(0, 80) })
+    parsed.message = 'تمام، بس عشان أقدر أساعدك بسرعة — وضّح لي إيش بالضبط سبب اعتراضك على المبلغ؟'
+    parsed.action = 'request_clarification'
+    parsed.reason = 'dispute_reason_guard_override'
+  }
+
   log.info('agent decision', {
     intent,
     action: parsed.action,
