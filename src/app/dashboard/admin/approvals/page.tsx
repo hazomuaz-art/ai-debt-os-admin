@@ -145,7 +145,7 @@ export default function ApprovalsPage() {
                           {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
                         </span>
                       </div>
-                      {item.description && <p className="text-[#8b95a7] text-sm mb-2 leading-relaxed">{item.description}</p>}
+                      {item.description && <p className="text-[#8b95a7] text-sm mb-2 leading-relaxed whitespace-pre-wrap">{item.description}</p>}
                       <div className="flex items-center gap-4 text-xs text-[#5f6b7e] font-medium">
                         <span className="flex items-center gap-1"><Clock size={14} /> {new Date(String(item.created_at ?? '')).toLocaleString(dir === 'rtl' ? 'ar-SA' : 'en-GB')}</span>
                         {item.expires_at && <span className="text-rose-400 flex items-center gap-1">{ap.expires} {new Date(String(item.expires_at ?? '')).toLocaleDateString(dir === 'rtl' ? 'ar-SA' : 'en-GB')}</span>}

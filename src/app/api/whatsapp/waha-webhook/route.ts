@@ -141,24 +141,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Dispute → open dispute + approval (dedup)
+      // Dispute → open dispute + approval (dedup), with full context
       if (aiDecision.action === 'record_dispute' && debt_id) {
-        const { data: existing } = await supabase.from('approvals')
-          .select('id').eq('company_id', c.company_id).eq('entity_id', debt_id)
-          .eq('approval_type', 'dispute').eq('status', 'pending').limit(1).maybeSingle()
-        if (!existing) {
-          const { data: disp } = await supabase.from('disputes').insert({
-            company_id: c.company_id, customer_id: c.id, debt_id,
-            dispute_type: 'customer_claim', description: text, status: 'pending',
-            priority: 'high', source: 'whatsapp_ai',
-          }).select('id').single()
-          await supabase.from('approvals').insert({
-            company_id: c.company_id, approval_type: 'dispute', entity_type: 'debt', entity_id: debt_id,
-            title: `اعتراض عميل: ${c.full_name ?? ''}`, description: `سبب العميل: ${text}`,
-            status: 'pending', priority: 'high',
-            requested_data: { customer_id: c.id, dispute_id: disp?.id ?? null, reason: text },
-          })
-        }
+        const { recordDispute } = await import('@/lib/dispute')
+        await recordDispute({
+          company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
+          debt_id, customer_message: text, agent_reason: aiDecision.reason,
+        })
       }
     })().catch(err => log.error('WAHA AI processing error', err as Error))
 
