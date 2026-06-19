@@ -70,6 +70,13 @@ export default function RulesPage() {
 
   return (
     <div className="space-y-6">
+      <div className="card p-4 border-amber-500/20 bg-amber-500/5 flex items-center gap-3">
+        <span className="text-amber-400 text-lg">⚠</span>
+        <div>
+          <div className="text-amber-400 text-sm font-medium">قيد الربط — لا تأثير على النظام حالياً</div>
+          <p className="text-[#8b95a7] text-xs mt-0.5">يمكنك بناء القواعد هنا، لكن لا يوجد محرك تنفيذ يُطبّقها فعلياً على المحادثات بعد.</p>
+        </div>
+      </div>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">Smart Rules Engine</h1>

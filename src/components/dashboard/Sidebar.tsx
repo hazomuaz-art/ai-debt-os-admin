@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  Activity, Users, MessageCircle, AlertTriangle, 
+import {
+  Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
-  Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Book, Package
+  Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Book, Package,
+  FlaskConical, TrendingUp, Phone, Brain, GitBranch
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
@@ -48,11 +49,27 @@ export function Sidebar({ profile }: { profile: any }) {
       ],
     },
     {
+      label: isRTL ? 'الذكاء الاصطناعي' : 'AI Tools',
+      items: [
+        { href: `/dashboard/${role}/ai-reply-test`, label: isRTL ? 'اختبار الوكيل' : 'Agent Test', icon: FlaskConical, roles: ['admin'] },
+        { href: `/dashboard/${role}/ai-revenue`,    label: isRTL ? 'عائدات الذكاء الاصطناعي' : 'AI Revenue', icon: TrendingUp, roles: ['admin'] },
+        { href: `/dashboard/${role}/voice`,         label: isRTL ? 'المحصّل الصوتي' : 'Voice Collector', icon: Phone, roles: ['admin'] },
+      ],
+    },
+    {
       label: isRTL ? 'النظام' : 'System',
       items: [
         { href: `/dashboard/${role}/automation`,   label: t.nav.automation, icon: Settings, roles: ['admin'] },
         { href: `/dashboard/${role}/integrations`, label: t.nav.integrations, icon: LinkIcon, roles: ['admin'] },
         { href: `/dashboard/${role}/alerts`,       label: t.nav.alerts, icon: Bell, roles: ['admin'] },
+      ],
+    },
+    {
+      label: isRTL ? 'قيد الربط — قريباً' : 'In Progress — Coming Soon',
+      items: [
+        { href: `/dashboard/${role}/knowledge-base`, label: isRTL ? 'قاعدة المعرفة' : 'Knowledge Base', icon: Book, roles: ['admin'], soon: true },
+        { href: `/dashboard/${role}/memory`,          label: isRTL ? 'ذاكرة الذكاء الاصطناعي' : 'AI Memory', icon: Brain, roles: ['admin'], soon: true },
+        { href: `/dashboard/${role}/rules`,           label: isRTL ? 'محرك القواعد' : 'Rules Engine', icon: GitBranch, roles: ['admin'], soon: true },
       ],
     },
   ].map(g => ({ ...g, items: g.items.filter(i => i.roles.includes(role)) })).filter(g => g.items.length > 0)
@@ -87,7 +104,12 @@ export function Sidebar({ profile }: { profile: any }) {
                     )}
                   >
                     <item.icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-[#10b981]' : ''} />
-                    <span>{item.label}</span>
+                    <span className="flex-1">{item.label}</span>
+                    {Boolean((item as { soon?: boolean }).soon) && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 shrink-0">
+                        {isRTL ? 'قريباً' : 'SOON'}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

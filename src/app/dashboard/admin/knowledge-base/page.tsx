@@ -88,7 +88,15 @@ export default function KnowledgeBasePage() {
 
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
-      
+
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 mt-6">
+        <span className="text-amber-400 text-lg">⚠</span>
+        <div>
+          <div className="text-amber-400 text-sm font-bold">قيد الربط — لا تأثير على الوكيل حالياً</div>
+          <p className="text-[#8b95a7] text-xs mt-0.5">يمكنك الإضافة والتعديل هنا، لكن الوكيل لا يقرأ من هذه القاعدة في ردوده حتى تُربط برمجياً بملف القضية.</p>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">

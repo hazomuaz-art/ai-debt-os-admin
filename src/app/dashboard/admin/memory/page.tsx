@@ -60,6 +60,13 @@ export default function MemoryPage() {
 
   return (
     <div className="space-y-6">
+      <div className="card p-4 border-amber-500/20 bg-amber-500/5 flex items-center gap-3">
+        <span className="text-amber-400 text-lg">⚠</span>
+        <div>
+          <div className="text-amber-400 text-sm font-medium">قيد الربط — لا تأثير على الوكيل حالياً</div>
+          <p className="text-[#8b95a7] text-xs mt-0.5">تُجلب هذه الإدخالات إلى سياق الوكيل لكنها لا تُستخدم في رده الفعلي حتى تُربط برمجياً.</p>
+        </div>
+      </div>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-bold">AI Memory</h1>
