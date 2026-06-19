@@ -51,12 +51,24 @@ function isGreeting(text: string) {
   return greetingRegex.test(normalized) && normalized.length <= 40 && !businessRegex.test(normalized)
 }
 
-function cleanReply(reply: string) {
-  return String(reply ?? '')
+function cleanReply(reply: string, customerFirstName?: string, isFirstMessage?: boolean) {
+  let r = String(reply ?? '')
     .replace(/أخوي[،,\s]*/g, '')
     .replace(/عزيزي العميل[،,\s]*/g, '')
     .replace(/عميلنا العزيز[،,\s]*/g, '')
     .trim()
+
+  // Deterministic safety net: the model is told not to address the customer
+  // by name as a habit after the first message, but LLMs don't always obey
+  // that instruction — so strip a leading vocative name ourselves rather
+  // than relying on the prompt alone. Only strips it at the START of the
+  // reply (a habitual greeting-style use), so a legitimate mid-sentence
+  // answer to "ايش اسمي" is left untouched.
+  if (!isFirstMessage && customerFirstName) {
+    const esc = customerFirstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    r = r.replace(new RegExp(`^(يا\\s+)?${esc}[،,]?\\s*`, 'i'), '').trim()
+  }
+  return r
 }
 
 function detectSignals(text: string) {
@@ -479,7 +491,8 @@ ${text}
     log.error('model returned empty response', { intent, model: modelId })
   }
 
-  parsed.message = cleanReply(parsed.message)
+  const customerFirstName = String(ctx.verified_customer_data?.customer_name ?? '').split(' ')[0] || undefined
+  parsed.message = cleanReply(parsed.message, customerFirstName, prevOutbound.length === 0)
   log.info('agent decision', {
     intent,
     action: parsed.action,
