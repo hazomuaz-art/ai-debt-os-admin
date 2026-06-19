@@ -15,58 +15,112 @@ export type ReceiptData = {
   confidence: number // 0-100
 }
 
-// Reads a bank-transfer / payment receipt image and extracts structured data.
-// Uses GPT-5.5 vision via OpenRouter.
-export async function extractReceipt(imageBase64: string): Promise<ReceiptData | null> {
-  const empty: ReceiptData = {
-    is_receipt: false, amount: null, currency: null, date: null,
-    sender_name: null, bank: null, reference: null, iban_last4: null, confidence: 0,
-  }
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) return empty
+const EMPTY: ReceiptData = {
+  is_receipt: false, amount: null, currency: null, date: null,
+  sender_name: null, bank: null, reference: null, iban_last4: null, confidence: 0,
+}
 
-  const client = new OpenAI({
+function getClient(): OpenAI | null {
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) return null
+  return new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
   })
-  const model = process.env.OPENROUTER_API_KEY ? 'openai/gpt-5.5' : 'gpt-4o'
-  const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+}
 
-  const prompt = `حلّل هذه الصورة. هل هي إيصال/سند تحويل بنكي أو دفع؟ استخرج البيانات وأعد JSON فقط بهذا الشكل بدون أي نص آخر:
+const visionModel = () => (process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o')
+const textModel = () => (process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o-mini')
+
+const PROMPT_INSTRUCTIONS = `هل هذا إيصال/سند تحويل بنكي أو دفع؟ استخرج البيانات وأعد JSON فقط بهذا الشكل بدون أي نص آخر:
 {"is_receipt": true|false, "amount": <رقم أو null>, "currency": "SAR|USD|...", "date": "YYYY-MM-DD أو null", "sender_name": "اسم المُحوِّل أو null", "bank": "اسم البنك أو null", "reference": "الرقم المرجعي أو null", "iban_last4": "آخر 4 أرقام من الآيبان المستلِم أو null", "confidence": <0-100>}
-إن لم تكن إيصالاً، أعد is_receipt=false والباقي null.`
+إن لم يكن إيصالاً، أعد is_receipt=false والباقي null.`
+
+function parseReceiptJson(raw: string): ReceiptData {
+  const s = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
+  const first = s.indexOf('{'); const last = s.lastIndexOf('}')
+  const parsed = JSON.parse(first !== -1 && last > first ? s.slice(first, last + 1) : s)
+  return {
+    is_receipt: !!parsed.is_receipt,
+    amount: parsed.amount != null && !Number.isNaN(Number(parsed.amount)) ? Number(parsed.amount) : null,
+    currency: parsed.currency ?? null,
+    date: parsed.date ?? null,
+    sender_name: parsed.sender_name ?? null,
+    bank: parsed.bank ?? null,
+    reference: parsed.reference ?? null,
+    iban_last4: parsed.iban_last4 ?? null,
+    confidence: Number(parsed.confidence) || 0,
+  }
+}
+
+// Reads a bank-transfer / payment receipt IMAGE and extracts structured data.
+export async function extractReceipt(imageBase64: string): Promise<ReceiptData | null> {
+  const client = getClient()
+  if (!client) return EMPTY
+
+  const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
 
   try {
     const res = await client.chat.completions.create({
-      model,
+      model: visionModel(),
       max_tokens: 400,
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'user',
           content: [
-            { type: 'text', text: prompt },
+            { type: 'text', text: `حلّل هذه الصورة. ${PROMPT_INSTRUCTIONS}` },
             { type: 'image_url', image_url: { url: dataUrl } },
           ] as any,
         },
       ],
     })
-    const raw = res.choices[0]?.message?.content ?? ''
-    const s = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
-    const first = s.indexOf('{'); const last = s.lastIndexOf('}')
-    const parsed = JSON.parse(first !== -1 && last > first ? s.slice(first, last + 1) : s)
-    return {
-      is_receipt: !!parsed.is_receipt,
-      amount: parsed.amount != null && !Number.isNaN(Number(parsed.amount)) ? Number(parsed.amount) : null,
-      currency: parsed.currency ?? null,
-      date: parsed.date ?? null,
-      sender_name: parsed.sender_name ?? null,
-      bank: parsed.bank ?? null,
-      reference: parsed.reference ?? null,
-      iban_last4: parsed.iban_last4 ?? null,
-      confidence: Number(parsed.confidence) || 0,
-    }
+    return parseReceiptJson(res.choices[0]?.message?.content ?? '')
   } catch (err: any) {
-    log.error('receipt OCR failed', { error: String(err?.message ?? err) })
-    return empty
+    log.error('receipt OCR (image) failed', { error: String(err?.message ?? err) })
+    return EMPTY
+  }
+}
+
+// Reads receipt data from plain TEXT (extracted from a PDF, or pasted by the
+// customer directly in the chat — e.g. a copied bank transfer confirmation).
+export async function extractReceiptFromText(text: string): Promise<ReceiptData | null> {
+  const client = getClient()
+  if (!client) return EMPTY
+  if (!text || text.trim().length < 5) return EMPTY
+
+  try {
+    const res = await client.chat.completions.create({
+      model: textModel(),
+      max_tokens: 300,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'user', content: `هذا نص مُستخرَج من رسالة/مستند أرسله عميل. ${PROMPT_INSTRUCTIONS}\n\nالنص:\n${text.slice(0, 4000)}` },
+      ],
+    })
+    return parseReceiptJson(res.choices[0]?.message?.content ?? '')
+  } catch (err: any) {
+    log.error('receipt OCR (text) failed', { error: String(err?.message ?? err) })
+    return EMPTY
+  }
+}
+
+// Reads a PDF receipt (bank statement / transfer confirmation). Extracts the
+// embedded text first (works for digitally-generated PDFs, which covers the
+// vast majority of bank receipts) and runs it through the text extractor.
+// Scanned/image-only PDFs will yield empty text and fall through to "needs
+// human review" rather than being silently dropped.
+export async function extractReceiptFromPdf(pdfBase64: string): Promise<ReceiptData | null> {
+  try {
+    const { default: pdfParse } = await import('pdf-parse')
+    const buf = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64')
+    const { text } = await pdfParse(buf)
+    if (!text || text.trim().length < 5) {
+      log.warn('PDF has no extractable text (likely scanned) — needs manual review')
+      return { ...EMPTY, is_receipt: true, confidence: 0 } // flag for review, don't drop silently
+    }
+    return await extractReceiptFromText(text)
+  } catch (err: any) {
+    log.error('receipt OCR (pdf) failed', { error: String(err?.message ?? err) })
+    return EMPTY
   }
 }

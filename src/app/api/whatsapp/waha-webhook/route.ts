@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizePhone, sendWhatsAppMessage } from '@/lib/whatsapp'
+import { processInboundReceipt } from '@/lib/payment-receipt'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('webhook/waha')
 
 const WAHA_URL = process.env.WAHA_API_URL
 const WAHA_KEY = process.env.WAHA_API_KEY
+
+// Customer typed a payment claim directly (no attachment) — e.g. pasted a
+// bank confirmation text. Requires a payment keyword AND a number to avoid
+// matching casual chat like "بدفع لك بكرة".
+const PAYMENT_TEXT_RE = /سددت|دفعت|حولت|ايصال|إيصال|paid|receipt|transfer/i
+function looksLikeTextReceipt(text: string): boolean {
+  return PAYMENT_TEXT_RE.test(text) && /\d{2,}/.test(text)
+}
+
+async function downloadMediaBase64(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
+    if (!r.ok) return null
+    const buf = Buffer.from(await r.arrayBuffer())
+    return buf.toString('base64')
+  } catch {
+    return null
+  }
+}
 
 // WAHA addresses LID-migrated contacts by "<id>@lid". Resolve it to the real
 // phone number so we can match the customer (stored by phone in our DB).
