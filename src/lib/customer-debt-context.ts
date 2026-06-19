@@ -16,7 +16,7 @@ export async function buildCustomerDebtContext(params: {
 
   const debtQuery = supabase
     .from('debts')
-    .select('id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name)')
+    .select('id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name, category)')
     .eq('company_id', params.company_id)
     .eq('customer_id', params.customer_id)
 
@@ -297,6 +297,7 @@ export async function buildCustomerDebtContext(params: {
       due_date: debt?.due_date || null,
       last_payment_date: debt?.last_payment_date || null,
       portfolio_name: (debt as any)?.portfolio?.name || null,
+      portfolio_category: (debt as any)?.portfolio?.category || null,
       notes: debt?.notes || null,
     },
 
