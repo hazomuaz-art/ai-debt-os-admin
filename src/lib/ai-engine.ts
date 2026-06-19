@@ -12,8 +12,12 @@ let _client: OpenAI | null = null
 
 function getClient(): OpenAI {
   if (!_client) {
-    if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured')
-    _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000, maxRetries: 2 })
+    if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not configured')
+    _client = new OpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: 'https://openrouter.ai/api/v1',
+      timeout: 30_000, maxRetries: 2,
+    })
   }
   return _client
 }
@@ -254,7 +258,7 @@ Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","col
   try {
     const response = await log.time('openai-score', () =>
       client.chat.completions.create({
-        model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }],
+        model: 'openai/gpt-4o-mini', messages: [{ role: 'user', content: prompt }],
         temperature: 0.2, max_tokens: 600, response_format: { type: 'json_object' },
       })
     )
@@ -268,7 +272,7 @@ Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","col
     logOpenAICost({
       company_id:   (input.debt as { company_id?: string }).company_id ?? '',
       action_type:  'score_debt',
-      model:        'gpt-4o-mini',
+      model:        'openai/gpt-4o-mini',
       input_tokens:  tokensIn,
       output_tokens: tokensOut,
       debt_id:       input.debt.id,
@@ -324,7 +328,7 @@ Return exactly this JSON shape:
   try {
     const response = await log.time('openai-action-plan', () =>
       client.chat.completions.create({
-        model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }],
+        model: 'openai/gpt-4o-mini', messages: [{ role: 'user', content: prompt }],
         temperature: 0.3, max_tokens: 4000, response_format: { type: 'json_object' },
       })
     )
@@ -338,7 +342,7 @@ Return exactly this JSON shape:
     logOpenAICost({
       company_id:   '',   // set by caller who knows company_id
       action_type:  'generate_action_plan',
-      model:        'gpt-4o-mini',
+      model:        'openai/gpt-4o-mini',
       input_tokens:  tokensIn2,
       output_tokens: tokensOut2,
       success:       true,
@@ -373,7 +377,7 @@ Tone: professional, respectful, FDCPA-compliant. No threats. Clear call to actio
 Return ONLY the message text.`
 
   const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 300,
+    model: 'openai/gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 300,
   })
   return response.choices[0]?.message?.content?.trim() ?? ''
 }

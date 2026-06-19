@@ -265,17 +265,17 @@ export async function generateWhatsappAutoReply(args: {
 
   if (hardReply) return { reply: hardReply, nextAction: 'reply' }
 
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return { reply: 'وصلت ملاحظتك، بنراجع الملف ونرد عليك.', nextAction: 'review' }
   }
 
-  const client = new OpenAI({ 
-    apiKey: process.env.OPENAI_API_KEY,
-    // baseURL removed
+  const client = new OpenAI({
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
   })
 
   const ai = await client.chat.completions.create({
-    model: 'gpt-5.5',
+    model: 'anthropic/claude-sonnet-4',
     max_completion_tokens: 420,
     tools: [
       {
@@ -549,18 +549,18 @@ export async function generateProactiveReminder(args: {
   })
 
   const fallback = 'السلام عليكم، للتذكير بموعد السداد المتفق عليه، طمّنا إذا تم الإيداع.'
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) return fallback
+  if (!process.env.OPENROUTER_API_KEY) return fallback
 
   const ai = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
   })
 
   const context = args.promise_details ?? args.reason ?? ''
 
   try {
     const res = await ai.chat.completions.create({
-      model: process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o',
+      model: 'anthropic/claude-sonnet-4',
       temperature: 0.4,
       max_tokens: 160,
       messages: [

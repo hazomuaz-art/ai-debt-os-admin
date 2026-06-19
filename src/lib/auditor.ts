@@ -413,7 +413,7 @@ export async function runAudit(companyId: string, safeFix = false): Promise<Audi
 
   // ── 6. Integrations ───────────────────────────────────────────────────────
   const integrationChecks = [
-    { key: 'OPENAI_API_KEY',             name: 'OpenAI (AI Scoring/Actions)' },
+    { key: 'OPENROUTER_API_KEY',          name: 'OpenRouter (All AI Models)' },
     { key: 'WHATSAPP_PHONE_NUMBER_ID',   name: 'WhatsApp Business (Phone ID)' },
     { key: 'WHATSAPP_ACCESS_TOKEN',      name: 'WhatsApp Business (Token)' },
     { key: 'NEXT_PUBLIC_SUPABASE_URL',   name: 'Supabase (Database)' },

@@ -29,11 +29,11 @@ const ENV_VARS: EnvVar[] = [
     validate: v => v.length > 20 ? null : 'Service role key appears invalid',
   },
 
-  // OpenAI — required
+  // OpenRouter — required (all AI calls route through it)
   {
-    key:      'OPENAI_API_KEY',
+    key:      'OPENROUTER_API_KEY',
     required: true,
-    validate: v => v.startsWith('sk-') ? null : 'OpenAI key must start with sk-',
+    validate: v => v.startsWith('sk-or-') ? null : 'OpenRouter key must start with sk-or-',
   },
 
   // App security — required
@@ -134,5 +134,5 @@ export function isWhatsAppConfigured(): boolean {
 }
 
 export function isOpenAIConfigured(): boolean {
-  return !!process.env.OPENAI_API_KEY
+  return !!process.env.OPENROUTER_API_KEY
 }

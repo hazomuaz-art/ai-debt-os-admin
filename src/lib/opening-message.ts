@@ -24,13 +24,13 @@ export async function generateOpeningMessage(args: {
 
   const fallback = `السلام عليكم${name}، معك خالد. كيف حالك؟`
 
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return fallback
   }
 
   const client = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
   })
 
   const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
@@ -61,7 +61,7 @@ ${facts || 'لا توجد بيانات كافية'}
 
   try {
     const ai = await client.chat.completions.create({
-      model: process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o',
+      model: 'anthropic/claude-sonnet-4',
       temperature: 0.4,
       max_tokens: 180,
       messages: [

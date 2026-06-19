@@ -61,11 +61,11 @@ const BASE_STATUSES = [
 export async function detectSchemaWithAI(
   input: AutoSchemaDetectionInput
 ): Promise<AutoSchemaDetectionResult> {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return fallbackDetectSchema(input)
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const client = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' })
 
   const prompt = `
 You are an enterprise debt collection data integration AI.
@@ -112,7 +112,7 @@ Return exactly:
 `
 
   const res = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'openai/gpt-4o-mini',
     temperature: 0.1,
     max_tokens: 2500,
     response_format: { type: 'json_object' },

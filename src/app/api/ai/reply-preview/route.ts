@@ -118,11 +118,11 @@ export async function POST(req: NextRequest) {
     const negotiation = generateNegotiationResponse(body.message)
     let aiText = negotiation.response
 
-    if (process.env.OPENAI_API_KEY) {
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    if (process.env.OPENROUTER_API_KEY) {
+      const client = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' })
 
       const ai = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'openai/gpt-4o-mini',
         temperature: 0.35,
         max_tokens: 450,
         messages: [
@@ -245,7 +245,7 @@ Important:
           response: aiText,
           intent: negotiation.intent as any,
           language,
-          model: 'gpt-4o-mini',
+          model: 'openai/gpt-4o-mini',
           confidence: 0.8,
           ttlDays: 14,
         })
@@ -311,11 +311,11 @@ Important:
     return NextResponse.json({
       data: {
         response: aiText,
-        source: process.env.OPENAI_API_KEY ? 'openai' : 'fallback',
+        source: process.env.OPENROUTER_API_KEY ? 'openai' : 'fallback',
         intent: negotiation.intent,
         strategy: negotiation.strategy,
         tone: negotiation.tone,
-        used_openai: !!process.env.OPENAI_API_KEY,
+        used_openai: !!process.env.OPENROUTER_API_KEY,
         used_context: hasContext,
         matched_customer_id: matchedCustomerId,
         matched_debt_id: matchedDebtId,

@@ -21,15 +21,15 @@ const EMPTY: ReceiptData = {
 }
 
 function getClient(): OpenAI | null {
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) return null
+  if (!process.env.OPENROUTER_API_KEY) return null
   return new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
   })
 }
 
-const visionModel = () => (process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o')
-const textModel = () => (process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o-mini')
+const visionModel = () => 'anthropic/claude-sonnet-4'
+const textModel = () => 'anthropic/claude-sonnet-4'
 
 const PROMPT_INSTRUCTIONS = `هل هذا إيصال/سند تحويل بنكي أو دفع؟ استخرج البيانات وأعد JSON فقط بهذا الشكل بدون أي نص آخر:
 {"is_receipt": true|false, "amount": <رقم أو null>, "currency": "SAR|USD|...", "date": "YYYY-MM-DD أو null", "sender_name": "اسم المُحوِّل أو null", "bank": "اسم البنك أو null", "reference": "الرقم المرجعي أو null", "iban_last4": "آخر 4 أرقام من الآيبان المستلِم أو null", "confidence": <0-100>}
@@ -111,9 +111,11 @@ export async function extractReceiptFromText(text: string): Promise<ReceiptData 
 // human review" rather than being silently dropped.
 export async function extractReceiptFromPdf(pdfBase64: string): Promise<ReceiptData | null> {
   try {
-    const { default: pdfParse } = await import('pdf-parse')
+    const { PDFParse } = await import('pdf-parse')
     const buf = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64')
-    const { text } = await pdfParse(buf)
+    const parser = new PDFParse({ data: buf })
+    const { text } = await parser.getText()
+    await parser.destroy()
     if (!text || text.trim().length < 5) {
       log.warn('PDF has no extractable text (likely scanned) — needs manual review')
       return { ...EMPTY, is_receipt: true, confidence: 0 } // flag for review, don't drop silently

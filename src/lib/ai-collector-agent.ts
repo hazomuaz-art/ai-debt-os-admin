@@ -326,13 +326,13 @@ export async function runCollectorAgent(args: {
     return { shouldReply: true, action: 'reply', reason: 'greeting_first_contact', message: msg }
   }
 
-  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return { shouldReply: true, action: 'reply', reason: 'fallback_no_api_key', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
 
   const client = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1' : undefined,
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
   })
 
   // ── Intent router ──
@@ -446,7 +446,7 @@ ${intentPrompts[intent]}
 
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
 
-  const modelId = process.env.OPENROUTER_API_KEY ? 'anthropic/claude-sonnet-4' : 'gpt-4o'
+  const modelId = 'anthropic/claude-sonnet-4'
   let ai
   try {
     ai = await client.chat.completions.create({

@@ -35,7 +35,7 @@ export async function runCollectorConversationBrain(
     }
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return {
       shouldReply: true,
       reply: 'وصلت رسالتك، بنراجع الملف ونرد عليك.',
@@ -45,10 +45,10 @@ export async function runCollectorConversationBrain(
     }
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const client = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' })
 
   const ai = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'openai/gpt-4o-mini',
     temperature: 0.18,
     max_tokens: 350,
     response_format: { type: 'json_object' },

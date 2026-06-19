@@ -67,11 +67,11 @@ async function checkJobQueue(companyId?: string): Promise<HealthResult> {
 
 /** Check if OpenAI API key is configured (no live call to save cost) */
 function checkOpenAI(): HealthResult {
-  const configured = !!process.env.OPENAI_API_KEY
+  const configured = !!process.env.OPENROUTER_API_KEY
   return {
     check_type: 'openai',
     status:     configured ? 'ok' : 'down',
-    message:    configured ? 'API key present' : 'OPENAI_API_KEY not set',
+    message:    configured ? 'API key present' : 'OPENROUTER_API_KEY not set',
   }
 }
 
