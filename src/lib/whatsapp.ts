@@ -106,6 +106,35 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
   const to = normalizePhone(options.to)
   const message = truncateMessage(options.message)
 
+  // 0. WAHA (browser-based gateway) — takes priority when configured.
+  // Uses the real WhatsApp Web client, so it resolves LID-migrated contacts
+  // automatically (sending to <number>@c.us is routed to the correct @lid),
+  // which the Baileys-based Evolution gateway fails to do.
+  const wahaUrl     = process.env.WAHA_API_URL
+  const wahaKey     = process.env.WAHA_API_KEY
+  const wahaSession = process.env.WAHA_SESSION || 'default'
+  if (wahaUrl && wahaKey) {
+    try {
+      const response = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/sendText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey },
+        body: JSON.stringify({ session: wahaSession, chatId: `${to}@c.us`, text: message }),
+      })
+      const data = await response.json().catch(() => ({} as any))
+      if (!response.ok) {
+        const errMsg = data?.message || data?.error || `HTTP ${response.status}`
+        log.error('WAHA send failed', undefined, { to, error: String(errMsg) })
+        return { message_id: null, status: 'failed', error: String(errMsg) }
+      }
+      const messageId = data?._data?.id?._serialized || data?.id?._serialized || data?.id || null
+      log.info('WAHA message sent', { to, message_id: messageId })
+      return { message_id: messageId, status: 'sent' }
+    } catch (err) {
+      log.error('WAHA send exception', err as Error, { to })
+      return { message_id: null, status: 'failed', error: err instanceof Error ? err.message : 'WAHA send failed' }
+    }
+  }
+
   // 1. If n8n is enabled, route via n8n webhook
   if (n8nEnabled && options.company_id) {
     const { getN8nClient } = await import('@/lib/n8n/client')
