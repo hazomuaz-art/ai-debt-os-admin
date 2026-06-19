@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
 import { parseXLSX, isXLSX } from '@/lib/excel-parser'
 import { processEventBatch, type PipelineEvent } from '@/lib/automation-pipeline'
+import { findCompanyProfile, type CompanyImportProfile } from '@/lib/company-import-profiles'
 
 // ── Column mapping (English + Arabic) ──────────────────────────────────────
 // Handles: UTF-8, Windows-1256, and common Arabic column names from
@@ -66,6 +67,7 @@ const COLUMN_MAP: Record<string, string> = {
   'ملاحظات': 'notes', 'ملاحظة': 'notes', 'التعليق': 'notes', 'وصف': 'notes',
   'المحصل': 'collector_name', 'اسم المحصل': 'collector_name',
   'المحفظة': 'portfolio_name', 'المشروع': 'portfolio_name', 'الجهة الممولة': 'portfolio_name',
+  'email': 'email', 'e-mail': 'email', 'البريد الالكتروني': 'email', 'الايميل': 'email', 'الإيميل': 'email',
   // Extra aliases
   'customer': 'full_name', 'debtor': 'full_name', 'debtor name': 'full_name',
   'client full name': 'full_name',
@@ -243,6 +245,44 @@ async function lookupPortfolio(
   return null
 }
 
+// Ensures a portfolio exists for a known company profile, seeding it with
+// the company-specific contact-outcome categories so the UI can show the
+// right dropdown instead of a generic one. Idempotent — safe to call once
+// per import.
+async function ensureCompanyPortfolio(
+  supabase: ReturnType<typeof createClient>,
+  companyId: string,
+  profile: CompanyImportProfile,
+): Promise<string> {
+  const { data: existing } = await supabase
+    .from('portfolios').select('id, metadata')
+    .eq('company_id', companyId).ilike('name', profile.nameAr)
+    .maybeSingle()
+
+  if (existing) {
+    const id = (existing as { id: string }).id
+    const meta = (existing as { metadata?: Record<string, unknown> }).metadata ?? {}
+    if (!meta.outcome_categories) {
+      await supabase.from('portfolios').update({
+        metadata: { ...meta, outcome_categories: profile.outcomeCategories, company_key: profile.key },
+      }).eq('id', id)
+    }
+    return id
+  }
+
+  const { data: created, error } = await supabase.from('portfolios').insert({
+    company_id: companyId,
+    name:       profile.nameAr,
+    name_ar:    profile.nameAr,
+    category:   profile.category,
+    source_system: 'manual',
+    metadata:   { outcome_categories: profile.outcomeCategories, company_key: profile.key, aliases: profile.aliases },
+  }).select('id').single()
+
+  if (error || !created) throw new Error(`Portfolio create failed: ${error?.message}`)
+  return (created as { id: string }).id
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -263,6 +303,13 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
     if (!file)
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+
+    // Optional: caller picked a known company profile (telecom/utility/
+    // insurance/... import templates) — forces every row into that
+    // company's portfolio and applies its company-specific column aliases.
+    const companyKey = (formData.get('company_key') as string | null)?.trim() || null
+    const companyProfile = companyKey ? findCompanyProfile(companyKey) : null
+    const forcedPortfolioId = companyProfile ? await ensureCompanyPortfolio(supabase, profile.company_id, companyProfile) : null
 
     const allowed = ['.csv', '.xlsx', '.xls']
     const ext = '.' + file.name.split('.').pop()!.toLowerCase()
@@ -302,11 +349,17 @@ export async function POST(request: NextRequest) {
     if (!headers || headers.length === 0)
       return NextResponse.json({ error: 'لم يتم العثور على أعمدة في الملف' }, { status: 400 })
 
-    // Map headers to field names using Fuzzy Matcher
+    // Map headers to field names — company-specific aliases first (if a
+    // known profile was picked), then the generic fuzzy matcher. Headers
+    // that match neither are kept (not dropped) so their data still
+    // reaches debts.metadata.extra further down.
     const fieldMap: Record<number, string> = {}
+    const unmappedHeaderIdx: number[] = []
     for (let i = 0; i < headers.length; i++) {
-      const mapped = getMappedColumn(headers[i])
+      const h = headers[i].toLowerCase().trim()
+      const mapped = companyProfile?.columnAliases?.[h] ?? getMappedColumn(headers[i])
       if (mapped) fieldMap[i] = mapped
+      else unmappedHeaderIdx.push(i)
     }
 
     // Validate required columns
@@ -328,6 +381,14 @@ export async function POST(request: NextRequest) {
       for (const [colIdxStr, fieldName] of Object.entries(fieldMap)) {
         const val = row[parseInt(colIdxStr)]?.trim()
         if (val) f[fieldName] = val
+      }
+
+      // Preserve company-specific / unrecognised columns instead of
+      // dropping them — e.g. CATEGORY, MNP, SADAD_NUMBER for Mobily.
+      const extra: Record<string, string> = {}
+      for (const idx of unmappedHeaderIdx) {
+        const val = row[idx]?.trim()
+        if (val) extra[headers[idx]] = val
       }
 
       if (!f.full_name) {
@@ -369,6 +430,7 @@ export async function POST(request: NextRequest) {
             ...(f.whatsapp      && { whatsapp:        f.whatsapp.replace(/[^\d+]/g, '') }),
             ...(f.city          && { city:            f.city }),
             ...(f.employer      && { employer:        f.employer }),
+            ...(f.email         && { email:           f.email }),
             ...(f.monthly_income && { monthly_income: parseFloat(f.monthly_income.replace(/[,، ]/g, '')) }),
           }).eq('id', customerId)
         } else {
@@ -381,6 +443,7 @@ export async function POST(request: NextRequest) {
             national_id:    f.national_id || null,
             city:           f.city || null,
             employer:       f.employer || null,
+            email:          f.email || null,
             monthly_income: f.monthly_income ? parseFloat(f.monthly_income.replace(/[,، ]/g, '')) : null,
           }).select('id').single()
 
@@ -407,8 +470,10 @@ export async function POST(request: NextRequest) {
           if (d && !isNaN(d.getTime())) dueDate = d.toISOString().split('T')[0]
         }
 
-        // Resolve portfolio
-        const portfolioId = await lookupPortfolio(supabase, profile.company_id, f.portfolio_name, portfolioCache)
+        // Resolve portfolio — a forced company profile always wins over
+        // any portfolio column found in the file itself.
+        const portfolioId = forcedPortfolioId
+          ?? await lookupPortfolio(supabase, profile.company_id, f.portfolio_name, portfolioCache)
 
         const status   = mapStatus(f.status)
         const priority = ['low','medium','high','critical'].includes(f.priority?.toLowerCase() ?? '')
@@ -434,6 +499,7 @@ export async function POST(request: NextRequest) {
           notes:            f.notes         || null,
           collector_name:   f.collector_name || null,
           portfolio_id:     portfolioId,
+          ...(Object.keys(extra).length > 0 && { metadata: { extra } }),
         }).select('id').single()
 
         if (debtErr) throw new Error(`Debt create failed: ${debtErr.message}`)

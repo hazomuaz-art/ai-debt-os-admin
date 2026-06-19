@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, X, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react'
+import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
 
 interface ImportResult {
   imported: number
@@ -12,6 +13,7 @@ interface ImportResult {
 
 export default function ImportDebtsModal() {
   const [open, setOpen] = useState(false)
+  const [companyKey, setCompanyKey] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -43,6 +45,7 @@ export default function ImportDebtsModal() {
 
     const formData = new FormData()
     formData.append('file', file)
+    if (companyKey) formData.append('company_key', companyKey)
 
     try {
       const res = await fetch('/api/debts/import', { method: 'POST', body: formData })
@@ -82,6 +85,7 @@ export default function ImportDebtsModal() {
     setFile(null)
     setResult(null)
     setError('')
+    setCompanyKey('')
   }
 
   return (
@@ -103,6 +107,22 @@ export default function ImportDebtsModal() {
 
             {!result ? (
               <>
+                {/* Company profile (optional) — forces the right portfolio +
+                    company-specific columns instead of generic detection. */}
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-[#8b95a7] mb-1.5">الشركة (اختياري — يحدد المحفظة وأعمدة الملف تلقائياً)</label>
+                  <select
+                    value={companyKey}
+                    onChange={e => setCompanyKey(e.target.value)}
+                    className="w-full bg-[#0b0e14] border border-[#222a36] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e7a54]"
+                  >
+                    <option value="">عام / غير معروف — كشف تلقائي بالذكاء الاصطناعي</option>
+                    {COMPANY_IMPORT_PROFILES.map(p => (
+                      <option key={p.key} value={p.key}>{p.nameAr}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Drop zone */}
                 <div
                   onDrop={handleDrop}
