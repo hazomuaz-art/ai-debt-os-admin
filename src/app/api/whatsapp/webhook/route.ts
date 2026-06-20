@@ -126,6 +126,15 @@ export async function POST(request: NextRequest) {
             .maybeSingle()
 
           if (customer) {
+            // Idempotency guard: avoid replying twice to a redelivered webhook.
+            const inboundMsgId = String(evo.data.key.id ?? '')
+            if (inboundMsgId) {
+              const { data: dup } = await supabase
+                .from('messages').select('id').eq('whatsapp_message_id', inboundMsgId).eq('direction', 'inbound')
+                .limit(1).maybeSingle()
+              if (dup) { log.info('duplicate inbound webhook ignored', { msgId: inboundMsgId }); return NextResponse.json({ status: 'ok' }) }
+            }
+
             const { data: latestDebt } = await supabase
               .from('debts')
               .select('id, current_balance')

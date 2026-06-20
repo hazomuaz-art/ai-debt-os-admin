@@ -45,6 +45,19 @@ export async function GET(req: NextRequest) {
     const phone = customer.whatsapp || customer.phone
     if (!phone) continue
 
+    // Idempotency guard: don't send a second reminder for the same promise
+    // within the same day (e.g. if the cron is triggered twice, or a manual
+    // run overlaps the scheduled one).
+    const sinceIso = new Date(Date.now() - 20 * 3600_000).toISOString()
+    const { data: alreadyReminded } = await supabase
+      .from('messages').select('id')
+      .eq('debt_id', debt.id).eq('direction', 'outbound')
+      .eq('metadata->>source', 'promise_followup')
+      .eq('metadata->>promise_id', promise.id)
+      .gte('created_at', sinceIso)
+      .limit(1).maybeSingle()
+    if (alreadyReminded) { log.info('reminder already sent for this promise today — skipping', { promise_id: promise.id }); continue }
+
     try {
       const reminderMsg = await generateProactiveReminder({
         company_id: promise.company_id,
@@ -71,7 +84,7 @@ export async function GET(req: NextRequest) {
           content: reminderMsg,
           status: sendResult.status === 'sent' ? 'sent' : 'failed',
           whatsapp_message_id: sendResult.message_id || null,
-          metadata: { sender: 'ai', action_type: 'reply', source: 'promise_followup', error: sendResult.error ?? null },
+          metadata: { sender: 'ai', action_type: 'reply', source: 'promise_followup', promise_id: promise.id, error: sendResult.error ?? null },
           sent_at: new Date().toISOString(),
         })
 

@@ -101,6 +101,16 @@ export async function POST(request: NextRequest) {
     const c = customer as { id: string; company_id: string; full_name?: string; ai_paused?: boolean }
     const msgId = String(payload?.id?._serialized ?? payload?.id ?? '').split('_').pop() ?? null
 
+    // Idempotency guard: WAHA/WhatsApp can redeliver the same webhook event
+    // (network retry, duplicate push) — without this check, the agent would
+    // run and reply twice for the exact same inbound message.
+    if (msgId) {
+      const { data: dup } = await supabase
+        .from('messages').select('id').eq('whatsapp_message_id', msgId).eq('direction', 'inbound')
+        .limit(1).maybeSingle()
+      if (dup) { log.info('duplicate inbound webhook ignored', { msgId }); return NextResponse.json({ status: 'ok' }) }
+    }
+
     const { data: latestDebt } = await supabase
       .from('debts').select('id, current_balance').eq('customer_id', c.id)
       .not('status', 'in', '("settled","written_off")')
