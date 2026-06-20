@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
           if (customer) {
             const { data: latestDebt } = await supabase
               .from('debts')
-              .select('id')
+              .select('id, current_balance')
               .eq('customer_id', (customer as { id: string }).id)
               .not('status', 'in', '("settled","written_off")')
               .order('created_at', { ascending: false })
@@ -232,6 +232,17 @@ export async function POST(request: NextRequest) {
                 await recordDispute({
                   company_id, customer_id, customer_name: (customer as { full_name?: string }).full_name,
                   debt_id, customer_message: text, agent_reason: aiDecision.reason,
+                })
+              }
+
+              // Promise → record ONLY with the date the agent extracted from
+              // the customer's own current message (never fabricated).
+              if (aiDecision.action === 'record_promise' && debt_id && aiDecision.promised_date) {
+                const { recordPromise } = await import('@/lib/promise')
+                await recordPromise({
+                  company_id, customer_id, debt_id,
+                  promised_amount: Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0),
+                  promised_date: aiDecision.promised_date, customer_message: text,
                 })
               }
             })().catch(err => log.error('AI Processing Error', err))

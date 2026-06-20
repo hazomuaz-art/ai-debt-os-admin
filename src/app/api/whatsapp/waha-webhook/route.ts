@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     const msgId = String(payload?.id?._serialized ?? payload?.id ?? '').split('_').pop() ?? null
 
     const { data: latestDebt } = await supabase
-      .from('debts').select('id').eq('customer_id', c.id)
+      .from('debts').select('id, current_balance').eq('customer_id', c.id)
       .not('status', 'in', '("settled","written_off")')
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     const debt_id = (latestDebt as { id: string } | null)?.id ?? null
@@ -147,6 +147,17 @@ export async function POST(request: NextRequest) {
         await recordDispute({
           company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
           debt_id, customer_message: text, agent_reason: aiDecision.reason,
+        })
+      }
+
+      // Promise → record ONLY with the date the agent extracted from the
+      // customer's own current message (never fabricated).
+      if (aiDecision.action === 'record_promise' && debt_id && aiDecision.promised_date) {
+        const { recordPromise } = await import('@/lib/promise')
+        await recordPromise({
+          company_id: c.company_id, customer_id: c.id, debt_id,
+          promised_amount: Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0),
+          promised_date: aiDecision.promised_date, customer_message: text,
         })
       }
     })().catch(err => log.error('WAHA AI processing error', err as Error))

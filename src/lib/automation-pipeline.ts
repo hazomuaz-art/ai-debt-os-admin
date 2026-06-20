@@ -643,45 +643,21 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
 async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
   const today = new Date().toISOString().split('T')[0]
   const in2days = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0]
-  const eventText = String(event?.data?.message ?? event?.data?.customer_statement ?? event?.data?.note ?? '').trim()
-  const rawIntent = eventText ? detectCustomerIntent(eventText) : 'unknown'
-  const hasPromiseTime =
-    eventText.includes('بكرة') || eventText.includes('بكره') ||
-    eventText.includes('نهاية الشهر') || eventText.includes('اخر الشهر') || eventText.includes('آخر الشهر') ||
-    eventText.includes('يوم') || eventText.includes('تاريخ') ||
-    eventText.toLowerCase().includes('tomorrow')
-  const detectedIntent = (rawIntent === 'payment_intent' || rawIntent === 'promise') && hasPromiseTime ? 'promise' : (rawIntent === 'promise' && !hasPromiseTime ? 'payment_intent' : rawIntent)
-  const promiseDate =
-    eventText.includes('بكرة') || eventText.includes('بكره') || eventText.toLowerCase().includes('tomorrow')
-      ? new Date(Date.now() + 86400000).toISOString().split('T')[0]
-      : in2days
 
   const sb = createServiceClient()
 
   try {
-    if (event?.source === 'promise_update' || detectedIntent === 'promise') {
-      const { data: existingPromise } = await sb.from('promises')
-        .select('id')
-        .eq('company_id', ctx.debt.company_id)
-        .eq('debt_id', ctx.debt.id)
-        .eq('status', 'pending')
-        .limit(1)
-
-      if (!(existingPromise?.length)) {
-        await sb.from('promises').insert({
-          company_id: ctx.debt.company_id,
-          customer_id: ctx.debt.customer_id,
-          debt_id: ctx.debt.id,
-          promised_amount: ctx.debt.current_balance,
-          promised_date: promiseDate,
-          channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
-          status: 'pending',
-          notes: eventText ? `Auto-created from inbound intent: ${eventText}` : 'Auto-created from promise_update event',
-        })
-        
-        await sb.from('debts').update({ status: 'promised' }).eq('id', ctx.debt.id)
-      }
-    }
+    // NOTE: this step deliberately does NOT create promise records from
+    // loose keyword-matching on inbound text anymore. That logic used to
+    // fire on any message containing e.g. "سداد" + "يوم" — including
+    // questions like "متى تاريخ السداد؟" — and fabricated a promised_date
+    // (today+2, or tomorrow if "بكرة" was mentioned) that the customer
+    // never actually gave. The agent then confronted customers with
+    // promises they never made. The only trustworthy source for a real
+    // promise is the collector agent's own explicit decision
+    // (action === 'record_promise' with a date it extracted from the
+    // customer's actual words) — see ai-collector-agent.ts and the
+    // webhook handlers that persist it from there.
 
     await sb.from('promises')
       .update({ status: 'broken' })

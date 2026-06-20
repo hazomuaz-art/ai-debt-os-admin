@@ -10,10 +10,20 @@ const log = createLogger('cron/verify-delivery')
 // on the first-ever message to a brand-new contact, while the e2e session
 // is still being established. Our DB only learns the TRUE delivery state
 // from the message.ack webhook, which upgrades status to delivered/read.
-// If a message is still stuck at "sent" well after it should have been
-// acked, it almost certainly never arrived — this run finds those, retries
-// each ONCE, and marks the original honestly as "failed" so reporting
-// (especially future campaigns) never shows false positives.
+//
+// 🔴 SAFETY (incident 2026-06-19): an earlier version of this job retried
+// EVERY stuck message independently. For a customer whose session is
+// permanently broken (never delivers anything), that meant every single
+// past AI reply in the conversation got rediscovered as "stuck" on
+// successive 5-minute runs and re-sent — effectively replaying an entire
+// old conversation, including escalation/legal-threat lines, back-to-back
+// in one burst. Fixed by reasoning PER CUSTOMER, not per message:
+//   - If a customer has never once had a message reach delivered/read,
+//     their session is treated as broken — we stop sending to them
+//     entirely (no retries) and raise a one-time alert for manual fix.
+//   - Otherwise, retry at most the SINGLE most-recent stuck message for
+//     that customer per run. Older stuck messages are marked failed
+//     without ever being re-sent.
 const STUCK_AFTER_MIN = 2   // give real acks this long to arrive
 const TOO_OLD_MIN = 60      // don't chase very old sends forever
 const MAX_PER_RUN = 30
@@ -37,60 +47,114 @@ export async function GET(req: NextRequest) {
     .order('sent_at', { ascending: true })
     .limit(MAX_PER_RUN)
 
-  const result = { checked: stuck?.length ?? 0, retried: 0, markedFailed: 0, correctedToFailed: 0, skipped: 0 }
+  const result = { checked: stuck?.length ?? 0, retried: 0, markedFailedNoResend: 0, brokenSessionsSkipped: 0, correctedToFailed: 0, skipped: 0 }
 
+  // Group by customer so we never act on more than one stuck message per
+  // customer per run, and so we can check session health once per customer.
+  const byCustomer = new Map<string, Array<NonNullable<typeof stuck>[number]>>()
   for (const m of stuck ?? []) {
-    const meta = (m as { metadata?: Record<string, unknown> }).metadata ?? {}
-    const alreadyRetried = !!meta.retry_of || !!meta.retry_attempted
-    if (alreadyRetried) {
-      // This was already a retry, or already retried once — stop chasing,
-      // just record it honestly as undelivered.
+    const cid = (m as { customer_id: string }).customer_id
+    if (!byCustomer.has(cid)) byCustomer.set(cid, [])
+    byCustomer.get(cid)!.push(m)
+  }
+
+  for (const [customerId, msgs] of Array.from(byCustomer.entries())) {
+    // Has this customer EVER had a message actually confirmed delivered/read?
+    // If not, their session is broken — stop sending to them entirely.
+    const { data: everDelivered } = await supabase
+      .from('messages').select('id')
+      .eq('customer_id', customerId).eq('channel', 'whatsapp').eq('direction', 'outbound')
+      .in('status', ['delivered', 'read'])
+      .limit(1).maybeSingle()
+
+    if (!everDelivered) {
+      for (const m of msgs) {
+        const meta = (m as { metadata?: Record<string, unknown> }).metadata ?? {}
+        await supabase.from('messages').update({
+          status: 'failed',
+          metadata: { ...meta, delivery_unconfirmed: true, session_broken: true },
+        }).eq('id', (m as { id: string }).id)
+        result.correctedToFailed++
+      }
+      result.brokenSessionsSkipped++
+
+      const { data: existingAlert } = await supabase
+        .from('system_alerts').select('id').eq('alert_type', 'whatsapp_session_broken')
+        .eq('is_resolved', false).contains('metadata', { customer_id: customerId }).limit(1).maybeSingle()
+      if (!existingAlert) {
+        await supabase.from('system_alerts').insert({
+          company_id: (msgs[0] as { company_id: string }).company_id, severity: 'critical',
+          alert_type: 'whatsapp_session_broken',
+          title: 'جلسة واتساب معطوبة مع عميل — لا تصل أي رسالة',
+          message: `لم تصل أي رسالة لهذا العميل منذ بداية المحادثة. توقف النظام عن الإرسال له تلقائياً. الحل: اطلب من العميل إرسال أي رسالة للبوت أولاً لإعادة فتح الجلسة.`,
+          metadata: { customer_id: customerId, stuck_count: msgs.length }, is_read: false, is_resolved: false,
+        })
+      }
+      continue
+    }
+
+    // Healthy session, just a transient miss — retry only the single most
+    // recent stuck message; mark any older ones failed without resending.
+    const sorted = [...msgs].sort((a, b) =>
+      new Date((b as { sent_at: string }).sent_at).getTime() - new Date((a as { sent_at: string }).sent_at).getTime())
+    const [latest, ...rest] = sorted
+
+    for (const m of rest) {
+      const meta = (m as { metadata?: Record<string, unknown> }).metadata ?? {}
       await supabase.from('messages').update({
         status: 'failed',
         metadata: { ...meta, delivery_unconfirmed: true },
       }).eq('id', (m as { id: string }).id)
-      result.markedFailed++
+      result.markedFailedNoResend++
+      result.correctedToFailed++
+    }
+
+    const meta = (latest as { metadata?: Record<string, unknown> }).metadata ?? {}
+    const alreadyRetried = !!meta.retry_of || !!meta.retry_attempted
+    if (alreadyRetried) {
+      await supabase.from('messages').update({
+        status: 'failed',
+        metadata: { ...meta, delivery_unconfirmed: true },
+      }).eq('id', (latest as { id: string }).id)
+      result.markedFailedNoResend++
       result.correctedToFailed++
       continue
     }
 
     const { data: customer } = await supabase
-      .from('customers').select('phone, whatsapp').eq('id', (m as { customer_id: string }).customer_id).maybeSingle()
+      .from('customers').select('phone, whatsapp').eq('id', customerId).maybeSingle()
     const phone = (customer as { whatsapp?: string; phone?: string } | null)?.whatsapp
       || (customer as { whatsapp?: string; phone?: string } | null)?.phone
     if (!phone) { result.skipped++; continue }
 
     const r = await sendWhatsAppMessage({
-      to: phone, message: String((m as { content: string }).content),
-      company_id: (m as { company_id: string }).company_id,
+      to: phone, message: String((latest as { content: string }).content),
+      company_id: (latest as { company_id: string }).company_id,
     })
 
-    // Mark the original honestly — it was never confirmed delivered,
-    // regardless of whether the retry itself appears to have gone through.
     await supabase.from('messages').update({
       status: 'failed',
       metadata: { ...meta, delivery_unconfirmed: true, retry_attempted: true },
-    }).eq('id', (m as { id: string }).id)
+    }).eq('id', (latest as { id: string }).id)
     result.correctedToFailed++
 
     if (r.status === 'sent') {
       await supabase.from('messages').insert({
-        company_id: (m as { company_id: string }).company_id,
-        customer_id: (m as { customer_id: string }).customer_id,
-        debt_id: (m as { debt_id: string | null }).debt_id,
+        company_id: (latest as { company_id: string }).company_id,
+        customer_id: customerId,
+        debt_id: (latest as { debt_id: string | null }).debt_id,
         channel: 'whatsapp', direction: 'outbound',
-        content: String((m as { content: string }).content),
+        content: String((latest as { content: string }).content),
         status: 'sent', whatsapp_message_id: r.message_id || null,
-        metadata: { ...meta, retry_of: (m as { id: string }).id },
+        metadata: { ...meta, retry_of: (latest as { id: string }).id },
         sent_at: new Date().toISOString(),
       })
       result.retried++
     } else {
-      result.markedFailed++
+      result.markedFailedNoResend++
     }
   }
 
-  // Dashboard visibility — never let undelivered messages hide silently.
   if (result.correctedToFailed > 0) {
     const { data: existing } = await supabase
       .from('system_alerts').select('id').eq('alert_type', 'whatsapp_delivery_unconfirmed')
@@ -99,7 +163,7 @@ export async function GET(req: NextRequest) {
       await supabase.from('system_alerts').insert({
         company_id: null, severity: 'warning', alert_type: 'whatsapp_delivery_unconfirmed',
         title: 'رسائل واتساب لم يتأكد تسليمها',
-        message: `${result.correctedToFailed} رسالة لم تصل فعلياً رغم ظهورها "مرسَلة" — تم تصحيح حالتها إلى "فشل" وإعادة محاولة الإرسال حيث أمكن.`,
+        message: `${result.correctedToFailed} رسالة لم تصل فعلياً رغم ظهورها "مرسَلة" — تم تصحيح حالتها إلى "فشل" (أقصى رسالة واحدة أُعيد إرسالها لكل عميل، لا إعادة إرسال جماعية).`,
         metadata: result, is_read: false, is_resolved: false,
       })
     }

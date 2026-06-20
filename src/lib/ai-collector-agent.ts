@@ -20,6 +20,10 @@ export type CollectorDecision = {
     | 'human_review'
   reason: string
   message: string
+  // Only meaningful when action === 'record_promise' — the exact date
+  // (YYYY-MM-DD) the customer stated, extracted by the model itself using
+  // the real "today" given in the prompt. Never fabricated downstream.
+  promised_date?: string | null
 }
 
 type HistoryItem = {
@@ -491,6 +495,7 @@ ${intentPrompts[intent]}
 10. 🔴 الحد الأقصى المطلق لأي مهلة أو تأجيل = 30 يوماً من تاريخ اليوم (${todayStr}) ولا يوماً أكثر تحت أي ظرف. إن طلب العميل أكثر من ذلك (شهرين، 3 شهور، أو ما شابه)، فرفضك إلزامي — لا تقل "ما عندي مشكلة" ولا توافق ضمنياً. اعرض عليه مدة أقصر بكثير (أسبوع إلى أسبوعين) وفاوضه نزولاً، ولا توافق على الشهر كاملاً إلا بعد محاولة تقصيره أولاً.
 11. 🔴 لا تختار action=record_dispute أبداً في أول رد على كلام فيه اعتراض غامض بلا سبب محدد (راجع تعليمات DISPUTE أعلاه) — اسأل عن السبب أولاً دائماً.
 12. 🔴 استخدم أساليب إقناع متنوعة فعلية لا تكرار نفس الجملة: التذكير بالعواقب بأدب، عرض حل وسط، تحديد خطوة صغيرة فورية (صورة إيصال، تاريخ محدد)، الإشارة إلى أن التأخير يزيد تعقيد الملف. إن شعرت أن العميل يرفض أو يماطل عمداً زِد الحزم والضغط ولا تستسلم أو تصمت.
+13. 🔴🔴 أهم قاعدة في تسجيل الوعود: اختر action=record_promise فقط إذا ذكر العميل **في رسالته الحالية بالذات** تاريخاً أو وقتاً محدداً وواضحاً للسداد (مثل "بسدد بكرة"، "يوم الخميس"، "نهاية الشهر"، "يوم 25"). احسب التاريخ الدقيق YYYY-MM-DD بالاستناد إلى تاريخ اليوم الحقيقي (${todayStr}) واكتبه في حقل promised_date. ممنوع منعاً باتاً اختيار record_promise أو ذكر "أنت وعدتني" إن لم يذكر العميل تاريخاً بنفسه في هذه المحادثة — حتى لو كانت كلامه يتضمن "بسدد" بلا تاريخ، فهذا نية لا وعد، اطلب منه التاريخ أولاً (action=negotiate) ولا تسجّل أي شيء. لا تخترع promised_date أبداً من عندك.
 
 ═══════════════ صيغة الإخراج ═══════════════
 أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:
@@ -498,7 +503,8 @@ ${intentPrompts[intent]}
   "shouldReply": true,
   "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
   "reason": "سبب مختصر",
-  "message": "رد الواتساب أو فارغ"
+  "message": "رد الواتساب أو فارغ",
+  "promised_date": "YYYY-MM-DD أو null — لا تعبئها إلا مع action=record_promise وبتاريخ ذكره العميل صريحاً الآن"
 }
 
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
@@ -578,6 +584,29 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
     parsed.message = 'تمام، بس عشان أقدر أساعدك بسرعة — وضّح لي إيش بالضبط سبب اعتراضك على المبلغ؟'
     parsed.action = 'request_clarification'
     parsed.reason = 'dispute_reason_guard_override'
+  }
+
+  // 3) Never persist a promise the customer didn't actually give a date
+  // for — this is the exact bug that caused the agent to later accuse
+  // first-time customers of "promises" they never made. Require BOTH a
+  // valid YYYY-MM-DD from the model AND a date-like signal in the
+  // customer's own current message before trusting it.
+  if (parsed.action === 'record_promise') {
+    const validDate = parsed.promised_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.promised_date)
+    const customerGaveDateSignal = hasAny(text, [
+      'بكرة', 'بكره', 'تومورو', 'tomorrow', 'الخميس', 'الجمعة', 'السبت', 'الأحد', 'الاحد',
+      'الإثنين', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الاربعاء', 'نهاية الشهر', 'اخر الشهر', 'آخر الشهر',
+      'يوم', 'تاريخ', 'الراتب',
+    ]) && /\d/.test(text) || hasAny(text, ['بكرة', 'بكره', 'tomorrow', 'الخميس', 'الجمعة', 'السبت', 'الأحد', 'الاحد', 'الإثنين', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الاربعاء', 'نهاية الشهر', 'اخر الشهر', 'آخر الشهر'])
+    if (!validDate || !customerGaveDateSignal) {
+      log.warn('fabricated promise guard fired — no real date from customer', { intent, original_date: parsed.promised_date, customer_text: text.slice(0, 80) })
+      parsed.message = 'تمام، بس عشان أسجلها — إيش التاريخ بالضبط اللي تقدر تسدد فيه؟'
+      parsed.action = 'negotiate'
+      parsed.reason = 'fabricated_promise_guard_override'
+      parsed.promised_date = null
+    }
+  } else {
+    parsed.promised_date = null
   }
 
   log.info('agent decision', {
