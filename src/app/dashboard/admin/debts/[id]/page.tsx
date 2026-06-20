@@ -14,6 +14,7 @@ import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
+import UnifiedTimeline from '@/components/debt/UnifiedTimeline'
 
 // Translate AI-generated score factor names (free-form English) to Arabic by keyword.
 function factorAr(name: string): string {
@@ -180,6 +181,17 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           
           {/* Quick Actions Panel */}
           <QuickActionsPanel debtId={debt.id} currentStatus={debt.status} />
+
+          {/* Unified customer history — everything in one chronological log */}
+          <UnifiedTimeline
+            messages={debt.messages}
+            payments={debt.payments}
+            promises={promises ?? []}
+            approvals={approvals ?? []}
+            followups={collectionFollowups ?? []}
+            statusHistory={collectionStatusHistory ?? []}
+            currency={debt.currency}
+          />
 
           {/* Debt Overview */}
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">

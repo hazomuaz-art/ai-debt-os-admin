@@ -78,13 +78,17 @@ export async function POST(request: NextRequest) {
 
     const from = String(payload?.from ?? '')
     const text = String(payload?.body ?? '')
+    const mediaUrl: string = payload?.media?.url ?? ''
+    const mimetype: string = String(payload?.media?.mimetype ?? '')
+    const hasReceiptMedia = !!mediaUrl && (mimetype.startsWith('image/') || mimetype === 'application/pdf')
     if (from.endsWith('@g.us')) { log.info('group message ignored', { from }); return NextResponse.json({ status: 'ok' }) }
-    if (!from || !text) return NextResponse.json({ status: 'ok' })
+    // Accept the message if it has text OR a receipt-type attachment.
+    if (!from || (!text && !hasReceiptMedia)) return NextResponse.json({ status: 'ok' })
 
     const phone = await resolvePhone(from, session)
     if (!phone) { log.warn('could not resolve phone', { from }); return NextResponse.json({ status: 'ok' }) }
 
-    log.info('WAHA inbound', { from, phone })
+    log.info('WAHA inbound', { from, phone, hasReceiptMedia, mimetype })
 
     const { data: customer } = await supabase
       .from('customers')
@@ -105,13 +109,34 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('messages').insert({
       company_id: c.company_id, customer_id: c.id, debt_id,
-      channel: 'whatsapp', direction: 'inbound', content: text, status: 'delivered',
+      channel: 'whatsapp', direction: 'inbound',
+      content: text || (mimetype === 'application/pdf' ? '📎 إيصال (PDF)' : '📎 إيصال (صورة)'),
+      status: 'delivered',
       whatsapp_message_id: msgId,
-      metadata: { provider: 'waha', from },
+      metadata: { provider: 'waha', from, ...(hasReceiptMedia && { media_url: mediaUrl, mimetype }) },
       sent_at: new Date().toISOString(),
     })
 
     if (c.ai_paused) { log.info('AI paused — skipping reply', { customer_id: c.id }); return NextResponse.json({ status: 'ok' }) }
+
+    // Payment receipt (image / PDF) → OCR verification pipeline.
+    if (hasReceiptMedia) {
+      ;(async () => {
+        try {
+          const r = await fetch(mediaUrl, { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
+          if (!r.ok) { log.error('receipt media download failed', undefined, { status: r.status }); return }
+          const b64 = Buffer.from(await r.arrayBuffer()).toString('base64')
+          const { processInboundReceipt } = await import('@/lib/payment-receipt')
+          await processInboundReceipt({
+            company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
+            debt_id, phone, source: mimetype === 'application/pdf' ? 'pdf' : 'image', data: b64,
+          })
+        } catch (err) {
+          log.error('WAHA receipt processing error', err as Error)
+        }
+      })().catch(() => {})
+      return NextResponse.json({ status: 'ok' })
+    }
 
     // Run the collector agent and reply (sendWhatsAppMessage routes via WAHA)
     ;(async () => {
