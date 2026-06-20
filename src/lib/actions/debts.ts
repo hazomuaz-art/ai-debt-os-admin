@@ -9,6 +9,8 @@ import { createLogger } from '@/lib/logger'
 import { trackDebtCreated, trackCustomerCreated } from '@/lib/usage-tracker'
 import { processEvent } from '@/lib/automation-pipeline'
 import { recordAttribution } from '@/lib/revenue-attribution'
+import { upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
+import { getPortfolioTableConfig } from '@/lib/portfolio-data-fields'
 const log = createLogger('actions/debts')
 
 // ============================================================
@@ -41,6 +43,7 @@ const createDebtSchema = z.object({
   account_number:  z.string().max(100).optional(),
   assigned_to:     z.string().uuid().optional().or(z.literal('')).transform(v => v || undefined),
   notes:           z.string().max(1000).optional(),
+  portfolio_id:    z.string().uuid().optional().or(z.literal('')).transform(v => v || undefined),
 })
 
 // ============================================================
@@ -105,6 +108,28 @@ export async function createCustomerAction(formData: FormData) {
 
     if (error) return { error: error.message }
 
+    // Portfolio-specific fields (المحفظة dropdown + dynamic fields, named
+    // pf_<column> by PortfolioFieldsSection) — same tables the importer
+    // routes data into.
+    const portfolioId = (raw.portfolio_id as string | undefined) || null
+    const companyKey  = (raw.company_key as string | undefined) || null
+    if (companyKey && getPortfolioTableConfig(companyKey)) {
+      const config = getPortfolioTableConfig(companyKey)!
+      const payload: Record<string, unknown> = {}
+      for (const field of config.fields) {
+        const val = raw[`pf_${field.column}`]
+        if (typeof val === 'string' && val.trim()) {
+          payload[field.column] = field.type === 'number' ? parseFloat(val) : val.trim()
+        }
+      }
+      if (Object.keys(payload).length > 0) {
+        await upsertPortfolioCustomerData(supabase, {
+          companyKey, companyId: profile.company_id, customerId: data.id,
+          portfolioId, payload,
+        })
+      }
+    }
+
     revalidatePath('/dashboard/admin/customers')
     revalidatePath('/dashboard/manager/customers')
     return { data }
@@ -165,8 +190,9 @@ export async function createDebtAction(formData: FormData) {
       return { error: error.message }
     }
 
-    // Auto-assign the debt to a portfolio based on its creditor
-    if (data && parsed.data.creditor_name) {
+    // Auto-assign the debt to a portfolio based on its creditor — skipped
+    // when the user already picked a portfolio explicitly via the dropdown.
+    if (data && !parsed.data.portfolio_id && parsed.data.creditor_name) {
       const portfolioId = await ensurePortfolioForCreditor(supabase, profile.company_id, parsed.data.creditor_name)
       if (portfolioId) {
         await supabase.from('debts').update({ portfolio_id: portfolioId }).eq('id', data.id)

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { createCaseAction } from '@/lib/actions/debts'
 import { UserPlus, Loader2 } from 'lucide-react'
+import PortfolioFieldsSection from '@/components/debt/PortfolioFieldsSection'
 
 export function AddCaseModal() {
   const [open, setOpen] = useState(false)
@@ -122,6 +123,8 @@ export function AddCaseModal() {
               </div>
             </div>
           </div>
+
+          <PortfolioFieldsSection />
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={() => setOpen(false)} className="btn-secondary flex-1">إلغاء</button>

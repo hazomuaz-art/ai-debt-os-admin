@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createCustomerAction } from '@/lib/actions/debts'
+import PortfolioFieldsSection from '@/components/debt/PortfolioFieldsSection'
 
 export function CreateCustomerModal() {
   const [open, setOpen] = useState(false)
@@ -78,6 +79,9 @@ export function CreateCustomerModal() {
               <textarea name="notes" className="input h-16 resize-none" />
             </div>
           </div>
+
+          <PortfolioFieldsSection />
+
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => setOpen(false)} className="btn-secondary flex-1">Cancel</button>
             <button type="submit" disabled={loading} className="btn-primary flex-1">

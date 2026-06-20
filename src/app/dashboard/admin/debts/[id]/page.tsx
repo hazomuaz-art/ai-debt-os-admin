@@ -15,6 +15,7 @@ import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
 import UnifiedTimeline from '@/components/debt/UnifiedTimeline'
+import { getPortfolioTableConfig } from '@/lib/portfolio-data-fields'
 
 // Translate AI-generated score factor names (free-form English) to Arabic by keyword.
 function factorAr(name: string): string {
@@ -137,6 +138,23 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .limit(5)
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
+
+  // Portfolio-specific fields (Mobily, STC, التعاونية, ...) — same data
+  // the importer routes into customer_data_<table>, also editable manually.
+  let portfolioData: Record<string, unknown> | null = null
+  let portfolioConfig: ReturnType<typeof getPortfolioTableConfig> = null
+  if (debt.portfolio_id) {
+    const { data: portfolioRow } = await supabase
+      .from('portfolios').select('metadata').eq('id', debt.portfolio_id).maybeSingle()
+    const companyKey = (portfolioRow?.metadata as Record<string, unknown> | null)?.company_key as string | undefined
+    portfolioConfig = getPortfolioTableConfig(companyKey)
+    if (portfolioConfig) {
+      const { data: row } = await supabase
+        .from(portfolioConfig.table).select('*')
+        .eq('customer_id', debt.customer_id).maybeSingle()
+      portfolioData = row
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
@@ -413,6 +431,27 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               )}
             </div>
           </div>
+
+          {portfolioConfig && portfolioData && (
+            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
+                <FileText className="text-white" size={20} />
+                <h2 className="text-lg font-bold text-white">بيانات المحفظة</h2>
+              </div>
+              <div className="space-y-3 text-sm">
+                {portfolioConfig.fields.map(f => {
+                  const val = portfolioData?.[f.column]
+                  if (val === null || val === undefined || val === '') return null
+                  return (
+                    <div key={f.column} className="flex justify-between items-center pb-3 border-b border-slate-50">
+                      <span className="text-[#8b95a7] font-bold">{f.label}</span>
+                      <span className="font-bold text-white">{String(val)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <h2 className="text-sm font-bold text-[#8b95a7] mb-3">المحصّل المسؤول</h2>

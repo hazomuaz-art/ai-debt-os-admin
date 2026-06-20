@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
 import { parseXLSX, isXLSX } from '@/lib/excel-parser'
 import { processEventBatch, type PipelineEvent } from '@/lib/automation-pipeline'
-import { findCompanyProfile, type CompanyImportProfile } from '@/lib/company-import-profiles'
+import { findCompanyProfile, resolveCompanyProfile, type CompanyImportProfile } from '@/lib/company-import-profiles'
+import { buildPortfolioPayload, upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
 
 // ── Column mapping (English + Arabic) ──────────────────────────────────────
 // Handles: UTF-8, Windows-1256, and common Arabic column names from
@@ -391,6 +392,21 @@ export async function POST(request: NextRequest) {
         if (val) extra[headers[idx]] = val
       }
 
+      // Full raw header→value map (every column, mapped or not) — used to
+      // populate the portfolio-specific customer_data_<table>, since some
+      // of those columns (e.g. "نوع الهوية") also map to a standard field.
+      const rawByHeader: Record<string, string> = {}
+      for (let i = 0; i < headers.length; i++) {
+        const val = row[i]?.trim()
+        if (val) rawByHeader[headers[i].toLowerCase().trim()] = val
+      }
+
+      // Resolve which known portfolio this row belongs to — a forced
+      // company profile (picked at upload time) always wins; otherwise
+      // sort each row by its own "portfolio"/"محفظة" column, so a single
+      // sheet containing multiple portfolios is routed correctly.
+      const rowProfile = companyProfile ?? (f.portfolio_name ? resolveCompanyProfile(f.portfolio_name) : null)
+
       if (!f.full_name) {
         results.errors.push(`Row ${rowIdx + 2}: missing customer name`)
         results.skipped++
@@ -452,6 +468,22 @@ export async function POST(request: NextRequest) {
           customerId = (newCust as { id: string }).id
         }
 
+        // Route portfolio-specific columns into customer_data_<table> for
+        // the row's resolved portfolio (Mobily, STC, التعاونية, ...).
+        if (rowProfile) {
+          const built = buildPortfolioPayload(rowProfile.key, rawByHeader)
+          if (built) {
+            await upsertPortfolioCustomerData(supabase, {
+              companyKey:  rowProfile.key,
+              companyId:   profile.company_id,
+              customerId,
+              portfolioId: forcedPortfolioId
+                ?? await ensureCompanyPortfolio(supabase, profile.company_id, rowProfile),
+              payload: built.payload,
+            })
+          }
+        }
+
         // Parse dates
         let dueDate: string | null = null
         if (f.due_date) {
@@ -470,9 +502,11 @@ export async function POST(request: NextRequest) {
           if (d && !isNaN(d.getTime())) dueDate = d.toISOString().split('T')[0]
         }
 
-        // Resolve portfolio — a forced company profile always wins over
-        // any portfolio column found in the file itself.
+        // Resolve portfolio — a forced company profile always wins; else
+        // a row-detected known profile gets its dedicated portfolio;
+        // otherwise fall back to plain name lookup against `portfolios`.
         const portfolioId = forcedPortfolioId
+          ?? (rowProfile ? await ensureCompanyPortfolio(supabase, profile.company_id, rowProfile) : null)
           ?? await lookupPortfolio(supabase, profile.company_id, f.portfolio_name, portfolioCache)
 
         const status   = mapStatus(f.status)

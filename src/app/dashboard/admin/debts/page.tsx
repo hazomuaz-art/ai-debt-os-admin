@@ -57,7 +57,8 @@ export default async function AdminDebtsPage({
       *,
       customer:customers(id, full_name, phone, whatsapp, ai_paused),
       assigned_collector:profiles!debts_assigned_to_fkey(id, full_name),
-      ai_scores(score, risk_classification)
+      ai_scores(score, risk_classification),
+      portfolio:portfolios(id, name, name_ar)
     `, { count: 'exact' })
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
@@ -121,6 +122,7 @@ export default async function AdminDebtsPage({
               <tr>
                 <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.ref_number}</th>
                 <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{t.ui.customer}</th>
+                <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">المحفظة</th>
                 <th className="px-6 py-4 text-start font-bold text-[#8b95a7]">{p.due_amount}</th>
                 <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{t.ui.status}</th>
                 <th className="px-6 py-4 text-center font-bold text-[#8b95a7]">{p.ai_score}</th>
@@ -130,16 +132,20 @@ export default async function AdminDebtsPage({
             </thead>
             <tbody className="divide-y divide-[#1c2330]">
               {(debts ?? []).length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_debts}</td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-[#5f6b7e]">{p.no_debts}</td></tr>
               ) : (debts ?? []).map((debt: any) => {
                 const latestScore = debt.ai_scores?.[0]
                 const cust = debt.customer as { id?: string; full_name?: string; phone?: string; whatsapp?: string; ai_paused?: boolean } | null
+                const portfolio = debt.portfolio as { id?: string; name?: string; name_ar?: string } | null
                 return (
                   <tr key={debt.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="px-6 py-4"><span className="font-mono text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">{debt.reference_number}</span></td>
                     <td className="px-6 py-4">
                       <div className="font-semibold text-white">{cust?.full_name ?? '—'}</div>
                       <div className="text-[#5f6b7e] text-xs mt-0.5 font-mono" dir="ltr">{cust?.phone ?? ''}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {portfolio ? <span className="text-xs font-bold text-slate-300 bg-[#222a36] px-2 py-1 rounded-md">{portfolio.name_ar ?? portfolio.name}</span> : <span className="text-[#5f6b7e]">—</span>}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-bold text-rose-400">{formatCurrency(debt.current_balance, debt.currency)}</div>
