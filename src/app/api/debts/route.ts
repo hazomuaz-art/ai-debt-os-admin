@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
     )
     if (queryErr) return queryErr
 
-    const offset = (query.page - 1) * query.limit
+    const page = query.page ?? 1
+    const limit = query.limit ?? 20
+    const offset = (page - 1) * limit
 
     // Build query with explicit type annotation to avoid cast hacks
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
       `, { count: 'exact' })
       .eq('company_id', ctx.profile.company_id)
       .order('created_at', { ascending: false })
-      .range(offset, offset + query.limit - 1)
+      .range(offset, offset + limit - 1)
 
     if (query.status)      dbQuery = dbQuery.eq('status', query.status)
     if (query.priority)    dbQuery = dbQuery.eq('priority', query.priority)
@@ -58,9 +60,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data:  debtsWithScore,
       count,
-      page:  query.page,
-      limit: query.limit,
-      pages: Math.ceil((count ?? 0) / query.limit),
+      page:  page,
+      limit: limit,
+      pages: Math.ceil((count ?? 0) / limit),
     })
   })
 }

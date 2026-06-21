@@ -56,7 +56,7 @@ export default function ApprovalsPage() {
   }
 
   function handleActionClick(item: Approval, status: 'approved' | 'rejected') {
-    if (status === 'approved' && (item.approval_type === 'custom' || item.approval_type === 'payment_plan')) {
+    if (status === 'approved' && (item.approval_type === 'custom' || (item.approval_type as string) === 'payment_plan')) {
       setPlanModalItem(item)
     } else {
       void act(item.id, status)

@@ -17,7 +17,7 @@ export function getServerTranslation(): {
 } {
   const locale = getServerLocale()
   return {
-    t: translations[locale],
+    t: translations[locale] as TranslationKeys,
     locale,
     dir: locale === 'ar' ? 'rtl' : 'ltr',
     isRTL: locale === 'ar',

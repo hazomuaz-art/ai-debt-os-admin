@@ -558,7 +558,7 @@ export default function CampaignsPage() {
                     <div className="flex gap-6 text-sm text-[#8b95a7] flex-wrap font-medium">
                       <div className="flex items-center gap-1.5"><Target size={14} className="text-[#5f6b7e]"/> المستهدفين: {campaign.target_count}</div>
                       <div className="flex items-center gap-1.5"><Megaphone size={14} className="text-blue-400"/> أُرسلت: {campaign.sent_count}</div>
-                      <div className="flex items-center gap-1.5"><MessageSquare size={14} className="text-purple-400"/> الردود: {campaign.response_count}</div>
+                      <div className="flex items-center gap-1.5"><MessageSquare size={14} className="text-purple-400"/> الردود: {(campaign as any).response_count}</div>
                       <div className="flex items-center gap-1.5"><Activity size={14} className="text-amber-400"/> الدفعات: {campaign.payment_count}</div>
                       <div className="flex items-center gap-1.5 text-emerald-600 font-bold">المحصّل: {String(Number(campaign.total_collected ?? 0))} SAR</div>
                     </div>

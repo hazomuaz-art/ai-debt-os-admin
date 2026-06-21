@@ -11,6 +11,7 @@
   | "refusal"
   | "information_request"
   | "promise"
+  | "legal_threat"
   | "unknown"
 
 export function detectCustomerIntent(message: string): CustomerIntent {

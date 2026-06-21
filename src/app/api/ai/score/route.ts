@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const scoreResult = await scoreDebt({
       debt:                debt as Parameters<typeof scoreDebt>[0]['debt'],
-      customer:            customer as Parameters<typeof scoreDebt>[0]['customer'],
+      customer:            customer as unknown as Parameters<typeof scoreDebt>[0]['customer'],
       payment_history:     (payments ?? []).map((p: { amount: unknown; payment_date: string; status: string }) => ({
         amount: Number(p.amount),
         date:   p.payment_date,

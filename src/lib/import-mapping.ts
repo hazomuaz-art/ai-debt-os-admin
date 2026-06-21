@@ -66,7 +66,7 @@ export function calculateImportRisk(status?: string | null, amount?: number) {
 
   if (s === 'settled') return 'low'
   if (s === 'legal' || Number(amount ?? 0) >= 8000) return 'high'
-  if (s === 'in_negotiation' || s === 'pending') return 'medium'
+  if ((s as string) === 'in_negotiation' || (s as string) === 'pending') return 'medium'
 
   return 'medium'
 }

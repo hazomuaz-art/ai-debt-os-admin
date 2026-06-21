@@ -72,7 +72,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const dir = locale === 'ar' ? 'rtl' : 'ltr'
   const isRTL = locale === 'ar'
-  const t = translations[locale]
+  const t = translations[locale] as TranslationKeys
 
   // Set initial direction
   useEffect(() => {

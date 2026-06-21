@@ -40,6 +40,7 @@ const createDebtSchema = z.object({
   priority:        z.string().default('medium'),
   due_date:        z.string().optional(),
   product_type:    z.string().max(100).optional(),
+  creditor_name:   z.string().max(200).optional(),
   account_number:  z.string().max(100).optional(),
   assigned_to:     z.string().uuid().optional().or(z.literal('')).transform(v => v || undefined),
   notes:           z.string().max(1000).optional(),
@@ -210,7 +211,7 @@ export async function createDebtAction(formData: FormData) {
         p_delay:      '30 seconds',
       })
     } catch (err) {
-      log.warn('Failed to enqueue AI score job', err instanceof Error ? err : new Error(String(err)))
+      log.warn('Failed to enqueue AI score job', { error: String(err) })
     }
 
     // Track usage (non-blocking)

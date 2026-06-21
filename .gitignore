@@ -44,3 +44,4 @@ Thumbs.db
 *.key
 
 automation-pipeline.backup.ts
+_handover/

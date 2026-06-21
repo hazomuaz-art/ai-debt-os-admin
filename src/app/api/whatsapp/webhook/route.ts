@@ -229,7 +229,6 @@ export async function POST(request: NextRequest) {
                     debt_id: debt_id ?? 'temp',
                     company_id,
                     source: 'ai_reply',
-                    event_type: 'whatsapp_outbound',
                     data: { message: aiDecision.message, action: aiDecision.action }
                   }).catch(e => log.error('pipeline processing failed', e))
                 }

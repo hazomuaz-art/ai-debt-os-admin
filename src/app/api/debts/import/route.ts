@@ -565,7 +565,7 @@ export async function POST(request: NextRequest) {
         pipelineResult = await processEventBatch(pipelineEvents, 4)
         logger.info('Pipeline complete', { imported: results.imported, pipeline: pipelineResult })
       } catch (pipelineErr) {
-        logger.warn('Pipeline batch error', pipelineErr)
+        logger.warn('Pipeline batch error', { error: String(pipelineErr) })
       }
     }
 

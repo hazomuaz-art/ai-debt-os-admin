@@ -142,7 +142,7 @@ export async function logCost(opts: LogCostOptions): Promise<void> {
     })
   } catch (err) {
     // Non-fatal — never let cost tracking break the main flow
-    log.warn('Failed to log cost entry', err instanceof Error ? err : new Error(String(err)))
+    log.warn('Failed to log cost entry', { error: String(err) })
   }
 }
 

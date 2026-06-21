@@ -86,8 +86,8 @@ export default async function AdminDebtsPage({
     supabase.from('debts').select('creditor_name').neq('creditor_name', null)
   ])
 
-  const productTypes = Array.from(new Set((productsData || []).map(p => p.product_type)))
-  const creditors = Array.from(new Set((creditorsData || []).map(c => c.creditor_name)))
+  const productTypes: string[] = Array.from(new Set((productsData || []).map((p: any) => String(p.product_type))))
+  const creditors: string[] = Array.from(new Set((creditorsData || []).map((c: any) => String(c.creditor_name))))
 
   const statusLabels: Record<string, string> = isAr ? {
     active: 'نشط', in_progress: 'قيد التنفيذ', promised: 'وعود سداد',

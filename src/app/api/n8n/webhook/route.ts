@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
           source: 'ai_reply',
           company_id,
           _customer_id: customer_id,
-          _debt_id: active_debt_id || null,
+          _debt_id: active_debt_id || undefined,
           data: { action: action_type, message: message_content }
         }).catch(() => {})
 

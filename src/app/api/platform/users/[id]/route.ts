@@ -29,7 +29,7 @@ export async function DELETE(
       }
 
       if (targetProfile.company_id !== ctx.profile.company_id) {
-        return errors.forbidden('Cannot delete a user from another company')
+        return errors.forbidden()
       }
 
       // Cleanup dependencies before deleting the Auth user

@@ -34,7 +34,7 @@ export type EventSource =
   | 'csv_import' | 'excel_import' | 'api_sync'
   | 'webhook_whatsapp' | 'webhook_evolution' | 'webhook_call'
   | 'payment_update' | 'promise_update' | 'refusal_detected' | 'dispute_detected' | 'payment_claim_detected' | 'legal_escalation_detected' | 'collector_note'
-  | 'debt_update' | 'customer_update' | 'manual'
+  | 'debt_update' | 'customer_update' | 'manual' | 'ai_reply'
 
 export interface PipelineEvent {
   source:        EventSource
@@ -225,7 +225,7 @@ const EVENT_TYPE_MAP: Record<EventSource, string> = {
   payment_update: 'payment', promise_update: 'promise_to_pay',
   refusal_detected: 'refusal', dispute_detected: 'dispute', payment_claim_detected: 'payment_claim', legal_escalation_detected: 'legal_escalation',
   collector_note: 'collector_note', debt_update: 'status_change',
-  customer_update: 'status_change', manual: 'ai_analysis',
+  customer_update: 'status_change', manual: 'ai_analysis', ai_reply: 'ai_analysis',
 }
 
 const CHANNEL_MAP: Record<EventSource, string> = {
@@ -234,7 +234,7 @@ const CHANNEL_MAP: Record<EventSource, string> = {
   payment_update: 'system', promise_update: 'whatsapp',
   refusal_detected: 'whatsapp', dispute_detected: 'whatsapp', payment_claim_detected: 'whatsapp', legal_escalation_detected: 'whatsapp',
   collector_note: 'manual', debt_update: 'system',
-  customer_update: 'system', manual: 'system',
+  customer_update: 'system', manual: 'system', ai_reply: 'whatsapp',
 }
 
 async function stepTimeline(
@@ -261,6 +261,7 @@ async function stepTimeline(
     debt_update:      `تحديث دين — الحالة: ${ctx.debt.status}`,
     customer_update:  `تحديث بيانات العميل`,
     manual:           `معالجة يدوية — الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}`,
+    ai_reply:         `رد آلي من الوكيل على ${ctx.customer.full_name}`,
   }
   try {
     await createServiceClient().from('timeline_events').insert({

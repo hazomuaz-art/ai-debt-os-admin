@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest) {
         const debtMap = new Map(debts.map(d => [d.id, d]))
         enrichedData = enrichedData.map(a => {
           if ((a.entity_type === 'debt' || a.entity_type === 'debts') && a.entity_id) {
-             const d = debtMap.get(a.entity_id)
+             const d: any = debtMap.get(a.entity_id)
              if (d && d.customers) {
                if (a.approval_type === 'custom' || a.approval_type === 'payment_plan') {
                  a.title = `طلب تقسيط: ${d.customers.full_name}`

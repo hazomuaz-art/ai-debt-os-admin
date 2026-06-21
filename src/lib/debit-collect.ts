@@ -143,7 +143,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
     try {
       // Resolve portfolio
       const portfolioCode = rec.portfolio_code?.toUpperCase()
-      const portfolio = portfolioByCode.get(portfolioCode ?? '') ??
+      const portfolio: any = portfolioByCode.get(portfolioCode ?? '') ??
                         portfolioByName.get(rec.portfolio_name?.toLowerCase() ?? '')
 
       // Upsert customer by national_id or phone

@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         if (waResult.status === 'sent') {
           await processEvent({
             debt_id: debt_id ?? 'temp', company_id: c.company_id,
-            source: 'ai_reply', event_type: 'whatsapp_outbound',
+            source: 'ai_reply',
             data: { message: aiDecision.message, action: aiDecision.action },
           }).catch(e => log.error('pipeline failed', e as Error))
         }

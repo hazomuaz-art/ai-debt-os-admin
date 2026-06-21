@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
 
   const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
   
-  let user = null
+  let user: any = null
   if (isDummyUrl) {
     const hasSession = request.cookies.has('mock-auth-logged-in')
     if (hasSession) {

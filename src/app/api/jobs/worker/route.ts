@@ -125,7 +125,7 @@ async function runWorker(): Promise<NextResponse> {
       try {
         try { await supabase.rpc('run_scheduled_cleanup') } catch { /* not yet deployed */ }
       } catch (cleanupErr) {
-        log.warn(' Cleanup failed:', cleanupErr)
+        log.warn(' Cleanup failed:', { error: String(cleanupErr) })
       }
     }
 

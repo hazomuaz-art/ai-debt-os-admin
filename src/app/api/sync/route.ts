@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       const result = await processRecords({
         company_id: ctx.profile.company_id,
         source:     source as 'debit_collect' | 'tamiuzz' | 'manual',
-        records:    records as Parameters<typeof processRecords>[0]['records'],
+        records:    records as unknown as Parameters<typeof processRecords>[0]['records'],
         synced_by:  ctx.user.id,
       })
 
