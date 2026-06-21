@@ -6,7 +6,7 @@ const createSchema = z.object({
   portfolio_id: z.string().uuid(),
   display_name: z.string().max(120).optional(),
   phone_number: z.string().min(8).max(30),
-  provider: z.enum(['evolution']).default('evolution'),
+  provider: z.enum(['waha']).default('waha'),
   instance_name: z.string().min(2).max(120),
   api_url: z.string().url().optional(),
   is_active: z.boolean().default(true),

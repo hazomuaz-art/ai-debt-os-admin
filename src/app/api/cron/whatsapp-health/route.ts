@@ -42,17 +42,18 @@ export async function GET(req: NextRequest) {
     return true
   }
 
-  // 1) connection state
-  const base = process.env.EVOLUTION_API_URL
-  const instance = process.env.EVOLUTION_INSTANCE_NAME
-  const apikey = process.env.EVOLUTION_API_KEY
+  // 1) connection state — WAHA session status (WORKING == connected)
+  const base = (process.env.WAHA_API_URL ?? '').replace(/\/$/, '')
+  const session = process.env.WAHA_SESSION || 'default'
+  const apikey = process.env.WAHA_API_KEY
   let state = 'unknown'
   try {
-    const r = await fetch(`${base}/instance/connectionState/${instance}`, { headers: { apikey: apikey ?? '' } })
+    const r = await fetch(`${base}/api/sessions/${session}`, { headers: { 'X-Api-Key': apikey ?? '' } })
     const j = await r.json()
-    state = j?.instance?.state ?? 'unknown'
+    // WAHA reports "WORKING" when the session is connected and authenticated.
+    state = j?.status === 'WORKING' ? 'open' : String(j?.status ?? 'unknown').toLowerCase()
   } catch (e) {
-    log.error('connectionState check failed', e)
+    log.error('WAHA session status check failed', e)
   }
   result.state = state
   if (state !== 'open') {
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
       'whatsapp_disconnected', 'critical',
       'انقطاع اتصال واتساب',
       `رقم واتساب غير متصل حالياً (الحالة: ${state}). الوكيل لا يستطيع إرسال أو استقبال الرسائل حتى تتم إعادة الربط.`,
-      { state, instance },
+      { state, session },
     )
   }
 
