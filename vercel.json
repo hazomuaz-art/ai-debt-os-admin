@@ -1,5 +1,11 @@
 {
   "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "master": false,
+      "main": false
+    }
+  },
   "buildCommand": "next build",
   "devCommand": "next dev",
   "installCommand": "npm install",
