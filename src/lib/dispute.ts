@@ -21,7 +21,7 @@ function classifyDisputeType(text: string): DisputeType {
  * surrounding conversation — instead of a single bare line. Also opens the
  * matching admin approval. Deduplicates against an existing open dispute.
  *
- * Usable from any WhatsApp gateway webhook (WAHA, Evolution, ...).
+ * Usable from any WhatsApp gateway webhook (WAHA).
  */
 export async function recordDispute(args: {
   company_id: string

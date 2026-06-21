@@ -8,9 +8,9 @@ import type { IntegrationSetting } from '@/types'
 
 const INTEGRATIONS = [
   {
-    key:         'evolution_whatsapp',
-    label:       'Evolution WhatsApp',
-    description: 'ربط واتساب عبر Evolution API لاستقبال وإرسال الرسائل والمفاوضات.',
+    key:         'waha',
+    label:       'WAHA WhatsApp',
+    description: 'ربط واتساب عبر WAHA لاستقبال وإرسال الرسائل والمفاوضات.',
     icon:        <MessageCircle size={24} className="text-white" />,
   },
   {
@@ -92,7 +92,7 @@ export default async function IntegrationsPage() {
         <div>
           <h3 className="font-bold text-lg mb-1">تحتاج مساعدة في الربط؟</h3>
           <p className="text-blue-200 text-sm">
-            يمكنك دائماً الرجوع إلى مركز المساعدة والتوثيق لمعرفة كيفية إعداد Evolution API ومسارات n8n بشكل صحيح.
+            يمكنك دائماً الرجوع إلى مركز المساعدة والتوثيق لمعرفة كيفية إعداد WAHA ومسارات n8n بشكل صحيح.
           </p>
         </div>
         <a

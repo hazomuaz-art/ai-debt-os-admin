@@ -9,7 +9,7 @@ export type ReceiptSource = 'image' | 'pdf' | 'text'
 
 /**
  * Shared receipt-verification pipeline, usable from any WhatsApp gateway
- * webhook (WAHA, Evolution, ...). Reads a payment proof sent by the customer
+ * webhook (WAHA). Reads a payment proof sent by the customer
  * — as an image, a PDF document, or plain text — extracts amount/date/etc,
  * and either auto-confirms the payment or flags it for admin review.
  *

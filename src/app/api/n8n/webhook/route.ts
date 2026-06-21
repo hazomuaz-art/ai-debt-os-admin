@@ -199,14 +199,14 @@ export async function POST(request: NextRequest) {
            return NextResponse.json({ error: 'Customer phone not found' }, { status: 404 })
         }
 
-        // Send WhatsApp message DIRECTLY to Evolution API (no n8n routing)
-        // We intentionally do NOT pass company_id to avoid circular n8n routing
-        console.log('[ai_reply_generated] Sending directly to Evolution API:', { phone, messageLength: message_content.length })
+        // Send WhatsApp message directly via the WAHA gateway.
+        console.log('[ai_reply_generated] Sending via WAHA:', { phone, messageLength: message_content.length })
         const waResult = await sendWhatsAppMessage({
           to: phone,
           message: message_content,
+          company_id,
         })
-        console.log('[ai_reply_generated] Evolution API Result:', JSON.stringify(waResult))
+        console.log('[ai_reply_generated] WAHA send result:', JSON.stringify(waResult))
 
         // Save outbound AI message
         await supabase.from('messages').insert({

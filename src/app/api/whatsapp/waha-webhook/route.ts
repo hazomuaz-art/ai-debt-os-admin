@@ -58,15 +58,20 @@ export async function POST(request: NextRequest) {
 
     // ── Delivery acknowledgements ──
     if (event === 'message.ack') {
+      // Outbound sends store the FULL serialized id (e.g.
+      // "true_<chat>@lid_<ref>"), so match on it directly. We also accept the
+      // bare trailing ref as a fallback for any legacy rows stored stripped.
       const msgId = String(payload?.id?._serialized ?? payload?.id ?? '')
       const newStatus = ackToStatus[Number(payload?.ack)]
       if (msgId && newStatus) {
-        const id = msgId.split('_').pop() ?? msgId
+        const ref = msgId.split('_').pop() ?? msgId
+        const match = `whatsapp_message_id.eq.${msgId},whatsapp_message_id.eq.${ref}`
         const rank: Record<string, number> = { sent: 1, delivered: 2, read: 3 }
         const { data: row } = await supabase
-          .from('messages').select('status').eq('whatsapp_message_id', id).maybeSingle()
-        if (!row || (rank[newStatus] ?? 0) > (rank[(row as { status: string }).status] ?? 0)) {
-          await supabase.from('messages').update({ status: newStatus }).eq('whatsapp_message_id', id)
+          .from('messages').select('id, status').or(match)
+          .eq('direction', 'outbound').limit(1).maybeSingle()
+        if (row && (rank[newStatus] ?? 0) > (rank[(row as { status: string }).status] ?? 0)) {
+          await supabase.from('messages').update({ status: newStatus }).eq('id', (row as { id: string }).id)
         }
       }
       return NextResponse.json({ status: 'ok' })
