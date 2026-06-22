@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { extractReceipt, extractReceiptFromPdf, extractReceiptFromText, type ReceiptData } from '@/lib/receipt-ocr'
+import { recordAttribution } from '@/lib/revenue-attribution'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('payment-receipt')
@@ -9,7 +10,7 @@ export type ReceiptSource = 'image' | 'pdf' | 'text'
 
 /**
  * Shared receipt-verification pipeline, usable from any WhatsApp gateway
- * webhook (WAHA, Evolution, ...). Reads a payment proof sent by the customer
+ * webhook (WAHA). Reads a payment proof sent by the customer
  * — as an image, a PDF document, or plain text — extracts amount/date/etc,
  * and either auto-confirms the payment or flags it for admin review.
  *
@@ -28,53 +29,195 @@ export async function processInboundReceipt(args: {
 }): Promise<void> {
   const svc = createServiceClient()
 
+  const srcLabel = args.source === 'image' ? 'صورة' : args.source === 'pdf' ? 'PDF' : 'نص'
+
   let ocr: ReceiptData | null
   if (args.source === 'image') ocr = await extractReceipt(args.data)
   else if (args.source === 'pdf') ocr = await extractReceiptFromPdf(args.data)
   else ocr = await extractReceiptFromText(args.data)
 
-  if (!ocr || !ocr.is_receipt || !ocr.amount) {
+  // Genuinely not a receipt (e.g. a random photo) → let the agent handle it.
+  if (!ocr || !ocr.is_receipt) {
     log.info('not recognized as a receipt — leaving for agent/human', { source: args.source, customer_id: args.customer_id })
     return
   }
 
+  // Load the debt + the expected collection account (our beneficiary) so we can
+  // actually MATCH the transfer instead of blindly trusting the amount.
   const { data: debt } = args.debt_id
-    ? await svc.from('debts').select('current_balance, currency').eq('id', args.debt_id).maybeSingle()
-    : { data: null }
-  const balance = Number((debt as { current_balance?: number } | null)?.current_balance ?? 0)
-  const currency = (debt as { currency?: string } | null)?.currency ?? ocr.currency ?? 'SAR'
+    ? await svc.from('debts')
+        .select('current_balance, currency, status, reference_number, account_number, creditor_name, portfolio_id, created_at')
+        .eq('id', args.debt_id).maybeSingle()
+    : { data: null as any }
+  const d = (debt ?? {}) as Record<string, any>
+  const balance = Number(d.current_balance ?? 0)
+  const currency = d.currency ?? ocr.currency ?? 'SAR'
 
-  // Text claims are never auto-verified — only image/PDF receipts with high
-  // OCR confidence and a sane amount can be confirmed automatically.
-  const autoVerify = args.source !== 'text' && ocr.confidence >= 70 && ocr.amount > 0 && ocr.amount <= balance * 1.2 + 1
+  const { data: accounts } = await svc.from('collection_accounts')
+    .select('method_type, iban, account_name, bank_name, biller_code, biller_name, portfolio_id')
+    .eq('company_id', args.company_id).eq('is_active', true)
+  const acc = (accounts ?? []).find((a: any) => d.portfolio_id && a.portfolio_id === d.portfolio_id)
+    ?? (accounts ?? []).find((a: any) => !a.portfolio_id) ?? (accounts ?? [])[0] ?? null
 
-  await svc.from('payments').insert({
+  const digits = (s: any) => String(s ?? '').replace(/\D/g, '')
+  const last4 = (s: any) => digits(s).slice(-4)
+  const amount = Number(ocr.amount ?? 0)
+  const amountOk = amount > 0 && amount <= balance * 1.2 + 1
+
+  // Beneficiary / invoice matching — proves the money went to US.
+  let beneficiary: 'match' | 'mismatch' | 'unknown' = 'unknown'
+  if (acc?.method_type === 'sadad_biller' && acc?.biller_code) {
+    // Invoice/SADAD-based creditor (e.g. telecom/utility): the bill or biller
+    // number on the receipt must reference our biller / the debt account.
+    const hay = `${ocr.invoice_number ?? ''} ${ocr.reference ?? ''} ${ocr.beneficiary_name ?? ''}`
+    const needles = [acc.biller_code, acc.biller_name, d.reference_number, d.account_number]
+      .map(digits).filter(n => n.length >= 4)
+    const haveAny = !!(ocr.invoice_number || ocr.reference)
+    beneficiary = needles.some(n => digits(hay).includes(n)) ? 'match' : (haveAny ? 'mismatch' : 'unknown')
+  } else if (acc?.iban) {
+    // Bank-transfer creditor (e.g. insurance): match recipient IBAN tail and/or
+    // beneficiary name against our account.
+    const expect4 = last4(acc.iban)
+    if (ocr.iban_last4 && expect4) beneficiary = last4(ocr.iban_last4) === expect4 ? 'match' : 'mismatch'
+    else if (ocr.beneficiary_name && acc.account_name &&
+             ocr.beneficiary_name.replace(/\s/g, '').includes(String(acc.account_name).split(' ')[0]))
+      beneficiary = 'match'
+    else beneficiary = 'unknown'
+  }
+
+  // Auto-confirm only image/PDF receipts that are a sane amount AND either match
+  // our beneficiary, or (when we have no account to check against) are very high
+  // confidence. A clear beneficiary MISMATCH is never auto-confirmed.
+  const autoVerify = args.source !== 'text' && amountOk && ocr.confidence >= 70 &&
+    (beneficiary === 'match' || (beneficiary === 'unknown' && ocr.confidence >= 85))
+
+  const matchMeta = { beneficiary, amountOk, expected_balance: balance, source: args.source }
+  const noteBits = [
+    `إيصال عبر الواتساب (${srcLabel})`,
+    ocr.reference ? `مرجع: ${ocr.reference}` : '',
+    ocr.invoice_number ? `فاتورة: ${ocr.invoice_number}` : '',
+    ocr.iban_last4 ? `آيبان٤: ${ocr.iban_last4}` : '',
+    ocr.beneficiary_name ? `المستفيد: ${ocr.beneficiary_name}` : '',
+    `مطابقة المستفيد: ${beneficiary}`,
+  ].filter(Boolean).join(' — ')
+
+  // No readable amount (e.g. scanned image-only PDF) → flag for review, never drop.
+  if (!amount) {
+    await svc.from('system_alerts').insert({
+      company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
+      title: 'إيصال يحتاج مراجعة يدوية',
+      message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن تعذّر قراءة المبلغ تلقائياً.`,
+      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr }, is_resolved: false,
+    })
+    await addTimeline(svc, args, 'payment', 'إيصال استُلم — يحتاج مراجعة يدوية (تعذّر قراءة المبلغ)', ocr)
+    await replyAndLog(svc, args, 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
+    return
+  }
+
+  const payDate = (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date)) ? ocr.date : new Date().toISOString().slice(0, 10)
+  const { data: insertedPayment } = await svc.from('payments').insert({
     company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-    amount: ocr.amount, currency,
+    amount, currency,
     status: autoVerify ? 'completed' : 'pending',
-    payment_date: (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date)) ? ocr.date : new Date().toISOString().slice(0, 10),
+    payment_date: payDate,
     verification_status: autoVerify ? 'verified' : 'pending',
     ocr_data: ocr,
-    notes: `إيصال عبر الواتساب (${args.source === 'image' ? 'صورة' : args.source === 'pdf' ? 'PDF' : 'نص'})`,
-  })
+    notes: noteBits,
+  }).select('id').single()
 
   let reply: string
   if (autoVerify && args.debt_id) {
-    const newBal = Math.max(0, balance - ocr.amount)
+    // ── FULL PAYMENT CYCLE: debt + promises + timeline all updated ──
+    const newBal = Math.max(0, balance - amount)
     const upd: Record<string, unknown> = { current_balance: newBal }
     if (newBal <= 0) upd.status = 'settled'
+    else if (d.status === 'promised' || d.status === 'overdue') upd.status = 'active'
     await svc.from('debts').update(upd).eq('id', args.debt_id)
-    reply = `تم استلام إيصالك وتأكيد مبلغ ${ocr.amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
+
+    // Any open promise is now kept → mark it so the agent stops chasing it.
+    // 'fulfilled' is NOT a valid promises.status (DB CHECK only allows
+    // pending|kept|broken|rescheduled|partial) — this update has been
+    // silently rejected by Postgres on every single payment ever since
+    // this code was written (Supabase doesn't throw on a CHECK violation
+    // here, it only returns `{ error }`, which was never checked), so
+    // promises never actually left 'pending' after being paid.
+    const { error: promiseUpdErr } = await svc.from('promises')
+      .update({ status: 'kept', fulfilled_at: new Date().toISOString() })
+      .eq('company_id', args.company_id).eq('debt_id', args.debt_id).eq('status', 'pending')
+    if (promiseUpdErr) log.error('failed to mark promise as kept', { error: promiseUpdErr.message, debt_id: args.debt_id })
+
+    await addTimeline(svc, args, 'payment',
+      `سداد مؤكَّد ${amount} ${currency}${newBal <= 0 ? ' — سُدّدت المديونية بالكامل' : ` — المتبقي ${newBal} ${currency}`} (${matchMeta.beneficiary})`, ocr)
+
+    // Attribution: this is the AI confirming a real payment via OCR, with
+    // no human collector involved at all — fully AI-driven. settlement vs
+    // payment depends on whether the debt was actually closed by it.
+    if (insertedPayment?.id) {
+      const { count: msgCount } = await svc.from('messages').select('id', { count: 'exact', head: true })
+        .eq('company_id', args.company_id).eq('customer_id', args.customer_id).eq('debt_id', args.debt_id)
+      const daysToCollect = d.created_at
+        ? Math.max(0, Math.round((Date.now() - new Date(d.created_at).getTime()) / 86_400_000))
+        : undefined
+      await recordAttribution({
+        company_id: args.company_id,
+        event_type: newBal <= 0 ? 'settlement' : 'payment',
+        payment_id: insertedPayment.id,
+        customer_id: args.customer_id,
+        debt_id: args.debt_id,
+        amount,
+        primary_channel: 'ai_reply',
+        primary_actor: 'ai',
+        ai_assisted: true,
+        portfolio_id: d.portfolio_id ?? undefined,
+        touches_before_pay: msgCount ?? undefined,
+        days_to_collect: daysToCollect,
+      })
+    }
+
+    reply = `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
   } else {
-    reply = 'استلمنا إيصالك، جاري التحقق منه وسنؤكد لك قريباً. شكراً.'
+    const reason = beneficiary === 'mismatch'
+      ? 'بيانات المستفيد/الفاتورة في الإيصال لا تطابق حساب التحصيل'
+      : `بحاجة مراجعة (ثقة ${ocr.confidence}%)`
     await svc.from('system_alerts').insert({
-      company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
-      title: 'إيصال دفع يحتاج مراجعة',
-      message: `العميل ${args.customer_name ?? ''} أرسل ${args.source === 'image' ? 'صورة' : args.source === 'pdf' ? 'PDF' : 'نص'} بمبلغ ${ocr.amount ?? '؟'} ${currency} (ثقة ${ocr.confidence}%)`,
-      metadata: { debt_id: args.debt_id, customer_id: args.customer_id }, is_resolved: false,
+      company_id: args.company_id, severity: beneficiary === 'mismatch' ? 'warning' : 'info',
+      alert_type: 'payment_review', title: 'إيصال دفع يحتاج مراجعة',
+      message: `العميل ${args.customer_name ?? ''}: ${srcLabel} بمبلغ ${amount} ${currency} — ${reason}.`,
+      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ...matchMeta, ocr }, is_resolved: false,
     })
+    await addTimeline(svc, args, 'payment', `إيصال بمبلغ ${amount} ${currency} — ${reason}`, ocr)
+    reply = beneficiary === 'mismatch'
+      ? 'استلمت إيصالك، بس يبدو إن التحويل لجهة مختلفة. نراجعه ونأكد لك — لا داعي لإعادة الإرسال.'
+      : 'تم استلام إيصالك ووصلني، جاري التحقق وسأؤكد لك قريباً. شكراً.'
   }
 
+  await replyAndLog(svc, args, reply)
+}
+
+// Adds a timeline entry so the customer page / history / dashboards reflect the
+// receipt event immediately (not stuck only in the payments table).
+async function addTimeline(
+  svc: ReturnType<typeof createServiceClient>,
+  args: { company_id: string; customer_id: string; debt_id: string | null },
+  event_type: string, summary: string, ocr: ReceiptData,
+): Promise<void> {
+  try {
+    await svc.from('timeline_events').insert({
+      company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+      event_type, channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+      summary: summary.slice(0, 200), detail: JSON.stringify(ocr).slice(0, 1000),
+      occurred_at: new Date().toISOString(),
+    })
+  } catch (e) {
+    log.error('receipt timeline insert failed', e as Error)
+  }
+}
+
+async function replyAndLog(
+  svc: ReturnType<typeof createServiceClient>,
+  args: { company_id: string; customer_id: string; debt_id: string | null; phone: string },
+  reply: string,
+): Promise<void> {
   const wr = await sendWhatsAppMessage({ to: args.phone, message: reply, company_id: args.company_id })
   await svc.from('messages').insert({
     company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,

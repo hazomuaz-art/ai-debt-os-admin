@@ -96,7 +96,7 @@ export default async function AIRevenuePage() {
                 <div>
                   <div className="text-slate-900 font-medium capitalize">{row.channel.replace('_', ' ')}</div>
                   <div className="text-[#5f6b7e] text-xs">
-                    {row.count} payments · Avg days {row.avg_days} · Avg ROI {row.avg_roi}%
+                    {row.count} payments · Avg days {row.avg_days}
                   </div>
                 </div>
                 <div className="text-slate-900 font-semibold">
