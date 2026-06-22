@@ -24,6 +24,12 @@ export type CollectorDecision = {
   // (YYYY-MM-DD) the customer stated, extracted by the model itself using
   // the real "today" given in the prompt. Never fabricated downstream.
   promised_date?: string | null
+  // The customer's stated timing in their OWN words / meaning, exactly as they
+  // expressed it (e.g. "مع نزول الراتب", "بداية الشهر الجاي", "عند نزول حساب
+  // المواطن", "بكرا"). This is the semantic promise — stored and reused so the
+  // agent never re-asks. Set by the model for any timing expression, however
+  // phrased; we do NOT keyword-match it.
+  promise_text?: string | null
 }
 
 type HistoryItem = {
@@ -42,6 +48,37 @@ function norm(text: string) {
 function hasAny(text: string, words: string[]) {
   const v = norm(text)
   return words.some(w => v.includes(w.toLowerCase()))
+}
+
+// Convert Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) numerals to ASCII
+// so that `\d` and numeric date parsing actually work on real WhatsApp text
+// like "يوم ٣٠" or "٣٠-٠٦". Without this, every Arabic-numeral date was treated
+// as "no date" — the core reason valid promises were rejected and re-asked.
+function toAsciiDigits(s: string): string {
+  return String(s ?? '')
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+}
+
+// Broad, robust detection of an explicit pay date/time the customer stated,
+// covering the many real spellings used on WhatsApp: بكرا/بكره/بكرة, غدا/غداً,
+// اليوم, weekday names, نهاية/آخر الشهر, مع الراتب, numeric dates (30/6, يوم 30,
+// 30 الشهر), and "خلال/بعد N يوم/اسبوع/شهر". Arabic numerals are normalised
+// first. This REPLACES a narrow keyword list that missed "بكرا" and every
+// Arabic-numeral date, which is what caused the post-promise questioning loop.
+function hasTemporalRef(raw: string): boolean {
+  const t = toAsciiDigits(norm(raw))
+  return (
+    /(بكرا|بكره|بكرة|غدا|غدًا|غداً|اليوم|الحين|بعد بكر|بعد غد|عقب بكر)/.test(t) ||
+    /(السبت|الاحد|الأحد|الاثنين|الإثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعه|الجمعة)/.test(t) ||
+    /(الراتب|راتب|معاش)/.test(t) ||
+    /(نهاية|اخر|آخر|بداية|اول|أول|منتصف)\s*(الشهر|الاسبوع|الأسبوع)/.test(t) ||
+    /(نهاية الشهر|اخر الشهر|آخر الشهر|الشهر الجاي|الشهر القادم|الاسبوع الجاي|الأسبوع الجاي|هالاسبوع|هالشهر)/.test(t) ||
+    /\b\d{1,2}\s*[\/\-.]\s*\d{1,2}\b/.test(t) ||
+    /يوم\s*\d{1,2}/.test(t) ||
+    /\b\d{1,2}\s*(الشهر|من الشهر|بالشهر|شهر)\b/.test(t) ||
+    /(خلال|بعد|عقب|كل)\s*\d+\s*(يوم|ايام|أيام|اسبوع|أسبوع|اسابيع|أسابيع|شهر|شهور|اشهر|أشهر)/.test(t)
+  )
 }
 
 // Only unambiguous farewell/thanks phrases — short acks like "طيب" or "تمام"
@@ -89,7 +126,7 @@ const ARABIC_WORD_NUM: Record<string, number> = {
 // anything beyond the policy max (30 days), since it doesn't reliably
 // follow that instruction from prompt text alone.
 function detectRequestedGraceDays(text: string): number | null {
-  const t = norm(text)
+  const t = toAsciiDigits(norm(text))
   for (const [phrase, days] of Object.entries(ARABIC_WORD_NUM)) {
     if (t.includes(phrase)) return days
   }
@@ -187,6 +224,24 @@ function dateOnly(d: any) {
   return s.length >= 10 ? s.slice(0, 10) : s
 }
 
+function addDaysISO(baseISO: string, days: number): string {
+  const d = new Date(baseISO + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+// A model-provided date is trustworthy only if it parses and lands in a sane
+// window relative to the real "today" (a few days back to allow timezone slack,
+// up to ~13 months ahead). Prevents storing a hallucinated far-past/future date.
+function isSaneDate(iso: string, todayISO: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false
+  const t = Date.parse(iso + 'T00:00:00Z')
+  const today = Date.parse(todayISO + 'T00:00:00Z')
+  if (Number.isNaN(t) || Number.isNaN(today)) return false
+  const diffDays = (t - today) / 86_400_000
+  return diffDays >= -2 && diffDays <= 400
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  Case file — the "memory" the agent reviews BEFORE every reply.
 //  Pulls verified DB facts, what was agreed, dashboard notes & history.
@@ -255,7 +310,8 @@ function buildCaseFile(ctx: any): string {
   if (openPromise) {
     const amt = money(openPromise.promised_amount, currency)
     const dt = dateOnly(openPromise.promised_date)
-    agreed.push(`📌 وعد سداد قائم${amt ? ` بمبلغ ${amt}` : ''}${dt ? ` بتاريخ ${dt}` : ''} — ذكّر العميل به وألزمه.`)
+    const timing = String(openPromise.notes ?? '').match(/توقيت العميل:\s*([^—]+)/)?.[1]?.trim()
+    agreed.push(`📌 وعد سداد قائم${amt ? ` بمبلغ ${amt}` : ''}${dt ? ` بتاريخ ${dt}` : ''}${timing ? ` (قاله العميل: ${timing})` : ''} — التزم به وذكّر العميل، و🔴 لا تسأله عن الموعد مرة أخرى فقد سجّلناه.`)
   }
 
   const pendingDispute = (ctx.recent_approvals ?? []).find((a: any) => a.approval_type === 'dispute' && a.status === 'pending')
@@ -506,7 +562,9 @@ ${intentPrompts[intent]}
 10. 🔴 الحد الأقصى المطلق لأي مهلة أو تأجيل = 30 يوماً من تاريخ اليوم (${todayStr}) ولا يوماً أكثر تحت أي ظرف. إن طلب العميل أكثر من ذلك (شهرين، 3 شهور، أو ما شابه)، فرفضك إلزامي — لا تقل "ما عندي مشكلة" ولا توافق ضمنياً. اعرض عليه مدة أقصر بكثير (أسبوع إلى أسبوعين) وفاوضه نزولاً، ولا توافق على الشهر كاملاً إلا بعد محاولة تقصيره أولاً.
 11. 🔴 لا تختار action=record_dispute أبداً في أول رد على كلام فيه اعتراض غامض بلا سبب محدد (راجع تعليمات DISPUTE أعلاه) — اسأل عن السبب أولاً دائماً.
 12. 🔴 استخدم أساليب إقناع متنوعة فعلية لا تكرار نفس الجملة: التذكير بالعواقب بأدب، عرض حل وسط، تحديد خطوة صغيرة فورية (صورة إيصال، تاريخ محدد)، الإشارة إلى أن التأخير يزيد تعقيد الملف. إن شعرت أن العميل يرفض أو يماطل عمداً زِد الحزم والضغط ولا تستسلم أو تصمت.
-13. 🔴🔴 أهم قاعدة في تسجيل الوعود: اختر action=record_promise فقط إذا ذكر العميل **في رسالته الحالية بالذات** تاريخاً أو وقتاً محدداً وواضحاً للسداد (مثل "بسدد بكرة"، "يوم الخميس"، "نهاية الشهر"، "يوم 25"). احسب التاريخ الدقيق YYYY-MM-DD بالاستناد إلى تاريخ اليوم الحقيقي (${todayStr}) واكتبه في حقل promised_date. ممنوع منعاً باتاً اختيار record_promise أو ذكر "أنت وعدتني" إن لم يذكر العميل تاريخاً بنفسه في هذه المحادثة — حتى لو كانت كلامه يتضمن "بسدد" بلا تاريخ، فهذا نية لا وعد، اطلب منه التاريخ أولاً (action=negotiate) ولا تسجّل أي شيء. لا تخترع promised_date أبداً من عندك.
+13. 🔴🔴 تسجيل الوعد (افهمه دلالياً لا بكلمات محفوظة): إذا ربط العميل السداد **بأي تعبير زمني أو مناسبة** مهما كانت صياغته — تاريخ صريح، يوم نسبي (بكرا/اليوم/بعد بكرة)، يوم أسبوع، بداية/نهاية/منتصف الشهر أو الأسبوع، نزول الراتب، الدعم، حساب المواطن، مكافأة/عيدية، بيع شيء، أو أي وقت طبيعي آخر يقصده — فهذا **وعد** واختر action=record_promise. لا تشترط صيغة معيّنة.
+   - عبّئ حقلين معاً: (1) promise_text = توقيت العميل بكلماته/معناه كما قاله بالضبط (مثل "مع نزول الراتب"، "بداية الشهر الجاي"، "عند نزول حساب المواطن"، "بكرا"). (2) promised_date = أفضل تحويل دقيق إلى YYYY-MM-DD اعتماداً على تاريخ اليوم الحقيقي (${todayStr}) والمنطقة الزمنية والسياق. لو التعبير قابل للتحويل لتاريخ فعلي حوّله؛ لو نسبي/ظرفي لا يُحوَّل بدقة، ضع أقرب تاريخ متابعة منطقي في promised_date واحفظ المعنى الحقيقي في promise_text. لا تخمّن عشوائياً، استنتج بمنطق من اليوم.
+   - لا تختر record_promise إلا إذا ذكر العميل توقيتاً فعلاً في رسالته. مجرد "بسدد" بلا أي إشارة زمنية = نية لا وعد → اسأله عن التوقيت مرة واحدة (action=negotiate). ومتى ما أعطى توقيتاً، لا تعد سؤاله عنه أبداً بعد تسجيله.
 
 ═══════════════ صيغة الإخراج ═══════════════
 أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:
@@ -515,7 +573,8 @@ ${intentPrompts[intent]}
   "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
   "reason": "سبب مختصر",
   "message": "رد الواتساب أو فارغ",
-  "promised_date": "YYYY-MM-DD أو null — لا تعبئها إلا مع action=record_promise وبتاريخ ذكره العميل صريحاً الآن"
+  "promised_date": "YYYY-MM-DD أو null — مع action=record_promise: أفضل تحويل لتوقيت العميل اعتماداً على تاريخ اليوم",
+  "promise_text": "توقيت العميل بكلماته (مثل: مع الراتب / بداية الشهر الجاي / بكرا) — فقط مع action=record_promise، وإلا null"
 }
 
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
@@ -574,6 +633,15 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
   const customerFirstName = String(ctx.verified_customer_data?.customer_name ?? '').split(' ')[0] || undefined
   parsed.message = cleanReply(parsed.message, customerFirstName, prevOutbound.length === 0)
 
+  // Facts already verified in the system + any promise already on file. Used by
+  // the deterministic conversation guards below to STOP the agent from asking
+  // for data the system already holds, or re-opening a point already settled.
+  const openPromiseRec = (ctx.recent_promises ?? []).find((p: any) => p.status === 'pending') ?? null
+  const currencyVal = ctx.verified_debt_data?.currency || 'SAR'
+  const balanceVal  = ctx.verified_debt_data?.current_balance
+  const creditorVal = ctx.verified_debt_data?.creditor_name
+  const refVal      = ctx.verified_debt_data?.reference_number
+
   // ── Deterministic guards — don't just hope the model followed the prompt ──
 
   // 1) Never let a grace period beyond the 30-day policy max slip through,
@@ -603,21 +671,114 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
   // valid YYYY-MM-DD from the model AND a date-like signal in the
   // customer's own current message before trusting it.
   if (parsed.action === 'record_promise') {
-    const validDate = parsed.promised_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.promised_date)
-    const customerGaveDateSignal = hasAny(text, [
-      'بكرة', 'بكره', 'تومورو', 'tomorrow', 'الخميس', 'الجمعة', 'السبت', 'الأحد', 'الاحد',
-      'الإثنين', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الاربعاء', 'نهاية الشهر', 'اخر الشهر', 'آخر الشهر',
-      'يوم', 'تاريخ', 'الراتب',
-    ]) && /\d/.test(text) || hasAny(text, ['بكرة', 'بكره', 'tomorrow', 'الخميس', 'الجمعة', 'السبت', 'الأحد', 'الاحد', 'الإثنين', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الاربعاء', 'نهاية الشهر', 'اخر الشهر', 'آخر الشهر'])
-    if (!validDate || !customerGaveDateSignal) {
-      log.warn('fabricated promise guard fired — no real date from customer', { intent, original_date: parsed.promised_date, customer_text: text.slice(0, 80) })
-      parsed.message = 'تمام، بس عشان أسجلها — إيش التاريخ بالضبط اللي تقدر تسدد فيه؟'
-      parsed.action = 'negotiate'
-      parsed.reason = 'fabricated_promise_guard_override'
+    const promiseText = String(parsed.promise_text ?? '').trim()
+    const validDate = !!parsed.promised_date && isSaneDate(String(parsed.promised_date), todayStr)
+    // GENERAL & SEMANTIC: a real promise = the model captured the customer's
+    // timing in promise_text (any natural expression) OR produced a sane date.
+    // We TRUST the model's language understanding instead of matching keywords;
+    // hasTemporalRef stays ONLY as a safety net if the model omits both fields.
+    const isRealPromise = promiseText.length > 0 || validDate || hasTemporalRef(text)
+    if (isRealPromise) {
+      parsed.promise_text = promiseText || null
+      // `promised_date` is NOT NULL in the DB → always store one. Prefer the
+      // model's sane date; otherwise a near follow-up checkpoint from today.
+      // The real verbal promise is preserved in promise_text either way.
+      if (!validDate) parsed.promised_date = addDaysISO(todayStr, 3)
+    } else {
+      // No timing expressed at all → it's an intention, not a dated promise.
       parsed.promised_date = null
+      parsed.promise_text = null
+      if (openPromiseRec) {
+        // A promise is ALREADY on file → acknowledge it, never re-ask.
+        const dt = dateOnly(openPromiseRec.promised_date)
+        log.warn('record_promise w/o timing but promise already on file — acknowledging', { dt })
+        parsed.message = dt
+          ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.`
+          : 'تمام، الوعد مسجّل عندي. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.'
+        parsed.action = 'reply'
+        parsed.reason = 'promise_already_on_file'
+      } else {
+        log.warn('record_promise without any timing — asking once', { customer_text: text.slice(0, 80) })
+        parsed.message = 'تمام، بس عشان أرتّبها صح — متى تقدر تسدد؟'
+        parsed.action = 'negotiate'
+        parsed.reason = 'promise_needs_timing'
+      }
     }
   } else {
     parsed.promised_date = null
+    parsed.promise_text = null
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  4) ROOT-LEVEL ANTI-REDUNDANCY ENFORCEMENT (deterministic, not prompt)
+  //  Enforces the mandatory pre-reply checks in CODE (the LLM does not obey
+  //  them reliably from prompt text alone):
+  //   (A) once a payment promise is on file → never re-ask "when will you pay"
+  //   (B) a fact the customer asks for that EXISTS in the case file is answered
+  //       directly — never deflect to "I'll check with management"
+  //   (C) never re-ask the same question the customer already answered
+  //  Escalation/deflection is allowed ONLY when the value is truly absent.
+  // ════════════════════════════════════════════════════════════════════
+  {
+    // (A) Promise already recorded → block any re-ask for a payment date.
+    const replyReAsksDate =
+      /(متى|إيمتى|ايمتى|أي\s*يوم|اي\s*يوم|التاريخ|وش\s*اليوم)/.test(parsed.message) &&
+      hasAny(parsed.message, ['تسدد', 'تدفع', 'السداد', 'الدفع', 'بتسدد', 'راح تسدد', 'تحوّل', 'تحول'])
+    if (openPromiseRec && replyReAsksDate && parsed.action !== 'record_promise') {
+      const dt = dateOnly(openPromiseRec.promised_date)
+      log.warn('redundant date re-ask blocked — promise already on file', { dt, original: parsed.message.slice(0, 80) })
+      parsed.message = dt
+        ? `تمام، أنا مسجّل إنك بتسدد بتاريخ ${dt}. بانتظارك، وأول ما تحوّل أرسل لي صورة الإيصال.`
+        : 'تمام، الوعد مسجّل عندي وبانتظار سدادك. أرسل لي صورة الإيصال بعد التحويل.'
+      parsed.action = 'reply'
+      parsed.reason = 'promise_on_file_no_reask'
+    }
+
+    // (B) Customer asked for a fact that EXISTS in the case file → answer it
+    // directly. Deflecting to management when the value is in the system is
+    // exactly what the customer complained about.
+    const deflectsToMgmt = hasAny(parsed.message, [
+      'أرجع للإدارة', 'ارجع للادارة', 'بأرجع لك', 'برجع لك', 'سأتحقق', 'بتحقق وأرد', 'أتحقق وأرد', 'أتحقق وأرجع',
+      'أرفع استفسارك', 'ارفع استفسارك', 'بحوّلها للإدارة', 'بحولها للادارة', 'أحوّلها للإدارة', 'بحوّل استفسارك',
+      'ما عندي هالمعلومة', 'ما عندي المعلومة', 'ما عندي هذي المعلومة', 'ما عندي هالمعلومه', 'بتواصل مع الإدارة',
+    ])
+    if (deflectsToMgmt) {
+      const asksBalance  = hasAny(text, ['كم', 'قديش', 'مبلغ', 'الرصيد', 'علي', 'عليه', 'باقي', 'المديونية', 'الدين'])
+      const asksCreditor = hasAny(text, ['الجهة', 'الشركة', 'البنك', 'الدائن', 'لصالح', 'لمين', 'مين الجهة'])
+      const asksRef      = hasAny(text, ['الرقم المرجعي', 'رقم المرجع', 'رقم الملف', 'المرجعي', 'reference'])
+      const bal = money(balanceVal, currencyVal)
+      let direct: string | null = null
+      if (asksBalance && bal) direct = `رصيدك المستحق حالياً ${bal}.`
+      else if (asksCreditor && creditorVal) direct = `المديونية لصالح ${creditorVal}.`
+      else if (asksRef && refVal) direct = `الرقم المرجعي لملفك هو ${refVal}.`
+      if (direct) {
+        log.warn('deflection-to-management blocked — answered directly from case file', { reason: parsed.reason })
+        parsed.message = direct
+        parsed.action = 'reply'
+        parsed.reason = 'answered_from_case_file'
+      }
+    }
+
+    // (C) Don't re-ask the SAME question already answered. Catch paraphrased
+    // repeats by content-word overlap against the agent's previous question.
+    const isQ = (s: string) => s.includes('؟') || /(متى|كم|وش|ايش|إيش|مين|ليش|هل|أي\s|اي\s)/.test(s)
+    const contentWords = (s: string) =>
+      new Set(norm(s).replace(/[^؀-ۿ\s]/g, ' ').split(/\s+/).filter(w => w.length >= 3))
+    if (lastAgentMessage && parsed.action === 'reply' && isQ(parsed.message) && isQ(lastAgentMessage)) {
+      const a = contentWords(parsed.message), b = contentWords(lastAgentMessage)
+      const inter = [...a].filter(w => b.has(w)).length
+      const overlap = inter / Math.max(1, Math.min(a.size, b.size))
+      if (a.size >= 3 && overlap >= 0.6) {
+        log.warn('repeated-question guard fired', { overlap: Number(overlap.toFixed(2)), original: parsed.message.slice(0, 80) })
+        const moves = [
+          'طيب، خلنا نمشي قدام — وش الخطوة اللي تناسبك الحين؟',
+          'تمام، الموضوع يحتاج حل. وش تقترح؟',
+          'فهمت عليك. تبي نرتّب طريقة السداد؟',
+        ]
+        parsed.message = moves[Math.floor(Math.random() * moves.length)]
+        parsed.reason = 'repeated_question_guard'
+      }
+    }
   }
 
   log.info('agent decision', {

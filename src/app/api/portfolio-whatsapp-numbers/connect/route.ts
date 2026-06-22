@@ -1,25 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
-import { getEvolutionManager } from '@/lib/evolution/client'
+import { createServiceClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/portfolio-whatsapp-numbers/connect?id=xxx
- * Returns connection state of the WhatsApp instance.
- * 
+ * Returns connection state of the WAHA session bound to this number.
+ *
  * POST /api/portfolio-whatsapp-numbers/connect
  * Body: { id: string }
- * Returns connection QR code.
- * 
+ * Starts the session (if needed) and returns the pairing QR code.
+ *
  * DELETE /api/portfolio-whatsapp-numbers/connect?id=xxx
- * Disconnects/logs out the instance.
+ * Logs out / stops the session.
+ *
+ * The `instance_name` column is reused as the WAHA session name.
  */
+
+type WahaCfg = { apiUrl: string; apiKey: string }
+
+async function resolveWaha(company_id: string, numberApiUrl?: string | null): Promise<WahaCfg | null> {
+  const supabase = createServiceClient()
+  const { data: integration } = await supabase
+    .from('integration_settings')
+    .select('config')
+    .eq('company_id', company_id)
+    .eq('integration_name', 'waha')
+    .maybeSingle()
+
+  const cfg = (integration?.config as Record<string, string> | undefined) ?? {}
+  const apiUrl = (numberApiUrl || cfg.api_url || process.env.WAHA_API_URL || '').replace(/\/$/, '')
+  const apiKey = cfg.api_key || process.env.WAHA_API_KEY || ''
+  if (!apiUrl || !apiKey) return null
+  return { apiUrl, apiKey }
+}
+
+function wahaHeaders(apiKey: string) {
+  return { 'Content-Type': 'application/json', 'X-Api-Key': apiKey }
+}
 
 export async function GET(req: NextRequest) {
   return withAuth(async (ctx) => {
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return errors.badRequest('Missing id parameter')
 
-    // Fetch the whatsapp number config
     const { data: number, error } = await ctx.supabase
       .from('portfolio_whatsapp_numbers')
       .select('*')
@@ -29,26 +52,19 @@ export async function GET(req: NextRequest) {
 
     if (error || !number) return errors.notFound('WhatsApp number not found')
 
-    // Fetch the integration settings for Evolution
-    const { data: integration } = await ctx.supabase
-      .from('integration_settings')
-      .select('config')
-      .eq('company_id', ctx.profile.company_id)
-      .eq('integration_name', 'evolution_whatsapp')
-      .maybeSingle()
-
-    const apiKey = (integration?.config as Record<string, string>)?.api_key || ''
-    const apiUrl = number.api_url || (integration?.config as Record<string, string>)?.api_url || ''
-
-    if (!apiUrl || !apiKey) {
-      return NextResponse.json({ success: false, state: 'close', error: 'Evolution API credentials not configured' })
+    const waha = await resolveWaha(ctx.profile.company_id, number.api_url)
+    if (!waha) {
+      return NextResponse.json({ success: false, state: 'close', error: 'WAHA credentials not configured' })
     }
 
     try {
-      const manager = getEvolutionManager()
-      const client = manager.getOrCreate(number.instance_name, apiUrl, apiKey)
-      const status = await client.getStatus()
-      return NextResponse.json({ success: true, ...status })
+      const r = await fetch(`${waha.apiUrl}/api/sessions/${number.instance_name}`, {
+        headers: wahaHeaders(waha.apiKey),
+        cache: 'no-store',
+      })
+      const j = await r.json().catch(() => ({} as any))
+      const state = j?.status === 'WORKING' ? 'open' : String(j?.status ?? 'close').toLowerCase()
+      return NextResponse.json({ success: true, state, status: j?.status ?? 'unknown' })
     } catch (err) {
       return NextResponse.json({
         success: false,
@@ -76,25 +92,31 @@ export async function POST(req: NextRequest) {
 
     if (error || !number) return errors.notFound('WhatsApp number not found')
 
-    const { data: integration } = await ctx.supabase
-      .from('integration_settings')
-      .select('config')
-      .eq('company_id', ctx.profile.company_id)
-      .eq('integration_name', 'evolution_whatsapp')
-      .maybeSingle()
+    const waha = await resolveWaha(ctx.profile.company_id, number.api_url)
+    if (!waha) return errors.badRequest('WAHA credentials not configured')
 
-    const apiKey = (integration?.config as Record<string, string>)?.api_key || ''
-    const apiUrl = number.api_url || (integration?.config as Record<string, string>)?.api_url || ''
-
-    if (!apiUrl || !apiKey) {
-      return errors.badRequest('Evolution API credentials not configured')
-    }
+    const session = number.instance_name as string
 
     try {
-      const manager = getEvolutionManager()
-      const client = manager.getOrCreate(number.instance_name, apiUrl, apiKey)
-      const qrData = await client.getQRCode()
-      return NextResponse.json({ success: true, ...qrData })
+      // Ensure the session exists/started before requesting its QR. WAHA
+      // returns 422 if it already exists or is running — that's fine.
+      await fetch(`${waha.apiUrl}/api/sessions/${session}/start`, {
+        method: 'POST',
+        headers: wahaHeaders(waha.apiKey),
+      }).catch(() => {})
+
+      const r = await fetch(`${waha.apiUrl}/api/${session}/auth/qr?format=image`, {
+        headers: { 'X-Api-Key': waha.apiKey },
+        cache: 'no-store',
+      })
+      if (!r.ok) {
+        return NextResponse.json(
+          { success: false, error: `WAHA QR returned HTTP ${r.status}` },
+          { status: 502 }
+        )
+      }
+      const b64 = Buffer.from(await r.arrayBuffer()).toString('base64')
+      return NextResponse.json({ success: true, base64: `data:image/png;base64,${b64}` })
     } catch (err) {
       return NextResponse.json({
         success: false,
@@ -118,29 +140,19 @@ export async function DELETE(req: NextRequest) {
 
     if (error || !number) return errors.notFound('WhatsApp number not found')
 
-    const { data: integration } = await ctx.supabase
-      .from('integration_settings')
-      .select('config')
-      .eq('company_id', ctx.profile.company_id)
-      .eq('integration_name', 'evolution_whatsapp')
-      .maybeSingle()
-
-    const apiKey = (integration?.config as Record<string, string>)?.api_key || ''
-    const apiUrl = number.api_url || (integration?.config as Record<string, string>)?.api_url || ''
-
-    if (!apiUrl || !apiKey) {
-      return errors.badRequest('Evolution API credentials not configured')
-    }
+    const waha = await resolveWaha(ctx.profile.company_id, number.api_url)
+    if (!waha) return errors.badRequest('WAHA credentials not configured')
 
     try {
-      const manager = getEvolutionManager()
-      const client = manager.getOrCreate(number.instance_name, apiUrl, apiKey)
-      await client.disconnect()
-      return NextResponse.json({ success: true, message: 'Instance disconnected successfully' })
+      await fetch(`${waha.apiUrl}/api/sessions/${number.instance_name}/logout`, {
+        method: 'POST',
+        headers: wahaHeaders(waha.apiKey),
+      })
+      return NextResponse.json({ success: true, message: 'Session disconnected successfully' })
     } catch (err) {
       return NextResponse.json({
         success: false,
-        error: err instanceof Error ? err.message : 'Failed to disconnect instance',
+        error: err instanceof Error ? err.message : 'Failed to disconnect session',
       }, { status: 502 })
     }
   })
