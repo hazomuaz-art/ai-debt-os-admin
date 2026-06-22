@@ -1009,6 +1009,7 @@ ${intentPrompts[intent]}
   const selectModel = (i: AgentIntent): string =>
     (['DISPUTE', 'NEGOTIATION'] as AgentIntent[]).includes(i) ? 'anthropic/claude-sonnet-4.6' : 'anthropic/claude-haiku-4.5'
   const modelId = selectModel(intent)
+  log.info('model routing', { intent, modelId })
   let ai
   try {
     ai = await client.chat.completions.create({
