@@ -17,9 +17,26 @@ function looksLikeTextReceipt(text: string): boolean {
   return PAYMENT_TEXT_RE.test(text) && /\d{2,}/.test(text)
 }
 
+// WAHA returns media URLs with its INTERNAL base (e.g. http://localhost:3000)
+// which is NOT reachable from this app process — every receipt download was
+// failing with "fetch failed". Rewrite the origin to the configured WAHA base
+// (WAHA_API_URL) while keeping the file path, so downloads actually work.
+function wahaMediaUrl(url: string): string {
+  if (!url || !WAHA_URL) return url
+  try {
+    const u = new URL(url)
+    const base = new URL(WAHA_URL)
+    u.protocol = base.protocol
+    u.host = base.host
+    return u.toString()
+  } catch {
+    return url
+  }
+}
+
 async function downloadMediaBase64(url: string): Promise<string | null> {
   try {
-    const r = await fetch(url, { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
+    const r = await fetch(wahaMediaUrl(url), { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
     if (!r.ok) return null
     const buf = Buffer.from(await r.arrayBuffer())
     return buf.toString('base64')
@@ -58,15 +75,20 @@ export async function POST(request: NextRequest) {
 
     // ── Delivery acknowledgements ──
     if (event === 'message.ack') {
+      // Outbound sends store the FULL serialized id (e.g.
+      // "true_<chat>@lid_<ref>"), so match on it directly. We also accept the
+      // bare trailing ref as a fallback for any legacy rows stored stripped.
       const msgId = String(payload?.id?._serialized ?? payload?.id ?? '')
       const newStatus = ackToStatus[Number(payload?.ack)]
       if (msgId && newStatus) {
-        const id = msgId.split('_').pop() ?? msgId
+        const ref = msgId.split('_').pop() ?? msgId
+        const match = `whatsapp_message_id.eq.${msgId},whatsapp_message_id.eq.${ref}`
         const rank: Record<string, number> = { sent: 1, delivered: 2, read: 3 }
         const { data: row } = await supabase
-          .from('messages').select('status').eq('whatsapp_message_id', id).maybeSingle()
-        if (!row || (rank[newStatus] ?? 0) > (rank[(row as { status: string }).status] ?? 0)) {
-          await supabase.from('messages').update({ status: newStatus }).eq('whatsapp_message_id', id)
+          .from('messages').select('id, status').or(match)
+          .eq('direction', 'outbound').limit(1).maybeSingle()
+        if (row && (rank[newStatus] ?? 0) > (rank[(row as { status: string }).status] ?? 0)) {
+          await supabase.from('messages').update({ status: newStatus }).eq('id', (row as { id: string }).id)
         }
       }
       return NextResponse.json({ status: 'ok' })
@@ -133,7 +155,7 @@ export async function POST(request: NextRequest) {
     if (hasReceiptMedia) {
       ;(async () => {
         try {
-          const r = await fetch(mediaUrl, { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
+          const r = await fetch(wahaMediaUrl(mediaUrl), { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
           if (!r.ok) { log.error('receipt media download failed', undefined, { status: r.status }); return }
           const b64 = Buffer.from(await r.arrayBuffer()).toString('base64')
           const { processInboundReceipt } = await import('@/lib/payment-receipt')
@@ -193,6 +215,7 @@ export async function POST(request: NextRequest) {
           company_id: c.company_id, customer_id: c.id, debt_id,
           promised_amount: Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0),
           promised_date: aiDecision.promised_date, customer_message: text,
+          promise_text: aiDecision.promise_text ?? null,
         })
       }
     })().catch(err => log.error('WAHA AI processing error', err as Error))

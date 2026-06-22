@@ -21,47 +21,38 @@ export async function POST(req: NextRequest) {
       const start = Date.now()
 
       try {
-        if (integration_name === 'evolution_whatsapp') {
+        if (integration_name === 'waha') {
           const baseUrl = String(config.api_url ?? '').replace(/\/$/, '')
           const apiKey = String(config.api_key ?? '')
-          const instanceName = String(config.instance_name ?? '')
+          const session = String(config.session ?? 'default')
 
-          if (!baseUrl || !apiKey || !instanceName) {
+          if (!baseUrl || !apiKey) {
             return NextResponse.json(
-              { success: false, message: 'Missing Evolution URL, API Key, or Instance Name' },
+              { success: false, message: 'Missing WAHA URL or API Key' },
               { status: 400 }
             )
           }
 
-          const res = await fetch(`${baseUrl}/instance/fetchInstances`, {
-            headers: { apikey: apiKey },
+          const res = await fetch(`${baseUrl}/api/sessions/${session}`, {
+            headers: { 'X-Api-Key': apiKey },
             cache: 'no-store',
           })
 
           if (!res.ok) {
             return NextResponse.json(
-              { success: false, message: `Evolution API returned HTTP ${res.status}` },
+              { success: false, message: `WAHA API returned HTTP ${res.status}` },
               { status: 502 }
             )
           }
 
-          const instances = await res.json()
-          const found = Array.isArray(instances)
-            ? instances.find((i: any) => i.name === instanceName)
-            : null
-
-          if (!found) {
-            return NextResponse.json(
-              { success: false, message: `Instance ${instanceName} not found` },
-              { status: 404 }
-            )
-          }
+          const data = await res.json().catch(() => ({} as any))
+          const connected = data?.status === 'WORKING'
 
           return NextResponse.json({
-            success: found.connectionStatus === 'open',
-            message: found.connectionStatus === 'open'
-              ? 'Evolution WhatsApp connected'
-              : `Evolution instance status: ${found.connectionStatus}`,
+            success: connected,
+            message: connected
+              ? 'WAHA WhatsApp connected'
+              : `WAHA session status: ${data?.status ?? 'unknown'}`,
             latency_ms: Date.now() - start,
           })
         }

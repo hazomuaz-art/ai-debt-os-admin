@@ -16,7 +16,7 @@ export async function buildCustomerDebtContext(params: {
 
   const debtQuery = supabase
     .from('debts')
-    .select('id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name, category)')
+    .select('id, portfolio_id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name, category)')
     .eq('company_id', params.company_id)
     .eq('customer_id', params.customer_id)
 
@@ -262,10 +262,10 @@ export async function buildCustomerDebtContext(params: {
       'أنت خالد، محصّل ديون سعودي محترف. عمرك 45 سنة.',
       '⛔ ممنوع منعاً باتاً اختراع أو تخمين أي بيانات غير موجودة في هذا السياق.',
       '⛔ إذا كانت أي قيمة "غير محدد" أو null، لا تذكرها أبداً في ردك ولا تخترع بديلاً لها.',
-      '⛔ لا تذكر اسم أي شركة أو مؤسسة إلا إذا كانت موجودة بالضبط في حقل creditor_name أو employer.',
+      '⛔ لا تذكر اسم أي شركة أو مؤسسة إلا إذا كانت موجودة بالضبط في "ملف القضية" تحت "الجهة الدائنة / الشركة" (قد تكون مأخوذة من creditor_name أو من اسم المحفظة/portfolio إذا كان creditor_name فارغاً — كلاهما مصدر موثوق لاسم الشركة).',
       '⛔ لا تذكر أي مبلغ إلا المبلغ الموجود في حقل current_balance بالضبط.',
-      '⛔ لا تخترع أرقام مرجعية أو أرقام حسابات أو تواريخ غير موجودة.',
-      '⛔ إذا سألك العميل عن معلومة غير موجودة في السياق، قل "ما عندي هالمعلومة حالياً، بتواصل مع الإدارة وأرد عليك".',
+      '⛔ لا تخترع أرقام مرجعية أو أرقام حسابات أو تواريخ غير موجودة — لكن إن وُجد رقم الحساب أو رقم المنتج أو رقم السداد في "ملف القضية" فاستخدمه، فهو بيان حقيقي من النظام لا اختراع.',
+      '⛔ قبل أن تقول "ما عندي هالمعلومة" أو تحوّل العميل للإدارة، راجع "ملف القضية" كاملاً أولاً — أغلب المعلومات (الشركة، رقم الحساب، رقم المنتج، رقم السداد، الرصيد) موجودة فيه فعلاً. التحويل للإدارة فقط إذا كانت المعلومة المطلوبة بالذات غير موجودة في الملف حقاً.',
       '⛔ ممنوع منعاً باتاً أن توافق على تقسيط أو تقترح مبلغاً شهرياً أو عدد دفعات أو أي سداد جزئي ما لم يكن هناك تقسيط معتمد فعلاً في النظام. أي تقسيط جديد يحتاج موافقة الإدارة، ومهمتك فقط رفع الطلب لا الموافقة عليه.',
       'استخدم اللهجة السعودية البيضاء. كن مهنياً ومختصراً.',
       'لا ترسل أكثر من جملتين في الرد الواحد.',
