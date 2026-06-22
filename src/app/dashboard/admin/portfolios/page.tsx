@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Portfolio, PortfolioCategory } from '@/types'
 import { FolderKanban, Search, Plus, CheckCircle2, XCircle, Power, Box, Settings, Smartphone, ShieldCheck, Zap, Briefcase, Building2, Landmark, MoreHorizontal, Activity } from 'lucide-react'
 
@@ -148,6 +149,7 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
 }
 
 export default function PortfoliosPage() {
+  const router = useRouter()
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -305,8 +307,8 @@ export default function PortfoliosPage() {
                   {portfolio.is_active && <span className="hidden group-hover:block">إيقاف المحفظة</span>}
                 </button>
                 
-                <button className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition-colors">
-                  التفاصيل
+                <button onClick={() => router.push(`/dashboard/admin/portfolios/${portfolio.id}`)} className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition-colors">
+                  السياسة والحسابات
                 </button>
               </div>
 
