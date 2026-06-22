@@ -216,7 +216,7 @@ export interface RecommendRequest {
 
 // ── Integration Settings ──────────────────────────────────────────────────
 
-export type IntegrationName = 'rasf_whatsapp' | 'tameez_calls' | 'collection_api' | 'evolution_whatsapp'
+export type IntegrationName = 'rasf_whatsapp' | 'tameez_calls' | 'collection_api' | 'waha'
 
 export interface IntegrationSetting {
   id:               string
@@ -239,7 +239,12 @@ export interface Portfolio {
   company_id:     string
   name:           string
   name_ar?:       string
-  code:           string
+  // Nullable in reality — the DB column allows NULL and every portfolio
+  // created via bulk import (the overwhelming majority in production) has
+  // no code set. The type previously claimed `string` (non-nullable),
+  // which is why portfolios/page.tsx's unguarded `.code.slice(...)` and
+  // `.code.toLowerCase()` calls crashed on every real row in production.
+  code:           string | null
   category:       PortfolioCategory
   external_id?:   string
   source_system:  'manual' | 'debit_collect' | 'tamiuzz' | 'api'
