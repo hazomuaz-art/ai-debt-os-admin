@@ -1,5 +1,16 @@
 import OpenAI from 'openai'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
+import {
+  buildCustomer360Context,
+  isDebtRelatedMessage,
+  selectDebtGroup,
+  pickPrimaryDebt,
+  mapDebtForList,
+} from '@/lib/customer-context-engine'
+import { getPlaybookForPortfolio, renderPlaybookForPrompt } from '@/lib/company-playbook'
+import { classifyInsuranceCase, detectInsuranceObjectionSignals, renderInsuranceCaseFile } from '@/lib/insurance-engine'
+import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply } from '@/lib/legal-escalation'
+import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('ai-collector-agent')
@@ -24,6 +35,12 @@ export type CollectorDecision = {
   // (YYYY-MM-DD) the customer stated, extracted by the model itself using
   // the real "today" given in the prompt. Never fabricated downstream.
   promised_date?: string | null
+  // The customer's stated timing in their OWN words / meaning, exactly as they
+  // expressed it (e.g. "مع نزول الراتب", "بداية الشهر الجاي", "عند نزول حساب
+  // المواطن", "بكرا"). This is the semantic promise — stored and reused so the
+  // agent never re-asks. Set by the model for any timing expression, however
+  // phrased; we do NOT keyword-match it.
+  promise_text?: string | null
 }
 
 type HistoryItem = {
@@ -42,6 +59,37 @@ function norm(text: string) {
 function hasAny(text: string, words: string[]) {
   const v = norm(text)
   return words.some(w => v.includes(w.toLowerCase()))
+}
+
+// Convert Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) numerals to ASCII
+// so that `\d` and numeric date parsing actually work on real WhatsApp text
+// like "يوم ٣٠" or "٣٠-٠٦". Without this, every Arabic-numeral date was treated
+// as "no date" — the core reason valid promises were rejected and re-asked.
+function toAsciiDigits(s: string): string {
+  return String(s ?? '')
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+}
+
+// Broad, robust detection of an explicit pay date/time the customer stated,
+// covering the many real spellings used on WhatsApp: بكرا/بكره/بكرة, غدا/غداً,
+// اليوم, weekday names, نهاية/آخر الشهر, مع الراتب, numeric dates (30/6, يوم 30,
+// 30 الشهر), and "خلال/بعد N يوم/اسبوع/شهر". Arabic numerals are normalised
+// first. This REPLACES a narrow keyword list that missed "بكرا" and every
+// Arabic-numeral date, which is what caused the post-promise questioning loop.
+function hasTemporalRef(raw: string): boolean {
+  const t = toAsciiDigits(norm(raw))
+  return (
+    /(بكرا|بكره|بكرة|غدا|غدًا|غداً|اليوم|الحين|بعد بكر|بعد غد|عقب بكر)/.test(t) ||
+    /(السبت|الاحد|الأحد|الاثنين|الإثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعه|الجمعة)/.test(t) ||
+    /(الراتب|راتب|معاش)/.test(t) ||
+    /(نهاية|اخر|آخر|بداية|اول|أول|منتصف)\s*(الشهر|الاسبوع|الأسبوع)/.test(t) ||
+    /(نهاية الشهر|اخر الشهر|آخر الشهر|الشهر الجاي|الشهر القادم|الاسبوع الجاي|الأسبوع الجاي|هالاسبوع|هالشهر)/.test(t) ||
+    /\b\d{1,2}\s*[\/\-.]\s*\d{1,2}\b/.test(t) ||
+    /يوم\s*\d{1,2}/.test(t) ||
+    /\b\d{1,2}\s*(الشهر|من الشهر|بالشهر|شهر)\b/.test(t) ||
+    /(خلال|بعد|عقب|كل)\s*\d+\s*(يوم|ايام|أيام|اسبوع|أسبوع|اسابيع|أسابيع|شهر|شهور|اشهر|أشهر)/.test(t)
+  )
 }
 
 // Only unambiguous farewell/thanks phrases — short acks like "طيب" or "تمام"
@@ -89,7 +137,7 @@ const ARABIC_WORD_NUM: Record<string, number> = {
 // anything beyond the policy max (30 days), since it doesn't reliably
 // follow that instruction from prompt text alone.
 function detectRequestedGraceDays(text: string): number | null {
-  const t = norm(text)
+  const t = toAsciiDigits(norm(text))
   for (const [phrase, days] of Object.entries(ARABIC_WORD_NUM)) {
     if (t.includes(phrase)) return days
   }
@@ -123,6 +171,38 @@ function detectSignals(text: string) {
     hardship: hasAny(text, ['ما عندي', 'ظروف', 'فلوس', 'راتب', 'متعسر', 'ما اقدر', 'ما أقدر']),
     angry: hasAny(text, ['ازعاج', 'ازعجتونا', 'شكوى', 'محامي', 'بلاغ', 'court', 'lawyer', 'complaint']),
     wrongNumber: hasAny(text, ['الرقم غلط', 'ما يخصني', 'مو رقمي', 'wrong number']),
+    // Explicit denial that any debt exists at all — distinct from a paymentClaim
+    // (paid already) or a specific dispute reason (wrong amount/not mine for a
+    // KNOWN reason). This is a bare denial and must be treated as an inquiry to
+    // investigate, never as a promise to pay or an introduction to push past.
+    deniesDebt: hasAny(text, [
+      'ما عندي مديونية', 'ما علي مديونية', 'ما عندي دين', 'ما علي دين', 'مالي مديونية',
+      'ليس علي مديونية', 'ليس عندي مديونية', 'ليس علي دين', 'ليس عندي دين',
+      'مافي مديونية', 'ما عليه شي', 'هذا مو حساب', 'مو حسابي', 'الحساب مو لي',
+      'لا اعرف هذا الدين', 'لا أعرف هذا الدين', 'ما اعرف هذا الدين', 'ما أعرف هذا الدين',
+      "don't have a debt", 'no debt',
+    ]),
+    // Direct identity/company/detail requests — must be answered FROM the case
+    // file (never deflected to "أرجع للإدارة") whenever the data exists.
+    asksWhoAreYou: hasAny(text, [
+      'من انت', 'من أنت', 'مين انت', 'مين أنت', 'منت', 'وش انت', 'مين المتصل', 'مين يتكلم', 'who are you',
+      'اسمك', 'من معي', 'مين معي',
+    ]),
+    // The customer explicitly denies having made any promise at all ("ما
+    // وعدتك بشي") — distinct from deniesDebt (denying the debt itself). The
+    // agent must NEVER restate/confirm the existing promise in this case.
+    deniesPromise: hasAny(text, [
+      'ما وعدتك', 'مو وعدتك', 'ماوعدتك', 'انا ما وعدت', 'أنا ما وعدت', 'لم اعدك', 'لم أعدك',
+      'ما قلت لك بسدد', 'ما قلت بسدد', 'مين قال', 'وين قلت', 'ما اتفقنا', 'متى وعدتك', 'وعدتك متى',
+    ]),
+    asksCompany: hasAny(text, [
+      'وش الشركة', 'ايش الشركة', 'إيش الشركة', 'مين الشركة', 'اي شركة', 'أي شركة',
+      'لمين هذا', 'لصالح مين', 'لحساب مين', 'مين الجهة', 'وش الجهة', 'ايش الجهة',
+    ]),
+    asksDetails: hasAny(text, [
+      'عطني التفاصيل', 'أعطني التفاصيل', 'اعطني التفاصيل', 'عطني تفاصيل', 'وضح لي',
+      'التفاصيل', 'تفاصيل أكثر', 'تفاصيل المديونية', 'وش التفاصيل', 'ايش التفاصيل', 'إيش التفاصيل',
+    ]),
   }
 }
 
@@ -187,6 +267,24 @@ function dateOnly(d: any) {
   return s.length >= 10 ? s.slice(0, 10) : s
 }
 
+function addDaysISO(baseISO: string, days: number): string {
+  const d = new Date(baseISO + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+// A model-provided date is trustworthy only if it parses and lands in a sane
+// window relative to the real "today" (a few days back to allow timezone slack,
+// up to ~13 months ahead). Prevents storing a hallucinated far-past/future date.
+function isSaneDate(iso: string, todayISO: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false
+  const t = Date.parse(iso + 'T00:00:00Z')
+  const today = Date.parse(todayISO + 'T00:00:00Z')
+  if (Number.isNaN(t) || Number.isNaN(today)) return false
+  const diffDays = (t - today) / 86_400_000
+  return diffDays >= -2 && diffDays <= 400
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  Case file — the "memory" the agent reviews BEFORE every reply.
 //  Pulls verified DB facts, what was agreed, dashboard notes & history.
@@ -207,19 +305,39 @@ function buildCaseFile(ctx: any): string {
   // 1) Who am I talking to (verified identity & status)
   lines.push('【 هوية العميل وحالته 】')
   add('الاسم', c.customer_name)
+  add('رقم الهوية', c.national_id)
   add('المدينة', c.city)
   add('جهة العمل', c.employer)
   add('مستوى الخطورة', c.risk_level)
 
   // 2) The debt facts (the ONLY numbers/names allowed)
+  // Company/creditor name: creditor_name is the primary source, but it is
+  // frequently null for debts created via bulk import (the import pipeline
+  // never populates it) — portfolio_name (the company/portfolio the debt was
+  // imported under, e.g. "STC"/"موبايلي") is the correct fallback identity in
+  // that case. Without this fallback the agent had NO company name to give
+  // the customer at all whenever creditor_name was empty, even though the
+  // real company name was sitting in portfolio_name the whole time.
+  const companyName = d.creditor_name || d.portfolio_name
   lines.push('')
   lines.push('【 بيانات المديونية المؤكدة 】')
-  add('الجهة الدائنة', d.creditor_name)
+  add('الجهة الدائنة / الشركة', companyName)
   add('قطاع الجهة الدائنة', { telecom: 'اتصالات', insurance: 'تأمين', utility: 'مرافق (كهرباء/ماء/طاقة)', recruitment: 'استقدام عمالة', government: 'حكومي', finance: 'تمويل', agriculture: 'زراعي', other: null }[String(d.portfolio_category ?? '').toLowerCase()] ?? null)
   add('نوع المنتج', d.product_type)
+  add('رقم الحساب / العقد', d.account_number)
   add('الرصيد الحالي المستحق', money(d.current_balance, currency))
   add('المبلغ الأصلي', money(d.original_amount, currency))
   add('الرقم المرجعي', d.reference_number)
+
+  // metadata.extra holds portfolio-specific raw columns preserved at import
+  // time (e.g. SADAD/biller number, product number) that have no dedicated
+  // standard column — these were previously NEVER surfaced to the model at
+  // all. Only common, customer-facing identifiers are pulled out by name;
+  // the rest of `extra` (internal flags, dates, etc.) stays out of the prompt.
+  const extra = (ctx.debt?.metadata?.extra ?? {}) as Record<string, any>
+  const pick = (...keys: string[]) => keys.map(k => extra[k]).find(v => v !== undefined && v !== null && String(v).trim() !== '') ?? null
+  add('رقم سداد / المفوتر', pick('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number'))
+  add('رقم المنتج', pick('رقم المنتج', 'product_number', 'رقم_المنتج'))
   const statusLabels: Record<string, string> = {
     'payment_plan': 'خطة تقسيط معتمدة وفعّالة',
     'active': 'نشط',
@@ -232,6 +350,31 @@ function buildCaseFile(ctx: any): string {
   add('حالة الملف', statusLabels[String(d.status ?? '').toLowerCase()] ?? d.status)
   add('تاريخ الاستحقاق', dateOnly(d.due_date))
   add('تاريخ آخر سداد', dateOnly(d.last_payment_date))
+
+  // 2b) Multiple debts under the SAME company/portfolio — list every claim,
+  // never just the primary one above. Set by the Customer 360 engine when
+  // the customer has more than one debt under one portfolio.
+  if (Array.isArray(ctx.verified_debts_list) && ctx.verified_debts_list.length > 1) {
+    lines.push('')
+    lines.push('【 🔴 مطالبات متعددة لنفس الجهة — اذكرها كلها باختصار، ممنوع ذكر واحدة فقط وتجاهل الباقي 】')
+    ctx.verified_debts_list.forEach((dd: any, i: number) => {
+      const bal = money(dd.current_balance, dd.currency || currency)
+      const parts = [
+        dd.reference_number && `مرجع ${dd.reference_number}`,
+        dd.account_number && `حساب ${dd.account_number}`,
+        bal && `رصيد ${bal}`,
+        dd.status && `حالة ${dd.status}`,
+      ].filter(Boolean)
+      lines.push(`- مطالبة ${i + 1}: ${parts.join('، ')}`)
+    })
+  }
+
+  if (ctx.open_dispute_record) {
+    const od = ctx.open_dispute_record
+    lines.push('')
+    lines.push(`【 اعتراض مسجّل قيد المراجعة (جدول disputes) 】`)
+    lines.push(`- نوعه: ${od.dispute_type ?? 'غير محدد'}${od.description ? ` — ${od.description}` : ''}. لا تسجّل اعتراضاً جديداً، طمئن العميل أنه قيد المراجعة.`)
+  }
 
   // 3) What we already discussed / agreed on (the core of "memory")
   const agreed: string[] = []
@@ -255,7 +398,8 @@ function buildCaseFile(ctx: any): string {
   if (openPromise) {
     const amt = money(openPromise.promised_amount, currency)
     const dt = dateOnly(openPromise.promised_date)
-    agreed.push(`📌 وعد سداد قائم${amt ? ` بمبلغ ${amt}` : ''}${dt ? ` بتاريخ ${dt}` : ''} — ذكّر العميل به وألزمه.`)
+    const timing = String(openPromise.notes ?? '').match(/توقيت العميل:\s*([^—]+)/)?.[1]?.trim()
+    agreed.push(`📌 وعد سداد قائم${amt ? ` بمبلغ ${amt}` : ''}${dt ? ` بتاريخ ${dt}` : ''}${timing ? ` (قاله العميل: ${timing})` : ''} — التزم به وذكّر العميل، و🔴 لا تسأله عن الموعد مرة أخرى فقد سجّلناه.`)
   }
 
   const pendingDispute = (ctx.recent_approvals ?? []).find((a: any) => a.approval_type === 'dispute' && a.status === 'pending')
@@ -334,12 +478,136 @@ export async function runCollectorAgent(args: {
     return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
   }
 
+  // ── Customer 360 — see every debt this customer has before picking one.
+  // The webhook may pass a single `debt_id` hint (its own "latest debt"
+  // guess), but that guess must never override real multi-portfolio
+  // ambiguity: if the customer's message is debt-related and they have
+  // debts under more than one company/portfolio, we resolve that here,
+  // deterministically, before any LLM call.
+  const ctx360 = await buildCustomer360Context({ company_id: args.company_id, customer_id: args.customer_id })
+  const debtRelated = isDebtRelatedMessage(text)
+  let forcedDebtId: string | null = args.debt_id ?? null
+  let verifiedDebtsList: any[] | null = null
+  let resolvedGroup: typeof ctx360.debtGroups[number] | null = null
+
+  if (ctx360.debtGroups.length > 1) {
+    if (debtRelated) {
+      const selection = selectDebtGroup(ctx360.debtGroups, text)
+      if (selection.mode === 'needs_clarification') {
+        const names = selection.groups.map(g => g.portfolio_name || 'بدون اسم شركة محدد').join(' / ')
+        log.info('multi-portfolio clarification requested — zero LLM call', { customer_id: args.customer_id, names })
+        return {
+          shouldReply: true,
+          action: 'request_clarification',
+          reason: 'multi_portfolio_clarification_needed',
+          message: `عندك أكثر من ملف مديونية معنا. تقصد مطالبة أي شركة: ${names}؟`,
+        }
+      }
+      const group = selection.group!
+      resolvedGroup = group
+      if (group.debts.length > 1) {
+        forcedDebtId = pickPrimaryDebt(group.debts)?.id ?? forcedDebtId
+        verifiedDebtsList = group.debts.map(mapDebtForList)
+      } else {
+        forcedDebtId = group.debts[0]?.id ?? forcedDebtId
+      }
+    }
+    // Not debt-related (greeting / "من أنت" / general chat) → never force a
+    // company choice; let the conversation continue without picking one.
+  } else if (ctx360.debtGroups.length === 1) {
+    const group = ctx360.debtGroups[0]
+    resolvedGroup = group
+    if (group.debts.length > 1 && debtRelated) {
+      forcedDebtId = pickPrimaryDebt(group.debts)?.id ?? forcedDebtId
+      verifiedDebtsList = group.debts.map(mapDebtForList)
+    } else if (group.debts.length === 1) {
+      forcedDebtId = group.debts[0].id
+    }
+  }
+
+  // ── Legal Escalation lock — checked BEFORE anything else (including the
+  // LLM). If this debt has an open legal escalation, خالد never replies
+  // again; only the fixed legal persona does, deterministically, until an
+  // admin/manager closes it. No negotiation, pressure, discount, or
+  // installment offer can ever slip through this gate.
+  if (forcedDebtId) {
+    const openEsc = await getOpenEscalation(args.company_id, forcedDebtId)
+    if (openEsc) {
+      log.info('legal escalation lock active — zero LLM call', { debt_id: forcedDebtId, escalation_type: openEsc.escalation_type })
+      return {
+        shouldReply: true,
+        action: 'human_review',
+        reason: 'legal_escalation_locked',
+        message: renderLegalPersonaReply(openEsc.escalation_type),
+      }
+    }
+  }
+
   // ── Always review the case file + history from the DB BEFORE replying ──
-  const ctx = await buildCustomerDebtContext({
+  const ctx: any = await buildCustomerDebtContext({
     company_id: args.company_id,
     customer_id: args.customer_id,
-    debt_id: args.debt_id ?? null,
+    debt_id: forcedDebtId,
   })
+  if (verifiedDebtsList) ctx.verified_debts_list = verifiedDebtsList
+  const openDispute = (ctx360.allDisputes ?? []).find((d: any) => d.status === 'pending' || d.status === 'open')
+  if (openDispute) ctx.open_dispute_record = openDispute
+
+  // ── Phase 2: Company Playbook — load the policy for the resolved
+  // portfolio (or the category default when no playbook row exists yet).
+  // Discount/installment limits and the dispute-type whitelist come from
+  // here; insurance-only concepts are stripped for every other category
+  // both here (data) and again later (a hard code guard on the reply).
+  const resolvedCategory = (resolvedGroup?.portfolio_category ?? ctx.verified_debt_data?.portfolio_category ?? 'other') as import('@/lib/company-playbook').PortfolioCategory
+  const resolvedPortfolioId = resolvedGroup?.portfolio_id ?? (ctx.debt as any)?.portfolio_id ?? null
+  const playbook = await getPlaybookForPortfolio({
+    company_id: args.company_id,
+    portfolio_id: resolvedPortfolioId,
+    category: resolvedCategory,
+  })
+
+  // ── Phase 3: Insurance Engine — classification is 100% data-driven from
+  // customer_data_tawuniya/medgulf (already fetched by Phase 1's context
+  // engine). Only ever built for category='insurance'; for every other
+  // category this stays null and nothing insurance-specific is injected.
+  const insuranceRow = playbook.category === 'insurance'
+    ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0]
+    : null
+  const insuranceCase = insuranceRow ? classifyInsuranceCase(insuranceRow) : null
+  const insuranceObjection = playbook.category === 'insurance' ? detectInsuranceObjectionSignals(text) : null
+
+  // ── Mandatory legal escalation — checked deterministically BEFORE the
+  // LLM call (legal_threat/lawyer_mention/complaint apply to every sector;
+  // the insurance-specific types only ever fire for an actual insurance
+  // portfolio, driven by the Phase 3 Insurance Engine's own classification
+  // — never a separate guess). Once detected, this debt's conversation is
+  // locked for every subsequent turn via the check above.
+  if (forcedDebtId) {
+    const mandatory = detectMandatoryEscalation({
+      text,
+      isInsurancePortfolio: playbook.category === 'insurance',
+      insuranceObjection,
+      insuranceCase,
+      customEscalationRules: playbook.escalation_rules,
+    })
+    if (mandatory) {
+      await openEscalation({
+        company_id: args.company_id,
+        customer_id: args.customer_id,
+        debt_id: forcedDebtId,
+        portfolio_id: resolvedPortfolioId,
+        escalation_type: mandatory.escalation_type,
+        reason: mandatory.reason,
+      })
+      log.info('legal escalation opened — zero LLM call on this turn', { debt_id: forcedDebtId, escalation_type: mandatory.escalation_type })
+      return {
+        shouldReply: true,
+        action: 'human_review',
+        reason: 'legal_escalation_opened',
+        message: renderLegalPersonaReply(mandatory.escalation_type),
+      }
+    }
+  }
 
   // Build chronological conversation (DB returns newest-first → reverse it).
   // Drop the trailing inbound if it duplicates the current message.
@@ -380,7 +648,7 @@ export async function runCollectorAgent(args: {
   })
 
   // ── Intent router ──
-  type AgentIntent = 'GREETING' | 'INTRODUCTION' | 'NEGOTIATION' | 'DISPUTE' | 'GENERAL'
+  type AgentIntent = 'GREETING' | 'INTRODUCTION' | 'INFO_REQUEST' | 'NEGOTIATION' | 'DISPUTE' | 'GENERAL'
   let intent: AgentIntent = 'GENERAL'
 
   const balance = ctx.verified_debt_data?.current_balance != null ? String(ctx.verified_debt_data.current_balance) : null
@@ -392,7 +660,15 @@ export async function runCollectorAgent(args: {
   // we greet first and bring up the debt only once the customer has replied.
   const isFirstEverContact = chronological.every(h => h.direction !== 'outbound')
 
-  if (!hasMentionedDebt && isFirstEverContact && !signals.angry && !signals.dispute) {
+  // Explicit identity/company/detail questions and bare debt denials are
+  // checked FIRST, with priority over the staged greeting→introduction flow
+  // and turn-count limits — a direct question must always be answered, not
+  // deferred because the conversation is still "early".
+  if (signals.asksWhoAreYou || signals.asksCompany || signals.asksDetails) {
+    intent = 'INFO_REQUEST'
+  } else if (signals.deniesDebt) {
+    intent = 'DISPUTE'
+  } else if (!hasMentionedDebt && isFirstEverContact && !signals.angry && !signals.dispute) {
     intent = 'GREETING'
   } else if (!hasMentionedDebt && chronological.length <= 3 && !signals.angry && !signals.dispute) {
     intent = 'INTRODUCTION'
@@ -429,6 +705,14 @@ export async function runCollectorAgent(args: {
 - العميل ردّ على ترحيبك. الآن وفقط الآن عرّفه أنك تتواصل من طرف الجهة الدائنة بخصوص المديونية القائمة.
 - اذكر اسم الجهة والمبلغ مرة واحدة فقط، ثم اسأله مباشرة: متى يقدر يسدد؟
 - سؤال واحد فقط، لا أكثر.`,
+    INFO_REQUEST: `【 مهمتك الآن: الرد المباشر على سؤال العميل من بيانات النظام 】
+- العميل سأل سؤالاً مباشراً: من أنت، أو وش الشركة/الجهة، أو طلب تفاصيل أكثر عن ملفه.
+- 🔴🔴 إذا سأل "من أنت؟" أو ما يشابهها: رد حرفياً بهذا التعريف ولا تغيّر صياغته: "أنا خالد الدويحي من شركة مصدر الرؤية، وكيل متابعة مطالبات شركة [الجهة]." — استبدل [الجهة] باسم الجهة/المحفظة من "ملف القضية" إن وُجد، وإن لم توجد فاحذف الجزء الأخير واكتفِ بـ"أنا خالد الدويحي من شركة مصدر الرؤية."
+- إذا سأل عن الشركة/الجهة: اذكر اسم الجهة الدائنة أو المحفظة كما هو في "ملف القضية" بالضبط. لا تقل "ما عندي معلومة" أو "أرجع للإدارة" إذا كان الاسم موجوداً في الملف.
+- إذا طلب "التفاصيل": اذكر كل ما هو متاح فعلياً في ملف القضية بصيغة واضحة ومرتبة (الجهة، رقم الحساب، رقم المنتج/السداد إن وجد، المبلغ، الرقم المرجعي) — لا تكتفِ بالمبلغ والرقم المرجعي فقط إن وُجدت تفاصيل إضافية في الملف.
+- 🔴 لا تطلب من العميل معلومة هو من المفروض أن يحصل عليها منك (مثل رقم حسابه) — أنت من يملك هذي المعلومة ويعطيها له، لا العكس.
+- إن كانت بعض التفاصيل المطلوبة فعلاً غير موجودة في الملف (لا اسم جهة ولا رقم حساب ولا أي شيء): وضّح فقط أن هذا الجزء بالذات غير متوفر حالياً، وقل إنك ستتحقق منه، بدل التعميم بأن "كل شيء غير معروف".
+- 🔴🔴 ممنوع منعاً باتاً إضافة أي ضغط سداد أو تذكير بموعد أو مطالبة بالدفع في هذا الرد — مهمتك الآن فقط الإجابة على سؤاله. لا تكتب "والمهم موعدك..." أو "بانتظار سدادك" أو أي جملة تعيد الحديث عن السداد، إلا إذا كان العميل نفسه سأل في رسالته الحالية عن السداد أو الموعد أو وعد به. الرد يتوقف عند الإجابة على سؤاله فقط.`,
     DISPUTE: `【 مهمتك الآن: فهم الاعتراض، مناقشته، وإقناع العميل — لا تصعيد سريع 】
 - العميل غاضب أو ينكر المديونية أو يقول الرقم خطأ أو يقول "معترض" بدون أي تفصيل.
 - 🔴 أهم قاعدة: إن لم يذكر العميل سبباً محدداً للاعتراض بعد، فمهمتك الوحيدة الآن سؤاله بوضوح وبأدب عن سبب اعتراضه. ممنوع تأكيد صحة الدين قبل أن يوضّح السبب.
@@ -485,6 +769,9 @@ ${installmentRule}
 ═══════════════ القواعد الحرجة (التزم بها حرفياً) ═══════════════
 ${strictRules}
 
+═══════════════ سياسة الشركة لهذي المحفظة بالذات ═══════════════
+${renderPlaybookForPrompt(playbook)}
+${insuranceCase ? `\n═══════════════ ملف القضية التأميني ═══════════════\n${renderInsuranceCaseFile(insuranceCase)}\n` : ''}
 ═══════════════ ملف القضية (راجعه كاملاً قبل أن ترد) ═══════════════
 ${caseFile}
 
@@ -506,7 +793,9 @@ ${intentPrompts[intent]}
 10. 🔴 الحد الأقصى المطلق لأي مهلة أو تأجيل = 30 يوماً من تاريخ اليوم (${todayStr}) ولا يوماً أكثر تحت أي ظرف. إن طلب العميل أكثر من ذلك (شهرين، 3 شهور، أو ما شابه)، فرفضك إلزامي — لا تقل "ما عندي مشكلة" ولا توافق ضمنياً. اعرض عليه مدة أقصر بكثير (أسبوع إلى أسبوعين) وفاوضه نزولاً، ولا توافق على الشهر كاملاً إلا بعد محاولة تقصيره أولاً.
 11. 🔴 لا تختار action=record_dispute أبداً في أول رد على كلام فيه اعتراض غامض بلا سبب محدد (راجع تعليمات DISPUTE أعلاه) — اسأل عن السبب أولاً دائماً.
 12. 🔴 استخدم أساليب إقناع متنوعة فعلية لا تكرار نفس الجملة: التذكير بالعواقب بأدب، عرض حل وسط، تحديد خطوة صغيرة فورية (صورة إيصال، تاريخ محدد)، الإشارة إلى أن التأخير يزيد تعقيد الملف. إن شعرت أن العميل يرفض أو يماطل عمداً زِد الحزم والضغط ولا تستسلم أو تصمت.
-13. 🔴🔴 أهم قاعدة في تسجيل الوعود: اختر action=record_promise فقط إذا ذكر العميل **في رسالته الحالية بالذات** تاريخاً أو وقتاً محدداً وواضحاً للسداد (مثل "بسدد بكرة"، "يوم الخميس"، "نهاية الشهر"، "يوم 25"). احسب التاريخ الدقيق YYYY-MM-DD بالاستناد إلى تاريخ اليوم الحقيقي (${todayStr}) واكتبه في حقل promised_date. ممنوع منعاً باتاً اختيار record_promise أو ذكر "أنت وعدتني" إن لم يذكر العميل تاريخاً بنفسه في هذه المحادثة — حتى لو كانت كلامه يتضمن "بسدد" بلا تاريخ، فهذا نية لا وعد، اطلب منه التاريخ أولاً (action=negotiate) ولا تسجّل أي شيء. لا تخترع promised_date أبداً من عندك.
+13. 🔴🔴 تسجيل الوعد (افهمه دلالياً لا بكلمات محفوظة): إذا ربط العميل السداد **بأي تعبير زمني أو مناسبة** مهما كانت صياغته — تاريخ صريح، يوم نسبي (بكرا/اليوم/بعد بكرة)، يوم أسبوع، بداية/نهاية/منتصف الشهر أو الأسبوع، نزول الراتب، الدعم، حساب المواطن، مكافأة/عيدية، بيع شيء، أو أي وقت طبيعي آخر يقصده — فهذا **وعد** واختر action=record_promise. لا تشترط صيغة معيّنة.
+   - عبّئ حقلين معاً: (1) promise_text = توقيت العميل بكلماته/معناه كما قاله بالضبط (مثل "مع نزول الراتب"، "بداية الشهر الجاي"، "عند نزول حساب المواطن"، "بكرا"). (2) promised_date = أفضل تحويل دقيق إلى YYYY-MM-DD اعتماداً على تاريخ اليوم الحقيقي (${todayStr}) والمنطقة الزمنية والسياق. لو التعبير قابل للتحويل لتاريخ فعلي حوّله؛ لو نسبي/ظرفي لا يُحوَّل بدقة، ضع أقرب تاريخ متابعة منطقي في promised_date واحفظ المعنى الحقيقي في promise_text. لا تخمّن عشوائياً، استنتج بمنطق من اليوم.
+   - لا تختر record_promise إلا إذا ذكر العميل توقيتاً فعلاً في رسالته. مجرد "بسدد" بلا أي إشارة زمنية = نية لا وعد → اسأله عن التوقيت مرة واحدة (action=negotiate). ومتى ما أعطى توقيتاً، لا تعد سؤاله عنه أبداً بعد تسجيله.
 
 ═══════════════ صيغة الإخراج ═══════════════
 أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:
@@ -515,7 +804,8 @@ ${intentPrompts[intent]}
   "action": "reply|silent|request_proof|request_clarification|negotiate|pressure|close_conversation|record_installment_request|record_promise|record_dispute|human_review",
   "reason": "سبب مختصر",
   "message": "رد الواتساب أو فارغ",
-  "promised_date": "YYYY-MM-DD أو null — لا تعبئها إلا مع action=record_promise وبتاريخ ذكره العميل صريحاً الآن"
+  "promised_date": "YYYY-MM-DD أو null — مع action=record_promise: أفضل تحويل لتوقيت العميل اعتماداً على تاريخ اليوم",
+  "promise_text": "توقيت العميل بكلماته (مثل: مع الراتب / بداية الشهر الجاي / بكرا) — فقط مع action=record_promise، وإلا null"
 }
 
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
@@ -574,6 +864,25 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
   const customerFirstName = String(ctx.verified_customer_data?.customer_name ?? '').split(' ')[0] || undefined
   parsed.message = cleanReply(parsed.message, customerFirstName, prevOutbound.length === 0)
 
+  // Facts already verified in the system + any promise already on file. Used by
+  // the deterministic conversation guards below to STOP the agent from asking
+  // for data the system already holds, or re-opening a point already settled.
+  const openPromiseRec = (ctx.recent_promises ?? []).find((p: any) => p.status === 'pending') ?? null
+  const currencyVal = ctx.verified_debt_data?.currency || 'SAR'
+  const balanceVal  = ctx.verified_debt_data?.current_balance
+  const creditorVal = ctx.verified_debt_data?.creditor_name
+  const refVal      = ctx.verified_debt_data?.reference_number
+  // Company name fallback (creditor_name → portfolio_name) and the
+  // import-preserved identifiers (account/product/sadad numbers) — same
+  // fallback logic as buildCaseFile, used here so the deflection guard below
+  // can answer correctly even when creditor_name alone is empty.
+  const companyVal  = creditorVal || ctx.verified_debt_data?.portfolio_name || null
+  const accountVal  = ctx.verified_debt_data?.account_number || null
+  const extraVal     = (ctx.debt?.metadata?.extra ?? {}) as Record<string, any>
+  const pickExtra = (...keys: string[]) => keys.map(k => extraVal[k]).find(v => v !== undefined && v !== null && String(v).trim() !== '') ?? null
+  const sadadVal    = pickExtra('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number')
+  const productNoVal = pickExtra('رقم المنتج', 'product_number', 'رقم_المنتج')
+
   // ── Deterministic guards — don't just hope the model followed the prompt ──
 
   // 1) Never let a grace period beyond the 30-day policy max slip through,
@@ -602,22 +911,345 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
   // first-time customers of "promises" they never made. Require BOTH a
   // valid YYYY-MM-DD from the model AND a date-like signal in the
   // customer's own current message before trusting it.
-  if (parsed.action === 'record_promise') {
-    const validDate = parsed.promised_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.promised_date)
-    const customerGaveDateSignal = hasAny(text, [
-      'بكرة', 'بكره', 'تومورو', 'tomorrow', 'الخميس', 'الجمعة', 'السبت', 'الأحد', 'الاحد',
-      'الإثنين', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الاربعاء', 'نهاية الشهر', 'اخر الشهر', 'آخر الشهر',
-      'يوم', 'تاريخ', 'الراتب',
-    ]) && /\d/.test(text) || hasAny(text, ['بكرة', 'بكره', 'tomorrow', 'الخميس', 'الجمعة', 'السبت', 'الأحد', 'الاحد', 'الإثنين', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الاربعاء', 'نهاية الشهر', 'اخر الشهر', 'آخر الشهر'])
-    if (!validDate || !customerGaveDateSignal) {
-      log.warn('fabricated promise guard fired — no real date from customer', { intent, original_date: parsed.promised_date, customer_text: text.slice(0, 80) })
-      parsed.message = 'تمام، بس عشان أسجلها — إيش التاريخ بالضبط اللي تقدر تسدد فيه؟'
-      parsed.action = 'negotiate'
-      parsed.reason = 'fabricated_promise_guard_override'
+  if (parsed.action === 'record_promise' && (signals.deniesDebt || signals.deniesPromise)) {
+    // A denial ("ما عندي مديونية" / "ما وعدتك بشي") must NEVER be processed as
+    // a promise at all — leave `action` as 'record_promise' for now (guards
+    // (F)/(G) below, which key off this exact action value, take over and
+    // reroute it to clarification/review) and just clear any fields the model
+    // tried to fabricate so nothing gets persisted if those guards somehow
+    // didn't fire.
+    parsed.promised_date = null
+    parsed.promise_text = null
+  } else if (parsed.action === 'record_promise') {
+    const promiseText = String(parsed.promise_text ?? '').trim()
+    const validDate = !!parsed.promised_date && isSaneDate(String(parsed.promised_date), todayStr)
+    // 🔴 The GATE is the CUSTOMER'S OWN CURRENT MESSAGE, never the model's
+    // claim alone. Previously `promiseText.length > 0 || validDate` let the
+    // model record a promise purely on its own say-so — a vague conditional
+    // like "شوف الكشف ويصير خير" (no date, no commitment) got accepted simply
+    // because the model produced a non-empty promise_text/promised_date. That
+    // is exactly backwards: promise_text/promised_date are only used to fill
+    // in the STORED values once we've independently confirmed, from the
+    // customer's literal words, that they actually expressed REAL timing.
+    // signals.promise (bare "بسدد" with no date) is deliberately NOT enough on
+    // its own — that case still asks once for the specific date below.
+    const isRealPromise = hasTemporalRef(text)
+    if (isRealPromise) {
+      parsed.promise_text = promiseText || null
+      // `promised_date` is NOT NULL in the DB → always store one. Prefer the
+      // model's sane date; otherwise a near follow-up checkpoint from today.
+      // The real verbal promise is preserved in promise_text either way.
+      if (!validDate) parsed.promised_date = addDaysISO(todayStr, 3)
+    } else {
+      // No timing expressed at all → it's an intention, not a dated promise.
       parsed.promised_date = null
+      parsed.promise_text = null
+      if (openPromiseRec) {
+        // A promise is ALREADY on file → acknowledge it, never re-ask.
+        const dt = dateOnly(openPromiseRec.promised_date)
+        log.warn('record_promise w/o timing but promise already on file — acknowledging', { dt })
+        parsed.message = dt
+          ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.`
+          : 'تمام، الوعد مسجّل عندي. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.'
+        parsed.action = 'reply'
+        parsed.reason = 'promise_already_on_file'
+      } else {
+        log.warn('record_promise without any timing — asking once', { customer_text: text.slice(0, 80) })
+        parsed.message = 'تمام، بس عشان أرتّبها صح — متى تقدر تسدد؟'
+        parsed.action = 'negotiate'
+        parsed.reason = 'promise_needs_timing'
+      }
     }
   } else {
     parsed.promised_date = null
+    parsed.promise_text = null
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  4) ROOT-LEVEL ANTI-REDUNDANCY ENFORCEMENT (deterministic, not prompt)
+  //  Enforces the mandatory pre-reply checks in CODE (the LLM does not obey
+  //  them reliably from prompt text alone):
+  //   (A) once a payment promise is on file → never re-ask "when will you pay"
+  //   (B) a fact the customer asks for that EXISTS in the case file is answered
+  //       directly — never deflect to "I'll check with management"
+  //   (C) never re-ask the same question the customer already answered
+  //  Escalation/deflection is allowed ONLY when the value is truly absent.
+  // ════════════════════════════════════════════════════════════════════
+  {
+    // (A) Promise already recorded → block any re-ask for a payment date.
+    const replyReAsksDate =
+      /(متى|إيمتى|ايمتى|أي\s*يوم|اي\s*يوم|التاريخ|وش\s*اليوم)/.test(parsed.message) &&
+      hasAny(parsed.message, ['تسدد', 'تدفع', 'السداد', 'الدفع', 'بتسدد', 'راح تسدد', 'تحوّل', 'تحول'])
+    if (openPromiseRec && replyReAsksDate && parsed.action !== 'record_promise') {
+      const dt = dateOnly(openPromiseRec.promised_date)
+      log.warn('redundant date re-ask blocked — promise already on file', { dt, original: parsed.message.slice(0, 80) })
+      parsed.message = dt
+        ? `تمام، أنا مسجّل إنك بتسدد بتاريخ ${dt}. بانتظارك، وأول ما تحوّل أرسل لي صورة الإيصال.`
+        : 'تمام، الوعد مسجّل عندي وبانتظار سدادك. أرسل لي صورة الإيصال بعد التحويل.'
+      parsed.action = 'reply'
+      parsed.reason = 'promise_on_file_no_reask'
+    }
+
+    // (B) Customer asked for a fact that EXISTS in the case file → answer it
+    // directly. Deflecting to management when the value is in the system is
+    // exactly what the customer complained about. Uses the SAME fallback
+    // chain as buildCaseFile (creditor_name → portfolio_name) plus
+    // account/product/sadad numbers, so a deflection is only ever allowed
+    // through when the specific value asked for is genuinely absent.
+    const deflectsToMgmt = hasAny(parsed.message, [
+      'أرجع للإدارة', 'ارجع للادارة', 'بأرجع لك', 'برجع لك', 'سأتحقق', 'بتحقق وأرد', 'أتحقق وأرد', 'أتحقق وأرجع',
+      'أرفع استفسارك', 'ارفع استفسارك', 'بحوّلها للإدارة', 'بحولها للادارة', 'أحوّلها للإدارة', 'بحوّل استفسارك',
+      'ما عندي هالمعلومة', 'ما عندي المعلومة', 'ما عندي هذي المعلومة', 'ما عندي هالمعلومه', 'بتواصل مع الإدارة',
+    ])
+    if (deflectsToMgmt) {
+      const asksBalance  = hasAny(text, ['كم', 'قديش', 'مبلغ', 'الرصيد', 'علي', 'عليه', 'باقي', 'المديونية', 'الدين'])
+      const asksCreditor = signals.asksCompany || hasAny(text, ['الجهة', 'الشركة', 'البنك', 'الدائن', 'لصالح', 'لمين', 'مين الجهة'])
+      const asksRef      = hasAny(text, ['الرقم المرجعي', 'رقم المرجع', 'رقم الملف', 'المرجعي', 'reference'])
+      const asksAccount  = hasAny(text, ['رقم الحساب', 'رقم العقد', 'الحساب', 'العقد'])
+      const asksSadad    = hasAny(text, ['رقم سداد', 'رقم السداد', 'المفوتر', 'sadad'])
+      const asksProduct  = hasAny(text, ['رقم المنتج', 'المنتج'])
+      const bal = money(balanceVal, currencyVal)
+      // "عطني التفاصيل" → combine every available identifier in one direct answer.
+      const detailParts = [
+        companyVal && `الجهة: ${companyVal}`,
+        accountVal && `رقم الحساب: ${accountVal}`,
+        productNoVal && `رقم المنتج: ${productNoVal}`,
+        sadadVal && `رقم السداد: ${sadadVal}`,
+        bal && `الرصيد المستحق: ${bal}`,
+        refVal && `الرقم المرجعي: ${refVal}`,
+      ].filter(Boolean)
+      let direct: string | null = null
+      const multiList = Array.isArray((ctx as any).verified_debts_list) ? (ctx as any).verified_debts_list as any[] : null
+      if (multiList && multiList.length > 1 && (asksBalance || signals.asksDetails)) {
+        direct = multiList.map((dd: any, i: number) => {
+          const b = money(dd.current_balance, dd.currency || currencyVal)
+          return `مطالبة ${i + 1}${dd.reference_number ? ` (مرجع ${dd.reference_number})` : ''}: ${b ?? 'غير محدد'}`
+        }).join(' | ') + '.'
+      } else if (signals.asksDetails && detailParts.length) direct = detailParts.join('، ') + '.'
+      else if (asksBalance && bal) direct = `رصيدك المستحق حالياً ${bal}.`
+      else if (asksCreditor && companyVal) direct = `المديونية لصالح ${companyVal}.`
+      else if (asksRef && refVal) direct = `الرقم المرجعي لملفك هو ${refVal}.`
+      else if (asksAccount && accountVal) direct = `رقم حسابك المسجّل هو ${accountVal}.`
+      else if (asksSadad && sadadVal) direct = `رقم السداد/المفوتر الخاص بملفك هو ${sadadVal}.`
+      else if (asksProduct && productNoVal) direct = `رقم المنتج المسجّل هو ${productNoVal}.`
+      if (direct) {
+        log.warn('deflection-to-management blocked — answered directly from case file', { reason: parsed.reason })
+        parsed.message = direct
+        parsed.action = 'reply'
+        parsed.reason = 'answered_from_case_file'
+      }
+    }
+
+    // (D) "من أنت؟" must always get the exact, fixed self-introduction —
+    // never the model's own improvisation (which was the literal complaint:
+    // the agent didn't introduce itself or named no company at all).
+    if (signals.asksWhoAreYou) {
+      const intro = companyVal
+        ? `أنا خالد الدويحي من شركة مصدر الرؤية، وكيل متابعة مطالبات شركة ${companyVal}.`
+        : 'أنا خالد الدويحي من شركة مصدر الرؤية، وكيل متابعة مطالبات.'
+      if (parsed.message.trim() !== intro) {
+        log.warn('self-introduction guard fired', { original: parsed.message.slice(0, 80) })
+        parsed.message = intro
+        parsed.action = 'reply'
+        parsed.reason = 'self_introduction'
+      }
+    }
+
+    // (E2) Multiple debts under the SAME portfolio: deterministically list
+    // EVERY claim whenever the customer asks about amount/balance/details —
+    // never rely on the model "remembering" the case-file instruction. This
+    // is the safety net for the exact production gap where the model
+    // answered with only the FIRST debt's amount and silently dropped the
+    // second one, even though both were in the case file.
+    const multiDebtsList = Array.isArray((ctx as any).verified_debts_list) ? (ctx as any).verified_debts_list as any[] : null
+    if (multiDebtsList && multiDebtsList.length > 1) {
+      const asksAboutAmount = hasAny(text, ['كم', 'مبلغ', 'الرصيد', 'باقي', 'المديونية', 'الدين']) || signals.asksDetails
+      const mentionsAllClaims = multiDebtsList.every((dd: any) =>
+        !dd.reference_number || parsed.message.includes(String(dd.reference_number)))
+      if (asksAboutAmount && !mentionsAllClaims) {
+        const listed = multiDebtsList.map((dd: any, i: number) => {
+          const b = money(dd.current_balance, dd.currency || currencyVal)
+          return `مطالبة ${i + 1}${dd.reference_number ? ` (مرجع ${dd.reference_number})` : ''}: ${b ?? 'غير محدد'}`
+        }).join(' | ') + '.'
+        log.warn('multi-debt listing guard fired — model omitted a claim', { original: parsed.message.slice(0, 100) })
+        parsed.message = listed
+        parsed.action = 'reply'
+        parsed.reason = 'multi_debt_all_claims_listed'
+      }
+    }
+
+    // (F) A bare denial that any debt exists ("ما عندي مديونية") must NEVER be
+    // recorded or treated as a promise to pay — that is the opposite of what
+    // the customer said. This is a dispute/inquiry, not an agreement, however
+    // the model classified it.
+    if (signals.deniesDebt && parsed.action === 'record_promise') {
+      log.warn('denial-of-debt blocked from being recorded as a promise', { original: parsed.message.slice(0, 80) })
+      parsed.action = 'request_clarification'
+      parsed.reason = 'denial_not_promise'
+      parsed.promised_date = null
+      parsed.promise_text = null
+      if (!parsed.message.trim()) parsed.message = 'طيب، وضّح لي السبب — هذا الملف مسجّل باسمك في النظام، وش بالضبط اللي تشوفه غلط فيه؟'
+    }
+
+    // (G) The customer explicitly denies having made ANY promise ("ما وعدتك
+    // بشي") — never restate/confirm an existing promise back to them (that is
+    // literally arguing with them using their own disputed record). Drop the
+    // promise from this reply and flag it for human review instead of
+    // asserting it as settled fact. We do NOT touch the DB row here (out of
+    // scope) — action=human_review surfaces it through the existing
+    // escalation path rather than silently re-confirming a disputed promise.
+    if (signals.deniesPromise) {
+      log.warn('customer denies the promise — dropping confirmation, flagging for review', { original: parsed.message.slice(0, 80) })
+      parsed.action = 'human_review'
+      parsed.reason = 'promise_disputed_needs_review'
+      parsed.promised_date = null
+      parsed.promise_text = null
+      parsed.message = 'طيب، بس بمراجعة هذي النقطة من عندنا — متى كان آخر تواصل بخصوص موعد السداد من جهتك؟'
+    }
+
+    // (H) INFO_REQUEST must answer the question ONLY — no payment pressure,
+    // due-date reminder, or "وعدت/المهم تسدد" push tacked onto an otherwise
+    // correct factual answer, unless the customer's OWN current message also
+    // asked about payment/timing. This is exactly what slipped through before:
+    // the model answered "هل هذي كل التفاصيل؟" correctly then appended "والمهم
+    // موعدك بكرة 25/6 للسداد" on its own initiative.
+    if (intent === 'INFO_REQUEST' && !signals.promise && !hasTemporalRef(text) && parsed.action !== 'record_promise') {
+      const PRESSURE_PATTERN = /(المهم[^.؟!]*?(موعد|تسدد|سداد)|موعدك[^.؟!]*|متى بتسدد[^.؟!]*\??|تقدر تسدد[^.؟!]*\??|جهزت المبلغ[^.؟!]*\??|بانتظار سدادك[^.؟!]*|وعدت[^.؟!]*)/g
+      if (PRESSURE_PATTERN.test(parsed.message)) {
+        const cleaned = parsed.message
+          .split(/(?<=[.؟!])\s+/)
+          .filter(sentence => !PRESSURE_PATTERN.test(sentence))
+          .join(' ')
+          .trim()
+        if (cleaned) {
+          log.warn('info-request payment-pressure stripped', { original: parsed.message.slice(0, 120), cleaned: cleaned.slice(0, 120) })
+          parsed.message = cleaned
+          parsed.reason = 'info_request_no_pressure'
+        }
+      }
+    }
+
+    // (I2) Insurance-only concepts (حق رجوع / طرف ثالث / حذف مسترد) must
+    // NEVER appear for a non-insurance portfolio — a hard code rule, not
+    // just a prompt instruction, in case the model ignores the playbook
+    // section above or a playbook row was mis-configured for this category.
+    if (playbook.category !== 'insurance') {
+      const INSURANCE_ONLY_PATTERN = /(حق\s*الرجوع|حق\s*رجوع|الطرف\s*الثالث|طرف\s*ثالث|حذف\s*مسترد|الحذف\s*المسترد)/g
+      if (INSURANCE_ONLY_PATTERN.test(parsed.message)) {
+        log.warn('insurance-only concept stripped from non-insurance portfolio reply', { category: playbook.category, original: parsed.message.slice(0, 120) })
+        parsed.message = parsed.message.replace(INSURANCE_ONLY_PATTERN, '').replace(/\s{2,}/g, ' ').trim()
+        if (!parsed.message) parsed.message = 'تمام، خلنا نكمل بخصوص ملفك.'
+      }
+    }
+
+    // (L2) Playbook forbidden_phrases — admin-configured per portfolio.
+    // Deterministic guard, not just a prompt instruction: any reply
+    // containing a forbidden phrase (substring match) is stripped of that
+    // sentence before it ever reaches the customer.
+    if (playbook.forbidden_phrases?.length) {
+      const lowerMsg = parsed.message.toLowerCase()
+      const hit = playbook.forbidden_phrases.find(p => p && lowerMsg.includes(p.toLowerCase()))
+      if (hit) {
+        log.warn('forbidden phrase blocked by playbook', { portfolio_id: resolvedPortfolioId, phrase: hit, original: parsed.message.slice(0, 120) })
+        const cleaned = parsed.message
+          .split(/(?<=[.؟!])\s+/)
+          .filter(sentence => !sentence.toLowerCase().includes(hit.toLowerCase()))
+          .join(' ')
+          .trim()
+        parsed.message = cleaned || 'تمام، خلنا نكمل بخصوص ملفك.'
+        parsed.reason = 'forbidden_phrase_blocked'
+      }
+    }
+
+
+    // (J2) Never let the model state, send, or invent ANY payment
+    // destination (bank account/IBAN/SADAD number/"transfer to this
+    // reference number") that is not the one approved in
+    // `collection_accounts`. Gated primarily on the CUSTOMER'S OWN request
+    // for payment details — not on guessing how the model might phrase an
+    // invented one, which a narrow keyword/IBAN-regex check on the model's
+    // reply alone proved to miss (a real production case: the model told
+    // the customer to "transfer to" the debt's reference_number, which is
+    // not a payment destination at all and matched no IBAN/bank keyword).
+    {
+      const approvedAccount = ctx.collection_account
+      const customerAsksWhereToPay = hasAny(text, [
+        'وين أحول', 'وين احول', 'اين احول', 'فين أحول', 'فين احول',
+        'الآيبان', 'ايبان', 'الحساب البنكي', 'حساب بنكي', 'رقم الحساب البنكي',
+        'وين ادفع', 'وين أدفع', 'كيف أحول', 'كيف احول', 'طريقة السداد', 'طريقة الدفع',
+      ])
+      const IBAN_PATTERN = /\bSA\d{2}[\s-]?\d{2,4}[\s-]?\d{4,}\b/i
+      const modelInventedSomething = IBAN_PATTERN.test(parsed.message) || hasAny(parsed.message, ['آيبان', 'حساب بنكي', 'الحساب البنكي'])
+
+      if (customerAsksWhereToPay || modelInventedSomething) {
+        const approvedIban = approvedAccount?.iban ? String(approvedAccount.iban) : null
+        const approvedBiller = approvedAccount?.biller_code ? String(approvedAccount.biller_code) : null
+        const mentionsApprovedValue =
+          (approvedIban && parsed.message.includes(approvedIban)) ||
+          (approvedBiller && parsed.message.includes(approvedBiller))
+
+        if (!mentionsApprovedValue) {
+          log.warn('blocked an unapproved/invented payment destination', { portfolio_id: resolvedPortfolioId, hasApprovedAccount: !!approvedAccount, original: parsed.message.slice(0, 120) })
+          if (approvedAccount) {
+            // An approved account DOES exist but the model quoted something
+            // else (or nothing concrete) — correct it to the real approved value.
+            parsed.message = approvedAccount.method_type === 'sadad_biller' && approvedAccount.biller_code
+              ? `طريقة السداد المعتمدة: سداد المفوتر "${approvedAccount.biller_name ?? ''}" رمز ${approvedAccount.biller_code}.`
+              : approvedAccount.iban
+                ? `طريقة السداد المعتمدة: تحويل على الآيبان ${approvedAccount.iban}${approvedAccount.account_name ? ` باسم ${approvedAccount.account_name}` : ''}.`
+                : 'بجهّز لك طريقة السداد المعتمدة وأرسلها لك.'
+            parsed.action = 'reply'
+            parsed.reason = 'account_corrected_from_collection_accounts'
+          } else {
+            // No approved account at all for this portfolio — never invent
+            // one, never quote a reference/account number as a payment
+            // destination. Deterministic safe reply + flag the missing data.
+            parsed.message = 'تمام، بجهّز لك طريقة السداد المعتمدة وأرسلها لك أول ما تتوفر — راح أتواصل معك قريباً بها.'
+            parsed.action = 'human_review'
+            parsed.reason = 'missing_collection_account'
+            try {
+              // severity is constrained to info|warning|error|critical —
+              // a non-matching value is silently rejected by Postgres and
+              // the Supabase client does NOT throw on that, it only
+              // returns `{ error }` — so the `.error` MUST be checked
+              // explicitly, or a failed insert looks identical to success.
+              const { error: alertErr } = await createServiceClient().from('system_alerts').insert({
+                company_id: args.company_id,
+                severity: 'warning',
+                alert_type: 'missing_collection_account',
+                title: 'بيانات حساب سداد ناقصة لمحفظة',
+                message: `محفظة ${ctx.verified_debt_data?.portfolio_name ?? resolvedPortfolioId ?? 'غير معروفة'} بلا حساب سداد معتمد في collection_accounts — العميل وافق على السداد وطلب طريقة الدفع.`,
+                metadata: { portfolio_id: resolvedPortfolioId, customer_id: args.customer_id },
+              })
+              if (alertErr) log.error('missing-account alert insert rejected by DB', { error: alertErr.message })
+            } catch (e) {
+              log.error('failed to insert missing-account alert', { error: String((e as any)?.message ?? e) })
+            }
+          }
+        }
+      }
+    }
+
+    // (C) Don't re-ask the SAME question already answered. Catch paraphrased
+    // repeats by content-word overlap against the agent's previous question.
+    const isQ = (s: string) => s.includes('؟') || /(متى|كم|وش|ايش|إيش|مين|ليش|هل|أي\s|اي\s)/.test(s)
+    const contentWords = (s: string) =>
+      new Set(norm(s).replace(/[^؀-ۿ\s]/g, ' ').split(/\s+/).filter(w => w.length >= 3))
+    if (lastAgentMessage && parsed.action === 'reply' && isQ(parsed.message) && isQ(lastAgentMessage)) {
+      const a = contentWords(parsed.message), b = contentWords(lastAgentMessage)
+      const inter = [...a].filter(w => b.has(w)).length
+      const overlap = inter / Math.max(1, Math.min(a.size, b.size))
+      if (a.size >= 3 && overlap >= 0.6) {
+        log.warn('repeated-question guard fired', { overlap: Number(overlap.toFixed(2)), original: parsed.message.slice(0, 80) })
+        const moves = [
+          'طيب، خلنا نمشي قدام — وش الخطوة اللي تناسبك الحين؟',
+          'تمام، الموضوع يحتاج حل. وش تقترح؟',
+          'فهمت عليك. تبي نرتّب طريقة السداد؟',
+        ]
+        parsed.message = moves[Math.floor(Math.random() * moves.length)]
+        parsed.reason = 'repeated_question_guard'
+      }
+    }
   }
 
   log.info('agent decision', {
