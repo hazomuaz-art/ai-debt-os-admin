@@ -28,6 +28,15 @@ const FIELD_DEFS: Record<string, FieldDef[]> = {
     { key: 'username',  label: 'اسم المستخدم',     type: 'text',     placeholder: 'Service account username' },
     { key: 'token',     label: 'كلمة المرور / الرمز', type: 'password', placeholder: 'Password or API token' },
   ],
+  rasf_whatsapp: [
+    { key: 'api_url',   label: 'رابط الخادم (InSync/Rasf URL)', type: 'url',      placeholder: 'https://rasf.yourdomain.com' },
+    { key: 'token',     label: 'رمز التوثيق (Token)',           type: 'password', placeholder: 'Bearer token' },
+    { key: 'sender_id', label: 'معرّف المرسل (اختياري)',         type: 'text',     placeholder: 'Sender ID' },
+  ],
+  tameez_calls: [
+    { key: 'api_url', label: 'رابط الخادم (Tameez Calls URL)', type: 'url',      placeholder: 'https://tameez.yourdomain.com' },
+    { key: 'api_key', label: 'مفتاح الـ API',                   type: 'password', placeholder: 'Tameez API Key' },
+  ],
 }
 
 // ── Status badge ──

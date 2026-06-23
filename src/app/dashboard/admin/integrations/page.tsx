@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { IntegrationCard } from '@/components/integrations/IntegrationCard'
-import { MessageCircle, Settings, Link as LinkIcon } from 'lucide-react'
+import { MessageCircle, Settings, Link as LinkIcon, PhoneCall, MessageSquare } from 'lucide-react'
 import type { IntegrationSetting } from '@/types'
 
 // ── Integration catalogue ──
@@ -24,6 +24,18 @@ const INTEGRATIONS = [
     label:       'أنظمة التحصيل والمحاسبة (ERP)',
     description: 'ربط ثنائي الاتجاه لمزامنة الديون والعملاء وسجلات السداد.',
     icon:        <LinkIcon size={24} className="text-white" />,
+  },
+  {
+    key:         'tameez_calls',
+    label:       'Tameez Calls',
+    description: 'ربط نظام تميز لتحليل وتسجيل المكالمات الصوتية مع العملاء.',
+    icon:        <PhoneCall size={24} className="text-white" />,
+  },
+  {
+    key:         'rasf_whatsapp',
+    label:       'InSync / Rasf WhatsApp',
+    description: 'ربط واتساب عبر بوابة رصف (InSync) كقناة بديلة لاستقبال وإرسال الرسائل.',
+    icon:        <MessageSquare size={24} className="text-white" />,
   },
 ]
 
