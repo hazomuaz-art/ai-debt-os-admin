@@ -1647,44 +1647,54 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
     const isQ = (s: string) => s.includes('؟') || /(متى|كم|وش|ايش|إيش|مين|ليش|هل|أي\s|اي\s)/.test(s)
     const contentWords = (s: string) =>
       new Set(norm(s).replace(/[^؀-ۿ\s]/g, ' ').split(/\s+/).filter(w => w.length >= 3))
-    if (lastAgentMessage && parsed.action === 'reply' && isQ(parsed.message) && isQ(lastAgentMessage)) {
+    if (lastAgentMessage && (parsed.action === 'reply' || parsed.action === 'negotiate') && isQ(parsed.message) && isQ(lastAgentMessage)) {
       const a = contentWords(parsed.message), b = contentWords(lastAgentMessage)
       const inter = [...a].filter(w => b.has(w)).length
       const overlap = inter / Math.max(1, Math.min(a.size, b.size))
       if (a.size >= 3 && overlap >= 0.6) {
         log.warn('repeated-question guard fired', { overlap: Number(overlap.toFixed(2)), original: parsed.message.slice(0, 80) })
-        // Payment-pressure fallbacks only make sense once the conversation is
-        // actually about negotiating payment. A repeated GREETING/INFO_REQUEST
-        // reply must never be replaced by a payment nudge — that was the exact
-        // cause of the agent pushing "متى تسدد؟" onto a plain greeting or an
-        // info question.
-        const movesNeutral = [
-          'طيب، خلنا نمشي قدام — وش تحتاج تعرفه أكثر؟',
-          'تمام، وضّح لي بس وش المطلوب بالضبط؟',
-          'خلاص، فهمت. عندك أي سؤال آخر؟',
-          'تمام، استوعبت. في شي ثاني تبي تعرفه؟',
-          'ماشي، الكلام واضح. تحتاج أي توضيح إضافي؟',
-        ]
-        const movesPayment = [
-          'طيب، خلنا نمشي قدام — وش الخطوة اللي تناسبك الحين؟',
-          'تمام، الموضوع يحتاج حل. وش تقترح؟',
-          'فهمت عليك. تبي نرتّب طريقة السداد؟',
-          'خلاص، فهمت وضعك. إيش الحل اللي يناسبك من جهتك؟',
-          'طيب، بدال ما نكرر نفس الكلام — وش تقدر تسوي الحين؟',
-          'تمام. خلنا نركّز على الخطوة الجاية، وش رأيك؟',
-          'فهمتك. بس محتاجين نتفق على شي عملي الحين.',
-          'ماشي، الكلام واضح. طيب وش القرار من جهتك؟',
-          'تمام، استوعبت كل اللي قلته. الحين وش الخطة؟',
-          'طيب، خلنا نوصل لشي ملموس — وش تقترح؟',
-          'فهمت، بس لازم نتحرك للأمام. وش رايك نسوي؟',
-          'تمام، واضح كلامك. إيش اللي يناسبك كخطوة قادمة؟',
-          'خلاص فهمت الموضوع. طيب وش الحل من ناحيتك؟',
-          'ماشي، بس نحتاج نقرر شي الحين — وش تشوف؟',
-          'تمام، استلمت كلامك. وش الخطوة اللي نقدر نمشي بها؟',
-        ]
-        const moves = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? movesNeutral : movesPayment
-        parsed.message = await pickUnusedVariant(args.customer_id, 'repeated_question', moves)
-        parsed.reason = 'repeated_question_guard'
+        // A promise already exists (on file, or just force-recorded above) →
+        // never inject a "when will you pay" fallback; only ever confirm it.
+        if (openPromiseRec || promiseForcedFromTemporalRef) {
+          const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
+          parsed.message = dt
+            ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك.`
+            : 'تمام، الوعد مسجّل عندي. بانتظار سدادك.'
+          parsed.reason = 'repeated_question_guard_promise_protected'
+        } else {
+          // Payment-pressure fallbacks only make sense once the conversation is
+          // actually about negotiating payment. A repeated GREETING/INFO_REQUEST
+          // reply must never be replaced by a payment nudge — that was the exact
+          // cause of the agent pushing "متى تسدد؟" onto a plain greeting or an
+          // info question.
+          const movesNeutral = [
+            'طيب، خلنا نمشي قدام — وش تحتاج تعرفه أكثر؟',
+            'تمام، وضّح لي بس وش المطلوب بالضبط؟',
+            'خلاص، فهمت. عندك أي سؤال آخر؟',
+            'تمام، استوعبت. في شي ثاني تبي تعرفه؟',
+            'ماشي، الكلام واضح. تحتاج أي توضيح إضافي؟',
+          ]
+          const movesPayment = [
+            'طيب، خلنا نمشي قدام — وش الخطوة اللي تناسبك الحين؟',
+            'تمام، الموضوع يحتاج حل. وش تقترح؟',
+            'فهمت عليك. تبي نرتّب طريقة السداد؟',
+            'خلاص، فهمت وضعك. إيش الحل اللي يناسبك من جهتك؟',
+            'طيب، بدال ما نكرر نفس الكلام — وش تقدر تسوي الحين؟',
+            'تمام. خلنا نركّز على الخطوة الجاية، وش رأيك؟',
+            'فهمتك. بس محتاجين نتفق على شي عملي الحين.',
+            'ماشي، الكلام واضح. طيب وش القرار من جهتك؟',
+            'تمام، استوعبت كل اللي قلته. الحين وش الخطة؟',
+            'طيب، خلنا نوصل لشي ملموس — وش تقترح؟',
+            'فهمت، بس لازم نتحرك للأمام. وش رايك نسوي؟',
+            'تمام، واضح كلامك. إيش اللي يناسبك كخطوة قادمة؟',
+            'خلاص فهمت الموضوع. طيب وش الحل من ناحيتك؟',
+            'ماشي، بس نحتاج نقرر شي الحين — وش تشوف؟',
+            'تمام، استلمت كلامك. وش الخطوة اللي نقدر نمشي بها؟',
+          ]
+          const moves = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? movesNeutral : movesPayment
+          parsed.message = await pickUnusedVariant(args.customer_id, 'repeated_question', moves)
+          parsed.reason = 'repeated_question_guard'
+        }
       }
     }
   }
@@ -1730,10 +1740,21 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
       'ماشي، بس أبغى أعرف القرار النهائي منك.',
       'تمام، وش رايك نرتّب موعد سداد واضح؟',
     ]
-    const fallbacks = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? fallbacksNeutral : fallbacksPayment
-    parsed.message = await pickUnusedVariant(args.customer_id, 'anti_repetition', fallbacks)
-    parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
-    parsed.reason = 'anti_repetition_guard'
+    // A promise already exists (on file, or just force-recorded above) →
+    // never fall back to a "when will you pay" payment nudge here either.
+    if (openPromiseRec || promiseForcedFromTemporalRef) {
+      const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
+      parsed.message = dt
+        ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك.`
+        : 'تمام، الوعد مسجّل عندي. بانتظار سدادك.'
+      parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+      parsed.reason = 'anti_repetition_guard_promise_protected'
+    } else {
+      const fallbacks = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? fallbacksNeutral : fallbacksPayment
+      parsed.message = await pickUnusedVariant(args.customer_id, 'anti_repetition', fallbacks)
+      parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+      parsed.reason = 'anti_repetition_guard'
+    }
   }
 
   return parsed
