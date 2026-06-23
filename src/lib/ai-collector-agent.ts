@@ -976,7 +976,14 @@ export async function runCollectorAgent(args: {
           String(a.description ?? '').includes('تقسيط')
         ))
 
-  const installmentRule = planActive
+  const installmentRule = isStcPortfolio
+    // STC policy bans the agent from proposing/mentioning installments at
+    // all, even as a negotiation tactic — only ever a customer-INITIATED
+    // request gets recorded and forwarded, never negotiated or approved.
+    ? `- 🔴🔴 ممنوع منعاً باتاً أن تقترح أو تذكر التقسيط ابتداءً بأي صياغة — لا كحل، لا كخيار، لا كمثال. لا تطرح الفكرة على العميل مهما طالت المفاوضة.
+  - إذا طلب العميل التقسيط بنفسه وبشكل صريح فقط: سجّل الطلب وارفعه للمراجعة (action=record_installment_request) دون وعد بالموافقة ودون اقتراح أي جدول/مبلغ شهري/عدد دفعات من عندك.
+  - في كل الحالات الأخرى: تفاوض على السداد الكامل أو دفعة الآن، بدون أي إشارة للتقسيط.`
+    : planActive
     ? '- ✅ يوجد تقسيط معتمد مسبقاً في النظام: أكّد للعميل أن خطته معتمدة واطلب موعد القسط القادم فقط. لا تغيّر شروط الخطة.'
     : `- 🔴 صلاحية التقسيط: لا تملك صلاحية اعتماد تقسيط أو تحديد مبلغ شهري/عدد دفعات بنفسك — هذا قرار الإدارة. لكن لا ترفض طلب العميل رفضاً جافاً ولا تردّ بقالب آلي.
   - أولاً (الأهم): حاول كمحصّل خبير إقناعه بالسداد الكامل أو دفعة كبيرة مقدّمة الآن (اربطها بمصلحته: إغلاق الملف، تجنّب التصعيد، راحة البال). تفاوض بذكاء قبل أي شيء.
@@ -1215,6 +1222,26 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
     parsed.reason = 'dispute_reason_guard_override'
   }
 
+  // 2b) Force record_promise when the CUSTOMER'S CURRENT message itself
+  // carries an unambiguous temporal reference (بداية الشهر / مع الراتب /
+  // الأسبوع الجاي ...) that the model failed to classify as a promise —
+  // e.g. it chose 'negotiate' and re-asked "متى تسدد؟" instead. Prompt
+  // instruction §13 alone is not enough; this is the deterministic
+  // backstop. Never overrides an explicit denial.
+  // "بس مو الحين" ("not now") matches hasTemporalRef's "الحين" word alone —
+  // explicit negation right before the time word means the customer is
+  // declining a NOW-commitment, not making one. Never force-record a
+  // promise in that case.
+  const negatesImmediateTiming = /(مو|ما|ماني|مب)\s*(الحين|اليوم|بكرا|بكرة|بكره)/.test(norm(text))
+  let promiseForcedFromTemporalRef = false
+  if (hasTemporalRef(text) && !negatesImmediateTiming && parsed.action !== 'record_promise' && !signals.deniesDebt && !signals.deniesPromise) {
+    log.warn('forcing record_promise — customer message has an explicit temporal reference the model did not classify as a promise', { original_action: parsed.action, text_preview: text.slice(0, 80) })
+    parsed.action = 'record_promise'
+    parsed.reason = 'promise_forced_from_temporal_ref'
+    promiseForcedFromTemporalRef = true
+    if (!String(parsed.promise_text ?? '').trim()) parsed.promise_text = text.trim().slice(0, 120)
+  }
+
   // 3) Never persist a promise the customer didn't actually give a date
   // for — this is the exact bug that caused the agent to later accuse
   // first-time customers of "promises" they never made. Require BOTH a
@@ -1264,6 +1291,16 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
       // model's sane date; otherwise a near follow-up checkpoint from today.
       // The real verbal promise is preserved in promise_text either way.
       if (!parsed.promised_date || !isSaneDate(String(parsed.promised_date), todayStr)) parsed.promised_date = addDaysISO(todayStr, 3)
+      // The model's ORIGINAL message is stale/wrong here (it's whatever it
+      // said before we force-reclassified its action — e.g. "متى تقدر
+      // تسدد؟"). Replace it with a clean acknowledgment so the customer is
+      // never asked the date again after already giving one.
+      if (promiseForcedFromTemporalRef) {
+        const dt = dateOnly(parsed.promised_date)
+        parsed.message = dt
+          ? `تمام، مسجّل وعدك بالسداد بتاريخ ${dt}. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.`
+          : 'تمام، مسجّل وعدك بالسداد. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.'
+      }
     } else {
       // No timing expressed at all → it's an intention, not a dated promise.
       parsed.promised_date = null
