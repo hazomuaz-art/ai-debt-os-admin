@@ -37,6 +37,25 @@ export function classifyStcServiceType(serviceNumber: string | null | undefined)
   return null
 }
 
+// Detects an STC customer asking about the MEANING of one of the
+// portfolio's operational fields (service/account number, device-bundling
+// status, status/establish dates, sadad number, late balance, service
+// type). MUST only ever be called when isStcPortfolio is true — these
+// phrases (e.g. "رقم الحساب") are common enough in everyday Arabic that
+// matching them for every portfolio would misclassify unrelated questions.
+const STC_FIELD_MEANING_WORDS = [
+  'رقم الخدمة', 'رقم خدمتي', 'رقم حسابي', 'رقم الحساب', 'نوع الخدمة',
+  'مع جهاز', 'بدون جهاز', 'بلا جهاز', 'باقة', 'بأقة', 'باقا', 'baqa',
+  'تاريخ التعثر', 'تاريخ تعثر', 'حالة الحساب', 'تاريخ الحساب',
+  'تاريخ تأسيس', 'تاريخ انشاء', 'تاريخ إنشاء', 'تأسيس العميل',
+  'رقم سداد', 'رقم السداد', 'المتأخر', 'المبلغ المتأخر', 'الرصيد المتأخر',
+]
+
+export function detectStcFieldMeaningQuestion(text: string): boolean {
+  const v = String(text ?? '').trim().toLowerCase()
+  return STC_FIELD_MEANING_WORDS.some(w => v.includes(w.toLowerCase()))
+}
+
 // Plain-language explanations of each customer_data_stc field — used both
 // to render the case-file knowledge block and to answer a direct customer
 // question about what a field means, without ever escalating.
