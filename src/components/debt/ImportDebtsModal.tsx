@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, X, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react'
+import { Upload, X, FileText, CheckCircle, AlertCircle, Download, HelpCircle } from 'lucide-react'
 import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
 
 interface ImportResult {
@@ -11,12 +11,33 @@ interface ImportResult {
   errors: string[]
 }
 
+interface MappingCandidate {
+  header: string
+  confidence: number
+}
+
+interface MappingFieldIssue {
+  field: string
+  field_label: string
+  candidates: MappingCandidate[]
+  reason: string
+}
+
+interface NeedsMappingGroup {
+  signature_hash: string
+  portfolio_label: string | null
+  row_numbers: number[]
+  row_count: number
+  fields: MappingFieldIssue[]
+}
+
 export default function ImportDebtsModal() {
   const [open, setOpen] = useState(false)
   const [companyKey, setCompanyKey] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
+  const [needsMapping, setNeedsMapping] = useState<NeedsMappingGroup[] | null>(null)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -42,6 +63,7 @@ export default function ImportDebtsModal() {
     setLoading(true)
     setError('')
     setResult(null)
+    setNeedsMapping(null)
 
     const formData = new FormData()
     formData.append('file', file)
@@ -55,6 +77,7 @@ export default function ImportDebtsModal() {
         setError(data.error || 'Import failed')
       } else {
         setResult(data.data)
+        setNeedsMapping(data.needs_mapping ?? null)
         if (data.data.imported > 0) router.refresh()
       }
     } catch (e: any) {
@@ -84,6 +107,7 @@ export default function ImportDebtsModal() {
     setOpen(false)
     setFile(null)
     setResult(null)
+    setNeedsMapping(null)
     setError('')
     setCompanyKey('')
   }
@@ -215,8 +239,55 @@ export default function ImportDebtsModal() {
                   </div>
                 )}
 
+                {/* Rows explicitly held back pending a mapping decision — never
+                    silently vanish. Each group corresponds to one detected file
+                    layout; row numbers, portfolio, candidate columns and the
+                    real reason (missing vs ambiguous) are all shown. */}
+                {needsMapping && needsMapping.length > 0 && (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <HelpCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                      <p className="font-semibold text-amber-400">
+                        {needsMapping.reduce((n, g) => n + g.row_count, 0)} صف يحتاج تحديد عمود ولم يُستورد
+                      </p>
+                    </div>
+                    <p className="text-xs text-[#8b95a7] mb-3">
+                      هذه الصفوف لم تُستورد لأن النظام لم يستطع تحديد عمود معيّن بثقة كافية (إما لأن العمود غير موجود فعلياً في الملف، أو لوجود أكثر من عمود محتمل يحتاج اختياراً يدوياً مرة واحدة). لا تُعتبر هذه الصفوف "مرفوضة" نهائياً.
+                    </p>
+                    <div className="space-y-3 max-h-72 overflow-y-auto">
+                      {needsMapping.map((group, gi) => (
+                        <div key={group.signature_hash} className="p-3 bg-[#0b0e14] border border-[#222a36] rounded-lg">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-sm font-medium text-slate-200">
+                              {group.portfolio_label ? `المحفظة/الشركة: ${group.portfolio_label}` : `مجموعة صفوف #${gi + 1}`}
+                            </p>
+                            <span className="text-xs text-amber-300">{group.row_count} صف</span>
+                          </div>
+                          <p className="text-xs text-[#5f6b7e] mb-2">
+                            أرقام الصفوف: {group.row_numbers.join('، ')}
+                          </p>
+                          <div className="space-y-2">
+                            {group.fields.map(f => (
+                              <div key={f.field} className="text-xs">
+                                <p className="text-amber-300 font-medium">{f.field_label}</p>
+                                <p className="text-[#8b95a7]">{f.reason}</p>
+                                {f.candidates.length > 0 && (
+                                  <p className="text-[#5f6b7e] mt-0.5">
+                                    أعمدة محتملة:{' '}
+                                    {f.candidates.map(c => `"${c.header}" (${c.confidence}%)`).join('، ')}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
-                  <button onClick={() => { setFile(null); setResult(null) }} className="btn-secondary flex-1">
+                  <button onClick={() => { setFile(null); setResult(null); setNeedsMapping(null) }} className="btn-secondary flex-1">
                     Import Another
                   </button>
                   <button onClick={handleClose} className="btn-primary flex-1">

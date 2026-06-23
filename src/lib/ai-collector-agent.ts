@@ -9,7 +9,9 @@ import {
 } from '@/lib/customer-context-engine'
 import { getPlaybookForPortfolio, renderPlaybookForPrompt } from '@/lib/company-playbook'
 import { classifyInsuranceCase, detectInsuranceObjectionSignals, renderInsuranceCaseFile } from '@/lib/insurance-engine'
-import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply } from '@/lib/legal-escalation'
+import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply, detectStcReviewSignal, recordStcReview } from '@/lib/legal-escalation'
+import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
+import { renderStcKnowledgeForCaseFile } from '@/lib/stc-knowledge'
 import {
   detectSevereDistress, renderDistressReply,
   detectOptOutIntent, renderOptOutConfirmation, setContactOptOut,
@@ -351,7 +353,7 @@ function isSaneDate(iso: string, todayISO: string): boolean {
 //  Pulls verified DB facts, what was agreed, dashboard notes & history.
 // ════════════════════════════════════════════════════════════════════
 
-function buildCaseFile(ctx: any): string {
+export function buildCaseFile(ctx: any, stcRow?: Record<string, any> | null): string {
   const lines: string[] = []
   const add = (label: string, value: any) => {
     if (value !== null && value !== undefined && String(value).trim() !== '') {
@@ -403,7 +405,8 @@ function buildCaseFile(ctx: any): string {
   // the rest of `extra` (internal flags, dates, etc.) stays out of the prompt.
   const extra = (ctx.debt?.metadata?.extra ?? {}) as Record<string, any>
   const pick = (...keys: string[]) => keys.map(k => extra[k]).find(v => v !== undefined && v !== null && String(v).trim() !== '') ?? null
-  add('رقم سداد / المفوتر', pick('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number'))
+  const sadadCaseVal = pick('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number')
+  add('رقم سداد / المفوتر', sadadCaseVal)
   add('رقم المنتج', pick('رقم المنتج', 'product_number', 'رقم_المنتج'))
   const statusLabels: Record<string, string> = {
     'payment_plan': 'خطة تقسيط معتمدة وفعّالة',
@@ -496,21 +499,29 @@ function buildCaseFile(ctx: any): string {
     agreed.forEach(a => lines.push(`- ${a}`))
   }
 
-  // 3b) Payment method (give to the customer when they agree to pay)
+  // 3b) Payment method (give to the customer when they agree to pay).
+  // A per-customer SADAD number (sadadCaseVal, from customer_data_<portfolio>
+  // .sadad_number / debts.metadata.extra) wins over collection_accounts —
+  // a single portfolio-wide collection_accounts row would be the WRONG
+  // destination for portfolios like STC where every customer has their own
+  // SADAD/biller number. Only fall back to collection_accounts when no
+  // customer-specific SADAD number exists.
   const acc = ctx.collection_account
-  if (acc) {
-    const payLines: string[] = []
+  const payLines: string[] = []
+  if (sadadCaseVal) {
+    payLines.push(`طريقة السداد المعتمدة: رقم السداد/المفوتر الخاص بهذا العميل هو ${sadadCaseVal}. وجّه العميل يسدد عبر تطبيق بنكه بهذا الرقم فقط — هذا هو مصدر الدفع المعتمد الوحيد لهذا العميل.`)
+  } else if (acc) {
     if (acc.method_type === 'sadad_biller' && acc.biller_code) {
       payLines.push(`طريقة السداد المعتمدة: سداد المفوتر "${acc.biller_name ?? ''}" رمز ${acc.biller_code}. وجّه العميل يسدد عبر تطبيق بنكه بهذا المفوتر.`)
     } else if (acc.iban) {
       payLines.push(`طريقة السداد المعتمدة: تحويل بنكي على الآيبان ${acc.iban}${acc.account_name ? ` باسم ${acc.account_name}` : ''}${acc.bank_name ? ` - ${acc.bank_name}` : ''}. اطلب من العميل إرسال صورة الإيصال بعد التحويل.`)
     }
     if (acc.instructions) payLines.push(`تعليمات إضافية: ${acc.instructions}`)
-    if (payLines.length) {
-      lines.push('')
-      lines.push('【 طريقة الدفع (أعطها للعميل فقط عند اتفاقه على السداد) 】')
-      payLines.forEach(l => lines.push(`- ${l}`))
-    }
+  }
+  if (payLines.length) {
+    lines.push('')
+    lines.push('【 طريقة الدفع (أعطها للعميل فقط عند اتفاقه على السداد) 】')
+    payLines.forEach(l => lines.push(`- ${l}`))
   }
 
   // 4) Dashboard notes (collector / admin notes added in the panel)
@@ -522,6 +533,10 @@ function buildCaseFile(ctx: any): string {
     lines.push('【 ملاحظات لوحة التحكم 】')
     notes.forEach(n => lines.push(`- ${n}`))
   }
+
+  // 5) STC-only operational knowledge — field semantics, never policy.
+  const stcKnowledge = renderStcKnowledgeForCaseFile(stcRow)
+  if (stcKnowledge) lines.push(stcKnowledge)
 
   return lines.join('\n')
 }
@@ -744,6 +759,15 @@ export async function runCollectorAgent(args: {
   // both here (data) and again later (a hard code guard on the reply).
   const resolvedCategory = (resolvedGroup?.portfolio_category ?? ctx.verified_debt_data?.portfolio_category ?? 'other') as import('@/lib/company-playbook').PortfolioCategory
   const resolvedPortfolioId = resolvedGroup?.portfolio_id ?? (ctx.debt as any)?.portfolio_id ?? null
+  // STC-specific identity check — gated on the portfolio NAME (matched
+  // against STC's own alias list from company-import-profiles.ts, since
+  // the real DB row is named "إس تي سي", not the Latin "STC"), not the
+  // broader 'telecom' category, so this never affects other telecom
+  // portfolios (e.g. Mobily). STC's policy bans the legal/lockout path
+  // entirely; see suppressLegalTriggers below.
+  const resolvedPortfolioName = String(resolvedGroup?.portfolio_name ?? ctx.verified_debt_data?.portfolio_name ?? '').trim().toLowerCase()
+  const stcProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'stc')
+  const isStcPortfolio = !!resolvedPortfolioName && !!stcProfile?.aliases.includes(resolvedPortfolioName)
   const playbook = await getPlaybookForPortfolio({
     company_id: args.company_id,
     portfolio_id: resolvedPortfolioId,
@@ -761,11 +785,13 @@ export async function runCollectorAgent(args: {
   const insuranceObjection = playbook.category === 'insurance' ? detectInsuranceObjectionSignals(text) : null
 
   // ── Mandatory legal escalation — checked deterministically BEFORE the
-  // LLM call (legal_threat/lawyer_mention/complaint apply to every sector;
-  // the insurance-specific types only ever fire for an actual insurance
-  // portfolio, driven by the Phase 3 Insurance Engine's own classification
-  // — never a separate guess). Once detected, this debt's conversation is
-  // locked for every subsequent turn via the check above.
+  // LLM call (legal_threat/lawyer_mention/complaint apply to every sector
+  // EXCEPT STC, whose policy bans the legal/lockout path entirely —
+  // suppressLegalTriggers below; the insurance-specific types only ever
+  // fire for an actual insurance portfolio, driven by the Phase 3 Insurance
+  // Engine's own classification — never a separate guess). Once detected,
+  // this debt's conversation is locked for every subsequent turn via the
+  // check above.
   if (forcedDebtId) {
     const mandatory = detectMandatoryEscalation({
       text,
@@ -773,6 +799,7 @@ export async function runCollectorAgent(args: {
       insuranceObjection,
       insuranceCase,
       customEscalationRules: playbook.escalation_rules,
+      suppressLegalTriggers: isStcPortfolio,
     })
     if (mandatory) {
       await openEscalation({
@@ -789,6 +816,24 @@ export async function runCollectorAgent(args: {
         action: 'human_review',
         reason: 'legal_escalation_opened',
         message: renderLegalPersonaReply(mandatory.escalation_type),
+      }
+    }
+
+    // STC only: a complaint about the company/service is logged for human
+    // visibility (customer_complaint/stc_review) WITHOUT freezing the
+    // conversation — the agent keeps talking normally on this same turn.
+    if (isStcPortfolio) {
+      const stcSignal = detectStcReviewSignal(text)
+      if (stcSignal) {
+        await recordStcReview({
+          company_id: args.company_id,
+          customer_id: args.customer_id,
+          debt_id: forcedDebtId,
+          portfolio_id: resolvedPortfolioId,
+          escalation_type: stcSignal.escalation_type,
+          reason: stcSignal.reason,
+        })
+        log.info('STC review signal recorded — conversation continues normally', { debt_id: forcedDebtId, escalation_type: stcSignal.escalation_type })
       }
     }
   }
@@ -896,6 +941,7 @@ export async function runCollectorAgent(args: {
 - إذا طلب "التفاصيل": اذكر كل ما هو متاح فعلياً في ملف القضية بصيغة واضحة ومرتبة (الجهة، رقم الحساب، رقم المنتج/السداد إن وجد، المبلغ، الرقم المرجعي) — لا تكتفِ بالمبلغ والرقم المرجعي فقط إن وُجدت تفاصيل إضافية في الملف.
 - 🔴 لا تطلب من العميل معلومة هو من المفروض أن يحصل عليها منك (مثل رقم حسابه) — أنت من يملك هذي المعلومة ويعطيها له، لا العكس.
 - إن كانت بعض التفاصيل المطلوبة فعلاً غير موجودة في الملف (لا اسم جهة ولا رقم حساب ولا أي شيء): وضّح فقط أن هذا الجزء بالذات غير متوفر حالياً، وقل إنك ستتحقق منه، بدل التعميم بأن "كل شيء غير معروف".
+${isStcPortfolio ? '- 🔴 إذا سأل عن "رقم الخدمة" أو "رقم الحساب" أو "نوع الخدمة" أو معنى "مع جهاز/بدون جهاز" أو معنى "تاريخ التعثر": أجب مباشرة من قسم "معرفة تشغيلية خاصة بـ STC" في ملف القضية إن وُجد — لا تحوّل للإدارة ولا تصعّد، هذي معلومة عادية تشرحها بنفسك فوراً.' : ''}
 - 🔴🔴 ممنوع منعاً باتاً إضافة أي ضغط سداد أو تذكير بموعد أو مطالبة بالدفع في هذا الرد — مهمتك الآن فقط الإجابة على سؤاله. لا تكتب "والمهم موعدك..." أو "بانتظار سدادك" أو أي جملة تعيد الحديث عن السداد، إلا إذا كان العميل نفسه سأل في رسالته الحالية عن السداد أو الموعد أو وعد به. الرد يتوقف عند الإجابة على سؤاله فقط.`,
     DISPUTE: `【 مهمتك الآن: فهم الاعتراض، مناقشته، وإقناع العميل — لا تصعيد سريع 】
 - العميل غاضب أو ينكر المديونية أو يقول الرقم خطأ أو يقول "معترض" بدون أي تفصيل.
@@ -925,7 +971,10 @@ ${installmentRule}
 - 🔴 ممنوع تكرار ذكر المبلغ أو اسم الجهة، اكتفِ بسؤاله عن الخطوة القادمة.`,
   }
 
-  const caseFile = buildCaseFile(ctx)
+  const stcRow = isStcPortfolio
+    ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
+    : null
+  const caseFile = buildCaseFile(ctx, stcRow)
   const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
   const np = ctx.negotiation_profile ?? {}
 

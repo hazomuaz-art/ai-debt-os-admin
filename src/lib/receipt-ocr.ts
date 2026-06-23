@@ -12,12 +12,18 @@ export type ReceiptData = {
   bank: string | null
   reference: string | null
   iban_last4: string | null
+  // Recipient/beneficiary of the transfer (the party that received the money) —
+  // used to verify the payment actually went to OUR collection account.
+  beneficiary_name: string | null
+  // For SADAD / bill-based creditors: the invoice / bill / SADAD number paid.
+  invoice_number: string | null
   confidence: number // 0-100
 }
 
 const EMPTY: ReceiptData = {
   is_receipt: false, amount: null, currency: null, date: null,
-  sender_name: null, bank: null, reference: null, iban_last4: null, confidence: 0,
+  sender_name: null, bank: null, reference: null, iban_last4: null,
+  beneficiary_name: null, invoice_number: null, confidence: 0,
 }
 
 function getClient(): OpenAI | null {
@@ -31,9 +37,9 @@ function getClient(): OpenAI | null {
 const visionModel = () => 'anthropic/claude-sonnet-4'
 const textModel = () => 'anthropic/claude-sonnet-4'
 
-const PROMPT_INSTRUCTIONS = `هل هذا إيصال/سند تحويل بنكي أو دفع؟ استخرج البيانات وأعد JSON فقط بهذا الشكل بدون أي نص آخر:
-{"is_receipt": true|false, "amount": <رقم أو null>, "currency": "SAR|USD|...", "date": "YYYY-MM-DD أو null", "sender_name": "اسم المُحوِّل أو null", "bank": "اسم البنك أو null", "reference": "الرقم المرجعي أو null", "iban_last4": "آخر 4 أرقام من الآيبان المستلِم أو null", "confidence": <0-100>}
-إن لم يكن إيصالاً، أعد is_receipt=false والباقي null.`
+const PROMPT_INSTRUCTIONS = `هل هذا إيصال/سند تحويل بنكي أو سداد فاتورة أو دفع؟ استخرج كل البيانات الممكنة وأعد JSON فقط بهذا الشكل بدون أي نص آخر:
+{"is_receipt": true|false, "amount": <رقم أو null>, "currency": "SAR|USD|...", "date": "YYYY-MM-DD أو null", "sender_name": "اسم المُحوِّل/الدافع أو null", "bank": "اسم البنك أو null", "reference": "الرقم المرجعي للعملية أو null", "iban_last4": "آخر 4 أرقام من آيبان المستلِم أو null", "beneficiary_name": "اسم المستفيد/المستلِم للمبلغ أو null", "invoice_number": "رقم الفاتورة أو رقم السداد/المفوتر أو null", "confidence": <0-100>}
+استخرج beneficiary_name و invoice_number إن وُجدا (مهم للتحقق). إن لم يكن إيصالاً، أعد is_receipt=false والباقي null.`
 
 function parseReceiptJson(raw: string): ReceiptData {
   const s = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
@@ -48,6 +54,8 @@ function parseReceiptJson(raw: string): ReceiptData {
     bank: parsed.bank ?? null,
     reference: parsed.reference ?? null,
     iban_last4: parsed.iban_last4 ?? null,
+    beneficiary_name: parsed.beneficiary_name ?? null,
+    invoice_number: parsed.invoice_number != null ? String(parsed.invoice_number) : null,
     confidence: Number(parsed.confidence) || 0,
   }
 }
@@ -76,7 +84,7 @@ export async function extractReceipt(imageBase64: string): Promise<ReceiptData |
     })
     return parseReceiptJson(res.choices[0]?.message?.content ?? '')
   } catch (err: any) {
-    log.error('receipt OCR (image) failed', { error: String(err?.message ?? err) })
+    log.error('receipt OCR (image) failed', { error: String(err?.stack || err?.message || err) })
     return EMPTY
   }
 }
@@ -99,7 +107,7 @@ export async function extractReceiptFromText(text: string): Promise<ReceiptData 
     })
     return parseReceiptJson(res.choices[0]?.message?.content ?? '')
   } catch (err: any) {
-    log.error('receipt OCR (text) failed', { error: String(err?.message ?? err) })
+    log.error('receipt OCR (text) failed', { error: String(err?.stack || err?.message || err) })
     return EMPTY
   }
 }
@@ -110,19 +118,44 @@ export async function extractReceiptFromText(text: string): Promise<ReceiptData 
 // Scanned/image-only PDFs will yield empty text and fall through to "needs
 // human review" rather than being silently dropped.
 export async function extractReceiptFromPdf(pdfBase64: string): Promise<ReceiptData | null> {
+  const buf = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64')
+  let textResult: ReceiptData | null = null
+
+  // 1) Try the embedded text layer (covers digitally-generated bank receipts).
   try {
     const { PDFParse } = await import('pdf-parse')
-    const buf = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64')
     const parser = new PDFParse({ data: buf })
     const { text } = await parser.getText()
     await parser.destroy()
-    if (!text || text.trim().length < 5) {
-      log.warn('PDF has no extractable text (likely scanned) — needs manual review')
-      return { ...EMPTY, is_receipt: true, confidence: 0 } // flag for review, don't drop silently
+    // pdf-parse v2 injects page markers like "-- 1 of 2 --"; strip them before
+    // judging whether there's REAL text (an image-only PDF yields only markers).
+    const meaningful = String(text ?? '').replace(/--\s*\d+\s*of\s*\d+\s*--/gi, '').replace(/\s+/g, ' ').trim()
+    if (meaningful.length >= 15) {
+      textResult = await extractReceiptFromText(meaningful)
+      if (textResult && textResult.is_receipt && textResult.amount) return textResult
     }
-    return await extractReceiptFromText(text)
   } catch (err: any) {
-    log.error('receipt OCR (pdf) failed', { error: String(err?.message ?? err) })
-    return EMPTY
+    log.error('receipt OCR (pdf text) failed', { error: String(err?.stack || err?.message || err) })
   }
+
+  // 2) No usable text layer → the PDF is a scanned image / bank-app export.
+  // Render the first page to a PNG and run the SAME vision OCR used for images.
+  try {
+    const { PDFParse } = await import('pdf-parse')
+    const parser = new PDFParse({ data: buf })
+    const shot = await parser.getScreenshot({ scale: 2, first: 1 })
+    await parser.destroy()
+    const page = shot?.pages?.[0]
+    const dataUrl: string | null = page?.dataUrl
+      || (page?.data ? `data:image/png;base64,${Buffer.from(page.data).toString('base64')}` : null)
+    if (dataUrl) {
+      const vision = await extractReceipt(dataUrl)
+      if (vision) return vision // trust the vision verdict (receipt or not)
+    }
+  } catch (err: any) {
+    log.error('receipt OCR (pdf render) failed', { error: String(err?.stack || err?.message || err) })
+  }
+
+  // Couldn't read text OR render → don't drop silently; flag for human review.
+  return textResult ?? { ...EMPTY, is_receipt: true, confidence: 0 }
 }

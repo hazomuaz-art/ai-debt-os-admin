@@ -163,7 +163,7 @@ export default function CampaignsPage() {
           pairingCode: json.pairingCode
         })
       } else {
-        alert('فشل في إنشاء رمز الاستجابة السريعة (QR Code). يرجى التحقق من إعدادات Evolution API.')
+        alert('فشل في إنشاء رمز الاستجابة السريعة (QR Code). يرجى التحقق من إعدادات WAHA.')
         setActiveQr(null)
       }
     } catch (e) {
@@ -230,7 +230,7 @@ export default function CampaignsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...numberForm,
-          provider: 'evolution',
+          provider: 'waha',
           daily_limit: Number(numberForm.daily_limit),
           is_active: true,
           metadata: {},
@@ -338,14 +338,14 @@ export default function CampaignsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-[#8b95a7] ps-2">اسم خادم Evolution *</label>
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">اسم جلسة WAHA *</label>
               <input required className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.instance_name}
                 onChange={e => setNumberForm(p => ({ ...p, instance_name: e.target.value }))} dir="ltr" />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-[#8b95a7] ps-2">رابط الخادم (Evolution API URL)</label>
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">رابط الخادم (WAHA API URL)</label>
               <input className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
                 value={numberForm.api_url}
                 onChange={e => setNumberForm(p => ({ ...p, api_url: e.target.value }))} dir="ltr" />
