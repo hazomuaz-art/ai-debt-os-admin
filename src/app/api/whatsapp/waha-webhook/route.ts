@@ -218,6 +218,17 @@ export async function POST(request: NextRequest) {
           promise_text: aiDecision.promise_text ?? null,
         })
       }
+
+      // Installment request → raise for admin review only (dedup). Never
+      // auto-approves and never touches debts.status — matches exactly what
+      // the agent told the customer it would do.
+      if (aiDecision.action === 'record_installment_request' && debt_id) {
+        const { recordInstallmentRequest } = await import('@/lib/installment-request')
+        await recordInstallmentRequest({
+          company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
+          debt_id, customer_message: text, agent_message: aiDecision.message,
+        })
+      }
     })().catch(err => log.error('WAHA AI processing error', err as Error))
 
     return NextResponse.json({ status: 'ok' })
