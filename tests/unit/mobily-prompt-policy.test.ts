@@ -38,7 +38,7 @@ function defaultPlaybook(category = 'telecom') {
   return {
     portfolio_id: 'p1', category,
     discounts: { allowed: false, max_percent: 0, requires_admin_approval: true },
-    installments: { allowed: true, max_months: 12, requires_admin_approval: true },
+    installments: { allowed: true, max_months: 2, requires_admin_approval: true },
     fields_to_surface: ['account_number', 'product_number'],
     allowed_dispute_types: ['wrong_number', 'not_mine', 'already_settled'],
     notes: null,

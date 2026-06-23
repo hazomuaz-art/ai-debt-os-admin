@@ -1,8 +1,12 @@
 -- Seeds the Mobily portfolio's company_playbooks policy row: Saudi
 -- professional tone only, no payment-pressure-every-reply, answer questions
--- first, explain the debt when asked, no agent-granted discounts,
--- installments allowed only as an admin-approved request (the agent records
--- and forwards, never approves). Operational/service-status knowledge and
+-- first, explain the debt when asked, no agent-granted discounts.
+-- Installments: the agent NEVER offers or mentions installments on its own
+-- initiative — only if the customer explicitly asks does it record the
+-- request and forward it for admin review, with the exact fixed reply
+-- "أقدر أرفع طلبك للمراجعة، وإذا تمت الموافقة يتم إفادتك." Approval is
+-- admin-only; if approved, the plan is capped at 2 months
+-- (installments.max_months = 2). Operational/service-status knowledge and
 -- the status-based payment-number routing (Inactive→service number,
 -- Closed→account number) are enforced in code (src/lib/mobily-knowledge.ts),
 -- mirroring the STC pattern; this row carries the written policy + FAQ
@@ -25,10 +29,10 @@ select
   p.id,
   1, true,
   '{"allowed": false, "max_percent": 0, "requires_admin_approval": true}',
-  '{"allowed": true, "max_months": 12, "requires_admin_approval": true}',
+  '{"allowed": true, "max_months": 2, "requires_admin_approval": true}',
   '["account_number","product_number","sadad_number","service_status","invoice_dispute","statement_request"]',
   '["wrong_number","not_mine","wrong_amount","already_settled","invoice_dispute","statement_request"]',
-  'سياسة موبايلي: تحصيل مهني هادئ باللهجة السعودية فقط، إجابة أسئلة العميل أولاً، شرح المديونية عند السؤال، بلا خصم من الوكيل والتقسيط برفع طلب للإدارة فقط.',
+  'سياسة موبايلي: تحصيل مهني هادئ باللهجة السعودية فقط، إجابة أسئلة العميل أولاً، شرح المديونية عند السؤال، بلا خصم من الوكيل؛ التقسيط لا يُذكر إلا إذا طلبه العميل، ويُرفع للمراجعة فقط (لا موافقة من الوكيل، والحد الأقصى عند الموافقة شهران).',
 $pol$الرد باللهجة السعودية المهنية فقط، وممنوع أي لهجة غير سعودية.
 ممنوع الأسلوب غير المهذب أو الاستفزازي أو التهديد غير المهني.
 ممنوع تكرار سؤال السداد في كل رد، وممنوع تحويل أي رد إلى "متى تسدد؟" بدون سبب.
@@ -37,7 +41,9 @@ $pol$الرد باللهجة السعودية المهنية فقط، وممنو
 يجب قراءة كامل بيانات العميل وسجل المحادثة وسياسة المحفظة قبل الرد.
 ممنوع اختراع معلومات غير موجودة في بيانات العميل؛ وإذا كانت المعلومة غير متوفرة يوضّح ذلك للعميل.
 لا تُمنح خصومات للعميل ولا يعتمد الوكيل أي خصم أو تخفيض؛ وإذا طلب العميل خصماً يُسجّل الطلب ويُحوّل للمراجعة.
-التقسيط مسموح حسب سياسة موبايلي لكن لا يمنحه الوكيل من عنده؛ يُسجّل طلب التقسيط ويُحوّل للمسار المعتمد.
+ممنوع على الوكيل أن يعرض التقسيط من نفسه أو يذكره ابتداءً، وممنوع أن يقول للعميل إن التقسيط متاح. يُذكر التقسيط فقط إذا طلبه العميل بنفسه أولاً.
+إذا طلب العميل التقسيط: يُسجَّل الطلب ويُرفع للمراجعة فقط — ممنوع على الوكيل الموافقة على التقسيط أو تحديد جدول/مبلغ شهري أو عدد دفعات بدون موافقة. الموافقة من الإدارة فقط، وإذا تمت الموافقة يكون التقسيط على شهرين فقط (لا أكثر).
+الرد الوحيد المسموح عند طلب العميل للتقسيط: "أقدر أرفع طلبك للمراجعة، وإذا تمت الموافقة يتم إفادتك."
 يجب شرح تفاصيل المديونية عند سؤال العميل عنها.
 إذا أنكر العميل ملكية الرقم أو الحساب يُسجّل الاعتراض ويُوجّه العميل لمراجعة موبايلي للتحقق من الملكية.
 ممنوع الادعاء بأن السداد تم التحقق منه قبل المطابقة الفعلية.$pol$,
