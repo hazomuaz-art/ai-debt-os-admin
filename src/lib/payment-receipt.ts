@@ -15,8 +15,11 @@ export type ReceiptSource = 'image' | 'pdf' | 'text'
  * and either auto-confirms the payment or flags it for admin review.
  *
  * Text-only claims (no attachment) are NEVER auto-verified, since they're
- * trivial to fabricate — they're always recorded as "pending" for a human
- * to confirm against the bank statement.
+ * trivial to fabricate — they're always recorded as "pending" /
+ * "pending_verification" for a human to confirm against the bank statement.
+ * Same for any attachment whose beneficiary reference (SADAD/account number
+ * or IBAN) doesn't match what we hold for this debt — amount or OCR
+ * confidence alone are never sufficient to auto-verify a payment.
  */
 export async function processInboundReceipt(args: {
   company_id: string
@@ -46,7 +49,7 @@ export async function processInboundReceipt(args: {
   // actually MATCH the transfer instead of blindly trusting the amount.
   const { data: debt } = args.debt_id
     ? await svc.from('debts')
-        .select('current_balance, currency, status, reference_number, account_number, creditor_name, portfolio_id, created_at')
+        .select('current_balance, currency, status, reference_number, account_number, creditor_name, portfolio_id, created_at, metadata')
         .eq('id', args.debt_id).maybeSingle()
     : { data: null as any }
   const d = (debt ?? {}) as Record<string, any>
@@ -56,40 +59,61 @@ export async function processInboundReceipt(args: {
   const { data: accounts } = await svc.from('collection_accounts')
     .select('method_type, iban, account_name, bank_name, biller_code, biller_name, portfolio_id')
     .eq('company_id', args.company_id).eq('is_active', true)
+  // Only ever match against an account explicitly configured for THIS
+  // portfolio (or a company-wide default with no portfolio_id at all) —
+  // never fall back to an unrelated portfolio's account just because one
+  // happens to exist, which would silently "match" against the wrong
+  // company's beneficiary.
   const acc = (accounts ?? []).find((a: any) => d.portfolio_id && a.portfolio_id === d.portfolio_id)
-    ?? (accounts ?? []).find((a: any) => !a.portfolio_id) ?? (accounts ?? [])[0] ?? null
+    ?? (accounts ?? []).find((a: any) => !a.portfolio_id) ?? null
 
   const digits = (s: any) => String(s ?? '').replace(/\D/g, '')
   const last4 = (s: any) => digits(s).slice(-4)
   const amount = Number(ocr.amount ?? 0)
   const amountOk = amount > 0 && amount <= balance * 1.2 + 1
 
-  // Beneficiary / invoice matching — proves the money went to US.
+  // The per-customer SADAD number (telecom: STC/Mobily/Zain) — the same
+  // field ai-collector-agent.ts treats as the primary payment reference for
+  // these portfolios. NOT "service/product number" (deliberately excluded —
+  // it never appears on the actual customer-sent receipts).
+  const extra = (d.metadata?.extra ?? {}) as Record<string, any>
+  const pickExtra = (...keys: string[]) => keys.map(k => extra[k]).find(v => v != null && String(v).trim() !== '') ?? null
+  const sadadNumber = pickExtra('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number')
+
+  // Beneficiary matching — proves the money actually went to OUR account for
+  // THIS specific customer/debt, never inferred from amount or OCR
+  // confidence alone.
+  //   - Telecom (STC/Mobily/Zain) & utilities/government: amount + (SADAD
+  //     number OR account number OR invoice/reference number).
+  //   - Insurance: amount + the company's approved IBAN.
   let beneficiary: 'match' | 'mismatch' | 'unknown' = 'unknown'
-  if (acc?.method_type === 'sadad_biller' && acc?.biller_code) {
-    // Invoice/SADAD-based creditor (e.g. telecom/utility): the bill or biller
-    // number on the receipt must reference our biller / the debt account.
-    const hay = `${ocr.invoice_number ?? ''} ${ocr.reference ?? ''} ${ocr.beneficiary_name ?? ''}`
-    const needles = [acc.biller_code, acc.biller_name, d.reference_number, d.account_number]
-      .map(digits).filter(n => n.length >= 4)
-    const haveAny = !!(ocr.invoice_number || ocr.reference)
-    beneficiary = needles.some(n => digits(hay).includes(n)) ? 'match' : (haveAny ? 'mismatch' : 'unknown')
-  } else if (acc?.iban) {
-    // Bank-transfer creditor (e.g. insurance): match recipient IBAN tail and/or
-    // beneficiary name against our account.
+  const referenceHay = digits(`${ocr.invoice_number ?? ''} ${ocr.reference ?? ''}`)
+  const referenceNeedles = [sadadNumber, d.account_number, d.reference_number, acc?.biller_code, acc?.biller_name]
+    .map(digits).filter(n => n.length >= 4)
+  const haveReferenceToCheck = !!(ocr.invoice_number || ocr.reference)
+
+  if (acc?.iban) {
+    // Bank-transfer creditor (insurance): match recipient IBAN tail and/or
+    // beneficiary name against the company's approved account.
     const expect4 = last4(acc.iban)
     if (ocr.iban_last4 && expect4) beneficiary = last4(ocr.iban_last4) === expect4 ? 'match' : 'mismatch'
     else if (ocr.beneficiary_name && acc.account_name &&
              ocr.beneficiary_name.replace(/\s/g, '').includes(String(acc.account_name).split(' ')[0]))
       beneficiary = 'match'
     else beneficiary = 'unknown'
+  } else if (referenceNeedles.length) {
+    beneficiary = referenceNeedles.some(n => referenceHay.includes(n))
+      ? 'match'
+      : (haveReferenceToCheck ? 'mismatch' : 'unknown')
   }
 
-  // Auto-confirm only image/PDF receipts that are a sane amount AND either match
-  // our beneficiary, or (when we have no account to check against) are very high
-  // confidence. A clear beneficiary MISMATCH is never auto-confirmed.
-  const autoVerify = args.source !== 'text' && amountOk && ocr.confidence >= 70 &&
-    (beneficiary === 'match' || (beneficiary === 'unknown' && ocr.confidence >= 85))
+  // Auto-confirm ONLY when: it's an actual attachment (never a typed-text
+  // claim), the amount is sane, AND the beneficiary genuinely matches a real
+  // reference we hold for this customer/debt. Amount alone is never enough,
+  // and OCR confidence alone is never enough — an "unknown" beneficiary
+  // (no checkable reference at all, or a clear mismatch) always falls to
+  // pending_verification, regardless of how confident the OCR reading was.
+  const autoVerify = args.source !== 'text' && amountOk && ocr.confidence >= 70 && beneficiary === 'match'
 
   const matchMeta = { beneficiary, amountOk, expected_balance: balance, source: args.source }
   const noteBits = [
@@ -120,7 +144,7 @@ export async function processInboundReceipt(args: {
     amount, currency,
     status: autoVerify ? 'completed' : 'pending',
     payment_date: payDate,
-    verification_status: autoVerify ? 'verified' : 'pending',
+    verification_status: autoVerify ? 'verified' : 'pending_verification',
     ocr_data: ocr,
     notes: noteBits,
   }).select('id').single()
@@ -176,9 +200,15 @@ export async function processInboundReceipt(args: {
 
     reply = `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
   } else {
+    // Match incomplete (beneficiary mismatch, unknown, or a typed-text
+    // claim with no attachment to verify) → never auto-verified. Always
+    // pending_verification + a payment_review alert + the same neutral
+    // reply, regardless of which specific reason caused it.
     const reason = beneficiary === 'mismatch'
       ? 'بيانات المستفيد/الفاتورة في الإيصال لا تطابق حساب التحصيل'
-      : `بحاجة مراجعة (ثقة ${ocr.confidence}%)`
+      : args.source === 'text'
+        ? 'مطالبة سداد نصية بدون مرفق — لا يمكن التحقق آلياً'
+        : `لا يوجد رقم حساب/سداد/IBAN مطابق في الإيصال (ثقة القراءة ${ocr.confidence}%)`
     await svc.from('system_alerts').insert({
       company_id: args.company_id, severity: beneficiary === 'mismatch' ? 'warning' : 'info',
       alert_type: 'payment_review', title: 'إيصال دفع يحتاج مراجعة',
@@ -186,9 +216,7 @@ export async function processInboundReceipt(args: {
       metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ...matchMeta, ocr }, is_resolved: false,
     })
     await addTimeline(svc, args, 'payment', `إيصال بمبلغ ${amount} ${currency} — ${reason}`, ocr)
-    reply = beneficiary === 'mismatch'
-      ? 'استلمت إيصالك، بس يبدو إن التحويل لجهة مختلفة. نراجعه ونأكد لك — لا داعي لإعادة الإرسال.'
-      : 'تم استلام إيصالك ووصلني، جاري التحقق وسأؤكد لك قريباً. شكراً.'
+    reply = 'وصلنا الإيصال، وبنراجع مطابقته على الحساب ونتأكد من البيانات.'
   }
 
   await replyAndLog(svc, args, reply)
