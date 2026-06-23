@@ -45,3 +45,8 @@ Thumbs.db
 
 automation-pipeline.backup.ts
 _handover/
+
+# One-off local data-cleanup backups (raw DB row dumps) — never belong in
+# git history or on the deploy target. The real backup is the
+# _backup_tier1_2026_06_22 table inside the production database itself.
+backups/

@@ -6,7 +6,7 @@ import {
   Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
   Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Book, Package,
-  FlaskConical, TrendingUp, Phone, Brain, GitBranch
+  FlaskConical, TrendingUp, Phone, Brain, GitBranch, Scale
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
@@ -46,6 +46,7 @@ export function Sidebar({ profile }: { profile: any }) {
         { href: `/dashboard/${role}/campaigns`,   label: t.nav.campaigns, icon: Megaphone, roles: ['admin'] },
         { href: `/dashboard/${role}/promises`,    label: t.nav.promises, icon: CheckCircle, roles: ['admin'] },
         { href: `/dashboard/${role}/approvals`,   label: t.nav.approvals, icon: Clock, roles: ['admin'] },
+        { href: `/dashboard/${role}/legal-escalations`, label: isRTL ? 'التصعيدات القانونية' : 'Legal Escalations', icon: Scale, roles: ['admin'] },
       ],
     },
     {

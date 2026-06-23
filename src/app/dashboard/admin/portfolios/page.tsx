@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Portfolio, PortfolioCategory } from '@/types'
 import { FolderKanban, Search, Plus, CheckCircle2, XCircle, Power, Box, Settings, Smartphone, ShieldCheck, Zap, Briefcase, Building2, Landmark, MoreHorizontal, Activity } from 'lucide-react'
 
@@ -148,16 +149,21 @@ function AddPortfolioModal({ onSaved }: { onSaved: () => void }) {
 }
 
 export default function PortfoliosPage() {
+  const router = useRouter()
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [loading, setLoading]       = useState(true)
+  const [loadError, setLoadError]   = useState('')
   const [search, setSearch]         = useState('')
 
   const load = useCallback(async () => {
-    setLoading(true)
+    setLoading(true); setLoadError('')
     try {
       const res = await fetch('/api/portfolios')
-      const data = await res.json() as { data?: Portfolio[] }
-      setPortfolios(data.data ?? [])
+      const data = await res.json().catch(() => ({})) as { data?: Portfolio[]; error?: string }
+      if (!res.ok) throw new Error(data.error ?? `فشل تحميل المحافظ (HTTP ${res.status})`)
+      setPortfolios(Array.isArray(data.data) ? data.data : [])
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'فشل تحميل المحافظ')
     } finally {
       setLoading(false)
     }
@@ -166,9 +172,9 @@ export default function PortfoliosPage() {
   useEffect(() => { void load() }, [load])
 
   const filtered = portfolios.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (p.name_ar ?? '').includes(search) ||
-    p.code.toLowerCase().includes(search.toLowerCase())
+    (p.code ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   async function toggleActive(id: string, current: boolean) {
@@ -248,6 +254,10 @@ export default function PortfoliosPage() {
         <div className="flex justify-center py-20">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div>
         </div>
+      ) : loadError ? (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-rose-400 font-bold">
+          {loadError}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-16 text-center">
           <div className="w-20 h-20 bg-blue-50 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -265,7 +275,7 @@ export default function PortfoliosPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold font-mono shadow-sm"
                     style={{ backgroundColor: portfolio.color + '15', color: portfolio.color, border: `1px solid ${portfolio.color}30` }}>
-                    {portfolio.code.slice(0, 3)}
+                    {(portfolio.code || portfolio.name_ar || portfolio.name || '—').slice(0, 3)}
                   </div>
                   <div>
                     <div className="font-bold text-white text-lg mb-1">{portfolio.name_ar || portfolio.name}</div>
@@ -305,8 +315,8 @@ export default function PortfoliosPage() {
                   {portfolio.is_active && <span className="hidden group-hover:block">إيقاف المحفظة</span>}
                 </button>
                 
-                <button className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition-colors">
-                  التفاصيل
+                <button onClick={() => router.push(`/dashboard/admin/portfolios/${portfolio.id}`)} className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition-colors">
+                  السياسة والحسابات
                 </button>
               </div>
 
