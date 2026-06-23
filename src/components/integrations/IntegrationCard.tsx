@@ -14,10 +14,10 @@ interface FieldDef {
 }
 
 const FIELD_DEFS: Record<string, FieldDef[]> = {
-  evolution_whatsapp: [
-    { key: 'api_url', label: 'رابط الخادم (Evolution URL)', type: 'url', placeholder: 'https://evolution.yourdomain.com' },
-    { key: 'api_key', label: 'مفتاح الـ API', type: 'password', placeholder: 'Global API Key' },
-    { key: 'instance_name', label: 'اسم النسخة (Instance)', type: 'text', placeholder: 'instance-1' },
+  waha: [
+    { key: 'api_url', label: 'رابط الخادم (WAHA URL)', type: 'url', placeholder: 'https://waha.yourdomain.com' },
+    { key: 'api_key', label: 'مفتاح الـ API', type: 'password', placeholder: 'WAHA API Key' },
+    { key: 'session', label: 'اسم الجلسة (Session)', type: 'text', placeholder: 'default' },
   ],
   n8n_automation: [
     { key: 'webhook_url', label: 'رابط ويب هوك (n8n Webhook URL)', type: 'url', placeholder: 'https://n8n.yourdomain.com/webhook/...' },

@@ -351,7 +351,7 @@ function isSaneDate(iso: string, todayISO: string): boolean {
 //  Pulls verified DB facts, what was agreed, dashboard notes & history.
 // ════════════════════════════════════════════════════════════════════
 
-function buildCaseFile(ctx: any): string {
+export function buildCaseFile(ctx: any): string {
   const lines: string[] = []
   const add = (label: string, value: any) => {
     if (value !== null && value !== undefined && String(value).trim() !== '') {
@@ -403,7 +403,8 @@ function buildCaseFile(ctx: any): string {
   // the rest of `extra` (internal flags, dates, etc.) stays out of the prompt.
   const extra = (ctx.debt?.metadata?.extra ?? {}) as Record<string, any>
   const pick = (...keys: string[]) => keys.map(k => extra[k]).find(v => v !== undefined && v !== null && String(v).trim() !== '') ?? null
-  add('رقم سداد / المفوتر', pick('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number'))
+  const sadadCaseVal = pick('sadad_number', 'رقم سداد', 'رقم السداد', 'sadad', 'biller_number')
+  add('رقم سداد / المفوتر', sadadCaseVal)
   add('رقم المنتج', pick('رقم المنتج', 'product_number', 'رقم_المنتج'))
   const statusLabels: Record<string, string> = {
     'payment_plan': 'خطة تقسيط معتمدة وفعّالة',
@@ -496,21 +497,29 @@ function buildCaseFile(ctx: any): string {
     agreed.forEach(a => lines.push(`- ${a}`))
   }
 
-  // 3b) Payment method (give to the customer when they agree to pay)
+  // 3b) Payment method (give to the customer when they agree to pay).
+  // A per-customer SADAD number (sadadCaseVal, from customer_data_<portfolio>
+  // .sadad_number / debts.metadata.extra) wins over collection_accounts —
+  // a single portfolio-wide collection_accounts row would be the WRONG
+  // destination for portfolios like STC where every customer has their own
+  // SADAD/biller number. Only fall back to collection_accounts when no
+  // customer-specific SADAD number exists.
   const acc = ctx.collection_account
-  if (acc) {
-    const payLines: string[] = []
+  const payLines: string[] = []
+  if (sadadCaseVal) {
+    payLines.push(`طريقة السداد المعتمدة: رقم السداد/المفوتر الخاص بهذا العميل هو ${sadadCaseVal}. وجّه العميل يسدد عبر تطبيق بنكه بهذا الرقم فقط — هذا هو مصدر الدفع المعتمد الوحيد لهذا العميل.`)
+  } else if (acc) {
     if (acc.method_type === 'sadad_biller' && acc.biller_code) {
       payLines.push(`طريقة السداد المعتمدة: سداد المفوتر "${acc.biller_name ?? ''}" رمز ${acc.biller_code}. وجّه العميل يسدد عبر تطبيق بنكه بهذا المفوتر.`)
     } else if (acc.iban) {
       payLines.push(`طريقة السداد المعتمدة: تحويل بنكي على الآيبان ${acc.iban}${acc.account_name ? ` باسم ${acc.account_name}` : ''}${acc.bank_name ? ` - ${acc.bank_name}` : ''}. اطلب من العميل إرسال صورة الإيصال بعد التحويل.`)
     }
     if (acc.instructions) payLines.push(`تعليمات إضافية: ${acc.instructions}`)
-    if (payLines.length) {
-      lines.push('')
-      lines.push('【 طريقة الدفع (أعطها للعميل فقط عند اتفاقه على السداد) 】')
-      payLines.forEach(l => lines.push(`- ${l}`))
-    }
+  }
+  if (payLines.length) {
+    lines.push('')
+    lines.push('【 طريقة الدفع (أعطها للعميل فقط عند اتفاقه على السداد) 】')
+    payLines.forEach(l => lines.push(`- ${l}`))
   }
 
   // 4) Dashboard notes (collector / admin notes added in the panel)

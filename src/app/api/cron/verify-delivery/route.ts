@@ -68,14 +68,68 @@ export async function GET(req: NextRequest) {
       .limit(1).maybeSingle()
 
     if (!everDelivered) {
-      for (const m of msgs) {
+      // Distinguish a BRAND-NEW customer whose first message was swallowed
+      // during e2e session setup (WhatsApp Web drops the very first message to
+      // a new contact while the encryption handshake runs) from a genuinely
+      // broken session. Give the newest message ONE bounded retry — the first
+      // attempt warms the e2e session, so the resend usually lands. Only after
+      // a retry has already been attempted (and still nothing delivered) do we
+      // declare the session broken and stop. This reuses the single-message,
+      // single-retry safety from the healthy path — no mass resends.
+      const sortedNew = [...msgs].sort((a, b) =>
+        new Date((b as { sent_at: string }).sent_at).getTime() - new Date((a as { sent_at: string }).sent_at).getTime())
+      const [newest, ...olderNew] = sortedNew
+      const newestMeta = (newest as { metadata?: Record<string, unknown> }).metadata ?? {}
+      const alreadyTried = !!newestMeta.retry_attempted || !!newestMeta.retry_of
+
+      // Older stuck messages are marked failed without ever being re-sent.
+      for (const m of olderNew) {
         const meta = (m as { metadata?: Record<string, unknown> }).metadata ?? {}
         await supabase.from('messages').update({
-          status: 'failed',
-          metadata: { ...meta, delivery_unconfirmed: true, session_broken: true },
+          status: 'failed', metadata: { ...meta, delivery_unconfirmed: true },
         }).eq('id', (m as { id: string }).id)
         result.correctedToFailed++
       }
+
+      if (!alreadyTried) {
+        // First-contact retry: mark the swallowed original failed, resend once.
+        await supabase.from('messages').update({
+          status: 'failed', metadata: { ...newestMeta, delivery_unconfirmed: true, retry_attempted: true },
+        }).eq('id', (newest as { id: string }).id)
+        result.correctedToFailed++
+
+        const { data: customer } = await supabase
+          .from('customers').select('phone, whatsapp').eq('id', customerId).maybeSingle()
+        const phone = (customer as { whatsapp?: string; phone?: string } | null)?.whatsapp
+          || (customer as { whatsapp?: string; phone?: string } | null)?.phone
+        if (!phone) { result.skipped++; continue }
+
+        const r = await sendWhatsAppMessage({
+          to: phone, message: String((newest as { content: string }).content),
+          company_id: (newest as { company_id: string }).company_id,
+        })
+        if (r.status === 'sent') {
+          await supabase.from('messages').insert({
+            company_id: (newest as { company_id: string }).company_id, customer_id: customerId,
+            debt_id: (newest as { debt_id: string | null }).debt_id,
+            channel: 'whatsapp', direction: 'outbound',
+            content: String((newest as { content: string }).content),
+            status: 'sent', whatsapp_message_id: r.message_id || null,
+            metadata: { ...newestMeta, retry_of: (newest as { id: string }).id, first_contact_retry: true },
+            sent_at: new Date().toISOString(),
+          })
+          result.retried++
+        } else {
+          result.markedFailedNoResend++
+        }
+        continue
+      }
+
+      // Retry already attempted and STILL nothing delivered → broken session.
+      await supabase.from('messages').update({
+        status: 'failed', metadata: { ...newestMeta, delivery_unconfirmed: true, session_broken: true },
+      }).eq('id', (newest as { id: string }).id)
+      result.correctedToFailed++
       result.brokenSessionsSkipped++
 
       const { data: existingAlert } = await supabase
@@ -86,7 +140,7 @@ export async function GET(req: NextRequest) {
           company_id: (msgs[0] as { company_id: string }).company_id, severity: 'critical',
           alert_type: 'whatsapp_session_broken',
           title: 'جلسة واتساب معطوبة مع عميل — لا تصل أي رسالة',
-          message: `لم تصل أي رسالة لهذا العميل منذ بداية المحادثة. توقف النظام عن الإرسال له تلقائياً. الحل: اطلب من العميل إرسال أي رسالة للبوت أولاً لإعادة فتح الجلسة.`,
+          message: `لم تصل أي رسالة لهذا العميل رغم إعادة المحاولة. توقف النظام عن الإرسال له تلقائياً. الحل: اطلب من العميل إرسال أي رسالة للبوت أولاً لإعادة فتح الجلسة.`,
           metadata: { customer_id: customerId, stuck_count: msgs.length }, is_read: false, is_resolved: false,
         })
       }

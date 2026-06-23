@@ -5,82 +5,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
 import { parseXLSX, isXLSX } from '@/lib/excel-parser'
+import { parseCSVBuffer } from '@/lib/csv-parser'
 import { processEventBatch, type PipelineEvent } from '@/lib/automation-pipeline'
 import { findCompanyProfile, resolveCompanyProfile, type CompanyImportProfile } from '@/lib/company-import-profiles'
 import { buildPortfolioPayload, upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
-
-// ── Column mapping (English + Arabic) ──────────────────────────────────────
-// Handles: UTF-8, Windows-1256, and common Arabic column names from
-// Saudi collection systems (Debit Collect, Tamiuzz, etc.)
-
-const COLUMN_MAP: Record<string, string> = {
-  // English — customer fields
-  'customer name': 'full_name', 'full name': 'full_name', 'name': 'full_name',
-  'client name': 'full_name', 'client': 'full_name',
-  'phone': 'phone', 'mobile': 'phone', 'telephone': 'phone',
-  'whatsapp': 'whatsapp', 'whatsapp number': 'whatsapp',
-  'national id': 'national_id', 'id number': 'national_id', 'iqama': 'national_id',
-  'national id number': 'national_id', 'id': 'national_id',
-  'city': 'city', 'region': 'city',
-  'employer': 'employer', 'company': 'employer', 'work': 'employer',
-  'monthly income': 'monthly_income', 'income': 'monthly_income', 'salary': 'monthly_income',
-  // English — debt fields
-  'amount': 'original_amount', 'original amount': 'original_amount',
-  'debt amount': 'original_amount', 'loan amount': 'original_amount',
-  'total amount': 'original_amount', 'principal': 'original_amount',
-  'balance': 'current_balance', 'current balance': 'current_balance',
-  'outstanding': 'current_balance', 'remaining': 'current_balance',
-  'outstanding balance': 'current_balance', 'remaining balance': 'current_balance',
-  'currency': 'currency',
-  'due date': 'due_date', 'expiry date': 'due_date', 'maturity date': 'due_date',
-  'status': 'status', 'debt status': 'status',
-  'priority': 'priority',
-  'product': 'product_type', 'product type': 'product_type', 'service': 'product_type',
-  'account number': 'account_number', 'account': 'account_number', 'contract': 'account_number',
-  'reference': 'reference_number', 'ref': 'reference_number', 'case number': 'reference_number',
-  'notes': 'notes', 'description': 'notes', 'remarks': 'notes', 'comment': 'notes',
-  'collector': 'collector_name', 'assigned to': 'collector_name',
-  'portfolio': 'portfolio_name',
-  // Arabic — customer fields
-  'اسم العميل': 'full_name', 'الاسم': 'full_name', 'الاسم الكامل': 'full_name',
-  'الاسم بالكامل': 'full_name', 'اسم': 'full_name', 'العميل': 'full_name',
-  'الجوال': 'phone', 'رقم الجوال': 'phone', 'الهاتف': 'phone', 'رقم الهاتف': 'phone',
-  'الموبايل': 'phone', 'رقم الموبايل': 'phone',
-  'واتساب': 'whatsapp', 'رقم الواتساب': 'whatsapp', 'واتس': 'whatsapp',
-  'الهوية': 'national_id', 'رقم الهوية': 'national_id', 'الهوية الوطنية': 'national_id',
-  'رقم الهوية الوطنية': 'national_id', 'هوية': 'national_id', 'الإقامة': 'national_id',
-  'المدينة': 'city', 'المنطقة': 'city', 'المحافظة': 'city',
-  'جهة العمل': 'employer', 'صاحب العمل': 'employer', 'الجهة': 'employer', 'العمل': 'employer',
-  'الراتب': 'monthly_income', 'الدخل': 'monthly_income', 'الدخل الشهري': 'monthly_income',
-  'الراتب الشهري': 'monthly_income',
-  // Arabic — debt fields
-  'المبلغ': 'original_amount', 'المبلغ الأصلي': 'original_amount', 'قيمة الدين': 'original_amount',
-  'مبلغ الدين': 'original_amount', 'إجمالي الدين': 'original_amount', 'الدين': 'original_amount',
-  'الرصيد': 'current_balance', 'الرصيد المتبقي': 'current_balance', 'المبلغ المتبقي': 'current_balance',
-  'المتبقي': 'current_balance', 'الرصيد الحالي': 'current_balance',
-  'العملة': 'currency',
-  'تاريخ الاستحقاق': 'due_date', 'تاريخ السداد': 'due_date', 'الاستحقاق': 'due_date',
-  'الحالة': 'status', 'حالة الدين': 'status', 'حالة القضية': 'status',
-  'الأولوية': 'priority',
-  'المنتج': 'product_type', 'نوع المنتج': 'product_type', 'الخدمة': 'product_type',
-  'رقم الحساب': 'account_number', 'رقم العقد': 'account_number', 'حساب': 'account_number',
-  'رقم القضية': 'reference_number', 'المرجع': 'reference_number', 'رقم المرجع': 'reference_number',
-  'ملاحظات': 'notes', 'ملاحظة': 'notes', 'التعليق': 'notes', 'وصف': 'notes',
-  'المحصل': 'collector_name', 'اسم المحصل': 'collector_name',
-  'المحفظة': 'portfolio_name', 'المشروع': 'portfolio_name', 'الجهة الممولة': 'portfolio_name',
-  'email': 'email', 'e-mail': 'email', 'البريد الالكتروني': 'email', 'الايميل': 'email', 'الإيميل': 'email',
-  // Extra aliases
-  'customer': 'full_name', 'debtor': 'full_name', 'debtor name': 'full_name',
-  'client full name': 'full_name',
-  'debt': 'original_amount', 'loan': 'original_amount', 'principal amount': 'original_amount',
-  'total debt': 'original_amount', 'claim amount': 'original_amount',
-  'مبلغ': 'original_amount', 'القيمة': 'original_amount',
-  'remaining amount': 'current_balance', 'remaining debt': 'current_balance',
-  'unpaid': 'current_balance', 'unpaid amount': 'current_balance',
-  'رصيد': 'current_balance', 'المبلغ الباقي': 'current_balance',
-  'case status': 'status', 'collection status': 'status', 'loan status': 'status',
-  'contract number': 'account_number', 'case ref': 'reference_number',
-}
+import { clusterRowsByLayout, resolveClusterMapping, type StandardField } from '@/lib/import-engine'
 
 // Arabic status mapping
 const STATUS_MAP: Record<string, string> = {
@@ -99,125 +28,6 @@ function mapStatus(raw: string | undefined): string {
   if (!raw) return 'active'
   const s = raw.toLowerCase().trim()
   return STATUS_MAP[s] ?? STATUS_MAP[raw.trim()] ?? 'active'
-}
-
-function getMappedColumn(header: string): string | null {
-  const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
-  // Clean up hidden characters, zero width spaces, BOM, etc.
-  const clean = h.replace(/[\u200B-\u200D\uFEFF]/g, '');
-
-  if (COLUMN_MAP[clean]) return COLUMN_MAP[clean];
-  
-  // Fuzzy match keywords to completely eliminate strict header errors
-  if (clean.includes('اسم') && (clean.includes('عميل') || clean.includes('مستفيد'))) return 'full_name';
-  if (clean.includes('العميل')) return 'full_name';
-  if (clean.includes('هوية') || clean.includes('إقامة') || clean.includes('اقامة')) return 'national_id';
-  if (clean.includes('مبلغ') || clean.includes('مديونية') || clean.includes('رصيد') || clean.includes('مطالبة')) return 'current_balance';
-  if (clean.includes('تواصل') || clean.includes('جوال') || clean.includes('هاتف') || clean.includes('موبايل')) return 'phone';
-  if (clean.includes('حساب') && !clean.includes('نوع')) return 'account_number';
-  if (clean.includes('عقد') || clean.includes('مرجع')) return 'reference_number';
-  if (clean.includes('محفظة') || clean.includes('مشروع')) return 'portfolio_name';
-  if (clean.includes('حالة') || clean.includes('حاله')) return 'status';
-  if (clean.includes('منتج') || clean.includes('خدمة')) return 'product_type';
-  if (clean.includes('ملاحظ') || clean.includes('تعليق')) return 'notes';
-  if (clean.includes('موعد') || clean.includes('استحقاق') || clean.includes('سداد')) return 'due_date';
-  if (clean.includes('راتب') || clean.includes('دخل')) return 'monthly_income';
-  if (clean.includes('شركة') || clean.includes('عمل') || clean.includes('جهة')) return 'employer';
-  if (clean.includes('مستخدم') || clean.includes('محصل') || clean.includes('مسؤول')) return 'collector_name';
-  
-  return null;
-}
-
-// ── Fix encoding issues (Windows-1256 / CP1256 for Arabic) ─────────────────
-
-function fixEncoding(text: string): string {
-  // If text looks like it's already valid UTF-8 with Arabic, return as-is
-  if (/[\u0600-\u06FF]/.test(text)) return text
-  // Try to fix common Windows-1256 mojibake by re-interpreting chars
-  // Common issue: Arabic text stored in CP1256 read as Latin-1
-  // We can't truly fix this without knowing the original encoding,
-  // but we can clean up obvious garbage characters
-  return text.replace(/[\x80-\x9F]/g, '').replace(/\uFFFD/g, '').trim()
-}
-
-// ── Parse CSV with proper encoding detection ────────────────────────────────
-
-function parseCSVBuffer(buf: ArrayBuffer): { headers: string[]; rows: string[][] } {
-  // Detect BOM and encoding
-  const bytes = new Uint8Array(buf)
-  let text: string
-
-  // UTF-8 BOM
-  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
-    text = new TextDecoder('utf-8').decode(buf.slice(3))
-  }
-  // UTF-16 LE BOM
-  else if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
-    text = new TextDecoder('utf-16le').decode(buf.slice(2))
-  }
-  // UTF-16 BE BOM
-  else if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
-    text = new TextDecoder('utf-16be').decode(buf.slice(2))
-  }
-  // Try UTF-8, fall back to Windows-1256 for Arabic files
-  else {
-    try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(buf)
-    } catch {
-      try {
-        text = new TextDecoder('windows-1256').decode(buf)
-      } catch {
-        text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
-      }
-    }
-  }
-
-  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  
-  // Clean up null bytes if it was UTF-16 decoded as UTF-8
-  text = text.replace(/\0/g, '')
-
-  const lines = text.trim().split('\n')
-  if (lines.length === 0 || text.trim() === '') {
-    throw new Error('الملف فارغ تماماً (Empty File).')
-  }
-  if (lines.length === 1) {
-    throw new Error('الملف يحتوي على صف العناوين فقط ولا توجد بيانات عملاء.')
-  }
-
-  // Detect delimiter
-  const firstLine = lines[0]
-  const commaCount = (firstLine.match(/,/g) || []).length
-  const semiCount = (firstLine.match(/;/g) || []).length
-  const tabCount = (firstLine.match(/\t/g) || []).length
-  
-  let delimiter = ','
-  if (tabCount > commaCount && tabCount > semiCount) delimiter = '\t'
-  else if (semiCount > commaCount) delimiter = ';'
-
-  function parseLine(line: string): string[] {
-    const result: string[] = []
-    let current = ''
-    let inQuotes = false
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
-        else inQuotes = !inQuotes
-      } else if (ch === delimiter && !inQuotes) {
-        result.push(fixEncoding(current.trim()))
-        current = ''
-      } else {
-        current += ch
-      }
-    }
-    result.push(fixEncoding(current.trim()))
-    return result
-  }
-
-  const headers = parseLine(lines[0]).map(h => h.toLowerCase().trim())
-  const rows    = lines.slice(1).filter(l => l.trim()).map(parseLine)
-  return { headers, rows }
 }
 
 // ── Portfolio lookup cache ─────────────────────────────────────────────────
@@ -246,10 +56,6 @@ async function lookupPortfolio(
   return null
 }
 
-// Ensures a portfolio exists for a known company profile, seeding it with
-// the company-specific contact-outcome categories so the UI can show the
-// right dropdown instead of a generic one. Idempotent — safe to call once
-// per import.
 async function ensureCompanyPortfolio(
   supabase: ReturnType<typeof createClient>,
   companyId: string,
@@ -285,6 +91,14 @@ async function ensureCompanyPortfolio(
 }
 
 // ── Main handler ───────────────────────────────────────────────────────────
+//
+// Column mapping is no longer a single global guess for the whole file. Rows
+// are clustered by their "active column" layout (see lib/import-engine.ts),
+// and EACH layout gets its own mapping resolved independently from header
+// text + column content + company profile + previously-confirmed templates.
+// A layout that is genuinely ambiguous is NEVER guessed — its rows are
+// skipped and reported under `needs_mapping`, never imported with wrong data
+// and never silently dropped without explanation.
 
 export async function POST(request: NextRequest) {
   try {
@@ -305,12 +119,20 @@ export async function POST(request: NextRequest) {
     if (!file)
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
-    // Optional: caller picked a known company profile (telecom/utility/
-    // insurance/... import templates) — forces every row into that
-    // company's portfolio and applies its company-specific column aliases.
     const companyKey = (formData.get('company_key') as string | null)?.trim() || null
     const companyProfile = companyKey ? findCompanyProfile(companyKey) : null
     const forcedPortfolioId = companyProfile ? await ensureCompanyPortfolio(supabase, profile.company_id, companyProfile) : null
+
+    // Optional: { [signatureHash]: { [header]: StandardField } } — confirms a
+    // mapping for one or more ambiguous layouts detected by a prior call to
+    // POST /api/debts/import/analyze. Confirmed mappings are persisted below
+    // so the SAME layout never needs to be confirmed again, even in a future
+    // file that mixes it with other layouts.
+    let overrides: Record<string, Record<string, StandardField>> = {}
+    const overridesRaw = formData.get('cluster_mapping_overrides') as string | null
+    if (overridesRaw) {
+      try { overrides = JSON.parse(overridesRaw) } catch { /* ignore malformed overrides */ }
+    }
 
     const allowed = ['.csv', '.xlsx', '.xls']
     const ext = '.' + file.name.split('.').pop()!.toLowerCase()
@@ -319,16 +141,15 @@ export async function POST(request: NextRequest) {
     if (file.size > 10 * 1024 * 1024)
       return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 })
 
-    // Parse file
     const buf = await file.arrayBuffer()
     let headers: string[]
-    let rows:    string[][]
+    let rows: string[][]
 
     if (ext === '.xlsx' || ext === '.xls' || isXLSX(buf)) {
       try {
         const parsed = parseXLSX(buf)
         headers = parsed.headers
-        rows    = parsed.rows
+        rows = parsed.rows
         logger.info(`Parsed XLSX: ${rows.length} rows, sheet: ${parsed.name}`)
       } catch (xlsxErr) {
         return NextResponse.json({
@@ -339,7 +160,7 @@ export async function POST(request: NextRequest) {
       try {
         const parsed = parseCSVBuffer(buf)
         headers = parsed.headers
-        rows    = parsed.rows
+        rows = parsed.rows
       } catch (csvErr) {
         return NextResponse.json({
           error: csvErr instanceof Error ? csvErr.message : 'Invalid CSV file format'
@@ -350,25 +171,114 @@ export async function POST(request: NextRequest) {
     if (!headers || headers.length === 0)
       return NextResponse.json({ error: 'لم يتم العثور على أعمدة في الملف' }, { status: 400 })
 
-    // Map headers to field names — company-specific aliases first (if a
-    // known profile was picked), then the generic fuzzy matcher. Headers
-    // that match neither are kept (not dropped) so their data still
-    // reaches debts.metadata.extra further down.
-    const fieldMap: Record<number, string> = {}
-    const unmappedHeaderIdx: number[] = []
-    for (let i = 0; i < headers.length; i++) {
-      const h = headers[i].toLowerCase().trim()
-      const mapped = companyProfile?.columnAliases?.[h] ?? getMappedColumn(headers[i])
-      if (mapped) fieldMap[i] = mapped
-      else unmappedHeaderIdx.push(i)
+    // ── Load previously-confirmed templates for this company ──
+    const { data: templateRows } = await supabase
+      .from('import_mapping_templates')
+      .select('id, signature_hash, field_map, use_count')
+      .eq('company_id', profile.company_id)
+    const savedTemplates: Record<string, Record<string, StandardField>> = {}
+    const templateIdByHash: Record<string, string> = {}
+    for (const t of templateRows ?? []) {
+      const row = t as { id: string; signature_hash: string; field_map: Record<string, StandardField> }
+      savedTemplates[row.signature_hash] = row.field_map
+      templateIdByHash[row.signature_hash] = row.id
     }
 
-    // Validate required columns
-    const fields = Object.values(fieldMap)
-    if (!fields.includes('full_name'))
-      return NextResponse.json({ error: `العمود المطلوب "اسم العميل" مفقود. الأعمدة التي تم العثور عليها: ${headers.join(' | ')}` }, { status: 400 })
-    if (!fields.includes('original_amount') && !fields.includes('current_balance'))
-      return NextResponse.json({ error: `العمود المطلوب "المبلغ" مفقود. الأعمدة التي تم العثور عليها: ${headers.join(' | ')}` }, { status: 400 })
+    const companyColumnAliases = companyProfile?.columnAliases as Record<string, StandardField | string> | undefined
+
+    // ── Cluster rows by layout, resolve mapping per cluster ──
+    const clusters = clusterRowsByLayout(headers, rows)
+    type ClusterRuntime = {
+      colFieldMap: Record<number, StandardField>
+      needsMapping: boolean
+      signatureHash: string
+      unresolvedFields: string[]
+      headerFieldMap: Record<string, StandardField> // for persisting as a template
+      // Kept ONLY for the diagnostic needs_mapping report below — never used
+      // to decide which rows import (that decision is colFieldMap/needsMapping,
+      // unchanged). Candidate columns + a human label per unresolved field, so
+      // the UI can show WHY a row was held back instead of it vanishing silently.
+      candidatesByField: Record<string, Array<{ header: string; confidence: number }>>
+      portfolioLabel: string | null
+    }
+    const clusterRuntimes: ClusterRuntime[] = []
+    const rowToCluster = new Map<number, number>() // rowIdx -> index into clusterRuntimes
+
+    for (const cluster of clusters) {
+      const override = overrides[cluster.signatureHash]
+      const saved = savedTemplates[cluster.signatureHash]
+      const effectiveSaved = override ?? saved // an explicit override always wins over a stale saved template
+
+      const { resolutions, fieldMap, needsMapping } = resolveClusterMapping(headers, rows, cluster, {
+        companyColumnAliases,
+        savedFieldMap: effectiveSaved,
+      })
+
+      const headerFieldMap: Record<string, StandardField> = {}
+      for (const [colIdxStr, field] of Object.entries(fieldMap)) headerFieldMap[headers[Number(colIdxStr)]] = field
+
+      const unresolvedFieldNames = Object.entries(resolutions).filter(([, r]) => r.needsMapping).map(([f]) => f)
+      const candidatesByField: Record<string, Array<{ header: string; confidence: number }>> = {}
+      for (const f of unresolvedFieldNames) {
+        candidatesByField[f] = resolutions[f as keyof typeof resolutions].candidates
+          .slice(0, 5).map(c => ({ header: c.header, confidence: Math.round(c.score * 100) }))
+      }
+
+      // Best-effort human label: a portfolio/company-name-shaped column active
+      // in this cluster, or a company-profile alias match on its values —
+      // purely cosmetic for the diagnostic report, computed the same way the
+      // read-only /analyze endpoint already does.
+      let portfolioLabel: string | null = null
+      const portfolioColIdx = headers.findIndex((h, i) =>
+        cluster.signature.includes(h) && /محفظة|مشروع|portfolio/i.test(h) && cluster.rowIndices.some(r => rows[r][i]?.trim()))
+      if (portfolioColIdx !== -1) {
+        const val = rows[cluster.rowIndices[0]]?.[portfolioColIdx]
+        if (val) portfolioLabel = resolveCompanyProfile(val)?.nameAr ?? val
+      }
+
+      const runtimeIdx = clusterRuntimes.length
+      clusterRuntimes.push({
+        colFieldMap: fieldMap,
+        needsMapping,
+        signatureHash: cluster.signatureHash,
+        unresolvedFields: unresolvedFieldNames,
+        headerFieldMap,
+        candidatesByField,
+        portfolioLabel,
+      })
+      for (const r of cluster.rowIndices) rowToCluster.set(r, runtimeIdx)
+    }
+
+    // Persist every cluster that resolved successfully (auto or via override)
+    // as a template — INCLUDING auto-resolved ones, so future imports of the
+    // same layout shape are instant and consistent, not re-derived each time.
+    for (const cr of clusterRuntimes) {
+      if (cr.needsMapping || Object.keys(cr.headerFieldMap).length === 0) continue
+      const existingId = templateIdByHash[cr.signatureHash]
+      if (existingId) {
+        await supabase.from('import_mapping_templates').update({
+          field_map: cr.headerFieldMap, use_count: (templateRows?.find((t: any) => t.id === existingId)?.use_count ?? 0) + 1,
+          last_used_at: new Date().toISOString(),
+        }).eq('id', existingId)
+      } else {
+        await supabase.from('import_mapping_templates').insert({
+          company_id: profile.company_id, signature_hash: cr.signatureHash,
+          signature_headers: headers.filter(h => clusters.find(c => c.signatureHash === cr.signatureHash)?.signature.includes(h)),
+          field_map: cr.headerFieldMap, confirmed_by: overrides[cr.signatureHash] ? user.id : null,
+          use_count: 1, last_used_at: new Date().toISOString(),
+        })
+      }
+    }
+
+    // Rows belonging to a cluster that still needs mapping are NEVER
+    // imported and NEVER silently skipped — they're reported explicitly.
+    const needsMappingClusters = clusterRuntimes
+      .map((cr, i) => ({ cr, i }))
+      .filter(({ cr }) => cr.needsMapping)
+    const needsMappingRowNumbers = new Set<number>()
+    for (const { i } of needsMappingClusters) {
+      for (const [rowIdx, ci] of rowToCluster.entries()) if (ci === i) needsMappingRowNumbers.add(rowIdx + 2)
+    }
 
     const portfolioCache = new Map<string, string>()
     const results = { imported: 0, skipped: 0, errors: [] as string[] }
@@ -378,33 +288,35 @@ export async function POST(request: NextRequest) {
       const row = rows[rowIdx]
       if (!row || row.every(cell => !cell?.trim())) continue
 
+      if (needsMappingRowNumbers.has(rowIdx + 2)) {
+        // Explicitly excluded — surfaced via `needs_mapping` in the response,
+        // not counted as a generic error and not imported.
+        continue
+      }
+
+      const clusterIdx = rowToCluster.get(rowIdx)
+      const fieldMap = clusterIdx != null ? clusterRuntimes[clusterIdx].colFieldMap : {}
+
       const f: Record<string, string> = {}
       for (const [colIdxStr, fieldName] of Object.entries(fieldMap)) {
         const val = row[parseInt(colIdxStr)]?.trim()
         if (val) f[fieldName] = val
       }
 
-      // Preserve company-specific / unrecognised columns instead of
-      // dropping them — e.g. CATEGORY, MNP, SADAD_NUMBER for Mobily.
+      const mappedColIdxs = new Set(Object.keys(fieldMap).map(Number))
       const extra: Record<string, string> = {}
-      for (const idx of unmappedHeaderIdx) {
-        const val = row[idx]?.trim()
-        if (val) extra[headers[idx]] = val
+      for (let i = 0; i < headers.length; i++) {
+        if (mappedColIdxs.has(i)) continue
+        const val = row[i]?.trim()
+        if (val) extra[headers[i]] = val
       }
 
-      // Full raw header→value map (every column, mapped or not) — used to
-      // populate the portfolio-specific customer_data_<table>, since some
-      // of those columns (e.g. "نوع الهوية") also map to a standard field.
       const rawByHeader: Record<string, string> = {}
       for (let i = 0; i < headers.length; i++) {
         const val = row[i]?.trim()
         if (val) rawByHeader[headers[i].toLowerCase().trim()] = val
       }
 
-      // Resolve which known portfolio this row belongs to — a forced
-      // company profile (picked at upload time) always wins; otherwise
-      // sort each row by its own "portfolio"/"محفظة" column, so a single
-      // sheet containing multiple portfolios is routed correctly.
       const rowProfile = companyProfile ?? (f.portfolio_name ? resolveCompanyProfile(f.portfolio_name) : null)
 
       if (!f.full_name) {
@@ -422,7 +334,6 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Upsert customer
         let customerId: string
 
         let existing = null
@@ -468,8 +379,6 @@ export async function POST(request: NextRequest) {
           customerId = (newCust as { id: string }).id
         }
 
-        // Route portfolio-specific columns into customer_data_<table> for
-        // the row's resolved portfolio (Mobily, STC, التعاونية, ...).
         if (rowProfile) {
           const built = buildPortfolioPayload(rowProfile.key, rawByHeader)
           if (built) {
@@ -484,27 +393,19 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Parse dates
         let dueDate: string | null = null
         if (f.due_date) {
-          // Handle DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, Arabic formats
           const raw = f.due_date.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
           const parts = raw.split(/[\/\-\.]/)
           let d: Date | null = null
           if (parts.length === 3) {
-            // Try YYYY-MM-DD first
             if (parts[0].length === 4)  d = new Date(`${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`)
-            // DD/MM/YYYY
             else if (parseInt(parts[0]) > 12) d = new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`)
-            // MM/DD/YYYY
             else d = new Date(`${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`)
           }
           if (d && !isNaN(d.getTime())) dueDate = d.toISOString().split('T')[0]
         }
 
-        // Resolve portfolio — a forced company profile always wins; else
-        // a row-detected known profile gets its dedicated portfolio;
-        // otherwise fall back to plain name lookup against `portfolios`.
         const portfolioId = forcedPortfolioId
           ?? (rowProfile ? await ensureCompanyPortfolio(supabase, profile.company_id, rowProfile) : null)
           ?? await lookupPortfolio(supabase, profile.company_id, f.portfolio_name, portfolioCache)
@@ -541,7 +442,6 @@ export async function POST(request: NextRequest) {
         results.imported++
         const debtId = (newDebt as { id: string }).id
 
-        // Queue pipeline event for each imported record
         pipelineEvents.push({
           source:       'csv_import',
           company_id:   profile.company_id,
@@ -556,9 +456,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Run automation pipeline SYNCHRONOUSLY before returning response.
-    // Fire-and-forget is NOT used because Vercel terminates the process
-    // immediately after the HTTP response is sent.
     let pipelineResult = { succeeded: 0, failed: 0, skipped: 0, total_alerts: 0, total_actions: 0 }
     if (pipelineEvents.length > 0) {
       try {
@@ -569,10 +466,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const FIELD_LABELS_AR: Record<string, string> = {
+      full_name: 'اسم العميل', national_id: 'رقم الهوية', phone: 'رقم الجوال',
+      original_amount: 'المبلغ', current_balance: 'الرصيد الحالي',
+    }
+    const needsMappingReport = needsMappingClusters.map(({ cr, i }) => {
+      const row_numbers = [...rowToCluster.entries()].filter(([, ci]) => ci === i).map(([r]) => r + 2)
+      const fields = cr.unresolvedFields.map(field => {
+        const candidates = cr.candidatesByField[field] ?? []
+        return {
+          field,
+          field_label: FIELD_LABELS_AR[field] ?? field,
+          candidates,
+          // Distinguish, in plain language, WHY the row didn't import: either
+          // the data genuinely has nothing usable (no candidates at all), or
+          // there IS a usable column but the system isn't sure which one
+          // (needs a one-time human pick) — never the same vague rejection.
+          reason: candidates.length === 0
+            ? `لا يوجد أي عمود يحتوي بيانات تصلح لـ"${FIELD_LABELS_AR[field] ?? field}" في هذه الصفوف — المعلومة غير موجودة في الملف فعلياً.`
+            : `يوجد أكثر من عمود محتمل لـ"${FIELD_LABELS_AR[field] ?? field}" ولم يستطع النظام الحسم تلقائياً — يحتاج تأكيد يدوي مرة واحدة.`,
+        }
+      })
+      return {
+        signature_hash: cr.signatureHash,
+        portfolio_label: cr.portfolioLabel,
+        row_numbers,
+        row_count: row_numbers.length,
+        fields,
+      }
+    })
+
     return NextResponse.json({
       data:    results,
       pipeline: pipelineResult,
-      message: `Imported ${results.imported} records. Pipeline: ${pipelineResult.succeeded} processed, ${pipelineResult.total_alerts} alerts, ${pipelineResult.total_actions} actions.`,
+      needs_mapping: needsMappingReport.length > 0 ? needsMappingReport : undefined,
+      message: needsMappingReport.length > 0
+        ? `Imported ${results.imported} records. ${needsMappingReport.reduce((n, c) => n + c.row_numbers.length, 0)} rows need column mapping confirmation (see needs_mapping) and were NOT imported. Pipeline: ${pipelineResult.succeeded} processed, ${pipelineResult.total_alerts} alerts, ${pipelineResult.total_actions} actions.`
+        : `Imported ${results.imported} records. Pipeline: ${pipelineResult.succeeded} processed, ${pipelineResult.total_alerts} alerts, ${pipelineResult.total_actions} actions.`,
     })
   } catch (error) {
     logger.error('Import failed', error)

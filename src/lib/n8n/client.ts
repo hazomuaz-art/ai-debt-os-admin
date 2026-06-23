@@ -114,7 +114,7 @@ class N8nClient {
   // ── WhatsApp Workflows ──
 
   /**
-   * Send a WhatsApp message via n8n → Evolution API
+   * Send a WhatsApp message via n8n → WAHA gateway
    */
   async sendWhatsAppMessage(params: {
     company_id: string
@@ -130,8 +130,9 @@ class N8nClient {
       event: 'send_message',
       data: {
         ...params,
-        api_url: process.env.EVOLUTION_API_URL || 'http://72.62.30.109:32769',
-        api_key: process.env.EVOLUTION_API_KEY || 'yW9pHPPCn5btvjeqFr2rUdo0gS8KOebB'
+        api_url: process.env.WAHA_API_URL || '',
+        api_key: process.env.WAHA_API_KEY || '',
+        session: process.env.WAHA_SESSION || 'default',
       },
       metadata: {
         company_id: params.company_id,

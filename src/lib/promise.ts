@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { recordAttribution } from '@/lib/revenue-attribution'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('promise')
@@ -16,25 +17,72 @@ export async function recordPromise(args: {
   customer_id: string
   debt_id: string
   promised_amount: number
-  promised_date: string // YYYY-MM-DD, already validated by the caller
+  promised_date: string // YYYY-MM-DD, best-effort date (column is NOT NULL)
   customer_message: string
+  // The customer's timing in their own words/meaning ("مع الراتب", "بداية الشهر
+  // الجاي", "بكرا"...). Stored verbatim so later turns reference the real
+  // promise even when the date is only a best-effort conversion.
+  promise_text?: string | null
 }): Promise<void> {
   const supabase = createServiceClient()
 
+  const noteParts: string[] = []
+  if (args.promise_text) noteParts.push(`توقيت العميل: ${args.promise_text}`)
+  noteParts.push(`كلام العميل: "${args.customer_message}"`)
+  const notes = noteParts.join(' — ')
+  const followUp = `${args.promised_date}T09:00:00+03:00`
+
+  // If a pending promise already exists, UPDATE it (the customer may have moved
+  // or clarified the date) rather than duplicating — keeps one source of truth.
   const { data: existing } = await supabase
     .from('promises').select('id')
     .eq('company_id', args.company_id).eq('debt_id', args.debt_id).eq('status', 'pending')
-    .limit(1).maybeSingle()
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+
   if (existing) {
-    log.info('pending promise already exists for this debt — not duplicating', { debt_id: args.debt_id })
-    return
+    await supabase.from('promises').update({
+      promised_date: args.promised_date, promised_amount: args.promised_amount,
+      notes, follow_up_at: followUp,
+    }).eq('id', (existing as { id: string }).id)
+    log.info('updated standing promise', { debt_id: args.debt_id, promised_date: args.promised_date })
+  } else {
+    const { data: created } = await supabase.from('promises').insert({
+      company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+      promised_amount: args.promised_amount, promised_date: args.promised_date,
+      channel: 'whatsapp', status: 'pending', notes, follow_up_at: followUp,
+    }).select('id').single()
+    log.info('recorded new promise', { debt_id: args.debt_id, promised_date: args.promised_date })
+
+    // Attribution: a genuinely NEW promise only — updating an existing
+    // pending one (the `if (existing)` branch above) is the same promise
+    // event, not a second one, so it does not get a second attribution row.
+    if (created) {
+      await recordAttribution({
+        company_id: args.company_id,
+        event_type: 'promise',
+        source_id: (created as { id: string }).id,
+        customer_id: args.customer_id,
+        debt_id: args.debt_id,
+        amount: args.promised_amount,
+        primary_channel: 'whatsapp',
+        primary_actor: 'ai',
+        ai_assisted: true,
+      })
+    }
   }
 
-  await supabase.from('promises').insert({
-    company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-    promised_amount: args.promised_amount, promised_date: args.promised_date,
-    channel: 'whatsapp', status: 'pending',
-    notes: `كلام العميل: "${args.customer_message}"`,
-  })
   await supabase.from('debts').update({ status: 'promised' }).eq('id', args.debt_id)
+
+  // Reflect the promise on the customer timeline immediately so the profile,
+  // history and follow-ups all stay in sync (not stuck in one part of the app).
+  try {
+    await supabase.from('timeline_events').insert({
+      company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+      event_type: 'promise_to_pay', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+      summary: `وعد سداد${args.promise_text ? ` (${args.promise_text})` : ''} بتاريخ ${args.promised_date}`,
+      detail: notes, occurred_at: new Date().toISOString(),
+    })
+  } catch (e) {
+    log.error('promise timeline insert failed', e as Error)
+  }
 }
