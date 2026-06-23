@@ -78,6 +78,21 @@ export async function recordDispute(args: {
 
   if (error) { log.error('failed to insert dispute', error); return }
 
+  // Reflect the dispute on the customer timeline immediately — only on this
+  // genuinely-new-dispute path (the dedup `return` above already skips it
+  // for an existing open dispute), so it never duplicates per follow-up turn.
+  try {
+    await supabase.from('timeline_events').insert({
+      company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+      event_type: 'escalation', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+      summary: `اعتراض عميل (${dispute_type}) — رُفع للمراجعة`,
+      detail: description,
+      occurred_at: new Date().toISOString(),
+    })
+  } catch (e) {
+    log.error('dispute timeline insert failed', e as Error)
+  }
+
   await supabase.from('approvals').insert({
     company_id: args.company_id, approval_type: 'dispute', entity_type: 'debt', entity_id: args.debt_id,
     title: `اعتراض عميل: ${args.customer_name ?? ''}`,
