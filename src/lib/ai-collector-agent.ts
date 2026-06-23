@@ -281,6 +281,19 @@ function isRobotic(reply: string) {
     'يرجى التكرم',
     'نود إشعاركم',
     'نفيدكم',
+  ]) || isNonSaudiDialect(reply)
+}
+
+// Code-level backstop for §-dialect: the prompt instructs Saudi dialect only
+// (and explicitly forbids other dialects/formal Arabic), but that alone is
+// not enforced — this catches the most common, unambiguous Egyptian/Sudanese
+// markers so a drifted reply is replaced rather than sent to the customer.
+// Deliberately narrow (only words that are NOT also natural Saudi usage) to
+// avoid false positives on legitimate Saudi phrasing.
+function isNonSaudiDialect(reply: string) {
+  return hasAny(reply, [
+    'عايز', 'عايزة', 'كمان', 'علشان', 'إزاي', 'ازاي', 'كده', 'النهاردة', 'إمبارح',
+    'زول', 'كيفنك', 'شديد كتير', 'ياخ بالله',
   ])
 }
 
@@ -867,6 +880,26 @@ export async function runCollectorAgent(args: {
     return { shouldReply: true, action: 'reply', reason: 'greeting_first_contact', message: msg }
   }
 
+  // A PURE greeting mid-conversation (e.g. the customer opens a new day with
+  // "السلام عليكم" and nothing else) must never be answered by jumping
+  // straight to the debt/payment — only ever fall through to GENERAL/
+  // NEGOTIATION's payment-pushing templates when this message carries other
+  // content. Deliberately narrow: short message, no other detected signal at
+  // all, so a real question or commitment riding along with the greeting
+  // still falls through to the normal AI pipeline below untouched.
+  if (
+    isGreeting(text) && hasHistory && text.trim().length <= 25 &&
+    !signals.dispute && !signals.angry && !signals.promise && !signals.installment &&
+    !signals.hardship && !signals.asksWhoAreYou && !signals.asksCompany &&
+    !signals.asksDetails && !signals.paymentClaim && !signals.deniesDebt && !signals.wrongNumber
+  ) {
+    let msg = 'هلا فيك، تفضل.'
+    if (text.includes('سلام')) msg = 'وعليكم السلام، تفضل.'
+    else if (text.includes('مساء')) msg = 'مساء النور، تفضل.'
+    else if (text.includes('صباح')) msg = 'صباح النور، تفضل.'
+    return { shouldReply: true, action: 'reply', reason: 'greeting_mid_conversation', message: msg }
+  }
+
   if (!process.env.OPENROUTER_API_KEY) {
     return { shouldReply: true, action: 'reply', reason: 'fallback_no_api_key', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
   }
@@ -995,6 +1028,7 @@ ${installmentRule}
   const todayWeekday = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' }).format(new Date())
 
   const systemPrompt = `أنت "خالد"، محصّل ديون سعودي محترف عمره 45 سنة ولديه خبرة تتجاوز 20 سنة في تحصيل ديون كل القطاعات (اتصالات، تأمين، مرافق، تمويل، استقدام، زراعي). تتحدث بلهجة سعودية بيضاء طبيعية جداً عبر الواتساب، كأنك إنسان حقيقي يجلس أمام العميل.
+🔴 ممنوع منعاً باتاً استخدام أي لهجة غير سعودية (مصرية، سودانية، شامية، أو أي لهجة خليجية أخرى) أو الفصحى الرسمية الثقيلة في أي رد — السعودية البيضاء فقط دائماً، بدون استثناء.
 
 🎯 شخصيتك كمحصّل خبير (التزم بها في كل رد):
 - واثق وهادئ وحازم، لا تتوسّل ولا تعتذر بإفراط، ولا تتنازل بسهولة.
@@ -1545,7 +1579,19 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
       const overlap = inter / Math.max(1, Math.min(a.size, b.size))
       if (a.size >= 3 && overlap >= 0.6) {
         log.warn('repeated-question guard fired', { overlap: Number(overlap.toFixed(2)), original: parsed.message.slice(0, 80) })
-        const moves = [
+        // Payment-pressure fallbacks only make sense once the conversation is
+        // actually about negotiating payment. A repeated GREETING/INFO_REQUEST
+        // reply must never be replaced by a payment nudge — that was the exact
+        // cause of the agent pushing "متى تسدد؟" onto a plain greeting or an
+        // info question.
+        const movesNeutral = [
+          'طيب، خلنا نمشي قدام — وش تحتاج تعرفه أكثر؟',
+          'تمام، وضّح لي بس وش المطلوب بالضبط؟',
+          'خلاص، فهمت. عندك أي سؤال آخر؟',
+          'تمام، استوعبت. في شي ثاني تبي تعرفه؟',
+          'ماشي، الكلام واضح. تحتاج أي توضيح إضافي؟',
+        ]
+        const movesPayment = [
           'طيب، خلنا نمشي قدام — وش الخطوة اللي تناسبك الحين؟',
           'تمام، الموضوع يحتاج حل. وش تقترح؟',
           'فهمت عليك. تبي نرتّب طريقة السداد؟',
@@ -1562,6 +1608,7 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
           'ماشي، بس نحتاج نقرر شي الحين — وش تشوف؟',
           'تمام، استلمت كلامك. وش الخطوة اللي نقدر نمشي بها؟',
         ]
+        const moves = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? movesNeutral : movesPayment
         parsed.message = await pickUnusedVariant(args.customer_id, 'repeated_question', moves)
         parsed.reason = 'repeated_question_guard'
       }
@@ -1582,13 +1629,23 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
 
   if (isRobotic(parsed.message) || isRepeated(parsed.message, prevOutbound)) {
     log.warn('anti-repetition guard fired', { intent, original: parsed.message.slice(0, 80) })
-    const fallbacks = [
+    // Same fix as guard (C) above: a greeting or an info-request reply that
+    // happens to look "robotic"/repeated must never be force-replaced with a
+    // payment nudge — only NEGOTIATION/GENERAL/DISPUTE/INTRODUCTION turns are
+    // actually about pushing payment forward.
+    const fallbacksNeutral = [
+      'طيب، تفضل — وش تحتاج؟',
+      'تمام، أنا موجود. عندك أي استفسار آخر؟',
+      'خلاص، فهمت. في شي ثاني أساعدك فيه؟',
+      'تمام، تفضل بسؤالك.',
+      'ماشي، وضّح لي بس وش المطلوب.',
+    ]
+    const fallbacksPayment = [
       'طيب، وش تبي نسوي بخصوص الموضوع؟',
       'تمام، خلنا نمشي قدام. وش الخطوة الجاية من عندك؟',
       'فهمت عليك. تبي نتكلم عن طريقة السداد؟',
       'ماشي، بس أبي أعرف متى تقدر تسدد؟',
       'أوكي، بس الموضوع يحتاج حل. متى نتوقع السداد؟',
-      'طيب، خلنا نتفق على شي واضح — متى تقدر تسدد؟',
       'تمام، بس محتاج جواب محدد منك. وش تشوف؟',
       'فهمت، بس الملف يحتاج حل قريب. وش رايك؟',
       'ماشي، خلنا نحدد خطوة عملية الحين.',
@@ -1599,6 +1656,7 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
       'ماشي، بس أبغى أعرف القرار النهائي منك.',
       'تمام، وش رايك نرتّب موعد سداد واضح؟',
     ]
+    const fallbacks = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? fallbacksNeutral : fallbacksPayment
     parsed.message = await pickUnusedVariant(args.customer_id, 'anti_repetition', fallbacks)
     parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
     parsed.reason = 'anti_repetition_guard'
