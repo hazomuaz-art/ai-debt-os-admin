@@ -137,9 +137,12 @@ describe('1) STC field-meaning question → INFO_REQUEST (was GENERAL before the
 })
 
 describe('2) the same question for a NON-STC portfolio is unaffected', () => {
-  it('"وش رقم الخدمة عندي؟" still falls through to GENERAL for Mobily (telecom, not STC)', async () => {
-    mockContext.verified_debt_data.portfolio_name = 'موبايلي'
-    mock360 = { debtGroups: [{ portfolio_id: 'p2', portfolio_name: 'موبايلي', portfolio_category: 'telecom', company_key: 'mobily', debts: [{ id: 'd1', status: 'overdue' }] }], allDisputes: [], customerDataByPortfolio: {} }
+  // Uses a generic telecom portfolio with no special handling as the control.
+  // (Not Mobily — Mobily now has its own field-meaning INFO_REQUEST routing,
+  // so it is no longer a valid "generic, unaffected" stand-in.)
+  it('"وش رقم الخدمة عندي؟" still falls through to GENERAL for a plain telecom portfolio (not STC)', async () => {
+    mockContext.verified_debt_data.portfolio_name = 'شركة اتصالات أخرى'
+    mock360 = { debtGroups: [{ portfolio_id: 'p2', portfolio_name: 'شركة اتصالات أخرى', portfolio_category: 'telecom', company_key: null, debts: [{ id: 'd1', status: 'overdue' }] }], allDisputes: [], customerDataByPortfolio: {} }
     await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش رقم الخدمة عندي؟' })
     const systemPrompt = lastCreateCallMessages[0].content as string
     expect(systemPrompt).toContain(GENERAL_MARKER)

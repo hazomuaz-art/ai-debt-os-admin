@@ -12,6 +12,7 @@ import { classifyInsuranceCase, detectInsuranceObjectionSignals, renderInsurance
 import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply, detectStcReviewSignal, recordStcReview } from '@/lib/legal-escalation'
 import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
 import { renderStcKnowledgeForCaseFile, detectStcFieldMeaningQuestion } from '@/lib/stc-knowledge'
+import { renderMobilyKnowledgeForCaseFile, detectMobilyFieldMeaningQuestion } from '@/lib/mobily-knowledge'
 import {
   detectSevereDistress, renderDistressReply,
   detectOptOutIntent, renderOptOutConfirmation, setContactOptOut,
@@ -366,7 +367,7 @@ function isSaneDate(iso: string, todayISO: string): boolean {
 //  Pulls verified DB facts, what was agreed, dashboard notes & history.
 // ════════════════════════════════════════════════════════════════════
 
-export function buildCaseFile(ctx: any, stcRow?: Record<string, any> | null): string {
+export function buildCaseFile(ctx: any, stcRow?: Record<string, any> | null, mobilyRow?: Record<string, any> | null): string {
   const lines: string[] = []
   const add = (label: string, value: any) => {
     if (value !== null && value !== undefined && String(value).trim() !== '') {
@@ -519,17 +520,24 @@ export function buildCaseFile(ctx: any, stcRow?: Record<string, any> | null): st
   // destination for portfolios like STC where every customer has their own
   // SADAD/biller number. Only fall back to collection_accounts when no
   // customer-specific SADAD number exists.
+  // Mobily resolves the payment number from service status (see the Mobily
+  // knowledge block below), NOT from sadad_number — so the generic
+  // SADAD-first payment block is suppressed for Mobily to avoid handing the
+  // customer two conflicting payment numbers. STC and every other portfolio
+  // are unaffected.
   const acc = ctx.collection_account
   const payLines: string[] = []
-  if (sadadCaseVal) {
-    payLines.push(`طريقة السداد المعتمدة: رقم السداد/المفوتر الخاص بهذا العميل هو ${sadadCaseVal}. وجّه العميل يسدد عبر تطبيق بنكه بهذا الرقم فقط — هذا هو مصدر الدفع المعتمد الوحيد لهذا العميل.`)
-  } else if (acc) {
-    if (acc.method_type === 'sadad_biller' && acc.biller_code) {
-      payLines.push(`طريقة السداد المعتمدة: سداد المفوتر "${acc.biller_name ?? ''}" رمز ${acc.biller_code}. وجّه العميل يسدد عبر تطبيق بنكه بهذا المفوتر.`)
-    } else if (acc.iban) {
-      payLines.push(`طريقة السداد المعتمدة: تحويل بنكي على الآيبان ${acc.iban}${acc.account_name ? ` باسم ${acc.account_name}` : ''}${acc.bank_name ? ` - ${acc.bank_name}` : ''}. اطلب من العميل إرسال صورة الإيصال بعد التحويل.`)
+  if (!mobilyRow) {
+    if (sadadCaseVal) {
+      payLines.push(`طريقة السداد المعتمدة: رقم السداد/المفوتر الخاص بهذا العميل هو ${sadadCaseVal}. وجّه العميل يسدد عبر تطبيق بنكه بهذا الرقم فقط — هذا هو مصدر الدفع المعتمد الوحيد لهذا العميل.`)
+    } else if (acc) {
+      if (acc.method_type === 'sadad_biller' && acc.biller_code) {
+        payLines.push(`طريقة السداد المعتمدة: سداد المفوتر "${acc.biller_name ?? ''}" رمز ${acc.biller_code}. وجّه العميل يسدد عبر تطبيق بنكه بهذا المفوتر.`)
+      } else if (acc.iban) {
+        payLines.push(`طريقة السداد المعتمدة: تحويل بنكي على الآيبان ${acc.iban}${acc.account_name ? ` باسم ${acc.account_name}` : ''}${acc.bank_name ? ` - ${acc.bank_name}` : ''}. اطلب من العميل إرسال صورة الإيصال بعد التحويل.`)
+      }
+      if (acc.instructions) payLines.push(`تعليمات إضافية: ${acc.instructions}`)
     }
-    if (acc.instructions) payLines.push(`تعليمات إضافية: ${acc.instructions}`)
   }
   if (payLines.length) {
     lines.push('')
@@ -547,9 +555,12 @@ export function buildCaseFile(ctx: any, stcRow?: Record<string, any> | null): st
     notes.forEach(n => lines.push(`- ${n}`))
   }
 
-  // 5) STC-only operational knowledge — field semantics, never policy.
+  // 5) Portfolio-specific operational knowledge — field semantics + (Mobily)
+  // the deterministic status-based payment number. Never policy.
   const stcKnowledge = renderStcKnowledgeForCaseFile(stcRow)
   if (stcKnowledge) lines.push(stcKnowledge)
+  const mobilyKnowledge = renderMobilyKnowledgeForCaseFile(mobilyRow)
+  if (mobilyKnowledge) lines.push(mobilyKnowledge)
 
   return lines.join('\n')
 }
@@ -781,6 +792,10 @@ export async function runCollectorAgent(args: {
   const resolvedPortfolioName = String(resolvedGroup?.portfolio_name ?? ctx.verified_debt_data?.portfolio_name ?? '').trim().toLowerCase()
   const stcProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'stc')
   const isStcPortfolio = !!resolvedPortfolioName && !!stcProfile?.aliases.includes(resolvedPortfolioName)
+  // Mobily — same NAME-based gating as STC (real DB row is "موبايلي", not
+  // "Mobily"), so it never affects STC or any other telecom portfolio.
+  const mobilyProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'mobily')
+  const isMobilyPortfolio = !!resolvedPortfolioName && !!mobilyProfile?.aliases.includes(resolvedPortfolioName)
   const playbook = await getPlaybookForPortfolio({
     company_id: args.company_id,
     portfolio_id: resolvedPortfolioId,
@@ -933,7 +948,11 @@ export async function runCollectorAgent(args: {
   // pressure-oriented template. Strictly gated on isStcPortfolio so no
   // other portfolio's intent classification changes.
   const asksStcFieldMeaning = isStcPortfolio && detectStcFieldMeaningQuestion(text)
-  if (signals.asksWhoAreYou || signals.asksCompany || signals.asksDetails || asksStcFieldMeaning) {
+  // Same as STC: a Mobily operational-field / payment-number question routes
+  // to INFO_REQUEST so the Mobily knowledge block is answered directly,
+  // never falling through to GENERAL's pressure template. Gated on Mobily.
+  const asksMobilyFieldMeaning = isMobilyPortfolio && detectMobilyFieldMeaningQuestion(text)
+  if (signals.asksWhoAreYou || signals.asksCompany || signals.asksDetails || asksStcFieldMeaning || asksMobilyFieldMeaning) {
     intent = 'INFO_REQUEST'
   } else if (signals.deniesDebt) {
     intent = 'DISPUTE'
@@ -982,6 +1001,7 @@ export async function runCollectorAgent(args: {
 - 🔴 لا تطلب من العميل معلومة هو من المفروض أن يحصل عليها منك (مثل رقم حسابه) — أنت من يملك هذي المعلومة ويعطيها له، لا العكس.
 - إن كانت بعض التفاصيل المطلوبة فعلاً غير موجودة في الملف (لا اسم جهة ولا رقم حساب ولا أي شيء): وضّح فقط أن هذا الجزء بالذات غير متوفر حالياً، وقل إنك ستتحقق منه، بدل التعميم بأن "كل شيء غير معروف".
 ${isStcPortfolio ? '- 🔴 إذا سأل عن "رقم الخدمة" أو "رقم الحساب" أو "نوع الخدمة" أو معنى "مع جهاز/بدون جهاز" أو معنى "تاريخ التعثر": أجب مباشرة من قسم "معرفة تشغيلية خاصة بـ STC" في ملف القضية إن وُجد — لا تحوّل للإدارة ولا تصعّد، هذي معلومة عادية تشرحها بنفسك فوراً.' : ''}
+${isMobilyPortfolio ? '- 🔴 إذا سأل عن "رقم الخدمة" أو "رقم الحساب" أو "حالة الخدمة" أو "طريقة/رقم السداد": أجب مباشرة من قسم "معرفة تشغيلية خاصة بموبايلي" في ملف القضية. عند سؤاله عن رقم السداد، أعطه فقط الرقم الصحيح المحدّد هناك حسب حالة الخدمة (Inactive→رقم الخدمة، Closed→رقم الحساب) — ممنوع إعطاء الرقم الخطأ.' : ''}
 - 🔴🔴 ممنوع منعاً باتاً إضافة أي ضغط سداد أو تذكير بموعد أو مطالبة بالدفع في هذا الرد — مهمتك الآن فقط الإجابة على سؤاله. لا تكتب "والمهم موعدك..." أو "بانتظار سدادك" أو أي جملة تعيد الحديث عن السداد، إلا إذا كان العميل نفسه سأل في رسالته الحالية عن السداد أو الموعد أو وعد به. الرد يتوقف عند الإجابة على سؤاله فقط.`,
     DISPUTE: `【 مهمتك الآن: فهم الاعتراض، مناقشته، وإقناع العميل — لا تصعيد سريع 】
 - العميل غاضب أو ينكر المديونية أو يقول الرقم خطأ أو يقول "معترض" بدون أي تفصيل.
@@ -1014,7 +1034,10 @@ ${installmentRule}
   const stcRow = isStcPortfolio
     ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
     : null
-  const caseFile = buildCaseFile(ctx, stcRow)
+  const mobilyRow = isMobilyPortfolio
+    ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
+    : null
+  const caseFile = buildCaseFile(ctx, stcRow, mobilyRow)
   const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
   const np = ctx.negotiation_profile ?? {}
 
