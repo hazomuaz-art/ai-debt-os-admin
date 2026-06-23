@@ -1506,6 +1506,20 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
       }
     }
 
+    // (L3) STC bans the agent from proposing/mentioning installments unless
+    // the CUSTOMER'S OWN current message explicitly asked for one
+    // (signals.installment). The prompt instruction (§installmentRule above)
+    // is not reliable enough on its own — this is the deterministic backstop
+    // that strips any leaked تقسيط/أقساط/قسط/جدولة mention from the reply.
+    if (isStcPortfolio && !signals.installment) {
+      const INSTALLMENT_LEAK_PATTERN = /(تقسيط|أقساط|اقساط|قسط(?!ت)|جدولة)/
+      if (INSTALLMENT_LEAK_PATTERN.test(parsed.message)) {
+        log.warn('STC installment mention stripped — customer did not request it', { original: parsed.message.slice(0, 120) })
+        parsed.message = 'تمام، سجلت وعدك بالسداد. بنحدّث الحالة بعد السداد.'
+        if (parsed.action === 'record_installment_request') parsed.action = 'negotiate'
+        parsed.reason = 'stc_installment_leak_blocked'
+      }
+    }
 
     // (J2) Never let the model state, send, or invent ANY payment
     // destination (bank account/IBAN/SADAD number/"transfer to this
