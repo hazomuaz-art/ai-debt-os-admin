@@ -45,27 +45,225 @@ export async function processInboundReceipt(args: {
     return
   }
 
-  // Load the debt + the expected collection account (our beneficiary) so we can
-  // actually MATCH the transfer instead of blindly trusting the amount.
-  const { data: debt } = args.debt_id
-    ? await svc.from('debts')
-        .select('current_balance, currency, status, reference_number, account_number, creditor_name, portfolio_id, created_at, metadata')
-        .eq('id', args.debt_id).maybeSingle()
-    : { data: null as any }
-  const d = (debt ?? {}) as Record<string, any>
-  const balance = Number(d.current_balance ?? 0)
-  const currency = d.currency ?? ocr.currency ?? 'SAR'
+  // ── Debt selection ───────────────────────────────────────────────────
+  // Never trust a single upstream "latest debt" guess — load EVERY open
+  // debt this customer has and match the receipt's own data (SADAD/account
+  // number/IBAN/reference) against each one. Only a debt the receipt
+  // genuinely matches may ever be updated.
+  const { data: openDebtsRaw } = await svc.from('debts')
+    .select('id, current_balance, currency, status, reference_number, account_number, creditor_name, portfolio_id, created_at, metadata')
+    .eq('customer_id', args.customer_id)
+    .not('status', 'in', '("settled","written_off")')
+  const openDebts = (openDebtsRaw ?? []) as Record<string, any>[]
 
   const { data: accounts } = await svc.from('collection_accounts')
     .select('method_type, iban, account_name, bank_name, biller_code, biller_name, portfolio_id')
     .eq('company_id', args.company_id).eq('is_active', true)
+
+  const amount = Number(ocr.amount ?? 0)
+
+  // No open debt at all → nothing to verify against, however confident the
+  // OCR reading is. Flag for a human, never guess a debt.
+  if (openDebts.length === 0) {
+    await svc.from('system_alerts').insert({
+      company_id: args.company_id, severity: 'warning', alert_type: 'payment_review',
+      title: 'إيصال بلا دين مفتوح لمطابقته',
+      message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن لا يوجد أي دين مفتوح على حسابه لمطابقة الإيصال عليه.`,
+      metadata: { customer_id: args.customer_id, ocr }, is_resolved: false,
+    })
+    await addTimeline(svc, { ...args, debt_id: null }, 'payment', 'إيصال استُلم — لا يوجد دين مفتوح لمطابقته، يحتاج مراجعة يدوية', ocr)
+    await replyAndLog(svc, { ...args, debt_id: null }, 'استلمت إيصالك، جاري التحقق ونرجع لك قريباً.')
+    return
+  }
+
+  const evaluated = openDebts.map(d => ({ debt: d, m: matchBeneficiary(d, ocr, accounts ?? []) }))
+
+  // Exactly one open debt → no ambiguity is even possible, it's the only
+  // candidate by definition (preserves the simple single-debt case exactly).
+  // Otherwise: select ONLY if exactly one of the several open debts is a
+  // confident beneficiary match — any other outcome (zero matches, or more
+  // than one matching) is genuine ambiguity and must never auto-resolve.
+  const confidentMatches = evaluated.filter(e => e.m.beneficiary === 'match')
+  let selected: { debt: Record<string, any>; m: ReturnType<typeof matchBeneficiary> } | null = null
+  let ambiguous = false
+
+  if (openDebts.length === 1) {
+    selected = evaluated[0]
+  } else if (confidentMatches.length === 1) {
+    selected = confidentMatches[0]
+  } else {
+    ambiguous = true
+  }
+
+  if (ambiguous) {
+    if (!amount) {
+      await svc.from('system_alerts').insert({
+        company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
+        title: 'إيصال يحتاج مراجعة يدوية',
+        message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن تعذّر قراءة المبلغ تلقائياً، ولديه ${openDebts.length} ديون مفتوحة.`,
+        metadata: { customer_id: args.customer_id, candidate_debt_ids: openDebts.map(d => d.id), ocr }, is_resolved: false,
+      })
+    } else {
+      const reason = confidentMatches.length > 1
+        ? `الإيصال يطابق أكثر من دين (${confidentMatches.length} من ${openDebts.length}) — لا يمكن تحديد الدين الصحيح آلياً`
+        : `الإيصال لا يطابق أي دين من ديون العميل المفتوحة (${openDebts.length} ديون) بثقة كافية`
+      await svc.from('system_alerts').insert({
+        company_id: args.company_id, severity: 'warning', alert_type: 'payment_review',
+        title: 'إيصال يحتاج تحديد الدين الصحيح يدوياً',
+        message: `العميل ${args.customer_name ?? ''}: ${srcLabel} بمبلغ ${amount} ${ocr.currency ?? 'SAR'} — ${reason}.`,
+        metadata: {
+          customer_id: args.customer_id,
+          candidate_debt_ids: openDebts.map(d => d.id),
+          matched_debt_ids: confidentMatches.map(e => e.debt.id),
+          ocr,
+        }, is_resolved: false,
+      })
+    }
+    await addTimeline(svc, { ...args, debt_id: null }, 'payment',
+      `إيصال بمبلغ ${amount || '?'} — تعذّر تحديد الدين الصحيح من بين ${openDebts.length} ديون مفتوحة`, ocr)
+    await replyAndLog(svc, { ...args, debt_id: null }, 'وصلنا الإيصال، وبنراجعه ونتأكد من الدين المرتبط به قبل اعتماده.')
+    return
+  }
+
+  const { debt: d, m } = selected!
+  const debt_id = String(d.id)
+  const { beneficiary, amountOk, balance, currency } = m
+  const callArgs = { ...args, debt_id }
+
+  // Auto-confirm ONLY when: it's an actual attachment (never a typed-text
+  // claim), the amount is sane, AND the beneficiary genuinely matches a real
+  // reference we hold for this customer/debt. Amount alone is never enough,
+  // and OCR confidence alone is never enough — an "unknown" beneficiary
+  // (no checkable reference at all, or a clear mismatch) always falls to
+  // pending_verification, regardless of how confident the OCR reading was.
+  const autoVerify = args.source !== 'text' && amountOk && ocr.confidence >= 70 && beneficiary === 'match'
+
+  const matchMeta = { beneficiary, amountOk, expected_balance: balance, source: args.source }
+  const noteBits = [
+    `إيصال عبر الواتساب (${srcLabel})`,
+    ocr.reference ? `مرجع: ${ocr.reference}` : '',
+    ocr.invoice_number ? `فاتورة: ${ocr.invoice_number}` : '',
+    ocr.iban_last4 ? `آيبان٤: ${ocr.iban_last4}` : '',
+    ocr.beneficiary_name ? `المستفيد: ${ocr.beneficiary_name}` : '',
+    `مطابقة المستفيد: ${beneficiary}`,
+  ].filter(Boolean).join(' — ')
+
+  // No readable amount (e.g. scanned image-only PDF) → flag for review, never drop.
+  if (!amount) {
+    await svc.from('system_alerts').insert({
+      company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
+      title: 'إيصال يحتاج مراجعة يدوية',
+      message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن تعذّر قراءة المبلغ تلقائياً.`,
+      metadata: { debt_id, customer_id: args.customer_id, ocr }, is_resolved: false,
+    })
+    await addTimeline(svc, callArgs, 'payment', 'إيصال استُلم — يحتاج مراجعة يدوية (تعذّر قراءة المبلغ)', ocr)
+    await replyAndLog(svc, callArgs, 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
+    return
+  }
+
+  const payDate = (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date)) ? ocr.date : new Date().toISOString().slice(0, 10)
+  const { data: insertedPayment } = await svc.from('payments').insert({
+    company_id: args.company_id, customer_id: args.customer_id, debt_id,
+    amount, currency,
+    status: autoVerify ? 'completed' : 'pending',
+    payment_date: payDate,
+    verification_status: autoVerify ? 'verified' : 'pending_verification',
+    ocr_data: ocr,
+    notes: noteBits,
+  }).select('id').single()
+
+  let reply: string
+  if (autoVerify) {
+    // ── FULL PAYMENT CYCLE: debt + promises + timeline all updated ──
+    const newBal = Math.max(0, balance - amount)
+    const upd: Record<string, unknown> = { current_balance: newBal }
+    if (newBal <= 0) upd.status = 'settled'
+    else if (d.status === 'promised' || d.status === 'overdue') upd.status = 'active'
+    await svc.from('debts').update(upd).eq('id', debt_id)
+
+    // Any open promise is now kept → mark it so the agent stops chasing it.
+    // 'fulfilled' is NOT a valid promises.status (DB CHECK only allows
+    // pending|kept|broken|rescheduled|partial) — this update has been
+    // silently rejected by Postgres on every single payment ever since
+    // this code was written (Supabase doesn't throw on a CHECK violation
+    // here, it only returns `{ error }`, which was never checked), so
+    // promises never actually left 'pending' after being paid.
+    const { error: promiseUpdErr } = await svc.from('promises')
+      .update({ status: 'kept', fulfilled_at: new Date().toISOString() })
+      .eq('company_id', args.company_id).eq('debt_id', debt_id).eq('status', 'pending')
+    if (promiseUpdErr) log.error('failed to mark promise as kept', { error: promiseUpdErr.message, debt_id })
+
+    await addTimeline(svc, callArgs, 'payment',
+      `سداد مؤكَّد ${amount} ${currency}${newBal <= 0 ? ' — سُدّدت المديونية بالكامل' : ` — المتبقي ${newBal} ${currency}`} (${matchMeta.beneficiary})`, ocr)
+
+    // Attribution: this is the AI confirming a real payment via OCR, with
+    // no human collector involved at all — fully AI-driven. settlement vs
+    // payment depends on whether the debt was actually closed by it.
+    if (insertedPayment?.id) {
+      const { count: msgCount } = await svc.from('messages').select('id', { count: 'exact', head: true })
+        .eq('company_id', args.company_id).eq('customer_id', args.customer_id).eq('debt_id', debt_id)
+      const daysToCollect = d.created_at
+        ? Math.max(0, Math.round((Date.now() - new Date(d.created_at).getTime()) / 86_400_000))
+        : undefined
+      await recordAttribution({
+        company_id: args.company_id,
+        event_type: newBal <= 0 ? 'settlement' : 'payment',
+        payment_id: insertedPayment.id,
+        customer_id: args.customer_id,
+        debt_id,
+        amount,
+        primary_channel: 'ai_reply',
+        primary_actor: 'ai',
+        ai_assisted: true,
+        portfolio_id: d.portfolio_id ?? undefined,
+        touches_before_pay: msgCount ?? undefined,
+        days_to_collect: daysToCollect,
+      })
+    }
+
+    reply = `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
+  } else {
+    // Match incomplete (beneficiary mismatch, unknown, or a typed-text
+    // claim with no attachment to verify) → never auto-verified. Always
+    // pending_verification + a payment_review alert + the same neutral
+    // reply, regardless of which specific reason caused it.
+    const reason = beneficiary === 'mismatch'
+      ? 'بيانات المستفيد/الفاتورة في الإيصال لا تطابق حساب التحصيل'
+      : args.source === 'text'
+        ? 'مطالبة سداد نصية بدون مرفق — لا يمكن التحقق آلياً'
+        : `لا يوجد رقم حساب/سداد/IBAN مطابق في الإيصال (ثقة القراءة ${ocr.confidence}%)`
+    await svc.from('system_alerts').insert({
+      company_id: args.company_id, severity: beneficiary === 'mismatch' ? 'warning' : 'info',
+      alert_type: 'payment_review', title: 'إيصال دفع يحتاج مراجعة',
+      message: `العميل ${args.customer_name ?? ''}: ${srcLabel} بمبلغ ${amount} ${currency} — ${reason}.`,
+      metadata: { debt_id, customer_id: args.customer_id, ...matchMeta, ocr }, is_resolved: false,
+    })
+    await addTimeline(svc, callArgs, 'payment', `إيصال بمبلغ ${amount} ${currency} — ${reason}`, ocr)
+    reply = 'وصلنا الإيصال، وبنراجع مطابقته على الحساب ونتأكد من البيانات.'
+  }
+
+  await replyAndLog(svc, callArgs, reply)
+}
+
+// Pure beneficiary-matching for ONE candidate debt — extracted so debt
+// SELECTION (across every open debt a customer has) and beneficiary
+// VERIFICATION (for whichever debt was selected) share the exact same
+// matching rules, never two diverging implementations.
+function matchBeneficiary(
+  d: Record<string, any>,
+  ocr: ReceiptData,
+  accounts: any[],
+): { beneficiary: 'match' | 'mismatch' | 'unknown'; amountOk: boolean; balance: number; currency: string } {
+  const balance = Number(d.current_balance ?? 0)
+  const currency = d.currency ?? ocr.currency ?? 'SAR'
+
   // Only ever match against an account explicitly configured for THIS
   // portfolio (or a company-wide default with no portfolio_id at all) —
   // never fall back to an unrelated portfolio's account just because one
   // happens to exist, which would silently "match" against the wrong
   // company's beneficiary.
-  const acc = (accounts ?? []).find((a: any) => d.portfolio_id && a.portfolio_id === d.portfolio_id)
-    ?? (accounts ?? []).find((a: any) => !a.portfolio_id) ?? null
+  const acc = accounts.find((a: any) => d.portfolio_id && a.portfolio_id === d.portfolio_id)
+    ?? accounts.find((a: any) => !a.portfolio_id) ?? null
 
   const digits = (s: any) => String(s ?? '').replace(/\D/g, '')
   const last4 = (s: any) => digits(s).slice(-4)
@@ -107,119 +305,7 @@ export async function processInboundReceipt(args: {
       : (haveReferenceToCheck ? 'mismatch' : 'unknown')
   }
 
-  // Auto-confirm ONLY when: it's an actual attachment (never a typed-text
-  // claim), the amount is sane, AND the beneficiary genuinely matches a real
-  // reference we hold for this customer/debt. Amount alone is never enough,
-  // and OCR confidence alone is never enough — an "unknown" beneficiary
-  // (no checkable reference at all, or a clear mismatch) always falls to
-  // pending_verification, regardless of how confident the OCR reading was.
-  const autoVerify = args.source !== 'text' && amountOk && ocr.confidence >= 70 && beneficiary === 'match'
-
-  const matchMeta = { beneficiary, amountOk, expected_balance: balance, source: args.source }
-  const noteBits = [
-    `إيصال عبر الواتساب (${srcLabel})`,
-    ocr.reference ? `مرجع: ${ocr.reference}` : '',
-    ocr.invoice_number ? `فاتورة: ${ocr.invoice_number}` : '',
-    ocr.iban_last4 ? `آيبان٤: ${ocr.iban_last4}` : '',
-    ocr.beneficiary_name ? `المستفيد: ${ocr.beneficiary_name}` : '',
-    `مطابقة المستفيد: ${beneficiary}`,
-  ].filter(Boolean).join(' — ')
-
-  // No readable amount (e.g. scanned image-only PDF) → flag for review, never drop.
-  if (!amount) {
-    await svc.from('system_alerts').insert({
-      company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
-      title: 'إيصال يحتاج مراجعة يدوية',
-      message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن تعذّر قراءة المبلغ تلقائياً.`,
-      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr }, is_resolved: false,
-    })
-    await addTimeline(svc, args, 'payment', 'إيصال استُلم — يحتاج مراجعة يدوية (تعذّر قراءة المبلغ)', ocr)
-    await replyAndLog(svc, args, 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
-    return
-  }
-
-  const payDate = (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date)) ? ocr.date : new Date().toISOString().slice(0, 10)
-  const { data: insertedPayment } = await svc.from('payments').insert({
-    company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-    amount, currency,
-    status: autoVerify ? 'completed' : 'pending',
-    payment_date: payDate,
-    verification_status: autoVerify ? 'verified' : 'pending_verification',
-    ocr_data: ocr,
-    notes: noteBits,
-  }).select('id').single()
-
-  let reply: string
-  if (autoVerify && args.debt_id) {
-    // ── FULL PAYMENT CYCLE: debt + promises + timeline all updated ──
-    const newBal = Math.max(0, balance - amount)
-    const upd: Record<string, unknown> = { current_balance: newBal }
-    if (newBal <= 0) upd.status = 'settled'
-    else if (d.status === 'promised' || d.status === 'overdue') upd.status = 'active'
-    await svc.from('debts').update(upd).eq('id', args.debt_id)
-
-    // Any open promise is now kept → mark it so the agent stops chasing it.
-    // 'fulfilled' is NOT a valid promises.status (DB CHECK only allows
-    // pending|kept|broken|rescheduled|partial) — this update has been
-    // silently rejected by Postgres on every single payment ever since
-    // this code was written (Supabase doesn't throw on a CHECK violation
-    // here, it only returns `{ error }`, which was never checked), so
-    // promises never actually left 'pending' after being paid.
-    const { error: promiseUpdErr } = await svc.from('promises')
-      .update({ status: 'kept', fulfilled_at: new Date().toISOString() })
-      .eq('company_id', args.company_id).eq('debt_id', args.debt_id).eq('status', 'pending')
-    if (promiseUpdErr) log.error('failed to mark promise as kept', { error: promiseUpdErr.message, debt_id: args.debt_id })
-
-    await addTimeline(svc, args, 'payment',
-      `سداد مؤكَّد ${amount} ${currency}${newBal <= 0 ? ' — سُدّدت المديونية بالكامل' : ` — المتبقي ${newBal} ${currency}`} (${matchMeta.beneficiary})`, ocr)
-
-    // Attribution: this is the AI confirming a real payment via OCR, with
-    // no human collector involved at all — fully AI-driven. settlement vs
-    // payment depends on whether the debt was actually closed by it.
-    if (insertedPayment?.id) {
-      const { count: msgCount } = await svc.from('messages').select('id', { count: 'exact', head: true })
-        .eq('company_id', args.company_id).eq('customer_id', args.customer_id).eq('debt_id', args.debt_id)
-      const daysToCollect = d.created_at
-        ? Math.max(0, Math.round((Date.now() - new Date(d.created_at).getTime()) / 86_400_000))
-        : undefined
-      await recordAttribution({
-        company_id: args.company_id,
-        event_type: newBal <= 0 ? 'settlement' : 'payment',
-        payment_id: insertedPayment.id,
-        customer_id: args.customer_id,
-        debt_id: args.debt_id,
-        amount,
-        primary_channel: 'ai_reply',
-        primary_actor: 'ai',
-        ai_assisted: true,
-        portfolio_id: d.portfolio_id ?? undefined,
-        touches_before_pay: msgCount ?? undefined,
-        days_to_collect: daysToCollect,
-      })
-    }
-
-    reply = `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
-  } else {
-    // Match incomplete (beneficiary mismatch, unknown, or a typed-text
-    // claim with no attachment to verify) → never auto-verified. Always
-    // pending_verification + a payment_review alert + the same neutral
-    // reply, regardless of which specific reason caused it.
-    const reason = beneficiary === 'mismatch'
-      ? 'بيانات المستفيد/الفاتورة في الإيصال لا تطابق حساب التحصيل'
-      : args.source === 'text'
-        ? 'مطالبة سداد نصية بدون مرفق — لا يمكن التحقق آلياً'
-        : `لا يوجد رقم حساب/سداد/IBAN مطابق في الإيصال (ثقة القراءة ${ocr.confidence}%)`
-    await svc.from('system_alerts').insert({
-      company_id: args.company_id, severity: beneficiary === 'mismatch' ? 'warning' : 'info',
-      alert_type: 'payment_review', title: 'إيصال دفع يحتاج مراجعة',
-      message: `العميل ${args.customer_name ?? ''}: ${srcLabel} بمبلغ ${amount} ${currency} — ${reason}.`,
-      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ...matchMeta, ocr }, is_resolved: false,
-    })
-    await addTimeline(svc, args, 'payment', `إيصال بمبلغ ${amount} ${currency} — ${reason}`, ocr)
-    reply = 'وصلنا الإيصال، وبنراجع مطابقته على الحساب ونتأكد من البيانات.'
-  }
-
-  await replyAndLog(svc, args, reply)
+  return { beneficiary, amountOk, balance, currency }
 }
 
 // Adds a timeline entry so the customer page / history / dashboards reflect the

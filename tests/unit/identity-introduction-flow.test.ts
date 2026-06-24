@@ -231,3 +231,52 @@ describe.each([
     expect(d.reason).not.toMatch(/identity_verification/)
   })
 })
+
+// Full, literal, turn-by-turn proof of the exact sequence requested:
+//   الوكيل: "معي الأخ/الأخت [الاسم]؟"
+//   العميل: "نعم."
+//   الوكيل: يعرّف بنفسه (الاسم + شركة التحصيل + الجهة).
+//   ثم حوار طبيعي عن المديونية — لا هوية، لا قفز لـ"متى بتسدد؟"، لا تكرار.
+// Each turn feeds the previous turn's real output into the next turn's
+// conversation history, exactly like production (waha-webhook accumulates
+// `messages` the same way).
+describe('Full first-contact sequence — turn by turn', () => {
+  it('سلام → تأكيد المستلم → نعم → تعريف كامل → حوار طبيعي، بدون هوية ولا قفز مباشر لمتى بتسدد', async () => {
+    const history: { direction: string; content: string }[] = []
+    mockContext.recent_messages = []
+
+    // Turn 1: customer's first-ever message (doesn't even have to be a greeting).
+    const t1 = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'السلام عليكم' })
+    expect(t1.reason).toBe('greeting_first_contact')
+    expect(t1.message).toBe('وعليكم السلام، معي الأخ/الأخت محمد؟')
+    expect(t1.message).not.toMatch(/هويت|إقامت|متى.*تسدد/)
+    history.push({ direction: 'inbound', content: 'السلام عليكم' }, { direction: 'outbound', content: t1.message })
+
+    // Turn 2: customer confirms — the model decides INTRODUCTION naturally;
+    // simulate a realistic model reply that follows the INTRODUCTION
+    // template (name + creditor + balance, one question).
+    mockContext.recent_messages = [...history].reverse()
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'تعريف بالمديونية بعد تأكيد الهوية',
+      message: 'تمام، أنا خالد من شركة مصدر الرؤية، أتواصل معك من طرف بنك الاختبار بخصوص مبلغ 1,000 ريال. متى تقدر تسدده؟',
+      promised_date: null,
+    })
+    const t2 = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'نعم' })
+    expect(t2.message).toMatch(/خالد/)
+    expect(t2.message).toMatch(/مصدر الرؤية/)
+    expect(t2.message).not.toMatch(/هويت|إقامت/)
+    history.push({ direction: 'inbound', content: 'نعم' }, { direction: 'outbound', content: t2.message })
+
+    // Turn 3: a natural follow-up — proves no identity request, no robotic
+    // "متى بتسدد؟" loop (customer didn't ask anything requiring it), and no
+    // verbatim repeat of turn 2's message.
+    mockContext.recent_messages = [...history].reverse()
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'negotiate', reason: 'العميل يطلب مهلة',
+      message: 'تمام، خذ وقتك، بس حاول ما تتأخر كثير عشان ما يتعقد الملف.', promised_date: null,
+    })
+    const t3 = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'أبغى أشوف وضعي وأرد عليك' })
+    expect(t3.message).not.toBe(t2.message)
+    expect(t3.message).not.toMatch(/هويت|إقامت/)
+  })
+})

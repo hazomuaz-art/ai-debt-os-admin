@@ -22,6 +22,7 @@ let lastReply = ''
 function chain(result: any) {
   const obj: any = {
     eq: () => obj,
+    not: () => obj,
     order: () => obj,
     limit: () => obj,
     select: (..._args: any[]) => obj,
@@ -89,11 +90,11 @@ beforeEach(() => {
 describe('1) SADAD/account-number reference matching (was always "unknown" before)', () => {
   it('an STC receipt whose invoice_number matches the customer sadad_number is auto-verified', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
         account_number: null, creditor_name: 'STC', portfolio_id: 'p-stc', created_at: '2026-01-01',
         metadata: { extra: { sadad_number: '900111222' } },
-      }, error: null,
+      }], error: null,
     }
     tableData.collection_accounts = { data: [], error: null } // STC has none, by design
     mockOcr = emptyOcr({ amount: 500, invoice_number: '900111222', confidence: 90 })
@@ -107,11 +108,11 @@ describe('1) SADAD/account-number reference matching (was always "unknown" befor
 
   it('the SAME receipt amount with a NON-matching invoice_number is never auto-verified', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
         account_number: null, creditor_name: 'STC', portfolio_id: 'p-stc', created_at: '2026-01-01',
         metadata: { extra: { sadad_number: '900111222' } },
-      }, error: null,
+      }], error: null,
     }
     tableData.collection_accounts = { data: [], error: null }
     // A fabricated receipt: right amount, very high OCR confidence, but the
@@ -129,11 +130,11 @@ describe('1) SADAD/account-number reference matching (was always "unknown" befor
 describe('2) amount/confidence alone are never sufficient; no cross-portfolio account fallback', () => {
   it('amount matches and confidence is high, but there is NO reference at all to check → pending_verification (not auto-verified)', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
         account_number: null, creditor_name: 'Some Co', portfolio_id: 'p-x', created_at: '2026-01-01',
         metadata: {},
-      }, error: null,
+      }], error: null,
     }
     tableData.collection_accounts = { data: [], error: null }
     mockOcr = emptyOcr({ amount: 500, confidence: 99 }) // no invoice_number, no reference at all
@@ -147,11 +148,11 @@ describe('2) amount/confidence alone are never sufficient; no cross-portfolio ac
 
   it('a collection_accounts row belonging to a DIFFERENT portfolio is never used as a fallback match', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
         account_number: null, creditor_name: 'STC', portfolio_id: 'p-stc', created_at: '2026-01-01',
         metadata: {},
-      }, error: null,
+      }], error: null,
     }
     // Only an account for an UNRELATED portfolio exists (has a portfolio_id
     // that does not match our debt's portfolio, and is not a null-portfolio
@@ -170,11 +171,11 @@ describe('2) amount/confidence alone are never sufficient; no cross-portfolio ac
 
   it('a text-only claim (no attachment) is NEVER auto-verified even with a perfectly matching reference', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: 'REF-1',
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: 'REF-1',
         account_number: 'ACC-1', creditor_name: 'Some Co', portfolio_id: 'p-x', created_at: '2026-01-01',
         metadata: {},
-      }, error: null,
+      }], error: null,
     }
     tableData.collection_accounts = { data: [], error: null }
     mockOcr = emptyOcr({ amount: 500, reference: 'REF-1', confidence: 95 })
@@ -190,11 +191,11 @@ describe('2) amount/confidence alone are never sufficient; no cross-portfolio ac
 describe('4) insurance IBAN matching still works correctly', () => {
   it('a matching IBAN tail auto-verifies', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
         account_number: null, creditor_name: 'Tawuniya', portfolio_id: 'p-ins', created_at: '2026-01-01',
         metadata: {},
-      }, error: null,
+      }], error: null,
     }
     tableData.collection_accounts = {
       data: [{ method_type: 'bank_transfer', iban: 'SA0011223344556677889900', account_name: 'Tawuniya Insurance', portfolio_id: 'p-ins' }],
@@ -211,11 +212,11 @@ describe('4) insurance IBAN matching still works correctly', () => {
 
   it('a mismatched IBAN tail is never auto-verified', async () => {
     tableData.debts = {
-      data: {
-        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+      data: [{
+        id: 'd1', current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
         account_number: null, creditor_name: 'Tawuniya', portfolio_id: 'p-ins', created_at: '2026-01-01',
         metadata: {},
-      }, error: null,
+      }], error: null,
     }
     tableData.collection_accounts = {
       data: [{ method_type: 'bank_transfer', iban: 'SA0011223344556677889900', account_name: 'Tawuniya Insurance', portfolio_id: 'p-ins' }],
