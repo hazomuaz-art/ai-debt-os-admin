@@ -16,9 +16,7 @@ import { renderMobilyKnowledgeForCaseFile, detectMobilyFieldMeaningQuestion } fr
 import {
   detectSevereDistress, renderDistressReply,
   detectOptOutIntent, renderOptOutConfirmation, setContactOptOut,
-  getCustomerGateState, extractLast4Candidate, nationalIdLast4,
-  recordVerificationAttempt, markVerified, incrementFailedVerification,
-  raiseUrgentHumanAlert, isSafePreVerificationIntent, MAX_VERIFICATION_ATTEMPTS,
+  getCustomerGateState, raiseUrgentHumanAlert,
   setPendingClarification, clearPendingClarification, pickUnusedVariant,
 } from '@/lib/conversation-gates'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -629,84 +627,11 @@ export async function runCollectorAgent(args: {
     return { shouldReply: true, action: 'human_review', reason: 'contact_opt_out', message: renderOptOutConfirmation() }
   }
 
-  // §1 — Identity verification gate. Until verified, no creditor name,
-  // balance, or reference number may be disclosed — even if asked directly
-  // — except for a plain greeting or "من أنت؟", neither of which reveal any
-  // customer-specific data. Comparison is exact-match in code, never an LLM
-  // judgment call.
-  if (gateState.verification_status === 'locked') {
-    return {
-      shouldReply: true, action: 'human_review', reason: 'identity_verification_locked',
-      message: 'ملفك محوّل لفريقنا للمتابعة المباشرة. سيتواصل معك أحد الزملاء قريباً.',
-    }
-  }
-  // The gate must never fire before the agent has introduced itself (name +
-  // company) at least once — a customer can't be expected to hand over an
-  // ID to someone who hasn't said who they are yet. Cheap, isolated check,
-  // independent of the heavier customer-debt-context fetch later in the
-  // pipeline (which isn't built yet at this point in the function).
-  let hasIntroducedBefore = false
-  if (gateState.verification_status === 'unverified') {
-    const { data: introRow } = await createServiceClient()
-      .from('messages').select('id')
-      .eq('customer_id', args.customer_id).eq('direction', 'outbound')
-      .ilike('content', '%خالد%')
-      .limit(1).maybeSingle()
-    hasIntroducedBefore = !!introRow
-  }
-
-  if (
-    gateState.verification_status === 'unverified' &&
-    hasIntroducedBefore &&
-    !isSafePreVerificationIntent({ isGreeting: isGreeting(text), asksWhoAreYou: signals.asksWhoAreYou })
-  ) {
-    const expectedLast4 = nationalIdLast4(gateState.national_id)
-    if (expectedLast4) {
-      const candidate = extractLast4Candidate(text)
-      if (candidate) {
-        const success = candidate === expectedLast4
-        await recordVerificationAttempt({ company_id: args.company_id, customer_id: args.customer_id, field_challenged: 'national_id_last4', success })
-        if (success) {
-          await markVerified(args.customer_id)
-          // Fall through — the rest of the pipeline now runs normally for a verified customer.
-        } else {
-          const newCount = gateState.verification_attempts_count + 1
-          await incrementFailedVerification(args.customer_id, newCount)
-          if (newCount >= MAX_VERIFICATION_ATTEMPTS) {
-            log.warn('identity verification locked after max attempts', { customer_id: args.customer_id })
-            await raiseUrgentHumanAlert({
-              company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-              alert_type: 'identity_verification_locked',
-              title: 'فشل تكرار التحقق من الهوية',
-              message: 'تم تجميد الملف بعد فشل التحقق مرتين — يحتاج مراجعة بشرية قبل أي تواصل آخر.',
-            })
-            return {
-              shouldReply: true, action: 'human_review', reason: 'identity_verification_locked',
-              message: 'ملفك محوّل لفريقنا للمتابعة المباشرة. سيتواصل معك أحد الزملاء قريباً.',
-            }
-          }
-          return {
-            shouldReply: true, action: 'request_clarification', reason: 'identity_verification_failed',
-            message: 'الرقم اللي ذكرته ما يطابق ما عندنا. تأكد وأعطني آخر 4 أرقام من رقم هويتك/إقامتك المسجّل.',
-          }
-        }
-      } else {
-        const identityVariants = [
-          'قبل أي تفاصيل، أحتاج تأكيد هويتك — أعطني آخر 4 أرقام من رقم هويتك أو إقامتك المسجّل لدينا.',
-          'حتى أقدر أكمل معك، أحتاج تأكيد بسيط لهويتك: آخر 4 أرقام من رقم هويتك أو إقامتك.',
-          'لحماية بياناتك، أحتاج أتأكد من هويتك أولاً — ممكن تعطيني آخر 4 أرقام من رقم الهوية أو الإقامة؟',
-        ]
-        const message = (await pickUnusedVariant(args.customer_id, 'identity_verification_required', identityVariants))
-          || identityVariants[0]
-        return {
-          shouldReply: true, action: 'request_clarification', reason: 'identity_verification_required',
-          message,
-        }
-      }
-    }
-    // No national_id on file at all → cannot run this gate; fall through
-    // rather than blocking a real customer forever on data we don't have.
-  }
+  // §1 — Identity verification gate: REMOVED by deliberate decision. The
+  // conversation never asks for a national-ID/iqama last-4 challenge at any
+  // point — recipient confirmation is handled instead by the first-contact
+  // "معي الأخ/الأخت [الاسم]؟" question below, which doesn't require the
+  // customer to disclose anything.
 
   // Fast path: customer ended the chat → stay silent, no cost.
   if (isCloser(text)) {
@@ -912,11 +837,13 @@ export async function runCollectorAgent(args: {
   const lastAgentMessage = prevOutbound[prevOutbound.length - 1] ?? ''
   const hasHistory = chronological.length > 0
 
-  // Pure greeting with NO prior history → light canned reply (true first contact).
-  // If there IS history, fall through to the AI so it uses what was discussed.
-  if (isGreeting(text) && !hasHistory) {
-    // Confirm the recipient by name BEFORE introducing the company — never
-    // jump straight to "تفضل؟" on true first contact, and never the debt.
+  // Absolute first-ever contact (no prior history at all) → the agent's
+  // very first reply is ALWAYS the recipient-confirmation question, no
+  // matter what the customer's first message actually says — never the
+  // debt, never an ID/verification challenge (removed entirely), and never
+  // a direct answer to a question asked in that same first message (that
+  // comes on the NEXT turn, once the recipient is confirmed).
+  if (!hasHistory) {
     const custFirstName = String(ctx.verified_customer_data?.customer_name ?? '').trim().split(' ')[0] || null
     const confirmQ = custFirstName ? `معي الأخ/الأخت ${custFirstName}؟` : 'تفضل؟'
     let msg = `يا هلا بك، ${confirmQ}`

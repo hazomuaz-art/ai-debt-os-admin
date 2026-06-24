@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Proves the Identity/Introduction Flow fix:
-//   - first-ever "السلام عليكم" asks "معي الأخ/الأخت [الاسم]؟", never the ID.
-//   - "انت مين؟" (reversed word order) is recognized and gets the fixed
-//     self-introduction, never the ID request, in the same reply.
-//   - the identity gate never fires before the agent has introduced itself
-//     (no prior outbound message mentioning "خالد") at least once.
-//   - once it does need to ask for the ID, it never repeats the exact same
-//     wording twice in a row (pickUnusedVariant).
+// Proves the Identity/Introduction Flow (identity verification REMOVED
+// entirely, per explicit decision):
+//   - the agent's absolute first-ever reply is ALWAYS the recipient
+//     confirmation question ("معي الأخ/الأخت [الاسم]؟"), regardless of what
+//     the customer's first message actually says — never the debt.
+//   - "انت مين؟" (reversed word order) is recognized and self-introduces.
+//   - NO message, under any circumstance, ever asks for a national-ID/iqama
+//     last-4 — the gate and its DB-backed lock/attempts machinery no longer
+//     exist in the pipeline at all.
+//   - an explicit payment promise is recorded directly — never intercepted
+//     by anything resembling an identity check (the exact regression this
+//     removal fixes: "بسدد أول الشهر" used to get swallowed by the gate).
 
 let mockModelContent = ''
 let mockContext: any = {}
@@ -57,9 +61,7 @@ vi.mock('@/lib/legal-escalation', async () => {
   return { ...actual, getOpenEscalation: vi.fn().mockImplementation(async () => null), openEscalation: vi.fn().mockResolvedValue('esc-1') }
 })
 
-// Controls for the two things this fix actually reads from `customers`/`messages`:
 let mockCustomerRow: any = {}
-let mockHasIntroducedRow: { id: string } | null = null
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn().mockImplementation(() => ({
@@ -75,22 +77,10 @@ vi.mock('@/lib/supabase/server', () => ({
           }),
         }
       }
-      if (table === 'messages') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                ilike: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockHasIntroducedRow, error: null })) }),
-                }),
-              }),
-            }),
-          }),
-        }
-      }
       // Any other table this flow doesn't care about — safe no-op shape.
       return {
         insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
         select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) }) }),
       }
     }),
@@ -111,7 +101,10 @@ function baseContext(overrides: Partial<any> = {}): any {
   }
 }
 
-function unverifiedRow(overrides: Partial<any> = {}) {
+// `verification_status`/`national_id` are still columns in the DB (kept for
+// any future re-enable), but the pipeline never reads them anymore — this
+// fixture intentionally still sets them, to prove the gate ignores them.
+function customerRow(overrides: Partial<any> = {}) {
   return {
     verification_status: 'unverified', verification_attempts_count: 0,
     contact_opt_out: false, pending_clarification: null, national_id: '1234567890',
@@ -123,22 +116,33 @@ function unverifiedRow(overrides: Partial<any> = {}) {
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'sk-test'
   mockContext = baseContext()
-  mockCustomerRow = unverifiedRow()
-  mockHasIntroducedRow = null
+  mockCustomerRow = customerRow()
   mock360 = null
 })
 
-describe('Identity / Introduction flow', () => {
-  it('first-ever "السلام عليكم" asks to confirm the recipient by name — never the ID, never the debt', async () => {
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'السلام عليكم' })
+describe('Identity / Introduction flow (identity verification removed)', () => {
+  it('absolute first-ever contact ALWAYS asks the recipient-confirmation question, even for a non-greeting message', async () => {
+    mockContext.recent_messages = []
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'كم المبلغ المطلوب مني بالضبط؟' })
 
     expect(d.reason).toBe('greeting_first_contact')
     expect(d.message).toContain('معي الأخ/الأخت محمد؟')
-    expect(d.message).not.toMatch(/هويت|رقم هوية|إقامت/)
     expect(d.message).not.toMatch(/1,000|بنك الاختبار/)
+    expect(d.message).not.toMatch(/هويت|رقم هوية|إقامت/)
   })
 
-  it('"انت مين؟" (reversed word order) is recognized and self-introduces — no ID request mixed in', async () => {
+  it('first-ever "السلام عليكم" asks the same confirmation question', async () => {
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'السلام عليكم' })
+
+    expect(d.reason).toBe('greeting_first_contact')
+    expect(d.message).toContain('وعليكم السلام، معي الأخ/الأخت محمد؟')
+  })
+
+  it('"انت مين؟" (reversed word order), AFTER first contact, is recognized and self-introduces — no ID ever requested', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'معي الأخ/الأخت محمد؟' },
+      { direction: 'inbound', content: 'نعم' },
+    ]
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'model_guess', message: 'مرحباً', promised_date: null })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'انت مين؟' })
 
@@ -148,42 +152,42 @@ describe('Identity / Introduction flow', () => {
     expect(d.message).not.toMatch(/هويت|رقم هوية|إقامت/)
   })
 
-  it('the identity gate never fires before the agent has introduced itself at least once', async () => {
-    mockHasIntroducedRow = null // no prior outbound message mentions "خالد" yet
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'ok', message: 'تمام', promised_date: null })
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'متى موعد السداد؟' })
-
-    expect(d.reason).not.toBe('identity_verification_required')
-    expect(d.message).not.toMatch(/هويت|رقم هوية|إقامت/)
-  })
-
-  it('once introduced, the gate DOES ask for the ID on an unrelated message with no 4-digit candidate', async () => {
-    mockHasIntroducedRow = { id: 'intro-1' } // a prior outbound message already said "خالد"
+  it('NO message ever triggers an identity-verification reason/lock, regardless of verification_status on file', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'معي الأخ/الأخت محمد؟' },
+      { direction: 'inbound', content: 'نعم' },
+    ]
+    mockCustomerRow = customerRow({ verification_status: 'locked', verification_attempts_count: 2 })
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'ok', message: 'تمام، فهمتك', promised_date: null })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وليش اعطيك رقم هويتي؟' })
 
-    expect(d.reason).toBe('identity_verification_required')
-    expect(d.action).toBe('request_clarification')
-    expect(d.message).toMatch(/هويت|إقامت/)
+    expect(d.reason).not.toMatch(/identity_verification/)
+    expect(d.action).not.toBe('human_review')
+    expect(d.message).not.toMatch(/هويت|رقم هوية|إقامت|تجميد/)
   })
 
-  it('never repeats the exact same identity-request wording twice in a row', async () => {
-    mockHasIntroducedRow = { id: 'intro-1' }
-    const first = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وليش اعطيك رقم هويتي؟' })
-    const second = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ما بعطيك شي' })
+  it('an explicit payment promise (AFTER first contact) is recorded directly, never intercepted by any identity check (the exact regression fixed)', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'معي الأخ/الأخت محمد؟' },
+      { direction: 'inbound', content: 'نعم' },
+      { direction: 'outbound', content: 'تمام، أنا أتواصل معك من طرف بنك الاختبار بخصوص مبلغ 1,000 ريال. متى تقدر تسدده؟' },
+    ]
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'negotiate', reason: 'model_missed_it',
+      message: 'متى تقدر تسدد؟', promised_date: null,
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد أول الشهر' })
 
-    expect(first.reason).toBe('identity_verification_required')
-    expect(second.reason).toBe('identity_verification_required')
-    expect(second.message).not.toBe(first.message)
+    expect(d.action).toBe('record_promise')
+    expect(d.reason).not.toMatch(/identity_verification/)
+    expect(d.promised_date).toBeTruthy()
   })
 })
 
-// Proves the whole flow is portfolio-agnostic: identical behavior whether
-// the debt belongs to STC, Mobily, or any other portfolio — none of the
-// four fixes (greeting confirmation, reversed who-are-you phrasing,
-// gate-after-introduction, varied ID-request wording) reference
-// isStcPortfolio/isMobilyPortfolio, which aren't even computed yet at the
-// point in the function where the identity gate and the first-contact
-// greeting run.
+// Proves the removal + the new first-contact rule are portfolio-agnostic:
+// identical behavior whether the debt belongs to STC, Mobily, or any other
+// portfolio — neither path references isStcPortfolio/isMobilyPortfolio,
+// which aren't even computed yet at this point in the function.
 describe.each([
   { label: 'STC', portfolioName: 'إس تي سي' },
   { label: 'Mobily', portfolioName: 'موبايلي' },
@@ -196,14 +200,18 @@ describe.each([
     }
   })
 
-  it('first-ever "السلام عليكم" still asks to confirm the recipient by name, not the ID', async () => {
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'السلام عليكم' })
+  it('first-ever contact still asks the confirmation question, never the ID', async () => {
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش الموضوع؟' })
     expect(d.reason).toBe('greeting_first_contact')
     expect(d.message).toContain('معي الأخ/الأخت محمد؟')
     expect(d.message).not.toMatch(/هويت|إقامت/)
   })
 
-  it('"انت مين؟" still self-introduces without an ID request', async () => {
+  it('"انت مين؟" still self-introduces without any ID request', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'معي الأخ/الأخت محمد؟' },
+      { direction: 'inbound', content: 'نعم' },
+    ]
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'model_guess', message: 'مرحباً', promised_date: null })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'انت مين؟' })
     expect(d.reason).toBe('self_introduction')
@@ -211,10 +219,15 @@ describe.each([
     expect(d.message).not.toMatch(/هويت|إقامت/)
   })
 
-  it('the identity gate still never fires before an introduction has been sent', async () => {
-    mockHasIntroducedRow = null
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'ok', message: 'تمام', promised_date: null })
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'متى موعد السداد؟' })
-    expect(d.reason).not.toBe('identity_verification_required')
+  it('an explicit promise is still recorded directly, no identity interference', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'معي الأخ/الأخت محمد؟' },
+      { direction: 'inbound', content: 'نعم' },
+      { direction: 'outbound', content: 'تمام، أنا أتواصل معك من طرف بنك الاختبار بخصوص مبلغ 1,000 ريال. متى تقدر تسدده؟' },
+    ]
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بداية الشهر بسدد' })
+    expect(d.action).toBe('record_promise')
+    expect(d.reason).not.toMatch(/identity_verification/)
   })
 })
