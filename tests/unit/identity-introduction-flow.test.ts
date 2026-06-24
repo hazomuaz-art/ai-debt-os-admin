@@ -22,14 +22,18 @@ vi.mock('@/lib/customer-debt-context', () => ({
   buildCustomerDebtContext: vi.fn().mockImplementation(async () => mockContext),
 }))
 
+let mock360: any = null
+function defaultGroup() {
+  return {
+    debtGroups: [{ portfolio_id: 'p1', portfolio_name: null, portfolio_category: null, company_key: null, debts: [{ id: 'd1', status: 'active' }] }],
+    allDisputes: [], customerDataByPortfolio: {},
+  }
+}
 vi.mock('@/lib/customer-context-engine', async () => {
   const actual = await vi.importActual<any>('@/lib/customer-context-engine')
   return {
     ...actual,
-    buildCustomer360Context: vi.fn().mockImplementation(async () => ({
-      debtGroups: [{ portfolio_id: 'p1', portfolio_name: null, portfolio_category: null, company_key: null, debts: [{ id: 'd1', status: 'active' }] }],
-      allDisputes: [], customerDataByPortfolio: {},
-    })),
+    buildCustomer360Context: vi.fn().mockImplementation(async () => mock360 ?? defaultGroup()),
   }
 })
 
@@ -121,6 +125,7 @@ beforeEach(() => {
   mockContext = baseContext()
   mockCustomerRow = unverifiedRow()
   mockHasIntroducedRow = null
+  mock360 = null
 })
 
 describe('Identity / Introduction flow', () => {
@@ -169,5 +174,47 @@ describe('Identity / Introduction flow', () => {
     expect(first.reason).toBe('identity_verification_required')
     expect(second.reason).toBe('identity_verification_required')
     expect(second.message).not.toBe(first.message)
+  })
+})
+
+// Proves the whole flow is portfolio-agnostic: identical behavior whether
+// the debt belongs to STC, Mobily, or any other portfolio — none of the
+// four fixes (greeting confirmation, reversed who-are-you phrasing,
+// gate-after-introduction, varied ID-request wording) reference
+// isStcPortfolio/isMobilyPortfolio, which aren't even computed yet at the
+// point in the function where the identity gate and the first-contact
+// greeting run.
+describe.each([
+  { label: 'STC', portfolioName: 'إس تي سي' },
+  { label: 'Mobily', portfolioName: 'موبايلي' },
+])('Identity / Introduction flow — portfolio-agnostic ($label)', ({ portfolioName }) => {
+  beforeEach(() => {
+    mockContext.verified_debt_data.portfolio_name = portfolioName
+    mock360 = {
+      debtGroups: [{ portfolio_id: 'p1', portfolio_name: portfolioName, portfolio_category: 'telecom', company_key: null, debts: [{ id: 'd1', status: 'active' }] }],
+      allDisputes: [], customerDataByPortfolio: {},
+    }
+  })
+
+  it('first-ever "السلام عليكم" still asks to confirm the recipient by name, not the ID', async () => {
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'السلام عليكم' })
+    expect(d.reason).toBe('greeting_first_contact')
+    expect(d.message).toContain('معي الأخ/الأخت محمد؟')
+    expect(d.message).not.toMatch(/هويت|إقامت/)
+  })
+
+  it('"انت مين؟" still self-introduces without an ID request', async () => {
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'model_guess', message: 'مرحباً', promised_date: null })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'انت مين؟' })
+    expect(d.reason).toBe('self_introduction')
+    expect(d.message).toMatch(/خالد/)
+    expect(d.message).not.toMatch(/هويت|إقامت/)
+  })
+
+  it('the identity gate still never fires before an introduction has been sent', async () => {
+    mockHasIntroducedRow = null
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'ok', message: 'تمام', promised_date: null })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'متى موعد السداد؟' })
+    expect(d.reason).not.toBe('identity_verification_required')
   })
 })
