@@ -100,6 +100,15 @@ export async function POST(request: NextRequest) {
 
     const from = String(payload?.from ?? '')
     const text = String(payload?.body ?? '')
+    // WAHA sends the message's own send time as a unix-seconds timestamp —
+    // used by the Temporal Intelligence Engine's Shadow Mode comparison
+    // (relative expressions like "بكرة" must resolve from when the customer
+    // actually sent the message, not whenever this webhook happens to run).
+    // Never affects the existing decision pipeline — read-only, additive.
+    const rawTimestamp = Number(payload?.timestamp)
+    const messageTimestamp = Number.isFinite(rawTimestamp) && rawTimestamp > 0
+      ? new Date(rawTimestamp * 1000).toISOString()
+      : new Date().toISOString()
     const mediaUrl: string = payload?.media?.url ?? ''
     const mimetype: string = String(payload?.media?.mimetype ?? '')
     const hasReceiptMedia = !!mediaUrl && (mimetype.startsWith('image/') || mimetype === 'application/pdf')
@@ -176,7 +185,7 @@ export async function POST(request: NextRequest) {
       const { processEvent } = await import('@/lib/automation-pipeline')
 
       const aiDecision = await runCollectorAgent({
-        company_id: c.company_id, customer_id: c.id, debt_id, message: text,
+        company_id: c.company_id, customer_id: c.id, debt_id, message: text, messageTimestamp,
       })
 
       if (aiDecision.shouldReply && aiDecision.message) {
