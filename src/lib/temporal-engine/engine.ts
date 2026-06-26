@@ -33,6 +33,36 @@ const RESOLVERS_IN_PRIORITY_ORDER = [
   approximateResolver,
 ]
 
+// Stub KB for quickScan only — never used for an actual resolution, only to
+// let the resolvers run synchronously without a Supabase round-trip. Empty
+// KB-sourced fields (holidays/govPrograms/spellingVariants/...) don't block
+// a resolver from matching: every resolver returns a non-null match on a
+// recognized PHRASE even when the KB row backing the date itself is empty
+// (e.g. holidayResolver still matches "بعد العيد" and returns a
+// needs_clarification match when kb.holidays is empty) — exactly what
+// quickScan needs: "does this look temporal", not "what's the exact date".
+const QUICK_SCAN_KB: TemporalKnowledgeBase = {
+  kbVersion: 'quick-scan-stub',
+  countryConfig: { countryCode: 'SA', defaultTimezone: 'Asia/Riyadh', defaultCalendar: 'gregorian', weekendDays: [5, 6], defaultSalaryDay: null },
+  spellingVariants: [], holidays: [], govPrograms: [], compositePatterns: [], businessCalendar: [],
+}
+
+// Synchronous, DB-free gate: "does this message look temporal at all?" —
+// the ONLY allowed answer to that question is "did any real resolver match
+// it", using the exact same resolver list/priority order as the full
+// engine. No separate keyword list, no duplicated lexicon — callers that
+// need a cheap pre-filter (e.g. Shadow Mode) call this instead of inventing
+// their own dictionary.
+export function quickScan(rawText: string, messageTimestamp: Date = new Date()): boolean {
+  const ctx: TemporalContext = {
+    messageTimestamp, countryCode: 'SA',
+    companyId: null, portfolioId: null, customerId: null, debtId: null,
+    customerSalaryDay: null,
+  }
+  const normalized = normalizeTemporalText(rawText, QUICK_SCAN_KB)
+  return RESOLVERS_IN_PRIORITY_ORDER.some(resolver => resolver.match(normalized, QUICK_SCAN_KB, ctx) !== null)
+}
+
 export async function runTemporalEngine(
   rawText: string, context: TemporalContext, kb: TemporalKnowledgeBase,
 ): Promise<TemporalResolution> {

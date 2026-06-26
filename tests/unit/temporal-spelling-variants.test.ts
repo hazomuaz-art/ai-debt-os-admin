@@ -17,6 +17,9 @@ vi.mock('openai', () => ({
   })),
 }))
 
+// Phase 1 Shadow Mode now calls the real Temporal Intelligence Engine
+// unconditionally on every runCollectorAgent call — stub it so these tests
+// stay isolated and don't pile up background work across the test process.
 vi.mock('@/lib/customer-debt-context', () => ({
   buildCustomerDebtContext: vi.fn().mockImplementation(async () => mockContext),
 }))

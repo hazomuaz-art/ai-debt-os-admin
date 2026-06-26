@@ -25,12 +25,19 @@ vi.mock('@/lib/logger', () => ({
   }),
 }))
 
-vi.mock('@/lib/temporal-engine', () => ({
-  resolveTemporalExpression: vi.fn().mockImplementation(async () => {
-    if (mockEngineShouldThrow) throw new Error('engine boom')
-    return mockEngineResolution
-  }),
-}))
+vi.mock('@/lib/temporal-engine', async () => {
+  // quickScan is the real implementation — it's a sync, DB-free resolver
+  // scan, safe to run for real in tests. Only resolveTemporalExpression
+  // (which hits Supabase via the KB loader) is mocked.
+  const actual = await vi.importActual<any>('@/lib/temporal-engine')
+  return {
+    ...actual,
+    resolveTemporalExpression: vi.fn().mockImplementation(async () => {
+      if (mockEngineShouldThrow) throw new Error('engine boom')
+      return mockEngineResolution
+    }),
+  }
+})
 
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
@@ -196,13 +203,45 @@ describe('Shadow Mode — structured comparison log', () => {
   })
 })
 
-describe('Shadow Mode — never runs for a non-temporal message', () => {
-  it('a plain non-temporal question never calls the new engine at all', async () => {
+describe('Shadow Mode — gated by quickScan(), the new engine\'s own detector (never the old lexicon)', () => {
+  it('a plain non-temporal question never calls the new engine at all — quickScan() correctly rejects it', async () => {
+    // No resolver in the engine matches this text, so quickScan() returns
+    // false and the shadow comparison never runs — same no-noise guarantee
+    // as before, but the decision now comes from the engine's own resolver
+    // loop instead of the old hasTemporalRef/signals.promise/
+    // hasCommitmentWithVagueTiming lexicon.
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام', promised_date: null })
     await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش الشركة؟' })
     await new Promise(r => setTimeout(r, 0))
 
     expect(logCalls.some(c => c.message.includes('temporal_engine_shadow_comparison'))).toBe(false)
+  })
+
+  it('covers a category the old lexicon has ZERO concept of at all (gov programs) — proves quickScan() closes the diagnosed coverage gap', async () => {
+    // "حساب المواطن" appears nowhere in hasTemporalRef/signals.promise/
+    // hasCommitmentWithVagueTiming — before this fix, this message would
+    // never have reached the shadow comparison.
+    mockEngineResolution = defaultEngineResolution({ reference_type: 'gov_program', resolved_date: '2026-07-10', confidence: 'medium' })
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد حساب المواطن' })
+    await new Promise(r => setTimeout(r, 0))
+
+    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
+    expect(shadowLog).toBeTruthy()
+    expect(shadowLog!.context.new_decision.reference_type).toBe('gov_program')
+    expect(shadowLog!.context.old_decision.hasTemporalRef).toBe(false) // confirms the OLD system was blind to this
+  })
+
+  it('covers a holiday expression the old lexicon also has zero concept of', async () => {
+    mockEngineResolution = defaultEngineResolution({ reference_type: 'holiday', resolved_date: '2026-03-24', confidence: 'medium' })
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد العيد' })
+    await new Promise(r => setTimeout(r, 0))
+
+    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
+    expect(shadowLog).toBeTruthy()
+    expect(shadowLog!.context.new_decision.reference_type).toBe('holiday')
+    expect(shadowLog!.context.old_decision.hasTemporalRef).toBe(false)
   })
 })
 

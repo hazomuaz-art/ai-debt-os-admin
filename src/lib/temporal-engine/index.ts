@@ -3,7 +3,7 @@
 // understand a temporal expression. No other file should contain its own
 // date/time regex or Date math for interpreting customer messages.
 import { loadTemporalKnowledgeBase } from './knowledge-base'
-import { runTemporalEngine } from './engine'
+import { runTemporalEngine, quickScan } from './engine'
 import type { TemporalContext, TemporalResolution } from './types'
 
 export type { TemporalContext, TemporalResolution, ReferenceType, Confidence } from './types'
@@ -17,3 +17,7 @@ export async function resolveTemporalExpression(text: string, context: TemporalC
 // Test-only seam: lets tests inject a fully-controlled KB snapshot instead
 // of hitting Supabase, without changing the public API callers use.
 export { runTemporalEngine as __resolveWithExplicitKnowledgeBaseForTests } from './engine'
+
+// Sync, DB-free "does this look temporal at all" gate — see engine.ts for
+// why this is the only allowed pre-filter (no separate keyword dictionary).
+export { quickScan }
