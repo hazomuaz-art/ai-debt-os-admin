@@ -575,6 +575,12 @@ export async function runCollectorAgent(args: {
   debt_id?: string | null
   message: string
   conversation_history?: HistoryItem[]
+  // When the customer actually sent this message (ISO string) — used ONLY
+  // by the Temporal Intelligence Engine Shadow Mode comparison below; the
+  // existing decision pipeline is untouched and still uses its own
+  // processing-time "today". Optional so every existing caller/test keeps
+  // working unchanged; defaults to "now" if omitted.
+  messageTimestamp?: string
 }): Promise<CollectorDecision> {
   let text = args.message.trim()
   let signals = detectSignals(text)
@@ -1324,6 +1330,67 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
   } else {
     parsed.promised_date = null
     parsed.promise_text = null
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  //  Temporal Intelligence Engine — Phase 1 SHADOW MODE ONLY.
+  //  Runs the new engine in parallel for observability — NEVER reads its
+  //  result into `parsed` (action/message/promised_date are already final
+  //  at this point, set entirely by the logic above). Fire-and-forget: any
+  //  failure here is caught and logged, never thrown, never adds latency to
+  //  the customer-facing reply. Only runs when the message plausibly
+  //  carries a temporal reference, to avoid log noise on unrelated turns.
+  // ════════════════════════════════════════════════════════════════════
+  if (hasTemporalRef(text) || signals.promise || hasCommitmentWithVagueTiming(text)) {
+    const oldDecisionSnapshot = {
+      hasTemporalRef: hasTemporalRef(text),
+      forcedPromise: promiseForcedFromTemporalRef,
+      action: parsed.action,
+      promised_date: parsed.promised_date ?? null,
+      promise_text: parsed.promise_text ?? null,
+    }
+    ;(async () => {
+      try {
+        const { resolveTemporalExpression } = await import('@/lib/temporal-engine')
+        const newDecision = await resolveTemporalExpression(text, {
+          messageTimestamp: args.messageTimestamp ? new Date(args.messageTimestamp) : new Date(),
+          countryCode: 'SA',
+          companyId: args.company_id,
+          portfolioId: resolvedPortfolioId ?? null,
+          customerId: args.customer_id,
+          debtId: args.debt_id ?? null,
+          customerSalaryDay: null,
+        })
+
+        const datesMatch = oldDecisionSnapshot.promised_date === newDecision.resolved_date
+        let mismatchReason: string | null = null
+        if (!datesMatch) {
+          if (!oldDecisionSnapshot.promised_date && newDecision.resolved_date) mismatchReason = 'old_found_nothing_new_resolved_a_date'
+          else if (oldDecisionSnapshot.promised_date && !newDecision.resolved_date) mismatchReason = 'old_forced_a_date_new_needs_clarification_or_unresolved'
+          else mismatchReason = 'both_resolved_but_to_different_dates'
+        }
+
+        log.info('temporal_engine_shadow_comparison', {
+          source_expression: text.slice(0, 200),
+          old_decision: oldDecisionSnapshot,
+          new_decision: {
+            resolved: newDecision.resolved,
+            resolved_date: newDecision.resolved_date,
+            confidence: newDecision.confidence,
+            reference_type: newDecision.reference_type,
+            needs_clarification: newDecision.needs_clarification,
+            clarification_reason: newDecision.clarification_reason,
+          },
+          dates_match: datesMatch,
+          mismatch_reason: mismatchReason,
+          explanation: newDecision.explanation,
+          engine_version: newDecision.engine_version,
+          kb_version: newDecision.kb_version,
+        })
+      } catch (err) {
+        log.error('temporal_engine_shadow_comparison failed — shadow mode only, never affects the live decision', err as Error)
+      }
+    })().catch(() => {})
   }
 
   // ════════════════════════════════════════════════════════════════════

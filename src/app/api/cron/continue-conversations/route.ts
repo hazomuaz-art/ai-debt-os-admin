@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
         customer_id: customerId,
         debt_id: debt.id,
         message: String(last.content ?? ''),
+        messageTimestamp: last.sent_at ?? undefined,
       })
       if (decision.shouldReply && decision.message) {
         const r = await sendWhatsAppMessage({ to: phone, message: decision.message, company_id: last.company_id })
