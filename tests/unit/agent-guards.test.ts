@@ -4,15 +4,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // feed the agent the EXACT "bad" model reply (re-asking an answered question,
 // deflecting to management) and prove the deterministic guards override it.
 let mockModelContent = ''
+// Corrective-regeneration call (see regenerateWithCorrection in
+// ai-collector-agent.ts) — distinct from mockModelContent so tests can prove
+// the guard actually triggered a real second model call, not a static bank
+// pick. Defaults to a generic non-repeating reply.
+let mockRegeneratedMessage = 'تمام، خلنا نمشي بخطوة فعلية مختلفة الحين.'
 let mockContext: any = {}
 
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
     chat: {
       completions: {
-        create: vi.fn().mockImplementation(async () => ({
-          choices: [{ message: { content: mockModelContent } }],
-        })),
+        create: vi.fn().mockImplementation(async (params: any) => {
+          const lastUserContent = params.messages?.[params.messages.length - 1]?.content ?? ''
+          if (typeof lastUserContent === 'string' && lastUserContent.includes('هل هذا النص مكتوب باللهجة السعودية')) {
+            return { choices: [{ message: { content: JSON.stringify({ is_saudi: true, foreign_word: null }) } }] }
+          }
+          if (typeof lastUserContent === 'string' && lastUserContent.includes('ردك السابق على هذه الرسالة كان فيه مشكلة محددة')) {
+            return { choices: [{ message: { content: JSON.stringify({ message: mockRegeneratedMessage }) } }] }
+          }
+          return { choices: [{ message: { content: mockModelContent } }] }
+        }),
       },
     },
   })),
@@ -367,8 +379,9 @@ describe('collector agent — deterministic anti-redundancy guards', () => {
     })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'ظروف صعبة' })
 
-    expect(d.reason).toBe('repeated_question_guard')
+    expect(d.reason).toBe('repeated_question_guard_regenerated')
     expect(d.message).not.toBe('طيب وش سبب تأخرك في السداد بالضبط؟')
+    expect(d.message).toBe(mockRegeneratedMessage)
   })
 })
 

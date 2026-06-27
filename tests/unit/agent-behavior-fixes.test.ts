@@ -18,7 +18,11 @@ vi.mock('openai', () => ({
     chat: {
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
-          lastCreateCallMessages = params.messages
+          // Only capture the main decision call (has a system prompt) — the
+          // dialect backstop / corrective-regeneration calls (see
+          // regenerateWithCorrection / isSaudiDialectLLM in ai-collector-agent.ts)
+          // are single-user-message calls and must not overwrite this.
+          if (params.messages?.[0]?.role === 'system') lastCreateCallMessages = params.messages
           return { choices: [{ message: { content: mockModelContent } }] }
         }),
       },
@@ -121,7 +125,7 @@ describe('أ) payment-pressure fallback never overrides a GREETING/INFO_REQUEST 
     })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'عطني التفاصيل' })
 
-    expect(d.reason).toBe('anti_repetition_guard')
+    expect(d.reason).toBe('anti_repetition_guard_regenerated')
     expect(d.message).not.toMatch(/تسدد|السداد/)
   })
 
@@ -132,7 +136,7 @@ describe('أ) payment-pressure fallback never overrides a GREETING/INFO_REQUEST 
     })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'بسدد بس مو الحين' })
 
-    expect(d.reason).toBe('anti_repetition_guard')
+    expect(d.reason).toBe('anti_repetition_guard_regenerated')
     // NEGOTIATION intent — the payment-oriented pool is allowed to fire here.
   })
 })

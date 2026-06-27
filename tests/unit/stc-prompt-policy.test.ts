@@ -21,7 +21,7 @@ vi.mock('openai', () => ({
     chat: {
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
-          lastCreateCallMessages = params.messages
+          if (params.messages?.[0]?.role === 'system') lastCreateCallMessages = params.messages
           return { choices: [{ message: { content: mockModelContent } }] }
         }),
       },

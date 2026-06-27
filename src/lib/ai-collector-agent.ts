@@ -19,7 +19,7 @@ import {
   getCustomerGateState, extractLast4Candidate, nationalIdLast4,
   recordVerificationAttempt, markVerified, incrementFailedVerification,
   raiseUrgentHumanAlert, isSafePreVerificationIntent, MAX_VERIFICATION_ATTEMPTS,
-  setPendingClarification, clearPendingClarification, pickUnusedVariant,
+  setPendingClarification, clearPendingClarification,
 } from '@/lib/conversation-gates'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
@@ -252,6 +252,19 @@ function detectSignals(text: string) {
       'ما وعدتك', 'مو وعدتك', 'ماوعدتك', 'انا ما وعدت', 'أنا ما وعدت', 'لم اعدك', 'لم أعدك',
       'ما قلت لك بسدد', 'ما قلت بسدد', 'مين قال', 'وين قلت', 'ما اتفقنا', 'متى وعدتك', 'وعدتك متى',
     ]),
+    // Explicit refusal to pay (distinct from deniesDebt — customer here does
+    // NOT dispute the debt exists, they're simply refusing/unwilling, or
+    // demanding contact stop, or escalating to legal/court). Root cause of a
+    // real production incident: with no signal for this, the model kept
+    // re-asking "متى تقدر تسدد؟" after the customer refused outright multiple
+    // times — never escalating, never changing approach.
+    refusesToPay: hasAny(text, [
+      'ما ابغي اسدد', 'ما أبغي اسدد', 'لن اسدد', 'لن أسدد', 'ما ابغى اسدد',
+      'ما اقدر اسدد', 'ما أقدر اسدد', 'ما راح اسدد', 'ما راح أسدد',
+      'لا ترسلون لي', 'لا ترسلوا لي', 'ما عاد تتواصلون معي', 'ما عاد تتصلون',
+      'ارفعوها للمحكمة', 'ارفعوها للمحكمه', 'ارفعها للمحكمة', 'ارفعها للمحكمه',
+      'محكمة', 'المحكمه', 'هرفع شكوى', 'برفع شكوى', 'بشتكي عليكم',
+    ]),
     asksCompany: hasAny(text, [
       'وش الشركة', 'ايش الشركة', 'إيش الشركة', 'مين الشركة', 'اي شركة', 'أي شركة',
       'لمين هذا', 'لصالح مين', 'لحساب مين', 'مين الجهة', 'وش الجهة', 'ايش الجهة',
@@ -295,6 +308,7 @@ function isNonSaudiDialect(reply: string) {
   return hasAny(reply, [
     'عايز', 'عايزة', 'كمان', 'علشان', 'إزاي', 'ازاي', 'كده', 'النهاردة', 'إمبارح',
     'زول', 'كيفنك', 'شديد كتير', 'ياخ بالله',
+    'دلوقتي', 'النهارده', 'امبارح', 'خلاص كده', 'يعني ايه', 'مش كده',
   ])
 }
 
@@ -313,6 +327,73 @@ function isRepeated(reply: string, prevOutbound: string[]) {
     const ratio = Math.min(r.length, old.length) / Math.max(r.length, old.length)
     return ratio >= 0.85 && (old.includes(r) || r.includes(old))
   })
+}
+
+// Real corrective regeneration — replaces the old approach of substituting a
+// canned phrase from a static bank when a guard fires. A static bank only
+// avoids literal-text repetition while still asking the customer the exact
+// same thing in different words (confirmed root cause of a real production
+// incident: 8 differently-worded "متى تقدر تسدد؟" variants in 5 minutes after
+// the customer explicitly refused to pay). This re-invokes the model with an
+// explicit, specific correction note describing exactly what was wrong, so
+// the new reply actually engages with what the customer said instead of
+// reshuffling synonyms. Fails closed to `null` on any error — caller must
+// supply a safe fallback for that case.
+async function regenerateWithCorrection(
+  client: OpenAI, modelId: string, systemPrompt: string, turns: { role: 'user' | 'assistant'; content: string }[],
+  customerText: string, correctionNote: string,
+): Promise<string | null> {
+  try {
+    const ai = await client.chat.completions.create({
+      model: modelId,
+      temperature: 0.5,
+      max_tokens: 200,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...turns,
+        {
+          role: 'user',
+          content: `رسالة العميل الحالية:\n${customerText}\n\n🔴 ردك السابق على هذه الرسالة كان فيه مشكلة محددة يجب تصحيحها الآن:\n${correctionNote}\n\nأعد رداً جديداً يعالج المشكلة أعلاه فعلياً (لا تكرر نفس الفكرة بصياغة أخرى — تعامل مع كلام العميل الحقيقي). أعد JSON فقط: {"message": "الرد المصحَّح"}`,
+        },
+      ],
+    })
+    const obj = extractJson(ai.choices?.[0]?.message?.content ?? '')
+    const msg = obj?.message
+    return typeof msg === 'string' && msg.trim() ? msg.trim() : null
+  } catch (err) {
+    log.error('regenerateWithCorrection failed', err as Error)
+    return null
+  }
+}
+
+// Backstop dialect check via the model's own judgment instead of an
+// ever-incomplete static blacklist (the blacklist in isNonSaudiDialect missed
+// "دلوقتي" — a real production incident where the agent itself used an
+// Egyptian word and the customer correctly called it out). A blacklist can
+// never enumerate every non-Saudi word; asking the model directly "is this
+// Saudi dialect, yes/no, which word if not" generalizes to any word, known
+// or not. Fails OPEN (treats as fine) on any error/parse failure — a verifier
+// outage must never block a reply from reaching the customer.
+async function isSaudiDialectLLM(client: OpenAI, reply: string): Promise<{ ok: boolean; foreignWord: string | null }> {
+  try {
+    const ai = await client.chat.completions.create({
+      model: 'anthropic/claude-haiku-4.5',
+      temperature: 0,
+      max_tokens: 80,
+      response_format: { type: 'json_object' },
+      messages: [{
+        role: 'user',
+        content: `هل هذا النص مكتوب باللهجة السعودية الطبيعية البحتة فقط، بدون أي كلمة أو تعبير من أي لهجة عربية أخرى (مصرية، شامية، خليجية غير سعودية) أو فصحى رسمية؟\n\nالنص: "${reply}"\n\nأعد JSON فقط: {"is_saudi": true أو false, "foreign_word": "الكلمة المخالفة بالضبط أو null"}`,
+      }],
+    })
+    const obj = extractJson(ai.choices?.[0]?.message?.content ?? '')
+    if (!obj || typeof obj.is_saudi !== 'boolean') return { ok: true, foreignWord: null }
+    return { ok: obj.is_saudi, foreignWord: obj.foreign_word ?? null }
+  } catch (err) {
+    log.error('isSaudiDialectLLM check failed — failing open', err as Error)
+    return { ok: true, foreignWord: null }
+  }
 }
 
 // Robustly extract a JSON object even when the model wraps it in markdown
@@ -1157,6 +1238,7 @@ ${text}
 - تاريخ اليوم الحقيقي: ${todayStr}
 ${requestedGraceDays !== null ? `- 🔴 العميل يطلب مهلة تقدّر بـ${requestedGraceDays} يوماً تقريباً. ${requestedGraceDays > 30 ? `هذا يتجاوز الحد الأقصى (30 يوماً) بكثير — ممنوع الموافقة عليه، اعرض مدة أقصر بكثير وفاوضه نزولاً.` : 'هذا ضمن الحد المسموح كحد أقصى، لكن حاول تقصيره أولاً قبل الموافقة الكاملة.'}` : ''}
 ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذكر سبباً محدداً للاعتراض في هذه الرسالة — لا تصعّد، اسأله عن السبب أولاً.' : ''}
+${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح العبارة (أو طلب التوقف عن التواصل / لوّح بالمحكمة). ممنوع تكرار سؤال "متى/كم تقدر تسدد؟" بأي صياغة الآن — تعامل مع رفضه مباشرة: إن لوّح بإجراء قانوني وضّح أن المديونية تبقى مسجّلة وحقه محفوظ، إن طلب التوقف عن التواصل سجّل ذلك واعرض تسجيل اعتراض رسمي إن وُجد سبب، ولا تستمر بنفس أسلوب الضغط للسداد دون تغيير المسار.' : ''}
 
 إن كانت رسالتك الأخيرة سؤالاً وقد أجاب العميل عليه الآن، لا تعد السؤال — انتقل بالمحادثة للأمام.`,
         },
@@ -1740,38 +1822,24 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
             : 'تمام، الوعد مسجّل عندي. بانتظار سدادك.'
           parsed.reason = 'repeated_question_guard_promise_protected'
         } else {
-          // Payment-pressure fallbacks only make sense once the conversation is
-          // actually about negotiating payment. A repeated GREETING/INFO_REQUEST
-          // reply must never be replaced by a payment nudge — that was the exact
-          // cause of the agent pushing "متى تسدد؟" onto a plain greeting or an
-          // info question.
-          const movesNeutral = [
-            'طيب، خلنا نمشي قدام — وش تحتاج تعرفه أكثر؟',
-            'تمام، وضّح لي بس وش المطلوب بالضبط؟',
-            'خلاص، فهمت. عندك أي سؤال آخر؟',
-            'تمام، استوعبت. في شي ثاني تبي تعرفه؟',
-            'ماشي، الكلام واضح. تحتاج أي توضيح إضافي؟',
-          ]
-          const movesPayment = [
-            'طيب، خلنا نمشي قدام — وش الخطوة اللي تناسبك الحين؟',
-            'تمام، الموضوع يحتاج حل. وش تقترح؟',
-            'فهمت عليك. تبي نرتّب طريقة السداد؟',
-            'خلاص، فهمت وضعك. إيش الحل اللي يناسبك من جهتك؟',
-            'طيب، بدال ما نكرر نفس الكلام — وش تقدر تسوي الحين؟',
-            'تمام. خلنا نركّز على الخطوة الجاية، وش رأيك؟',
-            'فهمتك. بس محتاجين نتفق على شي عملي الحين.',
-            'ماشي، الكلام واضح. طيب وش القرار من جهتك؟',
-            'تمام، استوعبت كل اللي قلته. الحين وش الخطة؟',
-            'طيب، خلنا نوصل لشي ملموس — وش تقترح؟',
-            'فهمت، بس لازم نتحرك للأمام. وش رايك نسوي؟',
-            'تمام، واضح كلامك. إيش اللي يناسبك كخطوة قادمة؟',
-            'خلاص فهمت الموضوع. طيب وش الحل من ناحيتك؟',
-            'ماشي، بس نحتاج نقرر شي الحين — وش تشوف؟',
-            'تمام، استلمت كلامك. وش الخطوة اللي نقدر نمشي بها؟',
-          ]
-          const moves = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? movesNeutral : movesPayment
-          parsed.message = await pickUnusedVariant(args.customer_id, 'repeated_question', moves)
-          parsed.reason = 'repeated_question_guard'
+          // Real corrective regeneration instead of a static phrase bank — a
+          // bank only varies the WORDING while asking the customer the exact
+          // same thing again, which is the literal complaint this fixes.
+          const note = signals.refusesToPay
+            ? 'كررت سؤال السداد بصياغة قريبة من ردك السابق، والعميل رفض السداد بصريح العبارة من قبل — لا تسأل عن موعد/مقدار السداد مرة أخرى، تعامل مع رفضه مباشرة (وضّح حقه المحفوظ أو اعرض تسجيل اعتراض رسمي).'
+            : 'كررت سؤالاً سبق أن طرحته بصياغة مشابهة جداً — راجع رسائل العميل السابقة وانتقل للخطوة التالية الفعلية بدل إعادة نفس السؤال.'
+          const corrected = await regenerateWithCorrection(client, modelId, systemPrompt, turns, text, note)
+          if (corrected) {
+            parsed.message = corrected
+            parsed.reason = 'repeated_question_guard_regenerated'
+          } else {
+            // Regeneration itself failed (API error) — last-resort neutral
+            // line, logged distinctly so a recurring failure here is visible.
+            parsed.message = (intent === 'GREETING' || intent === 'INFO_REQUEST')
+              ? 'تمام، وضّح لي بس وش المطلوب بالضبط؟'
+              : 'فهمت كلامك، بس محتاجين نتفق على خطوة عملية الحين — وش رأيك؟'
+            parsed.reason = 'repeated_question_guard_regeneration_failed'
+          }
         }
       }
     }
@@ -1791,33 +1859,6 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
 
   if (isRobotic(parsed.message) || isRepeated(parsed.message, prevOutbound)) {
     log.warn('anti-repetition guard fired', { intent, original: parsed.message.slice(0, 80) })
-    // Same fix as guard (C) above: a greeting or an info-request reply that
-    // happens to look "robotic"/repeated must never be force-replaced with a
-    // payment nudge — only NEGOTIATION/GENERAL/DISPUTE/INTRODUCTION turns are
-    // actually about pushing payment forward.
-    const fallbacksNeutral = [
-      'طيب، تفضل — وش تحتاج؟',
-      'تمام، أنا موجود. عندك أي استفسار آخر؟',
-      'خلاص، فهمت. في شي ثاني أساعدك فيه؟',
-      'تمام، تفضل بسؤالك.',
-      'ماشي، وضّح لي بس وش المطلوب.',
-    ]
-    const fallbacksPayment = [
-      'طيب، وش تبي نسوي بخصوص الموضوع؟',
-      'تمام، خلنا نمشي قدام. وش الخطوة الجاية من عندك؟',
-      'فهمت عليك. تبي نتكلم عن طريقة السداد؟',
-      'ماشي، بس أبي أعرف متى تقدر تسدد؟',
-      'أوكي، بس الموضوع يحتاج حل. متى نتوقع السداد؟',
-      'تمام، بس محتاج جواب محدد منك. وش تشوف؟',
-      'فهمت، بس الملف يحتاج حل قريب. وش رايك؟',
-      'ماشي، خلنا نحدد خطوة عملية الحين.',
-      'أوكي، بس وضّح لي وش الخطة من جهتك؟',
-      'تمام، استوعبت. بس وش الحل اللي تقترحه؟',
-      'طيب، نحتاج نقفل هالموضوع. متى ممكن تسدد؟',
-      'فهمتك، بس خلنا نمشي بخطوة فعلية الحين.',
-      'ماشي، بس أبغى أعرف القرار النهائي منك.',
-      'تمام، وش رايك نرتّب موعد سداد واضح؟',
-    ]
     // A promise already exists (on file, or just force-recorded above) →
     // never fall back to a "when will you pay" payment nudge here either.
     if (openPromiseRec || promiseForcedFromTemporalRef) {
@@ -1828,10 +1869,51 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
       parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
       parsed.reason = 'anti_repetition_guard_promise_protected'
     } else {
-      const fallbacks = (intent === 'GREETING' || intent === 'INFO_REQUEST') ? fallbacksNeutral : fallbacksPayment
-      parsed.message = await pickUnusedVariant(args.customer_id, 'anti_repetition', fallbacks)
-      parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
-      parsed.reason = 'anti_repetition_guard'
+      // Real corrective regeneration instead of a static phrase bank — see
+      // regenerateWithCorrection's doc comment for why a bank doesn't fix this.
+      const isRoboticHit = isRobotic(parsed.message)
+      const note = isRoboticHit
+        ? 'ردك السابق كان آلياً/فصيحاً أو بلهجة غير سعودية — أعد الصياغة بلهجة سعودية طبيعية بحتة، وبأسلوب إنسان حقيقي لا روبوت.'
+        : signals.refusesToPay
+          ? 'ردك السابق كرر سؤال السداد بعد رفض العميل الصريح للسداد من قبل — لا تسأل عن موعد/مقدار السداد مرة أخرى، تعامل مع رفضه مباشرة.'
+          : 'ردك السابق يكرر معنى رد سابق لك في نفس المحادثة — لا تعد نفس الفكرة بصياغة أخرى، تعامل مع كلام العميل الحالي تحديداً.'
+      const corrected = await regenerateWithCorrection(client, modelId, systemPrompt, turns, text, note)
+      if (corrected) {
+        parsed.message = corrected
+        parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+        parsed.reason = 'anti_repetition_guard_regenerated'
+      } else {
+        parsed.message = (intent === 'GREETING' || intent === 'INFO_REQUEST')
+          ? 'تمام، تفضل بسؤالك.'
+          : 'فهمت كلامك، بس محتاجين نتفق على شي عملي الحين — وش رأيك؟'
+        parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+        parsed.reason = 'anti_repetition_guard_regeneration_failed'
+      }
+    }
+  }
+
+  // Final dialect backstop — runs on whatever message will actually be sent
+  // (original or regenerated above). isNonSaudiDialect's static blacklist
+  // already ran as part of isRobotic() above; this is the LLM-judgment layer
+  // that catches words the blacklist doesn't know about yet (e.g. "دلوقتي" —
+  // a real incident where the agent itself used an Egyptian word and the
+  // customer correctly called it out as non-Saudi).
+  if (parsed.shouldReply && parsed.message.trim()) {
+    const dialectCheck = await isSaudiDialectLLM(client, parsed.message)
+    if (!dialectCheck.ok) {
+      log.warn('dialect guard fired — non-Saudi word detected by LLM check', {
+        foreign_word: dialectCheck.foreignWord, original: parsed.message.slice(0, 80),
+      })
+      const corrected = await regenerateWithCorrection(
+        client, modelId, systemPrompt, turns, text,
+        `ردك السابق فيه كلمة أو تعبير من لهجة غير سعودية${dialectCheck.foreignWord ? ` ("${dialectCheck.foreignWord}")` : ''} — أعد الصياغة كاملة بلهجة سعودية بيضاء طبيعية بحتة، بدون أي كلمة من أي لهجة عربية أخرى.`,
+      )
+      if (corrected) {
+        parsed.message = corrected
+        parsed.reason = 'dialect_guard_regenerated'
+      } else {
+        log.error('dialect_guard regeneration failed — sending original despite flagged word', new Error('regeneration_failed'))
+      }
     }
   }
 
