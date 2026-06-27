@@ -123,7 +123,7 @@ async function detectTemporalRefStructured(
 ): Promise<{ has_temporal_ref: boolean; resolved_date: string | null; confidence: number } | null> {
   try {
     const r = await client.chat.completions.create({
-      model: 'anthropic/claude-haiku-4.5',
+      model: 'anthropic/claude-sonnet-4.6',
       temperature: 0,
       max_tokens: 120,
       response_format: { type: 'json_object' },
@@ -686,58 +686,12 @@ export async function runCollectorAgent(args: {
     return { shouldReply: true, action: 'human_review', reason: 'contact_opt_out', message: renderOptOutConfirmation() }
   }
 
-  // §1 — Identity verification gate. Until verified, no creditor name,
-  // balance, or reference number may be disclosed — even if asked directly
-  // — except for a plain greeting or "من أنت؟", neither of which reveal any
-  // customer-specific data. Comparison is exact-match in code, never an LLM
-  // judgment call.
-  if (gateState.verification_status === 'locked') {
-    return {
-      shouldReply: true, action: 'human_review', reason: 'identity_verification_locked',
-      message: 'ملفك محوّل لفريقنا للمتابعة المباشرة. سيتواصل معك أحد الزملاء قريباً.',
-    }
-  }
-  if (gateState.verification_status === 'unverified' && !isSafePreVerificationIntent({ isGreeting: isGreeting(text), asksWhoAreYou: signals.asksWhoAreYou })) {
-    const expectedLast4 = nationalIdLast4(gateState.national_id)
-    if (expectedLast4) {
-      const candidate = extractLast4Candidate(text)
-      if (candidate) {
-        const success = candidate === expectedLast4
-        await recordVerificationAttempt({ company_id: args.company_id, customer_id: args.customer_id, field_challenged: 'national_id_last4', success })
-        if (success) {
-          await markVerified(args.customer_id)
-          // Fall through — the rest of the pipeline now runs normally for a verified customer.
-        } else {
-          const newCount = gateState.verification_attempts_count + 1
-          await incrementFailedVerification(args.customer_id, newCount)
-          if (newCount >= MAX_VERIFICATION_ATTEMPTS) {
-            log.warn('identity verification locked after max attempts', { customer_id: args.customer_id })
-            await raiseUrgentHumanAlert({
-              company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-              alert_type: 'identity_verification_locked',
-              title: 'فشل تكرار التحقق من الهوية',
-              message: 'تم تجميد الملف بعد فشل التحقق مرتين — يحتاج مراجعة بشرية قبل أي تواصل آخر.',
-            })
-            return {
-              shouldReply: true, action: 'human_review', reason: 'identity_verification_locked',
-              message: 'ملفك محوّل لفريقنا للمتابعة المباشرة. سيتواصل معك أحد الزملاء قريباً.',
-            }
-          }
-          return {
-            shouldReply: true, action: 'request_clarification', reason: 'identity_verification_failed',
-            message: 'الرقم اللي ذكرته ما يطابق ما عندنا. تأكد وأعطني آخر 4 أرقام من رقم هويتك/إقامتك المسجّل.',
-          }
-        }
-      } else {
-        return {
-          shouldReply: true, action: 'request_clarification', reason: 'identity_verification_required',
-          message: 'قبل أي تفاصيل، أحتاج تأكيد هويتك — أعطني آخر 4 أرقام من رقم هويتك أو إقامتك المسجّل لدينا.',
-        }
-      }
-    }
-    // No national_id on file at all → cannot run this gate; fall through
-    // rather than blocking a real customer forever on data we don't have.
-  }
+  // §1 — Identity verification gate REMOVED entirely per the owner's explicit,
+  // repeated business decision: the agent must NEVER ask the customer for ID
+  // last-4 ("قبل أي تفاصيل، أحتاج تأكيد هويتك ...") on any portfolio. First
+  // contact confirms the recipient by name instead (handled in the prompt /
+  // introduction flow), and the pipeline proceeds normally without an ID
+  // challenge. (Deliberate trade-off accepted by the owner.)
 
   // Fast path: customer ended the chat → stay silent, no cost.
   if (isCloser(text)) {
