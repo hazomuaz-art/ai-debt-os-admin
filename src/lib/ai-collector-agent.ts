@@ -1103,6 +1103,8 @@ ${signals.asksWhyAmountChanged && ctx.verified_debt_data?.original_amount != nul
 ${intentPrompts[intent]}
 
 ═══════════════ قائمة تحقّق إلزامية قبل كل رد ═══════════════
+0. 🔴🔴🔴 ممنوع منعاً باتاً تجاهل سؤال العميل أو طلبه. اقرأ رسالته كاملة، حلّلها، افهم المقصود، ثم **أجب على ما سأل عنه أولاً** قبل أي شيء. لو سأل "ايش المنتج؟" أجب عن المنتج من ملف القضية. ممنوع القفز لموضوع آخر (السداد، الوعد، التعريف بنفسك) قبل الإجابة على سؤاله الفعلي. حتى لو كان عنده وعد سداد قديم مسجّل، أجب على سؤاله الحالي أولاً ثم — إن لزم — ذكّره بوعده؛ لا تستبدل الإجابة بتأكيد الوعد.
+0.1 🔴🔴 ممنوع منعاً باتاً أن تطلب من العميل تأكيد هويته أو رقم هويته أو آخر أرقام من الهوية/الإقامة أو أي تحقق من شخصيته — لا تطلب ذلك إطلاقاً تحت أي ظرف ولأي شركة. تعامل مباشرة مع من يكاتبك بلا أي طلب تحقق هوية.
 1. اقرأ المحادثة السابقة كاملة: ما آخر سؤال سألته أنت؟ هل أجاب العميل عليه؟ لا تعد طرح سؤال مُجاب.
 2. راجع "ما تم الاتفاق عليه": لا تتجاهل وعداً قائماً أو تقسيطاً معتمداً.
 3. لا تخترع أي رقم/اسم/تاريخ غير موجود في ملف القضية. لكن قبل أن تقول "ما عندي معلومة" أو "بحوّلها للإدارة"، راجع ملف القضية كاملاً جيداً — أغلب المعلومات (الجهة، المنتج، الرصيد، الرقم المرجعي، التواريخ، الملاحظات) موجودة فيه فعلاً. التحويل للإدارة فقط عند معلومة غير موجودة حقاً في الملف، أو قرار يحتاج صلاحية إدارية (${isStcPortfolio ? 'تخفيض، قبول اعتراض' : 'تخفيض، تصعيد قانوني، قبول اعتراض'}).
@@ -1742,14 +1744,31 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       const overlap = inter / Math.max(1, Math.min(a.size, b.size))
       if (a.size >= 3 && overlap >= 0.6) {
         log.warn('repeated-question guard fired', { overlap: Number(overlap.toFixed(2)), original: parsed.message.slice(0, 80) })
-        // A promise already exists (on file, or just force-recorded above) →
-        // never inject a "when will you pay" fallback; only ever confirm it.
-        if (openPromiseRec || promiseForcedFromTemporalRef) {
+        // A promise already exists, BUT we must NEVER ignore a question the
+        // customer just asked. If their current message asks something
+        // (product, details, company, "why", any question), answer THAT —
+        // re-generating a real reply — and only avoid re-asking payment
+        // timing. Substituting a bare "your promise is recorded" over a real
+        // question was a confirmed production bug (customer asked "ايش المنتج؟"
+        // twice and got "الوعد مسجّل..." both times).
+        const customerAskedSomething =
+          isQ(text) || signals.asksDetails || signals.asksCompany || signals.asksWhoAreYou || signals.asksWhyAmountChanged
+        if ((openPromiseRec || promiseForcedFromTemporalRef) && !customerAskedSomething) {
           const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
           parsed.message = dt
             ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك.`
             : 'تمام، الوعد مسجّل عندي. بانتظار سدادك.'
           parsed.reason = 'repeated_question_guard_promise_protected'
+        } else if (openPromiseRec || promiseForcedFromTemporalRef) {
+          // Promise on file AND the customer asked something → answer their
+          // question; do not re-ask timing, do not parrot the promise.
+          const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
+          const corrected = await regenerateWithCorrection(
+            client, modelId, systemPrompt, turns, text,
+            `العميل سأل سؤالاً محدداً في رسالته الحالية ويجب أن تجيب عليه من ملف القضية مباشرة (لا تتجاهله). يوجد وعد سداد مسجّل مسبقاً${dt ? ` بتاريخ ${dt}` : ''} — لذلك لا تعيد سؤاله متى يسدد، لكن أجب على سؤاله الحالي أولاً وبشكل كامل.`,
+          )
+          parsed.message = corrected ?? parsed.message
+          parsed.reason = corrected ? 'repeated_question_guard_answered_with_promise_on_file' : 'repeated_question_guard_regeneration_failed'
         } else {
           // Real corrective regeneration instead of a static phrase bank — a
           // bank only varies the WORDING while asking the customer the exact
@@ -1788,15 +1807,28 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
 
   if (isRobotic(parsed.message) || isRepeated(parsed.message, prevOutbound)) {
     log.warn('anti-repetition guard fired', { intent, original: parsed.message.slice(0, 80) })
-    // A promise already exists (on file, or just force-recorded above) →
-    // never fall back to a "when will you pay" payment nudge here either.
-    if (openPromiseRec || promiseForcedFromTemporalRef) {
+    // Same rule as the repeated-question guard: never bury a real customer
+    // question under a "your promise is recorded" line. Only substitute the
+    // promise confirmation when the customer did NOT ask anything.
+    const askedQ = /[؟?]/.test(text) || /(متى|كم|وش|ايش|إيش|مين|ليش|ليه|هل|أي\s|اي\s|كيف)/.test(text)
+    const customerAskedSomething =
+      askedQ || signals.asksDetails || signals.asksCompany || signals.asksWhoAreYou || signals.asksWhyAmountChanged
+    if ((openPromiseRec || promiseForcedFromTemporalRef) && !customerAskedSomething) {
       const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
       parsed.message = dt
         ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك.`
         : 'تمام، الوعد مسجّل عندي. بانتظار سدادك.'
       parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
       parsed.reason = 'anti_repetition_guard_promise_protected'
+    } else if (openPromiseRec || promiseForcedFromTemporalRef) {
+      const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
+      const corrected = await regenerateWithCorrection(
+        client, modelId, systemPrompt, turns, text,
+        `العميل سأل سؤالاً محدداً في رسالته الحالية ويجب أن تجيب عليه من ملف القضية مباشرة (لا تتجاهله). يوجد وعد سداد مسجّل مسبقاً${dt ? ` بتاريخ ${dt}` : ''} — لا تعيد سؤاله متى يسدد، لكن أجب على سؤاله الحالي أولاً وبشكل كامل.`,
+      )
+      parsed.message = corrected ?? parsed.message
+      parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
+      parsed.reason = corrected ? 'anti_repetition_guard_answered_with_promise_on_file' : 'anti_repetition_guard_regeneration_failed'
     } else {
       // Real corrective regeneration instead of a static phrase bank — see
       // regenerateWithCorrection's doc comment for why a bank doesn't fix this.

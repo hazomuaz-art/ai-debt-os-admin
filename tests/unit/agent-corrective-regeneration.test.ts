@@ -175,6 +175,47 @@ describe('Real incident — agent itself used a non-Saudi word ("دلوقتي")'
   })
 })
 
+describe('Real incident — customer question must never be buried by a promise confirmation', () => {
+  it('customer asks "ايش المنتج؟" while an old promise is on file → answers the question, does NOT parrot the promise', async () => {
+    // Exact production bug (Mobily, 2026-06-27): customer asked "المنتج ايش؟"
+    // twice; agent replied "تمام، الوعد مسجّل عندي بتاريخ 2026-07-10" both times,
+    // ignoring the question. The repeated-question / anti-repetition guards
+    // substituted the promise confirmation over a real info question.
+    mockContext = baseContext([
+      { direction: 'outbound', content: 'وش المنتج اللي تسأل عنه بالضبط؟' },
+      { direction: 'inbound', content: 'المنتج' },
+    ])
+    mockContext.recent_promises = [{ promised_date: '2026-07-10', status: 'pending' }]
+    // Model reply is itself a question (triggers the repeated-question guard).
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'وش المنتج اللي تقصده بالضبط؟' })
+    mockRegeneratedMessage = 'منتجك هو شريحة بيانات Postpaid عند موبايلي، والمبلغ المتأخر عليها 789 ريال.'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ايش المنتج مافهمت' })
+
+    // Must NOT be the bare promise confirmation; must answer the question.
+    expect(d.message).not.toMatch(/الوعد مسجّل/)
+    expect(d.reason).not.toBe('repeated_question_guard_promise_protected')
+    expect(d.reason).not.toBe('anti_repetition_guard_promise_protected')
+  })
+
+  it('customer who is NOT asking anything (pure stall) still gets the promise confirmation when a promise is on file', async () => {
+    mockContext = baseContext([
+      { direction: 'outbound', content: 'متى تقدر تسدد بالضبط؟' },
+      { direction: 'inbound', content: 'بعدين' },
+    ])
+    mockContext.recent_promises = [{ promised_date: '2026-07-10', status: 'pending' }]
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'طيب متى تقدر تسدد بالضبط؟' })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'والله مشغول هاليومين' })
+
+    // A promise is on file and the customer isn't asking anything → the agent
+    // must NOT re-ask the date; it confirms the existing promise instead.
+    // (Handled by the earlier promise_on_file_no_reask guard.)
+    expect(d.message).not.toMatch(/متى تقدر تسدد/)
+    expect(d.message).toMatch(/2026-07-10|مسجّل/)
+  })
+})
+
 describe('Root fix — all customer replies routed through Sonnet (not Haiku)', () => {
   it('a routine GENERAL intent reply uses Sonnet, never Haiku', async () => {
     mockContext = baseContext([])
