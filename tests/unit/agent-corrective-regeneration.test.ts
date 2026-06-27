@@ -13,14 +13,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 //   2. The anti-repetition/repeated-question guards substituted a STATIC BANK
 //      of ~14-15 pre-written phrases (all meaning "when will you pay?" in
 //      different words) instead of actually regenerating a contextual reply.
-//   3. isNonSaudiDialect was a static blacklist that didn't include "دلوقتي"
-//      (or any word not explicitly enumerated) — now backed by an LLM-judged
-//      check (isSaudiDialectLLM) that catches ANY non-Saudi word, known or not.
+//   3. Dialect drift ("شنو", "دلوقتي") was caused by routing routine intents
+//      to Haiku, which ignores the Saudi-dialect instruction. A post-hoc LLM
+//      dialect filter was tried and REMOVED (it false-flagged normal Arabic
+//      words like "محصّل"/"رصيد" in production). Root fix: all replies now go
+//      through Sonnet, which follows the dialect constraint. The cheap static
+//      isNonSaudiDialect blacklist (incl. "دلوقتي") remains as a safe catch.
 
 let mockModelContent = ''
 let mockRegeneratedMessage = ''
-let dialectCheckResponse = { is_saudi: true, foreign_word: null as string | null }
 let createCallCount = 0
+let capturedModels: string[] = []
 let mockContext: any = {}
 
 vi.mock('openai', () => ({
@@ -29,10 +32,8 @@ vi.mock('openai', () => ({
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
           createCallCount++
+          capturedModels.push(params.model)
           const lastUserContent = params.messages?.[params.messages.length - 1]?.content ?? ''
-          if (typeof lastUserContent === 'string' && lastUserContent.includes('هل هذا النص مكتوب باللهجة السعودية')) {
-            return { choices: [{ message: { content: JSON.stringify(dialectCheckResponse) } }] }
-          }
           if (typeof lastUserContent === 'string' && lastUserContent.includes('ردك السابق على هذه الرسالة كان فيه مشكلة محددة')) {
             return { choices: [{ message: { content: JSON.stringify({ message: mockRegeneratedMessage }) } }] }
           }
@@ -109,8 +110,8 @@ function baseContext(recentMessages: { direction: string; content: string }[]): 
 
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'sk-test'
-  dialectCheckResponse = { is_saudi: true, foreign_word: null }
   createCallCount = 0
+  capturedModels = []
 })
 
 describe('Real incident — repeated "متى تقدر تسدد؟" after explicit refusal', () => {
@@ -160,29 +161,32 @@ describe('Real incident — agent itself used a non-Saudi word ("دلوقتي")'
     expect(d.message).toBe(mockRegeneratedMessage)
   })
 
-  it('the LLM dialect backstop catches a non-Saudi word NOT in the static blacklist', async () => {
+  it('a genuinely Saudi reply with normal Arabic words is NOT falsely flagged (no broken dialect filter)', async () => {
+    // Regression guard for the removed isSaudiDialectLLM backstop, which in
+    // production false-flagged normal Arabic words ("محصّل", "رصيد",
+    // "المديونية", "قيد", "الاعتراض") and regenerated needlessly. A clean
+    // Saudi reply must pass through untouched.
     mockContext = baseContext([])
-    // "برضو" (Egyptian for "also/too") is deliberately NOT in isNonSaudiDialect's
-    // static list — proves the LLM-judged backstop generalizes beyond any
-    // fixed enumeration, which is the whole point of this layer.
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، برضو محتاج أعرف وضعك الحين.' })
-    dialectCheckResponse = { is_saudi: false, foreign_word: 'برضو' }
-    mockRegeneratedMessage = 'تمام، بس برضه محتاج أعرف وضعك الحين.'.replace('برضه', 'كذلك') // a genuinely corrected Saudi-only reply
-    mockRegeneratedMessage = 'تمام، محتاج أعرف وضعك الحين.'
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، عندك رصيد متأخر والمديونية قيد المراجعة. متى تقدر تسدد؟' })
 
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وضعي صعب' })
 
-    expect(d.reason).toBe('dialect_guard_regenerated')
-    expect(d.message).toBe(mockRegeneratedMessage)
+    expect(d.message).toBe('تمام، عندك رصيد متأخر والمديونية قيد المراجعة. متى تقدر تسدد؟')
   })
+})
 
-  it('a genuinely Saudi reply is left untouched by the dialect backstop (fails open / no false positives)', async () => {
+describe('Root fix — all customer replies routed through Sonnet (not Haiku)', () => {
+  it('a routine GENERAL intent reply uses Sonnet, never Haiku', async () => {
     mockContext = baseContext([])
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، فاهم وضعك. متى تقدر تسدد؟' })
-    dialectCheckResponse = { is_saudi: true, foreign_word: null }
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، عندك مديونية متأخرة. متى تقدر تسدد؟' })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وضعي صعب' })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش وضع حسابي' })
 
-    expect(d.message).toBe('تمام، فاهم وضعك. متى تقدر تسدد؟')
+    // Production root cause: Haiku ignored the Saudi-dialect instruction and
+    // emitted "شنو"/"دلوقتي". Every customer-facing decision call must now
+    // use Sonnet.
+    expect(capturedModels.length).toBeGreaterThan(0)
+    expect(capturedModels.every(m => m === 'anthropic/claude-sonnet-4.6')).toBe(true)
+    expect(capturedModels).not.toContain('anthropic/claude-haiku-4.5')
   })
 })

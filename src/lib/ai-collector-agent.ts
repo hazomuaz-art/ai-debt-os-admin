@@ -367,35 +367,6 @@ async function regenerateWithCorrection(
   }
 }
 
-// Backstop dialect check via the model's own judgment instead of an
-// ever-incomplete static blacklist (the blacklist in isNonSaudiDialect missed
-// "دلوقتي" — a real production incident where the agent itself used an
-// Egyptian word and the customer correctly called it out). A blacklist can
-// never enumerate every non-Saudi word; asking the model directly "is this
-// Saudi dialect, yes/no, which word if not" generalizes to any word, known
-// or not. Fails OPEN (treats as fine) on any error/parse failure — a verifier
-// outage must never block a reply from reaching the customer.
-async function isSaudiDialectLLM(client: OpenAI, reply: string): Promise<{ ok: boolean; foreignWord: string | null }> {
-  try {
-    const ai = await client.chat.completions.create({
-      model: 'anthropic/claude-haiku-4.5',
-      temperature: 0,
-      max_tokens: 80,
-      response_format: { type: 'json_object' },
-      messages: [{
-        role: 'user',
-        content: `هل هذا النص مكتوب باللهجة السعودية الطبيعية البحتة فقط، بدون أي كلمة أو تعبير من أي لهجة عربية أخرى (مصرية، شامية، خليجية غير سعودية) أو فصحى رسمية؟\n\nالنص: "${reply}"\n\nأعد JSON فقط: {"is_saudi": true أو false, "foreign_word": "الكلمة المخالفة بالضبط أو null"}`,
-      }],
-    })
-    const obj = extractJson(ai.choices?.[0]?.message?.content ?? '')
-    if (!obj || typeof obj.is_saudi !== 'boolean') return { ok: true, foreignWord: null }
-    return { ok: obj.is_saudi, foreignWord: obj.foreign_word ?? null }
-  } catch (err) {
-    log.error('isSaudiDialectLLM check failed — failing open', err as Error)
-    return { ok: true, foreignWord: null }
-  }
-}
-
 // Robustly extract a JSON object even when the model wraps it in markdown
 // fences or adds prose around it (Claude via OpenRouter often ignores json_object).
 function extractJson(raw: string): any | null {
@@ -1145,7 +1116,8 @@ ${installmentRule}
   const todayWeekday = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' }).format(new Date())
 
   const systemPrompt = `أنت "خالد"، محصّل ديون سعودي محترف عمره 45 سنة ولديه خبرة تتجاوز 20 سنة في تحصيل ديون كل القطاعات (اتصالات، تأمين، مرافق، تمويل، استقدام، زراعي). تتحدث بلهجة سعودية بيضاء طبيعية جداً عبر الواتساب، كأنك إنسان حقيقي يجلس أمام العميل.
-🔴 ممنوع منعاً باتاً استخدام أي لهجة غير سعودية (مصرية، سودانية، شامية، أو أي لهجة خليجية أخرى) أو الفصحى الرسمية الثقيلة في أي رد — السعودية البيضاء فقط دائماً، بدون استثناء.
+🔴 ممنوع منعاً باتاً استخدام أي لهجة غير سعودية (مصرية، سودانية، شامية، عراقية، أو أي لهجة خليجية أخرى) أو الفصحى الرسمية الثقيلة في أي رد — السعودية البيضاء فقط دائماً، بدون استثناء.
+أمثلة على كلمات ممنوعة منعاً مطلقاً (وبدائلها السعودية): "دلوقتي/دلوقت" → قل "الحين". "شنو" → قل "وش". "عايز" → قل "أبغى". "كمان" → قل "بعد". "علشان" → قل "عشان". "ازاي/إزاي" → قل "كيف". "كده/كدا" → قل "كذا". "برضو/برضه" → قل "بعد". "النهاردة" → قل "اليوم". أي كلمة من هذا النوع تُفسد الرد بالكامل وتجعل العميل يشك أنك لست سعودياً — راجع كل كلمة في ردك قبل إرساله وتأكد أنها سعودية بحتة.
 
 🎯 شخصيتك كمحصّل خبير (التزم بها في كل رد):
 - واثق وهادئ وحازم، لا تتوسّل ولا تعتذر بإفراط، ولا تتنازل بسهولة.
@@ -1209,12 +1181,15 @@ ${intentPrompts[intent]}
   const requestedGraceDays = detectRequestedGraceDays(text)
   const disputeReasonGiven = hasSpecificDisputeReason(text)
 
-  // §9: Haiku for routine intents, Sonnet for the intents that actually
-  // require careful judgment (dispute handling, negotiation). Confirmed
-  // exact OpenRouter slugs via the live /models API before wiring this in —
-  // these are NOT the raw Anthropic API model ids.
-  const selectModel = (i: AgentIntent): string =>
-    (['DISPUTE', 'NEGOTIATION'] as AgentIntent[]).includes(i) ? 'anthropic/claude-sonnet-4.6' : 'anthropic/claude-haiku-4.5'
+  // §9: ALL customer-facing replies go through Sonnet. Haiku was previously
+  // used for "routine" intents (GREETING/GENERAL/INTRODUCTION) but production
+  // logs proved Haiku does NOT obey the Saudi-dialect-only instruction — it
+  // emitted non-Saudi words ("شنو", "دلوقتي") to real customers despite the
+  // explicit prompt ban. The dialect requirement is a hard constraint, so the
+  // model must be the one that reliably follows instructions. A post-hoc
+  // dialect filter was tried and removed (it produced false positives on
+  // normal Arabic words like "محصّل"/"رصيد"). Root fix = capable model.
+  const selectModel = (_i: AgentIntent): string => 'anthropic/claude-sonnet-4.6'
   const modelId = selectModel(intent)
   log.info('model routing', { intent, modelId })
   let ai
@@ -1892,30 +1867,6 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
     }
   }
 
-  // Final dialect backstop — runs on whatever message will actually be sent
-  // (original or regenerated above). isNonSaudiDialect's static blacklist
-  // already ran as part of isRobotic() above; this is the LLM-judgment layer
-  // that catches words the blacklist doesn't know about yet (e.g. "دلوقتي" —
-  // a real incident where the agent itself used an Egyptian word and the
-  // customer correctly called it out as non-Saudi).
-  if (parsed.shouldReply && parsed.message.trim()) {
-    const dialectCheck = await isSaudiDialectLLM(client, parsed.message)
-    if (!dialectCheck.ok) {
-      log.warn('dialect guard fired — non-Saudi word detected by LLM check', {
-        foreign_word: dialectCheck.foreignWord, original: parsed.message.slice(0, 80),
-      })
-      const corrected = await regenerateWithCorrection(
-        client, modelId, systemPrompt, turns, text,
-        `ردك السابق فيه كلمة أو تعبير من لهجة غير سعودية${dialectCheck.foreignWord ? ` ("${dialectCheck.foreignWord}")` : ''} — أعد الصياغة كاملة بلهجة سعودية بيضاء طبيعية بحتة، بدون أي كلمة من أي لهجة عربية أخرى.`,
-      )
-      if (corrected) {
-        parsed.message = corrected
-        parsed.reason = 'dialect_guard_regenerated'
-      } else {
-        log.error('dialect_guard regeneration failed — sending original despite flagged word', new Error('regeneration_failed'))
-      }
-    }
-  }
 
   return parsed
 }
