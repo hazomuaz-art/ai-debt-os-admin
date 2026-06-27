@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { recordAttribution } from '@/lib/revenue-attribution'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('dispute')
@@ -21,7 +22,7 @@ function classifyDisputeType(text: string): DisputeType {
  * surrounding conversation — instead of a single bare line. Also opens the
  * matching admin approval. Deduplicates against an existing open dispute.
  *
- * Usable from any WhatsApp gateway webhook (WAHA, Evolution, ...).
+ * Usable from any WhatsApp gateway webhook (WAHA).
  */
 export async function recordDispute(args: {
   company_id: string
@@ -92,4 +93,22 @@ export async function recordDispute(args: {
       dispute_type, conversation_excerpt: excerpt,
     },
   })
+
+  // Attribution: the AI opened this dispute/escalation. `amount` here is
+  // contextual (the outstanding balance at the time), never collected
+  // revenue — getChannelSummary/getAIvsHumanSummary exclude this event_type.
+  if (disp?.id) {
+    const { data: debtRow } = await supabase.from('debts').select('current_balance').eq('id', args.debt_id).maybeSingle()
+    await recordAttribution({
+      company_id: args.company_id,
+      event_type: 'dispute',
+      source_id: disp.id,
+      customer_id: args.customer_id,
+      debt_id: args.debt_id,
+      amount: Number(debtRow?.current_balance ?? 0),
+      primary_channel: 'whatsapp',
+      primary_actor: 'ai',
+      ai_assisted: true,
+    })
+  }
 }

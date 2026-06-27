@@ -441,16 +441,15 @@ export async function recordPaymentAction(input: {
 
     await recordAttribution({
       company_id: profile.company_id,
+      event_type: isFullPayment ? 'settlement' : 'payment',
       payment_id: payment.id,
       customer_id: debt.customer_id,
       debt_id: input.debt_id,
       amount: input.amount,
-      currency: debt.currency,
-      attribution_channel: 'collector',
-      attribution_actor: 'collector',
+      primary_channel: 'collector',
+      primary_actor: 'collector',
       ai_assisted: false,
       collector_id: user.id,
-      cost_of_collection: 0,
     })
 
     // Update debt balance and status

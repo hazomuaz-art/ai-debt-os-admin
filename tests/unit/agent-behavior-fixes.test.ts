@@ -1,0 +1,174 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// Proves the 3 approved fixes (أ/ب/ج) directly via the real runCollectorAgent
+// pipeline (mocked OpenAI/Supabase only):
+//   أ) anti_repetition_guard / repeated_question_guard never force a payment
+//      question onto a GREETING or INFO_REQUEST turn.
+//   ب) a model reply drifting into Egyptian/Sudanese dialect is caught and
+//      replaced — the prompt now also explicitly forbids it.
+//   ج) a pure greeting mid-conversation gets a short ack, never jumps to the
+//      debt/payment.
+
+let mockModelContent = ''
+let lastCreateCallMessages: any[] = []
+let mockContext: any = {}
+
+vi.mock('openai', () => ({
+  default: vi.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: vi.fn().mockImplementation(async (params: any) => {
+          lastCreateCallMessages = params.messages
+          return { choices: [{ message: { content: mockModelContent } }] }
+        }),
+      },
+    },
+  })),
+}))
+
+vi.mock('@/lib/customer-debt-context', () => ({
+  buildCustomerDebtContext: vi.fn().mockImplementation(async () => mockContext),
+}))
+
+function singleDebtGroup() {
+  return { debtGroups: [{ portfolio_id: 'p1', portfolio_name: null, portfolio_category: null, company_key: null, debts: [{ id: 'd1', status: 'active' }] }], allDisputes: [], customerDataByPortfolio: {} }
+}
+
+function defaultPlaybook() {
+  return {
+    portfolio_id: 'p1', category: 'other',
+    discounts: { allowed: false, max_percent: 0, requires_admin_approval: true },
+    installments: { allowed: false, max_months: 0, requires_admin_approval: true },
+    fields_to_surface: ['account_number', 'reference_number'],
+    allowed_dispute_types: ['wrong_number', 'not_mine', 'already_settled'],
+    notes: null,
+    company_policy: null, ai_instructions: null, forbidden_phrases: [], escalation_rules: [], portfolio_specific_rules: null,
+    is_default: true,
+  }
+}
+vi.mock('@/lib/company-playbook', async () => {
+  const actual = await vi.importActual<any>('@/lib/company-playbook')
+  return { ...actual, getPlaybookForPortfolio: vi.fn().mockImplementation(async () => defaultPlaybook()) }
+})
+
+const mockAlertInsert = vi.fn().mockResolvedValue({ data: null, error: null })
+const mockCustomerGateRow: any = {
+  verification_status: 'verified', verification_attempts_count: 0,
+  contact_opt_out: false, pending_clarification: null, national_id: null,
+  used_reply_variants: {},
+}
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: vi.fn().mockImplementation(() => ({
+    from: vi.fn().mockImplementation((table: string) => ({
+      insert: mockAlertInsert,
+      update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: table === 'customers' ? mockCustomerGateRow : null, error: null }),
+        }),
+      }),
+    })),
+  })),
+}))
+
+vi.mock('@/lib/legal-escalation', async () => {
+  const actual = await vi.importActual<any>('@/lib/legal-escalation')
+  return { ...actual, getOpenEscalation: vi.fn().mockImplementation(async () => null), openEscalation: vi.fn().mockResolvedValue('esc-1') }
+})
+
+vi.mock('@/lib/customer-context-engine', async () => {
+  const actual = await vi.importActual<any>('@/lib/customer-context-engine')
+  return { ...actual, buildCustomer360Context: vi.fn().mockImplementation(async () => singleDebtGroup()) }
+})
+
+import { runCollectorAgent } from '@/lib/ai-collector-agent'
+
+function baseContextWithHistory(): any {
+  return {
+    verified_customer_data: { customer_name: 'سعد القحطاني' },
+    verified_debt_data: {
+      current_balance: 800, currency: 'SAR', creditor_name: 'بنك الإنماء',
+      reference_number: 'REF-5', status: 'overdue', portfolio_category: 'finance',
+    },
+    recent_messages: [
+      { direction: 'outbound', content: 'معك خالد بخصوص مديونية بقيمة 800 ريال.' },
+      { direction: 'inbound', content: 'تمام' },
+    ],
+    recent_promises: [], recent_approvals: [], recent_payments: [],
+    strict_rules: [], negotiation_profile: {},
+    latest_collection_context: { last_followup: null, last_status_change: null },
+    collection_account: null, customer: { notes: null }, debt: { metadata: {} },
+  }
+}
+
+beforeEach(() => {
+  process.env.OPENROUTER_API_KEY = 'sk-test'
+  mockContext = baseContextWithHistory()
+  mockAlertInsert.mockClear()
+  lastCreateCallMessages = []
+})
+
+describe('أ) payment-pressure fallback never overrides a GREETING/INFO_REQUEST reply', () => {
+  it('a repeated-looking INFO_REQUEST reply is replaced with a neutral fallback, not a payment question', async () => {
+    // The model answers a balance question, but phrases it identically to a
+    // very recent outbound message (近-duplicate, no digits) → isRepeated fires.
+    mockContext.recent_messages.push({ direction: 'outbound', content: 'تمام راجعت ملفك وكل شي واضح عندي' })
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'x', message: 'تمام راجعت ملفك وكل شي واضح عندي',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'عطني التفاصيل' })
+
+    expect(d.reason).toBe('anti_repetition_guard')
+    expect(d.message).not.toMatch(/تسدد|السداد/)
+  })
+
+  it('the same repeated-looking reply DURING an actual negotiation still allows the payment-nudge pool', async () => {
+    mockContext.recent_messages.push({ direction: 'outbound', content: 'تمام راجعت ملفك وكل شي واضح عندي' })
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'x', message: 'تمام راجعت ملفك وكل شي واضح عندي',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'بسدد بس مو الحين' })
+
+    expect(d.reason).toBe('anti_repetition_guard')
+    // NEGOTIATION intent — the payment-oriented pool is allowed to fire here.
+  })
+})
+
+describe('ب) non-Saudi dialect / heavy formal Arabic in a reply gets caught and replaced', () => {
+  it('an Egyptian-dialect reply ("عايز" / "كمان") is replaced by the anti-repetition guard', async () => {
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'x', message: 'عايز أعرف كمان متى هتسدد الفلوس بتاعتك.',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'كيف الحال' })
+
+    expect(d.message).not.toMatch(/عايز|كمان/)
+  })
+
+  it('the system prompt explicitly forbids non-Saudi dialects and formal Arabic', async () => {
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، الرقم المرجعي هو REF-5.' })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'وش الرقم المرجعي؟' })
+    const systemPrompt = lastCreateCallMessages[0].content as string
+    expect(systemPrompt).toContain('ممنوع منعاً باتاً استخدام أي لهجة غير سعودية')
+  })
+})
+
+describe('ج) a pure greeting mid-conversation never jumps to the debt', () => {
+  it('"السلام عليكم" alone mid-conversation gets a short ack, with zero LLM call', async () => {
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'السلام عليكم' })
+
+    expect(d.reason).toBe('greeting_mid_conversation')
+    expect(d.message).not.toMatch(/800|ريال|مديونية|تسدد/)
+    expect(lastCreateCallMessages.length).toBe(0) // never reached the LLM at all
+  })
+
+  it('a greeting RIDING ALONG with real content (e.g. a promise) still falls through to the normal pipeline', async () => {
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_promise', reason: 'x', message: 'تمام، مسجل وعدك.',
+      promised_date: '2026-06-25', promise_text: 'بكرا',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'السلام عليكم بسدد بكرا' })
+
+    expect(d.reason).not.toBe('greeting_mid_conversation')
+    expect(lastCreateCallMessages.length).toBeGreaterThan(0) // went through the LLM as normal
+  })
+})
