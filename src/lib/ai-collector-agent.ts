@@ -1338,10 +1338,21 @@ ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذك
   //  result into `parsed` (action/message/promised_date are already final
   //  at this point, set entirely by the logic above). Fire-and-forget: any
   //  failure here is caught and logged, never thrown, never adds latency to
-  //  the customer-facing reply. Only runs when the message plausibly
-  //  carries a temporal reference, to avoid log noise on unrelated turns.
+  //  the customer-facing reply.
+  //
+  //  Gated by the NEW engine's own quickScan(), never the OLD lexicon
+  //  (hasTemporalRef/signals.promise/hasCommitmentWithVagueTiming) — a gate
+  //  built from the old lexicon would only cover what the OLD system
+  //  already knows, defeating the purpose of Shadow Mode, which exists to
+  //  observe the NEW engine's full coverage (salary, gov programs,
+  //  holidays, composites...) including everything the old system can't
+  //  see at all. quickScan() runs the same resolver list/priority order as
+  //  the full engine, synchronously, with zero separate keyword list to
+  //  maintain in this file — the engine is the only source of truth for
+  //  "does this look temporal".
   // ════════════════════════════════════════════════════════════════════
-  if (hasTemporalRef(text) || signals.promise || hasCommitmentWithVagueTiming(text)) {
+  const { quickScan } = await import('@/lib/temporal-engine')
+  if (quickScan(text, args.messageTimestamp ? new Date(args.messageTimestamp) : new Date())) {
     const oldDecisionSnapshot = {
       hasTemporalRef: hasTemporalRef(text),
       forcedPromise: promiseForcedFromTemporalRef,
