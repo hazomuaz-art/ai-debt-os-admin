@@ -55,7 +55,13 @@
       "Read(//c/Users/moham/.ssh/**)",
       "Bash(curl -s -m 8 -o /dev/null -w \"VPS HTTP: %{http_code}\\\\n\" http://72.62.30.109)",
       "Bash(timeout 25 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@72.62.30.109 \"pm2 list && echo '=== last 30 log lines ===' && pm2 logs --nostream --lines 30 2>&1 | tail -40\")",
-      "Bash(timeout 25 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@72.62.30.109 \"echo '=== ERROR log tail ===' && tail -40 /root/.pm2/logs/ai-debt-os-admin-error.log\")"
+      "Bash(timeout 25 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@72.62.30.109 \"echo '=== ERROR log tail ===' && tail -40 /root/.pm2/logs/ai-debt-os-admin-error.log\")",
+      "Bash(npx vitest *)",
+      "mcp__5c9f363a-3137-42a8-aef8-225ddb1432f6__execute_sql",
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "PowerShell(cd D:\\\\ai-debt-os-admin; powershell -ExecutionPolicy Bypass -File deploy.ps1 \"fix: auditor cleanup, health nav, disable ai_memory, server-action test fix\")"
     ]
   }
 }
