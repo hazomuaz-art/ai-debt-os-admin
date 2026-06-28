@@ -216,6 +216,42 @@ describe('Real incident — customer question must never be buried by a promise 
   })
 })
 
+describe('Real incident — fabricated promise from the word "الحين" alone', () => {
+  it('a plain question containing "الحين" (no payment verb) is NEVER force-converted into a promise', async () => {
+    // Exact production bug (Mobily, 2026-06-27): "الحين اراجع موبايلي ولا
+    // وين؟" is a question about WHEN to check with Mobily, using "الحين" as
+    // "now" — not a payment commitment. hasTemporalRef's bare "الحين" trigger
+    // forced action=record_promise and fabricated a date out of nowhere.
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تقدر تروح لأي فرع موبايلي للاستفسار.' })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'الحين اراجع موبايلي ولا وين' })
+
+    expect(d.action).not.toBe('record_promise')
+    expect(d.message).not.toMatch(/الوعد مسجّل|مسجّل وعدك/)
+  })
+
+  it('"الحين" combined with an actual payment verb still forces a real promise', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام.' })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد الحين' })
+
+    expect(d.action).toBe('record_promise')
+  })
+})
+
+describe('Date understanding — government support program payouts', () => {
+  it('"بسدد مع حساب المواطن" is recognized as a real promise (deterministic, not just model judgment)', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تقدر تسدد؟' })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد مع حساب المواطن' })
+
+    expect(d.action).toBe('record_promise')
+  })
+})
+
 describe('Root fix — all customer replies routed through Sonnet (not Haiku)', () => {
   it('a routine GENERAL intent reply uses Sonnet, never Haiku', async () => {
     mockContext = baseContext([])

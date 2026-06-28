@@ -217,7 +217,7 @@ describe('Shadow Mode — gated by quickScan(), the new engine\'s own detector (
     expect(logCalls.some(c => c.message.includes('temporal_engine_shadow_comparison'))).toBe(false)
   })
 
-  it('covers a category the old lexicon has ZERO concept of at all (gov programs) — proves quickScan() closes the diagnosed coverage gap', async () => {
+  it('gov programs (e.g. حساب المواطن) now reach the shadow comparison too — hasTemporalRef was extended to cover them deterministically', async () => {
     // "حساب المواطن" appears nowhere in hasTemporalRef/signals.promise/
     // hasCommitmentWithVagueTiming — before this fix, this message would
     // never have reached the shadow comparison.
@@ -229,7 +229,7 @@ describe('Shadow Mode — gated by quickScan(), the new engine\'s own detector (
     const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
     expect(shadowLog).toBeTruthy()
     expect(shadowLog!.context.new_decision.reference_type).toBe('gov_program')
-    expect(shadowLog!.context.old_decision.hasTemporalRef).toBe(false) // confirms the OLD system was blind to this
+    expect(shadowLog!.context.old_decision.hasTemporalRef).toBe(true) // hasTemporalRef now recognizes gov-program phrases deterministically
   })
 
   it('covers a holiday expression the old lexicon also has zero concept of', async () => {

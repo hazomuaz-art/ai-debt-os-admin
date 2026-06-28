@@ -88,12 +88,25 @@ function toAsciiDigits(s: string): string {
 // 30 الشهر), and "خلال/بعد N يوم/اسبوع/شهر". Arabic numerals are normalised
 // first. This REPLACES a narrow keyword list that missed "بكرا" and every
 // Arabic-numeral date, which is what caused the post-promise questioning loop.
+// "الحين"/"اليوم" alone are NOT reliable payment-timing signals — they're
+// extremely common general-purpose words ("now"/"today") in Saudi dialect
+// that show up in totally unrelated sentences ("الحين اراجع موبايلي ولا
+// وين؟", "ما ابغي اسدد الحين"). A real production incident: the agent
+// fabricated brand-new promises (with a wrong/drifting date) from plain
+// questions and refusals that merely happened to contain "الحين". They only
+// count as a temporal reference when paired with an actual payment-commitment
+// verb in the SAME message — otherwise they're noise.
+const PAYMENT_VERB = /(سدد|اسدد|أسدد|بسدد|ادفع|أدفع|بدفع|احول|أحول|بحول|حول|دفعت|سددت|حولت)/
 function hasTemporalRef(raw: string): boolean {
   const t = toAsciiDigits(norm(raw))
   return (
-    /(بكرا|بكره|بكرة|غدا|غدًا|غداً|اليوم|الحين|بعد بكر|بعد غد|عقب بكر)/.test(t) ||
+    /(بكرا|بكره|بكرة|غدا|غدًا|غداً|بعد بكر|بعد غد|عقب بكر)/.test(t) ||
+    (/(اليوم|الحين)/.test(t) && PAYMENT_VERB.test(t)) ||
     /(السبت|الاحد|الأحد|الاثنين|الإثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعه|الجمعة)/.test(t) ||
     /(الراتب|راتب|معاش)/.test(t) ||
+    // Government support program payouts — customers commonly tie a promise
+    // to these instead of a calendar date (e.g. "بسدد مع حساب المواطن").
+    /(حساب المواطن|المواطن|الضمان الاجتماعي|الضمان|ساند|حافز|التامينات|التأمينات|التقاعد)/.test(t) ||
     /(نهاية|اخر|آخر|بداية|اول|أول|منتصف)\s*(الشهر|الاسبوع|الأسبوع)/.test(t) ||
     /(نهاية الشهر|اخر الشهر|آخر الشهر|الشهر الجاي|الشهر القادم|الاسبوع الجاي|الأسبوع الجاي|هالاسبوع|هالشهر)/.test(t) ||
     /\b\d{1,2}\s*[\/\-.]\s*\d{1,2}\b/.test(t) ||
