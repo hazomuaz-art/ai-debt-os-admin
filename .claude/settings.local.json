@@ -61,7 +61,9 @@
       "Bash(node -e ' *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "PowerShell(cd D:\\\\ai-debt-os-admin; powershell -ExecutionPolicy Bypass -File deploy.ps1 \"fix: auditor cleanup, health nav, disable ai_memory, server-action test fix\")"
+      "PowerShell(cd D:\\\\ai-debt-os-admin; powershell -ExecutionPolicy Bypass -File deploy.ps1 \"fix: auditor cleanup, health nav, disable ai_memory, server-action test fix\")",
+      "Read(//c/Users/X13/Downloads/**)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
