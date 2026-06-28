@@ -247,7 +247,10 @@ export const createCustomerSchema = z.object({
 export const inviteUserSchema = z.object({
   email:      z.string().email(),
   full_name:  z.string().min(2).max(200),
-  role:       z.enum(['admin', 'manager', 'collector']),
+  // 'admin' is deliberately excluded — granting admin via this API would let
+  // any existing admin silently create another full admin without a more
+  // deliberate, audited path. Promote to admin manually if ever needed.
+  role:       z.enum(['manager', 'collector']),
   password:   z.string().min(8).max(72),
   company_id: uuidSchema,
 })

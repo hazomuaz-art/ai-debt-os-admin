@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Seeds the Mobily portfolio's company_playbooks policy row: Saudi
 -- professional tone only, no payment-pressure-every-reply, answer questions
 -- first, explain the debt when asked, no agent-granted discounts.
@@ -63,3 +65,5 @@ where p.name in ('موبايلي', 'موبايلى', 'Mobily', 'mobily')
   and not exists (
     select 1 from company_playbooks cp where cp.portfolio_id = p.id
   );
+
+COMMIT;

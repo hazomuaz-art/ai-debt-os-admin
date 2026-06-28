@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Seeds the STC portfolio's company_playbooks policy row: bans the
 -- legal/threat path entirely (forbidden_phrases + escalation_rules = '[]'),
 -- makes sadad_number the primary payment source, and documents the new
@@ -49,3 +51,5 @@ where p.name in ('إس تي سي', 'STC', 'اس تي سي')
   and not exists (
     select 1 from company_playbooks cp where cp.portfolio_id = p.id
   );
+
+COMMIT;

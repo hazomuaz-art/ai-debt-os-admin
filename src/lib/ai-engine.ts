@@ -6,20 +6,20 @@ import { logOpenAICost } from '@/lib/cost-tracker'
 
 const log = createLogger('ai-engine')
 
-// ── OpenAI singleton ──────────────────────────────────────────────────────
-
-let _client: OpenAI | null = null
+// ── OpenAI client ─────────────────────────────────────────────────────────
+// Deliberately NOT cached as a module-level singleton: constructing the SDK
+// wrapper is cheap (no network/connection-pool cost), and caching it caused
+// a real test-isolation bug — a test that re-mocked the `openai` module and
+// re-imported this file fresh still got the FIRST test's cached client,
+// silently ignoring its own mock.
 
 function getClient(): OpenAI {
-  if (!_client) {
-    if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not configured')
-    _client = new OpenAI({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      timeout: 30_000, maxRetries: 2,
-    })
-  }
-  return _client
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not configured')
+  return new OpenAI({
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
+    timeout: 30_000, maxRetries: 2,
+  })
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────

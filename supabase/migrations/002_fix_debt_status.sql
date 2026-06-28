@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration 002: Normalize debt status values and add missing fields
 
 -- Drop old constraint and add updated one with consistent values
@@ -28,3 +30,5 @@ ALTER TABLE public.debts ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.debts ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE;
 
 -- Update RLS policies to also account for new statuses (no change needed — they're text-based)
+
+COMMIT;

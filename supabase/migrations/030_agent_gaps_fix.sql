@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Agent Gaps Fix (§0-§9 spec): identity verification, opt-out, and
 -- cross-message conversation state. All conversation-scoped state lives on
 -- `customers` (not `debts`) — identity/opt-out/pending-clarification are
@@ -41,3 +43,5 @@ alter table customers
 -- bundled into that first message is never lost. Cleared once consumed.
 alter table customers
   add column if not exists pending_clarification jsonb;
+
+COMMIT;

@@ -3,6 +3,8 @@
 -- Run this in Supabase SQL Editor
 -- ============================================================
 
+BEGIN;
+
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -394,3 +396,5 @@ CREATE POLICY "Insert logs" ON public.logs
 -- SEED: Demo company (optional for testing)
 -- ============================================================
 -- INSERT INTO public.companies (name, slug, plan) VALUES ('Demo Corp', 'demo-corp', 'growth');
+
+COMMIT;

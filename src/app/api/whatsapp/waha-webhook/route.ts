@@ -105,6 +105,23 @@ function scheduleBurstProcessing(
 
 export async function POST(request: NextRequest) {
   try {
+    // Previously unauthenticated — anyone who knew this URL could POST a
+    // fake "message" event with any phone number and trigger the AI agent
+    // (and its side effects: promises, disputes, payment classification)
+    // as if a real customer said it. WAHA's session config now sends a
+    // custom header (X-Webhook-Secret) with every webhook call — checked
+    // here. Enforced once WAHA_WEBHOOK_SECRET is configured on this app;
+    // fails loud while unset rather than silently staying open.
+    const expectedSecret = process.env.WAHA_WEBHOOK_SECRET
+    if (expectedSecret) {
+      if (request.headers.get('x-webhook-secret') !== expectedSecret) {
+        log.warn('WAHA webhook rejected — missing/invalid secret')
+        return NextResponse.json({ status: 'ok' })
+      }
+    } else {
+      log.error('WAHA_WEBHOOK_SECRET is not set — this webhook is unauthenticated and publicly triggerable')
+    }
+
     const body = await request.json().catch(() => ({} as any))
     const event: string = body?.event ?? ''
     const session: string = body?.session ?? process.env.WAHA_SESSION ?? 'default'

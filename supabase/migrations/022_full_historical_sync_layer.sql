@@ -1,3 +1,5 @@
+BEGIN;
+
 -- MIGRATION 020: Full Historical Sync Layer + Dynamic Status Mapping
 
 -- 1) Store original statuses from any collection system without losing them
@@ -252,3 +254,5 @@ BEGIN
       WITH CHECK (company_id IN (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
   END IF;
 END $$;
+
+COMMIT;

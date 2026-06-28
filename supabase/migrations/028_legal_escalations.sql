@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Legal Escalation Engine: an independent escalation record + a hard
 -- negotiation lock. While an escalation is open for a debt, the normal
 -- agent (خالد) never replies — only the fixed "إدارة الشؤون القانونية"
@@ -37,3 +39,5 @@ create policy "legal_escalations_company_isolation" on legal_escalations
   for all
   using (company_id = public.get_user_company_id())
   with check (company_id = public.get_user_company_id());
+
+COMMIT;

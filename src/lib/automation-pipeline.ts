@@ -26,6 +26,11 @@ import { detectCustomerIntent } from '@/lib/negotiation-intent'
 
 const log = createLogger('automation-pipeline')
 
+// Shared by stepAction and stepWhatsApp — a debt already being actively
+// negotiated/promised/on a plan shouldn't get a fresh automated action or
+// WhatsApp send layered on top. Single source so both stay in sync.
+const ACTIVE_NEGOTIATION_STATUSES = ['promised', 'in_negotiation', 'payment_plan']
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -371,7 +376,7 @@ async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<
     if ((count ?? 0) > 0) return false
   } catch { /* continue */ }
 
-  if (['promised', 'in_negotiation', 'payment_plan'].includes(ctx.debt.status)) return false
+  if (ACTIVE_NEGOTIATION_STATUSES.includes(ctx.debt.status)) return false
 
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
   const hasWA = !!(ctx.customer.whatsapp)
@@ -990,7 +995,7 @@ async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
   if (!phone) return false
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
   if (daysOverdue <= 0) return false
-  if (['promised', 'in_negotiation', 'payment_plan'].includes(ctx.debt.status)) return false
+  if (ACTIVE_NEGOTIATION_STATUSES.includes(ctx.debt.status)) return false
 
   const nameIsArabicWA = /[\u0600-\u06FF]/.test(ctx.customer.full_name ?? '')
   const waBal = ctx.debt.current_balance.toLocaleString('en-SA')

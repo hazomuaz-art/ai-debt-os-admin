@@ -1,3 +1,5 @@
+BEGIN;
+
 -- MIGRATION 021: Evolution API WhatsApp Channels + n8n Integration
 -- Supports multi-instance WhatsApp via Evolution API
 
@@ -156,3 +158,5 @@ CREATE TRIGGER customer_memory_v2_updated_at BEFORE UPDATE ON public.customer_me
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 CREATE TRIGGER disputes_updated_at BEFORE UPDATE ON public.disputes
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Temporal Intelligence Engine — Knowledge Base + Learning Capture schema.
 -- Phase 0: tables only, purely additive, zero impact on existing behavior.
 -- Nothing in the live agent reads/writes these tables yet (Strangler Pattern
@@ -153,3 +155,5 @@ insert into temporal_composite_patterns (country_code, pattern_key, description_
   ('SA', 'gov_program_then_offset', 'بعد برنامج حكومي + إضافة فترة', 'gov_program', 'add'),
   ('SA', 'holiday_then_offset', 'بعد عطلة رسمية + إضافة فترة (مثل: بعد العيد بأسبوع)', 'holiday', 'add')
 on conflict (pattern_key) do nothing;
+
+COMMIT;

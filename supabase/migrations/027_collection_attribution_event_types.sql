@@ -1,3 +1,5 @@
+BEGIN;
+
 -- AI Revenue Attribution: collection_attribution gains event-type tagging
 -- and idempotency anchors so a promise/payment/settlement/dispute event
 -- can never be duplicated by a retried webhook call.
@@ -29,3 +31,5 @@ create unique index if not exists uq_collection_attribution_source
   on collection_attribution(source_id) where source_id is not null;
 create unique index if not exists uq_collection_attribution_settlement
   on collection_attribution(debt_id) where event_type = 'settlement';
+
+COMMIT;

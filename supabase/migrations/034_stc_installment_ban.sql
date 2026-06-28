@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Appends an explicit installment-ban instruction to the STC portfolio's
 -- company_playbooks.ai_instructions. STC's playbook already had
 -- installments.allowed = false (set in 030_stc_policy_no_legal.sql), but
@@ -15,3 +17,5 @@ update company_playbooks
 set ai_instructions = ai_instructions || E'\nممنوع على الوكيل عرض أو اقتراح التقسيط في STC ابتداءً بأي شكل.\nإذا طلب العميل التقسيط بنفسه وبشكل صريح فقط: سجّل الطلب وارفعه للمراجعة بدون أي وعد أو موافقة منك، ودون اقتراح جدول أو مبلغ شهري أو عدد دفعات من عندك.'
 where portfolio_id = (select id from portfolios where name in ('إس تي سي', 'STC', 'اس تي سي'))
   and ai_instructions not like '%ممنوع على الوكيل عرض أو اقتراح التقسيط في STC%';
+
+COMMIT;

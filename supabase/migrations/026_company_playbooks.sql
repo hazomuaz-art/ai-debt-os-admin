@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Phase 2: Company Playbooks — one policy row per portfolio, versioned.
 -- The AI collector agent reads the latest active row for a portfolio
 -- before replying. Independent table (not portfolios.metadata) so policy
@@ -36,3 +38,5 @@ create policy "company_playbooks_company_isolation" on company_playbooks
   for all
   using (company_id = public.get_user_company_id())
   with check (company_id = public.get_user_company_id());
+
+COMMIT;
