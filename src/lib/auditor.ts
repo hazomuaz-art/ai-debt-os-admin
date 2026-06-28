@@ -99,12 +99,10 @@ const EXPECTED_ROUTES = [
   { path: '/api/sync',                method: 'POST', name: 'Collection sync' },
   { path: '/api/modules/timeline',    method: 'GET',  name: 'Timeline module' },
   { path: '/api/modules/alerts',      method: 'GET',  name: 'Alerts module' },
-  { path: '/api/modules/rules',       method: 'GET',  name: 'Rules module' },
   { path: '/api/modules/campaigns',   method: 'GET',  name: 'Campaigns module' },
   { path: '/api/modules/promises',    method: 'GET',  name: 'Promises module' },
   { path: '/api/modules/approvals',   method: 'GET',  name: 'Approvals module' },
   { path: '/api/modules/memory',      method: 'GET',  name: 'AI Memory module' },
-  { path: '/api/modules/kb',          method: 'GET',  name: 'Knowledge Base module' },
   { path: '/api/health',              method: 'GET',  name: 'Health check' },
 ]
 

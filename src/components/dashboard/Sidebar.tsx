@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation'
 import {
   Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
-  Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Book, Package,
-  FlaskConical, TrendingUp, Phone, Brain, GitBranch, Scale
+  Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Package,
+  FlaskConical, TrendingUp, Phone, Brain, Scale
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
@@ -68,9 +68,7 @@ export function Sidebar({ profile }: { profile: any }) {
     {
       label: isRTL ? 'قيد الربط — قريباً' : 'In Progress — Coming Soon',
       items: [
-        { href: `/dashboard/${role}/knowledge-base`, label: isRTL ? 'قاعدة المعرفة' : 'Knowledge Base', icon: Book, roles: ['admin'], soon: true },
         { href: `/dashboard/${role}/memory`,          label: isRTL ? 'ذاكرة الذكاء الاصطناعي' : 'AI Memory', icon: Brain, roles: ['admin'], soon: true },
-        { href: `/dashboard/${role}/rules`,           label: isRTL ? 'محرك القواعد' : 'Rules Engine', icon: GitBranch, roles: ['admin'], soon: true },
       ],
     },
   ].map(g => ({ ...g, items: g.items.filter(i => i.roles.includes(role)) })).filter(g => g.items.length > 0)
