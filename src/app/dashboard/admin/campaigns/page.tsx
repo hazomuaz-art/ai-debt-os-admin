@@ -70,7 +70,9 @@ export default function CampaignsPage() {
     name: '',
     campaign_type: 'reminder',
     message_template: '',
+    portfolio_id: '',
   })
+  const [runningCampaignId, setRunningCampaignId] = useState<string | null>(null)
 
   const [numberForm, setNumberForm] = useState({
     portfolio_id: '',
@@ -211,13 +213,34 @@ export default function CampaignsPage() {
       await fetch('/api/modules/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...campaignForm, status: 'draft', channels: ['whatsapp'] }),
+        body: JSON.stringify({ ...campaignForm, portfolio_id: campaignForm.portfolio_id || null, status: 'draft', channels: ['whatsapp'] }),
       })
-      setCampaignForm({ name: '', campaign_type: 'reminder', message_template: '' })
+      setCampaignForm({ name: '', campaign_type: 'reminder', message_template: '', portfolio_id: '' })
       setShowCampaignForm(false)
       await load()
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleRunCampaign(campaign: Campaign) {
+    if (!(campaign as any).portfolio_id) { alert('هذي الحملة بلا محفظة محدّدة — افتح حملة جديدة واختر المحفظة.'); return }
+    if (!confirm(`تشغيل حملة "${campaign.name}"؟ سيتم بناء قائمة المستهدفين وإضافتهم لطابور الإرسال الفعلي.`)) return
+    setRunningCampaignId(campaign.id)
+    try {
+      const res = await fetch('/api/campaign-builder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: campaign.id, portfolio_id: (campaign as any).portfolio_id }),
+      })
+      const json = await res.json() as { data?: { recipients_created: number; queue_created: number; message?: string }; error?: string }
+      if (!res.ok) throw new Error(json.error ?? 'فشل تشغيل الحملة')
+      alert(json.data?.message ?? `تم جدولة ${json.data?.queue_created ?? 0} رسالة للإرسال. سيتم إرسالها تلقائياً عبر طابور المعالجة الخلفي.`)
+      await load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'فشل تشغيل الحملة')
+    } finally {
+      setRunningCampaignId(null)
     }
   }
 
@@ -394,6 +417,19 @@ export default function CampaignsPage() {
               </select>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">المحفظة المستهدَفة *</label>
+              <select required className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
+                value={campaignForm.portfolio_id}
+                onChange={e => setCampaignForm(p => ({ ...p, portfolio_id: e.target.value }))}>
+                <option value="">اختر المحفظة...</option>
+                {portfolios.map(p => (
+                  <option key={p.id} value={p.id}>{p.code ? `${p.code} - ` : ''}{p.name_ar || p.name}</option>
+                ))}
+              </select>
+              <div className="text-[#5f6b7e] text-xs">يجب أن يكون لهذي المحفظة رقم واتساب مربوط (أعلى الصفحة) قبل تشغيل الحملة.</div>
+            </div>
+
             <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-bold text-[#8b95a7] ps-2">قالب الرسالة الافتتاحية</label>
               <textarea rows={3} className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] resize-none"
@@ -563,6 +599,16 @@ export default function CampaignsPage() {
                       <div className="flex items-center gap-1.5 text-emerald-600 font-bold">المحصّل: {String(Number(campaign.total_collected ?? 0))} SAR</div>
                     </div>
                   </div>
+
+                  {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                    <button
+                      onClick={() => handleRunCampaign(campaign)}
+                      disabled={runningCampaignId === campaign.id}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 shrink-0">
+                      <PlayCircle size={14} />
+                      {runningCampaignId === campaign.id ? 'جارٍ التشغيل…' : 'تشغيل الحملة'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

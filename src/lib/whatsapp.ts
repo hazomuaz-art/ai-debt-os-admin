@@ -11,6 +11,13 @@ export interface SendMessageOptions {
   message:         string
   phone_number_id?: string
   company_id?:     string
+  // Per-portfolio WAHA session override (e.g. for campaigns sending from a
+  // specific portfolio's linked number instead of the company-wide default
+  // session). The API key is still always resolved company-wide/from env —
+  // only the session name and server URL are overridable, matching the
+  // existing portfolio_whatsapp_numbers connect/QR flow's own resolution.
+  waha_session?:   string | null
+  waha_api_url?:   string | null
 }
 
 export interface SendResult {
@@ -86,6 +93,11 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
       wahaSession = config.session || wahaSession
     }
   }
+
+  // Explicit per-send overrides win over everything above (e.g. a campaign
+  // sending from a specific portfolio's linked WhatsApp number/session).
+  if (options.waha_api_url) wahaUrl = options.waha_api_url
+  if (options.waha_session) wahaSession = options.waha_session
 
   const to = normalizePhone(options.to)
   const message = truncateMessage(options.message)
