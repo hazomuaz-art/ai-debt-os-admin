@@ -1656,9 +1656,18 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       const INSTALLMENT_LEAK_PATTERN = /(تقسيط|أقساط|اقساط|قسط(?!ت)|جدولة)/
       if (INSTALLMENT_LEAK_PATTERN.test(parsed.message)) {
         log.warn('STC installment mention stripped — customer did not request it', { original: parsed.message.slice(0, 120) })
-        parsed.message = 'تمام، سجلت وعدك بالسداد. بنحدّث الحالة بعد السداد.'
         if (parsed.action === 'record_installment_request') parsed.action = 'negotiate'
         parsed.reason = 'stc_installment_leak_blocked'
+        // Never substitute a canned "your promise is recorded" line regardless
+        // of what the customer's CURRENT message actually says — that was the
+        // exact production bug ("اي طلب؟" answered with a fabricated promise
+        // confirmation). Regenerate a reply that drops the installment mention
+        // but still answers whatever the customer is currently asking.
+        const corrected = await regenerateWithCorrection(
+          client, modelId, systemPrompt, turns, text,
+          'لا يجوز ذكر أو اقتراح التقسيط في ردك على هذا العميل (محفظة STC لا تسمح به إلا بطلب صريح من العميل لم يحدث هنا) — أعد الصياغة بدون أي ذكر للتقسيط/الأقساط، مع الإجابة الكاملة على ما سأله العميل أو قاله في رسالته الحالية.',
+        )
+        parsed.message = corrected ?? 'تمام، خلنا نكمل بخصوص ملفك.'
       }
     }
 

@@ -64,6 +64,45 @@ async function resolvePhone(from: string, session: string): Promise<string> {
 
 const ackToStatus: Record<number, string> = { 1: 'sent', 2: 'delivered', 3: 'read', 4: 'read' }
 
+// ── Rapid-fire message burst merging ──
+// Root cause of a real production pattern: a customer often sends 2-3
+// WhatsApp messages within seconds of each other (e.g. "ماوعدتك انا بشي"
+// immediately followed by "انت تستهبل؟"). Without this, EACH message fired
+// its own independent runCollectorAgent call instantly — the agent generating
+// a reply to message 1 had zero knowledge message 2 even existed yet,
+// producing two separate, sometimes contradictory replies seconds apart. A
+// human agent reading WhatsApp would naturally wait a beat and read the
+// whole burst before replying once. This does the same: buffer per-customer,
+// debounce, then run the agent ONCE on the merged text.
+// Single PM2 fork-mode process (confirmed in deploy.ps1 — no horizontal
+// scaling), so an in-process Map is sufficient; no cross-instance store needed.
+const pendingBursts = new Map<string, { texts: string[]; timer: ReturnType<typeof setTimeout>; latestTimestamp: string }>()
+const BURST_DEBOUNCE_MS = 6000
+
+function scheduleBurstProcessing(
+  customerId: string,
+  text: string,
+  messageTimestamp: string,
+  run: (mergedText: string, latestTimestamp: string) => Promise<void>,
+): void {
+  let entry = pendingBursts.get(customerId)
+  if (entry) {
+    clearTimeout(entry.timer)
+    entry.texts.push(text)
+    entry.latestTimestamp = messageTimestamp
+  } else {
+    entry = { texts: [text], latestTimestamp: messageTimestamp, timer: null as unknown as ReturnType<typeof setTimeout> }
+    pendingBursts.set(customerId, entry)
+  }
+  // `entry` is the same mutable object stored in the map — the closure below
+  // always sees the LATEST texts/timestamp by the time it actually fires,
+  // since every new message in the burst mutates this same object in place.
+  entry.timer = setTimeout(() => {
+    pendingBursts.delete(customerId)
+    run(entry!.texts.join('\n'), entry!.latestTimestamp).catch(() => {})
+  }, BURST_DEBOUNCE_MS)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({} as any))
@@ -179,13 +218,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ok' })
     }
 
-    // Run the collector agent and reply (sendWhatsAppMessage routes via WAHA)
-    ;(async () => {
+    // Run the collector agent and reply (sendWhatsAppMessage routes via WAHA).
+    // Debounced/merged across a rapid-fire burst — see scheduleBurstProcessing.
+    scheduleBurstProcessing(c.id, text, messageTimestamp, async (mergedText, latestTimestamp) => {
       const { runCollectorAgent } = await import('@/lib/ai-collector-agent')
       const { processEvent } = await import('@/lib/automation-pipeline')
 
       const aiDecision = await runCollectorAgent({
-        company_id: c.company_id, customer_id: c.id, debt_id, message: text, messageTimestamp,
+        company_id: c.company_id, customer_id: c.id, debt_id, message: mergedText, messageTimestamp: latestTimestamp,
       })
 
       if (aiDecision.shouldReply && aiDecision.message) {
@@ -212,7 +252,7 @@ export async function POST(request: NextRequest) {
         const { recordDispute } = await import('@/lib/dispute')
         await recordDispute({
           company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
-          debt_id, customer_message: text, agent_reason: aiDecision.reason,
+          debt_id, customer_message: mergedText, agent_reason: aiDecision.reason,
         })
       }
 
@@ -223,11 +263,11 @@ export async function POST(request: NextRequest) {
         await recordPromise({
           company_id: c.company_id, customer_id: c.id, debt_id,
           promised_amount: Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0),
-          promised_date: aiDecision.promised_date, customer_message: text,
+          promised_date: aiDecision.promised_date, customer_message: mergedText,
           promise_text: aiDecision.promise_text ?? null,
         })
       }
-    })().catch(err => log.error('WAHA AI processing error', err as Error))
+    })
 
     return NextResponse.json({ status: 'ok' })
   } catch (err) {
