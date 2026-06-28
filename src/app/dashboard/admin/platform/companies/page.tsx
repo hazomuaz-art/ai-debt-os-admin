@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { CreateCompanyModal } from '@/components/dashboard/CreateCompanyModal'
+import { Building2 } from 'lucide-react'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
-    <div className="card p-4">
-      <div className="text-[#8b95a7] text-xs uppercase tracking-wider">{title}</div>
-      <div className="text-slate-900 text-2xl font-bold mt-1">{value}</div>
+    <div className="bg-[#151a23] p-6 rounded-2xl border border-[#222a36] shadow-sm">
+      <div className="text-[#8b95a7] text-xs font-bold uppercase tracking-wider">{title}</div>
+      <div className="text-white text-2xl font-bold mt-1">{value}</div>
       {sub && <div className="text-[#5f6b7e] text-xs mt-1">{sub}</div>}
     </div>
   )
@@ -76,57 +77,63 @@ export default async function PlatformCompaniesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display font-bold text-2xl text-slate-900">Platform Companies</h1>
-          <p className="text-[#8b95a7] text-sm mt-1">
-            Super-admin overview for companies, subscriptions, usage, and tenant activity.
-          </p>
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
+      {/* Header */}
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+            <Building2 size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-1">إدارة الشركات</h1>
+            <p className="text-[#8b95a7] text-sm">نظرة شاملة على كل الشركات والاشتراكات والاستخدام</p>
+          </div>
         </div>
         <CreateCompanyModal />
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card title="Companies" value={companies.length} sub={`${activeCompanies} active`} />
-        <Card title="Users" value={users.length} />
-        <Card title="Customers" value={customers.length} />
-        <Card title="Total Debt" value={totalBalance.toLocaleString()} sub="SAR" />
+        <Card title="الشركات" value={companies.length} sub={`${activeCompanies} نشطة`} />
+        <Card title="المستخدمون" value={users.length} />
+        <Card title="العملاء" value={customers.length} />
+        <Card title="إجمالي الديون" value={totalBalance.toLocaleString()} sub="SAR" />
       </div>
 
-      <div className="card overflow-hidden">
+      {/* Table */}
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 border-b border-[#222a36]">
-          <h2 className="text-slate-900 font-semibold">Companies</h2>
+          <h2 className="text-white font-bold">الشركات</h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[#8b95a7] border-b border-[#222a36]">
-                <th className="text-end p-3">Company</th>
-                <th className="text-end p-3">Plan</th>
-                <th className="text-end p-3">Status</th>
-                <th className="text-start p-3">Users</th>
-                <th className="text-start p-3">Customers</th>
-                <th className="text-start p-3">Debts</th>
-                <th className="text-start p-3">AI Calls</th>
-                <th className="text-start p-3">WhatsApp</th>
-                <th className="text-start p-3">MRR</th>
+          <table className="w-full text-sm text-start">
+            <thead className="bg-[#0b0e14] text-[#8b95a7] text-xs">
+              <tr>
+                <th className="text-end p-3 font-bold uppercase">الشركة</th>
+                <th className="text-end p-3 font-bold uppercase">الخطة</th>
+                <th className="text-end p-3 font-bold uppercase">الحالة</th>
+                <th className="text-start p-3 font-bold uppercase">المستخدمون</th>
+                <th className="text-start p-3 font-bold uppercase">العملاء</th>
+                <th className="text-start p-3 font-bold uppercase">الديون</th>
+                <th className="text-start p-3 font-bold uppercase">طلبات AI</th>
+                <th className="text-start p-3 font-bold uppercase">واتساب</th>
+                <th className="text-start p-3 font-bold uppercase">MRR</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#1c2330]">
               {companies.map((c: any) => {
                 const sub = subscription(c.id)
                 return (
-                  <tr key={c.id} className="border-b border-[#222a36] text-slate-300">
+                  <tr key={c.id} className="hover:bg-[#1a212c] transition-colors text-slate-300">
                     <td className="p-3">
-                      <Link href={`/dashboard/admin/platform/companies/${c.id}`} className="text-slate-900 font-medium hover:text-brand-400">{c.name}</Link>
+                      <Link href={`/dashboard/admin/platform/companies/${c.id}`} className="text-white font-bold hover:text-emerald-400">{c.name}</Link>
                       <div className="text-[#5f6b7e] text-xs">{c.slug}</div>
                     </td>
                     <td className="p-3">{sub?.plan_name ?? c.plan ?? 'starter'}</td>
                     <td className="p-3">
-                      <span className={c.is_active ? 'text-green-400' : 'text-red-400'}>
-                        {c.is_active ? 'active' : 'suspended'}
+                      <span className={c.is_active ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                        {c.is_active ? 'نشطة' : 'معلَّقة'}
                       </span>
                     </td>
                     <td className="p-3 text-start">{countByCompany(users, c.id)}</td>
@@ -142,8 +149,8 @@ export default async function PlatformCompaniesPage() {
               })}
               {companies.length === 0 && (
                 <tr>
-                  <td className="p-6 text-[#8b95a7] text-center" colSpan={9}>
-                    No companies found.
+                  <td className="p-12 text-center bg-[#222a36]/50" colSpan={9}>
+                    <div className="text-[#5f6b7e] text-sm font-bold">لا توجد شركات حالياً</div>
                   </td>
                 </tr>
               )}

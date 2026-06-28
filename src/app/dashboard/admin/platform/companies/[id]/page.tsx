@@ -1,15 +1,16 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
 import UserStatusButton from '@/components/dashboard/UserStatusButton'
 import SubscriptionActionButtons from '@/components/dashboard/SubscriptionActionButtons'
+import { ArrowRight } from 'lucide-react'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
-    <div className="card p-4">
-      <div className="text-[#8b95a7] text-xs uppercase tracking-wider">{title}</div>
-      <div className="text-slate-900 text-2xl font-bold mt-1">{value}</div>
+    <div className="bg-[#151a23] p-6 rounded-2xl border border-[#222a36] shadow-sm">
+      <div className="text-[#8b95a7] text-xs font-bold uppercase tracking-wider">{title}</div>
+      <div className="text-white text-2xl font-bold mt-1">{value}</div>
       {sub && <div className="text-[#5f6b7e] text-xs mt-1">{sub}</div>}
     </div>
   )
@@ -70,93 +71,103 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
   const messages = usage.reduce((sum: number, r: any) => sum + Number(r.messages_count ?? 0), 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
+      {/* Header */}
+      <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-start justify-between gap-4 mt-6">
         <div>
-          <Link href="/dashboard/admin/platform/companies" className="text-brand-400 text-sm hover:text-brand-300">
-            ? Back to Companies
+          <Link href="/dashboard/admin/platform/companies" className="text-emerald-400 text-sm font-bold hover:text-emerald-300 flex items-center gap-1">
+            <ArrowRight size={14} /> رجوع لكل الشركات
           </Link>
 
-          <h1 className="font-display font-bold text-2xl text-slate-900 mt-3">
+          <h1 className="text-2xl font-bold text-white mt-3 mb-1">
             {company.name}
           </h1>
 
-          <p className="text-[#8b95a7] text-sm mt-1">
-            {company.slug} · Created {company.created_at ? new Date(company.created_at).toLocaleDateString() : '-'}
+          <p className="text-[#8b95a7] text-sm">
+            {company.slug} · تاريخ الإنشاء {company.created_at ? new Date(company.created_at).toLocaleDateString() : '-'}
           </p>
         </div>
 
         <div className="text-start">
-          <div className={company.is_active ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
-            {company.is_active ? 'Active' : 'Suspended'}
+          <div className={company.is_active ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+            {company.is_active ? 'نشطة' : 'معلَّقة'}
           </div>
           <div className="text-[#8b95a7] text-sm mb-2">
-            {sub?.plan_name ?? company.plan ?? 'starter'} · {sub?.status ?? 'no subscription'}
+            {sub?.plan_name ?? company.plan ?? 'starter'} · {sub?.status ?? 'بلا اشتراك'}
           </div>
           <SubscriptionActionButtons companyId={company.id} status={sub?.status ?? null} />
         </div>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card title="Users" value={users.length} />
-        <Card title="Customers" value={customers.length} />
-        <Card title="Debts" value={debts.length} />
-        <Card title="Total Debt" value={totalDebt.toLocaleString()} sub="SAR" />
-        <Card title="AI Calls" value={aiCalls.toLocaleString()} />
-        <Card title="WhatsApp" value={whatsapp.toLocaleString()} />
-        <Card title="Messages" value={messages.toLocaleString()} />
+        <Card title="المستخدمون" value={users.length} />
+        <Card title="العملاء" value={customers.length} />
+        <Card title="الديون" value={debts.length} />
+        <Card title="إجمالي الديون" value={totalDebt.toLocaleString()} sub="SAR" />
+        <Card title="طلبات AI" value={aiCalls.toLocaleString()} />
+        <Card title="واتساب" value={whatsapp.toLocaleString()} />
+        <Card title="الرسائل" value={messages.toLocaleString()} />
         <Card title="MRR" value={sub?.mrr_usd ? `$${Number(sub.mrr_usd).toFixed(0)}` : '-'} />
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="p-4 border-b border-[#222a36]">
-          <div className="flex items-center justify-between gap-3"><h2 className="text-slate-900 font-semibold">Users</h2><InviteUserModal companyId={company.id} /></div>
+      {/* Users */}
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-[#222a36] flex items-center justify-between gap-3">
+          <h2 className="text-white font-bold">المستخدمون</h2>
+          <InviteUserModal companyId={company.id} />
         </div>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-[#8b95a7] border-b border-[#222a36]">
-              <th className="text-end p-3">Name</th>
-              <th className="text-end p-3">Email</th>
-              <th className="text-end p-3">Role</th>
-              <th className="text-end p-3">Status</th><th className="text-end p-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u: any) => (
-              <tr key={u.id} className="border-b border-[#222a36] text-slate-300">
-                <td className="p-3">{u.full_name ?? '-'}</td>
-                <td className="p-3">{u.email ?? '-'}</td>
-                <td className="p-3 font-semibold">{u.role ?? '-'}</td>
-                <td className="p-3">
-                  <span className={u.is_active ? 'text-green-400' : 'text-red-400'}>
-                    {u.is_active ? 'active' : 'disabled'}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <UserStatusButton userId={u.id} isActive={Boolean(u.is_active)} />
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-start">
+            <thead className="bg-[#0b0e14] text-[#8b95a7] text-xs">
               <tr>
-                <td className="p-6 text-[#8b95a7] text-center" colSpan={4}>No users found.</td>
+                <th className="text-end p-3 font-bold uppercase">الاسم</th>
+                <th className="text-end p-3 font-bold uppercase">البريد</th>
+                <th className="text-end p-3 font-bold uppercase">الصلاحية</th>
+                <th className="text-end p-3 font-bold uppercase">الحالة</th>
+                <th className="text-end p-3 font-bold uppercase">إجراء</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[#1c2330]">
+              {users.map((u: any) => (
+                <tr key={u.id} className="hover:bg-[#1a212c] transition-colors text-slate-300">
+                  <td className="p-3 text-white font-medium">{u.full_name ?? '-'}</td>
+                  <td className="p-3 font-mono text-xs">{u.email ?? '-'}</td>
+                  <td className="p-3 font-bold">{u.role ?? '-'}</td>
+                  <td className="p-3">
+                    <span className={u.is_active ? 'text-emerald-400' : 'text-rose-400'}>
+                      {u.is_active ? 'نشط' : 'معطَّل'}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <UserStatusButton userId={u.id} isActive={Boolean(u.is_active)} />
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && (
+                <tr>
+                  <td className="p-12 text-center bg-[#222a36]/50" colSpan={5}>
+                    <div className="text-[#5f6b7e] text-sm font-bold">لا يوجد مستخدمون</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="card overflow-hidden">
+      {/* Recent events */}
+      <div className="bg-[#151a23] border border-[#222a36] rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 border-b border-[#222a36]">
-          <h2 className="text-slate-900 font-semibold">Recent Tenant Events</h2>
+          <h2 className="text-white font-bold">آخر الأحداث</h2>
         </div>
 
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-[#1c2330]">
           {events.map((e: any, index: number) => (
             <div key={index} className="p-4 flex items-center justify-between text-sm">
               <div>
-                <div className="text-slate-900">{e.event_type}</div>
+                <div className="text-white font-medium">{e.event_type}</div>
                 <div className="text-[#5f6b7e]">{e.note ?? '-'}</div>
               </div>
               <div className="text-[#5f6b7e]">
@@ -166,15 +177,12 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
           ))}
 
           {events.length === 0 && (
-            <div className="p-6 text-[#8b95a7] text-center">No events found.</div>
+            <div className="p-12 text-center bg-[#222a36]/50">
+              <div className="text-[#5f6b7e] text-sm font-bold">لا توجد أحداث مسجَّلة</div>
+            </div>
           )}
         </div>
       </div>
     </div>
   )
 }
-
-
-
-
-
