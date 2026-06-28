@@ -38,7 +38,6 @@ export type Customer360Context = {
   allStatusHistory: any[]
   allAssignments: any[]
   alerts: any[]
-  aiMemory: any[]
   collectionAccounts: any[]
   customerDataByPortfolio: Record<string, any[]>
 }
@@ -76,7 +75,6 @@ export async function buildCustomer360Context(params: {
     { data: followups },
     { data: statusHistory },
     { data: assignments },
-    { data: memory },
     { data: collAccounts },
     { data: alerts },
   ] = await Promise.all([
@@ -111,9 +109,6 @@ export async function buildCustomer360Context(params: {
 
     supabase.from('collection_assignments').select('debt_id, assigned_to_name, assigned_by_name, assignment_status, assigned_at, released_at')
       .eq('company_id', params.company_id).eq('customer_id', params.customer_id).order('assigned_at', { ascending: false }),
-
-    supabase.from('ai_memory').select('trigger_pattern, response_text, category, success_rate, use_count, last_used_at, source, created_at')
-      .eq('company_id', params.company_id).eq('is_active', true).order('use_count', { ascending: false }).limit(8),
 
     supabase.from('collection_accounts').select('method_type, iban, account_name, bank_name, biller_code, biller_name, instructions, portfolio_id')
       .eq('company_id', params.company_id).eq('is_active', true),
@@ -177,7 +172,6 @@ export async function buildCustomer360Context(params: {
     allStatusHistory: statusHistory ?? [],
     allAssignments: assignments ?? [],
     alerts: alerts ?? [],
-    aiMemory: memory ?? [],
     collectionAccounts: collAccounts ?? [],
     customerDataByPortfolio,
   }

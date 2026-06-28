@@ -5,7 +5,7 @@ import { vi, beforeAll, afterAll, afterEach } from 'vitest'
 process.env.NEXT_PUBLIC_SUPABASE_URL     = 'https://test.supabase.co'
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-xxxxxxxxxxxxxxxxxxxx'
 process.env.SUPABASE_SERVICE_ROLE_KEY    = 'test-service-role-key-xxxxxxxxxxxxxxxxx'
-process.env.OPENAI_API_KEY               = 'sk-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+process.env.OPENROUTER_API_KEY           = 'sk-or-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 process.env.APP_SECRET                   = 'test-app-secret-32-characters-long!!'
 process.env.NEXT_PUBLIC_APP_URL          = 'http://localhost:3000'
 process.env.WHATSAPP_PHONE_NUMBER_ID     = '123456789'
@@ -15,14 +15,18 @@ process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = '987654321'
 process.env.NODE_ENV                     = 'test'
 
 // ── Supabase mock ──────────────────────────────────────────────────────────
+// vi.fn() (not plain arrow functions) so individual tests can override the
+// return value per-test via vi.mocked(createClient).mockReturnValue(...) —
+// the default implementation still returns a working mock client for every
+// test that doesn't need to override it.
 vi.mock('@/lib/supabase/server', () => ({
-  createClient:        () => mockSupabaseClient(),
-  createServerClient:  () => mockSupabaseClient(),
-  createServiceClient: () => mockSupabaseClient(),
+  createClient:        vi.fn().mockImplementation(() => mockSupabaseClient()),
+  createServerClient:  vi.fn().mockImplementation(() => mockSupabaseClient()),
+  createServiceClient: vi.fn().mockImplementation(() => mockSupabaseClient()),
 }))
 
 vi.mock('@/lib/supabase/client', () => ({
-  createBrowserClient: () => mockSupabaseClient(),
+  createBrowserClient: vi.fn().mockImplementation(() => mockSupabaseClient()),
 }))
 
 // ── Next.js mocks ──────────────────────────────────────────────────────────

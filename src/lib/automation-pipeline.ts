@@ -298,63 +298,13 @@ async function stepTimeline(
 // Step: AI Memory
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function stepMemory(ctx: Ctx): Promise<number> {
-  const sb = createServiceClient()
-  let added = 0
-
-  const entries: Array<{ pattern: string; text: string; cat: string }> = []
-
-  // 1. Debt notes / last contact result
-  for (const raw of [ctx.debt.notes, ctx.debt.last_contact_result]) {
-    if (!raw || raw.trim().length < 8) continue
-    const note  = raw.trim()
-    const lower = note.toLowerCase()
-    const cat =
-      lower.includes('بسدد') || lower.includes('will pay') || lower.includes('سوف') ? 'payment_promise' :
-      lower.includes('غاضب') || lower.includes('angry') || lower.includes('يشتكي') ? 'angry' :
-      lower.includes('مو عندي') || lower.includes('no money') || lower.includes('ظروف') ? 'objection' :
-      lower.includes('تصعيد') || lower.includes('legal') || lower.includes('محكمة') ? 'escalation' :
-      'general'
-    entries.push({ pattern: note.slice(0, 200), text: note, cat })
-  }
-
-  // 2. Customer + debt profile (always useful for AI context)
-  if (ctx.customer.full_name && ctx.debt.current_balance > 0) {
-    const profile = `عميل: ${ctx.customer.full_name} | رصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} | حالة: ${ctx.debt.status} | مرجع: ${ctx.debt.reference_number}`
-    entries.push({ pattern: profile.slice(0, 200), text: profile, cat: 'general' })
-  }
-
-  // 3. Payment behaviour
-  if (ctx.payments.length > 0) {
-    const txt = `سجل مدفوعات: ${ctx.payments.length} دفعة — آخر دفعة: ${ctx.payments[0]?.date ?? 'غير محدد'}`
-    entries.push({ pattern: txt.slice(0, 200), text: txt, cat: 'payment_promise' })
-  }
-
-  for (const e of entries) {
-    if (!e.pattern.trim()) continue
-    try {
-      const { data: ex } = await sb.from('ai_memory')
-        .select('id').eq('company_id', ctx.debt.company_id)
-        .eq('trigger_pattern', e.pattern).maybeSingle()
-      if (ex) continue
-
-      await sb.from('ai_memory').insert({
-        company_id:      ctx.debt.company_id,
-        trigger_pattern: e.pattern,
-        response_text:   e.text,
-        category:        e.cat,
-        language:        /[\u0600-\u06FF]/.test(e.pattern) ? 'ar' : 'en',
-        status:          'approved',
-        is_active:       true,
-        source:          'imported',
-        success_count:   0,
-        use_count:       0,
-      })
-      added++
-    } catch { /* non-critical */ }
-  }
-  return added
+// ai_memory is disabled — confirmed unused in the actual agent reply path.
+// Read/write disabled at the source rather than dropping the table, so it
+// remains a safe rollback if ever needed.
+async function stepMemory(_ctx: Ctx): Promise<number> {
+  return 0
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step: AI Score (always runs, falls back to rule-based)
@@ -884,32 +834,7 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
     done.push('ai_impact:timeline')
   }
 
-  if (impact.memory && message) {
-    const triggerPattern = message.slice(0, 120)
-    const { data: existing } = await sb.from('ai_memory')
-      .select('id')
-      .eq('company_id', ctx.debt.company_id)
-      .eq('trigger_pattern', triggerPattern)
-      .maybeSingle()
-
-    if (!existing) {
-      await sb.from('ai_memory').insert({
-        company_id: ctx.debt.company_id,
-        trigger_pattern: triggerPattern,
-        response_text: summary,
-        category: 'ai_system_impact',
-        language: /[\u0600-\u06FF]/.test(triggerPattern) ? 'ar' : 'en',
-        status: 'approved',
-        is_active: true,
-        source: 'ai_system_operator',
-        success_rate: 1,
-        use_count: 1,
-      })
-      done.push('ai_impact:memory')
-    } else {
-      done.push('ai_impact:memory_exists')
-    }
-  }
+  // ai_memory disabled — see stepMemory() above.
 
   if (impact.promise) {
     const today = new Date().toISOString().split('T')[0]

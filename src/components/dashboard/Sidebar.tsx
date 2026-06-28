@@ -6,7 +6,7 @@ import {
   Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
   Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Package,
-  FlaskConical, TrendingUp, Phone, Brain, Scale
+  FlaskConical, TrendingUp, Phone, Brain, Scale, HeartPulse
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
@@ -63,6 +63,7 @@ export function Sidebar({ profile }: { profile: any }) {
         { href: `/dashboard/${role}/automation`,   label: t.nav.automation, icon: Settings, roles: ['admin'] },
         { href: `/dashboard/${role}/integrations`, label: t.nav.integrations, icon: LinkIcon, roles: ['admin'] },
         { href: `/dashboard/${role}/alerts`,       label: t.nav.alerts, icon: Bell, roles: ['admin'] },
+        { href: `/dashboard/${role}/health`,       label: isRTL ? 'صحة النظام' : 'System Health', icon: HeartPulse, roles: ['admin'] },
       ],
     },
     {

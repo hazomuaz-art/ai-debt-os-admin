@@ -22,10 +22,10 @@ describe('validateEnv', () => {
   })
 
   it('reports missing required vars', () => {
-    delete process.env.OPENAI_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     const result = validateEnv()
     expect(result.valid).toBe(false)
-    expect(result.missing).toContain('OPENAI_API_KEY')
+    expect(result.missing).toContain('OPENROUTER_API_KEY')
   })
 
   it('reports invalid Supabase URL', () => {
@@ -36,10 +36,10 @@ describe('validateEnv', () => {
   })
 
   it('reports invalid OpenAI key format', () => {
-    process.env.OPENAI_API_KEY = 'not-starting-with-sk'
+    process.env.OPENROUTER_API_KEY = 'not-starting-with-sk'
     const result = validateEnv()
     expect(result.valid).toBe(false)
-    expect(result.invalid.map(i => i.key)).toContain('OPENAI_API_KEY')
+    expect(result.invalid.map(i => i.key)).toContain('OPENROUTER_API_KEY')
   })
 
   it('reports short APP_SECRET', () => {
@@ -90,7 +90,7 @@ describe('isOpenAIConfigured', () => {
   })
 
   it('returns false when key missing', () => {
-    delete process.env.OPENAI_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     expect(isOpenAIConfigured()).toBe(false)
   })
 })

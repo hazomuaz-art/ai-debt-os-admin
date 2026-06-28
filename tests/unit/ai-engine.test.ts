@@ -90,7 +90,13 @@ describe('scoreDebt', () => {
     expect(result.factors).toEqual([])
   })
 
-  it('throws on empty OpenAI response', async () => {
+  // scoreDebt deliberately NEVER throws on an OpenAI failure (empty response,
+  // invalid JSON, network error) — it catches internally and falls back to
+  // the rule-based scorer (scoringFallback) instead, so a debt is never left
+  // unscored just because the LLM call failed. These tests previously
+  // expected the OLD throw-on-failure behavior; updated to match the actual,
+  // intentional, safer fallback behavior.
+  it('falls back to rule-based scoring on an empty OpenAI response (never throws)', async () => {
     const openai = (await import('openai')).default as any
     openai.mockImplementation(() => ({
       chat: { completions: { create: vi.fn().mockResolvedValue({
@@ -99,10 +105,12 @@ describe('scoreDebt', () => {
     }))
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
-    await expect(scoreDebtFresh(validInput)).rejects.toThrow()
+    const result = await scoreDebtFresh(validInput)
+    expect(result.score).toBeGreaterThanOrEqual(0)
+    expect(result.risk_classification).toBeTruthy()
   })
 
-  it('throws on invalid JSON response', async () => {
+  it('falls back to rule-based scoring on an invalid JSON response (never throws)', async () => {
     const openai = (await import('openai')).default as any
     openai.mockImplementation(() => ({
       chat: { completions: { create: vi.fn().mockResolvedValue({
@@ -111,7 +119,9 @@ describe('scoreDebt', () => {
     }))
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
-    await expect(scoreDebtFresh(validInput)).rejects.toThrow('invalid JSON')
+    const result = await scoreDebtFresh(validInput)
+    expect(result.score).toBeGreaterThanOrEqual(0)
+    expect(result.risk_classification).toBeTruthy()
   })
 
   it('defaults unknown risk_classification to medium', async () => {

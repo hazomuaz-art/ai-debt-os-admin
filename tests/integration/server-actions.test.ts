@@ -14,7 +14,7 @@ describe('createCustomerAction', () => {
   it('returns error for unauthenticated user', async () => {
     // Mock getUser returning null
     mockClient.auth.getUser.mockResolvedValue({ data: { user: null }, error: null })
-    vi.mocked(require('@/lib/supabase/server').createClient).mockReturnValue(mockClient)
+    vi.mocked((await import('@/lib/supabase/server')).createClient).mockReturnValue(mockClient)
 
     const { createCustomerAction } = await import('@/lib/actions/debts')
     const formData = new FormData()
@@ -31,7 +31,7 @@ describe('createCustomerAction', () => {
       error: null,
     })
     mockClient.single.mockResolvedValue({ data: fixtures.adminProfile, error: null })
-    vi.mocked(require('@/lib/supabase/server').createClient).mockReturnValue(mockClient)
+    vi.mocked((await import('@/lib/supabase/server')).createClient).mockReturnValue(mockClient)
 
     const { createCustomerAction } = await import('@/lib/actions/debts')
     const formData = new FormData()
@@ -56,7 +56,7 @@ describe('recordPaymentAction', () => {
       // Debt lookup
       .mockResolvedValueOnce({ data: fixtures.debt, error: null })
 
-    vi.mocked(require('@/lib/supabase/server').createClient).mockReturnValue(mockClient)
+    vi.mocked((await import('@/lib/supabase/server')).createClient).mockReturnValue(mockClient)
 
     const { recordPaymentAction } = await import('@/lib/actions/debts')
 
@@ -78,7 +78,7 @@ describe('recordPaymentAction', () => {
       .mockResolvedValueOnce({ data: fixtures.adminProfile, error: null })
       .mockResolvedValueOnce({ data: { ...fixtures.debt, status: 'settled' }, error: null })
 
-    vi.mocked(require('@/lib/supabase/server').createClient).mockReturnValue(mockClient)
+    vi.mocked((await import('@/lib/supabase/server')).createClient).mockReturnValue(mockClient)
 
     const { recordPaymentAction } = await import('@/lib/actions/debts')
 
@@ -109,7 +109,7 @@ describe('updateDebtStatusAction', () => {
       error: null,
     })
     mockClient.single.mockResolvedValue({ data: fixtures.adminProfile, error: null })
-    vi.mocked(require('@/lib/supabase/server').createClient).mockReturnValue(mockClient)
+    vi.mocked((await import('@/lib/supabase/server')).createClient).mockReturnValue(mockClient)
 
     const { updateDebtStatusAction } = await import('@/lib/actions/debts')
 
@@ -127,7 +127,7 @@ describe('updateDebtStatusAction', () => {
       .mockResolvedValueOnce({ data: fixtures.collectorProfile, error: null })
       .mockResolvedValueOnce({ data: { ...fixtures.debt, status: 'settled' }, error: null })
 
-    vi.mocked(require('@/lib/supabase/server').createClient).mockReturnValue(mockClient)
+    vi.mocked((await import('@/lib/supabase/server')).createClient).mockReturnValue(mockClient)
 
     const { updateDebtStatusAction } = await import('@/lib/actions/debts')
 

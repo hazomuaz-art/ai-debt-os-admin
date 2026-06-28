@@ -76,10 +76,10 @@ export interface AuditReport {
 
 const EXPECTED_TABLES = [
   'companies','profiles','customers','debts','payments','messages',
-  'ai_scores','ai_actions','ai_memory','timeline_events','collection_rules',
+  'ai_scores','ai_actions','ai_memory','timeline_events',
   'system_alerts','system_config','promises','approvals','campaigns',
-  'portfolios','job_queue','knowledge_base','integration_settings',
-  'orchestrator_runs',
+  'portfolios','job_queue','integration_settings',
+  'orchestrator_runs','legal_escalations',
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,6 +104,8 @@ const EXPECTED_ROUTES = [
   { path: '/api/modules/approvals',   method: 'GET',  name: 'Approvals module' },
   { path: '/api/modules/memory',      method: 'GET',  name: 'AI Memory module' },
   { path: '/api/health',              method: 'GET',  name: 'Health check' },
+  { path: '/api/cron/legal-escalation-check', method: 'GET', name: 'Legal escalation cron' },
+  { path: '/api/cron/send-campaign-queue',    method: 'GET', name: 'Campaign queue cron' },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,8 +126,8 @@ const EXPECTED_PAGES = [
   { path: '/dashboard/admin/memory',        name: 'AI Memory' },
   { path: '/dashboard/admin/automation',    name: 'Automation' },
   { path: '/dashboard/admin/integrations',  name: 'Integrations' },
-  { path: '/dashboard/admin/rules',         name: 'Rules Engine' },
   { path: '/dashboard/admin/portfolios',    name: 'Portfolios' },
+  { path: '/dashboard/admin/legal-escalations', name: 'Legal Escalations' },
   { path: '/dashboard/admin/health',        name: 'System Health' },
 ]
 
@@ -140,7 +142,6 @@ const MODULE_MAP = [
   { name: 'AI Memory',       writes: 'ai_memory',       reads: 'ai_memory',       pipeline_step: 'memory' },
   { name: 'Timeline',        writes: 'timeline_events', reads: 'timeline_events', pipeline_step: 'timeline' },
   { name: 'Alerts',          writes: 'system_alerts',   reads: 'system_alerts',   pipeline_step: 'alerts' },
-  { name: 'Rules Engine',    writes: 'collection_rules',reads: 'collection_rules',pipeline_step: 'rules' },
   { name: 'Promises',        writes: 'promises',        reads: 'promises',        pipeline_step: 'promises' },
   { name: 'Approvals',       writes: 'approvals',       reads: 'approvals',       pipeline_step: 'approvals' },
   { name: 'Campaigns',       writes: 'campaigns',       reads: 'campaigns',       pipeline_step: 'campaigns' },
@@ -375,7 +376,6 @@ export async function runAudit(companyId: string, safeFix = false): Promise<Audi
     { name: 'Approvals → Approvals page',     table: 'approvals',      page: 'approvals' },
     { name: 'Campaigns → Campaigns page',     table: 'campaigns',      page: 'campaigns' },
     { name: 'AI Memory → Memory page',        table: 'ai_memory',      page: 'memory' },
-    { name: 'Rules → Rules page',             table: 'collection_rules',page: 'rules' },
     { name: 'Orchestrator runs → Health page',table: 'orchestrator_runs',page: 'health' },
   ]
 

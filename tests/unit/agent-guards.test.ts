@@ -210,14 +210,19 @@ describe('collector agent — deterministic anti-redundancy guards', () => {
 
   it('(D) ACCEPTS the promise when customer says "بكرا" (alef spelling) — no re-ask loop', async () => {
     mockContext.recent_promises = []
+    // "tomorrow" computed relative to the actual current date, not a
+    // hardcoded literal — a fixed past-tense date here would correctly get
+    // rejected by isSaneDate() and silently replaced by the fallback,
+    // making this test flaky-by-construction as time passes.
+    const tomorrow = new Date(Date.now() + 24 * 3600_000).toISOString().slice(0, 10)
     mockModelContent = JSON.stringify({
       shouldReply: true, action: 'record_promise', reason: 'customer_gave_date',
-      message: 'تمام، بانتظار سدادك بكرا. أرسل لي الإيصال بعد التحويل.', promised_date: '2026-06-22',
+      message: 'تمام، بانتظار سدادك بكرا. أرسل لي الإيصال بعد التحويل.', promised_date: tomorrow,
     })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'خلاص بسدد بكرا' })
 
     expect(d.action).toBe('record_promise')           // promise recorded, NOT re-asked
-    expect(d.promised_date).toBe('2026-06-22')
+    expect(d.promised_date).toBe(tomorrow)
     expect(d.reason).not.toContain('guard')
   })
 

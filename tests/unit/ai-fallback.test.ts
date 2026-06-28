@@ -49,8 +49,12 @@ describe('scoringFallback (rule-based)', () => {
   })
 
   it('recommends legal action for 200+ days overdue', () => {
+    // The fallback's recommended_strategy is Arabic now (was English when
+    // this test was written) — "تصعيد قانوني" = legal escalation, "إعدام
+    // الدين" = debt write-off. Same intent the old /legal|write/ regex
+    // checked for, just localized.
     const result = scoringFallback({ ...baseInput, days_overdue: 200 })
-    expect(result.recommended_strategy.toLowerCase()).toMatch(/legal|write/i)
+    expect(result.recommended_strategy).toMatch(/تصعيد قانوني|إعدام الدين/)
   })
 
   it('never throws regardless of input', () => {

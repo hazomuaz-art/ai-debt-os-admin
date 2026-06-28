@@ -835,7 +835,7 @@ export async function runCollectorAgent(args: {
   // engine). Only ever built for category='insurance'; for every other
   // category this stays null and nothing insurance-specific is injected.
   const insuranceRow = playbook.category === 'insurance'
-    ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0]
+    ? (ctx360.customerDataByPortfolio?.[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0]
     : null
   const insuranceCase = insuranceRow ? classifyInsuranceCase(insuranceRow) : null
   const insuranceObjection = playbook.category === 'insurance' ? detectInsuranceObjectionSignals(text) : null
@@ -1075,10 +1075,10 @@ ${installmentRule}
   }
 
   const stcRow = isStcPortfolio
-    ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
+    ? (ctx360.customerDataByPortfolio?.[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
     : null
   const mobilyRow = isMobilyPortfolio
-    ? (ctx360.customerDataByPortfolio[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
+    ? (ctx360.customerDataByPortfolio?.[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0] ?? null
     : null
   const caseFile = buildCaseFile(ctx, stcRow, mobilyRow)
   const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''

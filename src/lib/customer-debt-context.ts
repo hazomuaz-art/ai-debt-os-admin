@@ -35,7 +35,6 @@ export async function buildCustomerDebtContext(params: {
     { data: messages },
     { data: timeline },
     { data: promises },
-    { data: memory },
     { data: approvals },
     { data: alerts },
     { data: collectionFollowups },
@@ -83,14 +82,6 @@ export async function buildCustomerDebtContext(params: {
           .eq('customer_id', params.customer_id)
           .order('created_at', { ascending: false })
           .limit(5),
-
-    supabase
-      .from('ai_memory')
-      .select('trigger_pattern, response_text, category, success_rate, use_count, last_used_at, source, created_at')
-      .eq('company_id', params.company_id)
-      .eq('is_active', true)
-      .order('use_count', { ascending: false })
-      .limit(8),
 
     debtId
       ? supabase
@@ -307,7 +298,6 @@ export async function buildCustomerDebtContext(params: {
     recent_messages: messages ?? [],
     recent_timeline: timeline ?? [],
     recent_promises: promises ?? [],
-    ai_memory: memory ?? [],
     recent_approvals: approvals ?? [],
     active_alerts: alerts ?? [],
     collection_history: {
