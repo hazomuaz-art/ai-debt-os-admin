@@ -16,10 +16,12 @@ export default async function DashboardLayout({
   const { data: profile } = await supabase
     .from('profiles').select('id, full_name, email, role, company_id').eq('id', user.id).single()
 
+  const isPlatformOwner = !!profile?.company_id && profile.company_id === process.env.PLATFORM_OWNER_COMPANY_ID
+
   return (
     <div className="flex h-screen bg-[#0b0e14] text-slate-200 font-sans" >
       {/* Sidebar */}
-      <Sidebar profile={profile || {}} />
+      <Sidebar profile={profile || {}} isPlatformOwner={isPlatformOwner} />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#0b0e14] z-10">

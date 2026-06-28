@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
 import UserStatusButton from '@/components/dashboard/UserStatusButton'
+import SubscriptionActionButtons from '@/components/dashboard/SubscriptionActionButtons'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
@@ -89,9 +90,10 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
           <div className={company.is_active ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
             {company.is_active ? 'Active' : 'Suspended'}
           </div>
-          <div className="text-[#8b95a7] text-sm">
+          <div className="text-[#8b95a7] text-sm mb-2">
             {sub?.plan_name ?? company.plan ?? 'starter'} · {sub?.status ?? 'no subscription'}
           </div>
+          <SubscriptionActionButtons companyId={company.id} status={sub?.status ?? null} />
         </div>
       </div>
 

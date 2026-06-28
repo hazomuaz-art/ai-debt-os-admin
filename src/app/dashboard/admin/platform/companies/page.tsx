@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { CreateCompanyModal } from '@/components/dashboard/CreateCompanyModal'
 
 function Card({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
@@ -76,11 +77,14 @@ export default async function PlatformCompaniesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display font-bold text-2xl text-slate-900">Platform Companies</h1>
-        <p className="text-[#8b95a7] text-sm mt-1">
-          Super-admin overview for companies, subscriptions, usage, and tenant activity.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display font-bold text-2xl text-slate-900">Platform Companies</h1>
+          <p className="text-[#8b95a7] text-sm mt-1">
+            Super-admin overview for companies, subscriptions, usage, and tenant activity.
+          </p>
+        </div>
+        <CreateCompanyModal />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

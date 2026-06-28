@@ -117,8 +117,8 @@ export function InviteUserModal({ companyId }: { companyId: string }) {
             <select name="role" className="w-full bg-[#0d1117] border-none text-white rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0e7a54]">
               <option value="collector">موظف تحصيل (Collector)</option>
               <option value="manager">مشرف تحصيل (Manager)</option>
-              <option value="admin">مدير نظام (Admin)</option>
             </select>
+            <p className="text-xs text-[#5f6b7e] font-medium mt-2">صلاحية "مدير نظام" لا تُمنح عبر هذا النموذج لأسباب أمنية — تحتاج إجراءً يدوياً منفصلاً.</p>
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-[#222a36]">

@@ -6,13 +6,13 @@ import {
   Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
   Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Package,
-  FlaskConical, TrendingUp, Phone, Brain, Scale, HeartPulse
+  FlaskConical, TrendingUp, Phone, Brain, Scale, HeartPulse, Building2
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
-export function Sidebar({ profile }: { profile: any }) {
+export function Sidebar({ profile, isPlatformOwner }: { profile: any; isPlatformOwner?: boolean }) {
   const pathname = usePathname()
   const { t, isRTL } = useTranslation()
   const role = profile?.role || 'admin'
@@ -73,6 +73,12 @@ export function Sidebar({ profile }: { profile: any }) {
         { href: `/dashboard/${role}/memory`,          label: isRTL ? 'ذاكرة الذكاء الاصطناعي' : 'AI Memory', icon: Brain, roles: ['admin'], soon: true },
       ],
     },
+    ...(isPlatformOwner ? [{
+      label: isRTL ? 'منصّة SaaS' : 'SaaS Platform',
+      items: [
+        { href: `/dashboard/${role}/platform/companies`, label: isRTL ? 'إدارة الشركات' : 'Manage Companies', icon: Building2, roles: ['admin'] },
+      ],
+    }] : []),
   ].map(g => ({ ...g, items: g.items.filter(i => i.roles.includes(role)) })).filter(g => g.items.length > 0)
 
   return (
