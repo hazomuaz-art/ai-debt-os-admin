@@ -256,6 +256,18 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // Installment request → open the SAME approval the dashboard already
+      // knows how to notify the customer about on approve/reject (see
+      // src/app/api/modules/approvals/route.ts PATCH) — this action was
+      // computed by the agent before today but never actually acted on here.
+      if (aiDecision.action === 'record_installment_request' && debt_id) {
+        const { recordInstallmentRequest } = await import('@/lib/installment-request')
+        await recordInstallmentRequest({
+          company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
+          debt_id, customer_message: mergedText, agent_reason: aiDecision.reason,
+        })
+      }
+
       // Promise → record ONLY with the date the agent extracted from the
       // customer's own current message (never fabricated).
       if (aiDecision.action === 'record_promise' && debt_id && aiDecision.promised_date) {

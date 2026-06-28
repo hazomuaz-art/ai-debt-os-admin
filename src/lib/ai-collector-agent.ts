@@ -1021,10 +1021,11 @@ export async function runCollectorAgent(args: {
   - في كل الحالات الأخرى: تفاوض على السداد الكامل أو دفعة الآن، بدون أي إشارة للتقسيط.`
     : planActive
     ? '- ✅ يوجد تقسيط معتمد مسبقاً في النظام: أكّد للعميل أن خطته معتمدة واطلب موعد القسط القادم فقط. لا تغيّر شروط الخطة.'
-    : `- 🔴 صلاحية التقسيط: لا تملك صلاحية اعتماد تقسيط أو تحديد مبلغ شهري/عدد دفعات بنفسك — هذا قرار الإدارة. لكن لا ترفض طلب العميل رفضاً جافاً ولا تردّ بقالب آلي.
-  - أولاً (الأهم): حاول كمحصّل خبير إقناعه بالسداد الكامل أو دفعة كبيرة مقدّمة الآن (اربطها بمصلحته: إغلاق الملف، تجنّب التصعيد، راحة البال). تفاوض بذكاء قبل أي شيء.
-  - إن أصرّ فعلاً على التقسيط بعد محاولتك: اطلب منه أن يقترح هو التصوّر الذي يناسبه (كم دفعة وكم شهرياً ومتى يبدأ)، وقل له بأسلوب بشري إنك سترفع طلبه للإدارة للنظر فيه دون أن تعده بالموافقة، واختر action=record_installment_request. لا تذكر أرقاماً أو جدولاً من عندك إطلاقاً.
-  - الهدف: تبدو كمحصّل يحاور ويحاول الحل، لا كموظف يحوّل كل شيء للإدارة فوراً.`
+    : `- 🔴🔴 ممنوع منعاً باتاً أن تقترح أو تذكر التقسيط ابتداءً من عندك بأي صياغة — لا كحل، لا كخيار، لا كمثال، بغض النظر عن مبلغ الدين. الفكرة لا تُطرح إلا إذا طلبها العميل بنفسه أولاً.
+  - لا تملك صلاحية اعتماد تقسيط أو تحديد مبلغ شهري/عدد دفعات بنفسك بأي حال — هذا قرار الإدارة دوماً، ولو طلبه العميل وأصررت أنت على رفضه بدل رفعه فهذا خطأ أيضاً.
+  - أولاً (الأهم): حاول كمحصّل خبير إقناعه بالسداد الكامل أو دفعة كبيرة مقدّمة الآن (اربطها بمصلحته: إغلاق الملف، تجنّب التصعيد، راحة البال). تفاوض بذكاء قبل أي شيء — ولا تذكر التقسيط أبداً خلال هذا التفاوض.
+  - فقط إذا طلب العميل التقسيط بنفسه وبشكل صريح: اطلب منه أن يقترح هو التصوّر الذي يناسبه (كم دفعة وكم شهرياً ومتى يبدأ)، وقل له بأسلوب بشري إنك سترفع طلبه للإدارة للنظر فيه دون أن تعده بالموافقة، واختر action=record_installment_request. لا تذكر أرقاماً أو جدولاً من عندك إطلاقاً، ولا توافق ولا ترفض الطلب من نفسك — الإدارة فقط تقرر، بغض النظر عن حجم المبلغ.
+  - الهدف: تبدو كمحصّل يحاور ويحاول الحل، لا كموظف يحوّل كل شيء للإدارة فوراً ولا كمن يطرح حلولاً لم يطلبها العميل.`
 
   const intentPrompts: Record<AgentIntent, string> = {
     GREETING: `【 مهمتك الآن: الترحيب فقط 】
@@ -1222,6 +1223,13 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
 
   const customerFirstName = String(ctx.verified_customer_data?.customer_name ?? '').split(' ')[0] || undefined
   parsed.message = cleanReply(parsed.message, customerFirstName, prevOutbound.length === 0)
+
+  // Captured BEFORE any corrective guard rewrites parsed.message — the
+  // installment-leak guard further down must judge the MODEL's own draft,
+  // not text injected by an earlier guard answering a real question (e.g.
+  // referencing an existing pending request's status is not the agent
+  // proposing a new installment).
+  const modelDraftedMessage = parsed.message
 
   // Facts already verified in the system + any promise already on file. Used by
   // the deterministic conversation guards below to STOP the agent from asking
@@ -1647,17 +1655,19 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       }
     }
 
-    // (L3) STC bans the agent from proposing/mentioning installments unless
-    // the CUSTOMER'S OWN current message explicitly asked for one
-    // (signals.installment). The prompt instruction (§installmentRule above)
-    // is not reliable enough on its own — this is the deterministic backstop
-    // that strips any leaked تقسيط/أقساط/قسط/جدولة mention from the reply.
-    if (isStcPortfolio && !signals.installment) {
+    // (L3) No portfolio's agent may propose/mention installments unless the
+    // CUSTOMER'S OWN current message explicitly asked for one
+    // (signals.installment) — universal rule, not just STC. The prompt
+    // instruction (§installmentRule above) is not reliable enough on its
+    // own — this is the deterministic backstop that strips any leaked
+    // تقسيط/أقساط/قسط/جدولة mention from the reply. Skipped only when an
+    // installment plan is already active (confirming it is legitimate).
+    if (!planActive && !signals.installment) {
       const INSTALLMENT_LEAK_PATTERN = /(تقسيط|أقساط|اقساط|قسط(?!ت)|جدولة)/
-      if (INSTALLMENT_LEAK_PATTERN.test(parsed.message)) {
-        log.warn('STC installment mention stripped — customer did not request it', { original: parsed.message.slice(0, 120) })
+      if (INSTALLMENT_LEAK_PATTERN.test(modelDraftedMessage)) {
+        log.warn('installment mention stripped — customer did not request it', { original: parsed.message.slice(0, 120) })
         if (parsed.action === 'record_installment_request') parsed.action = 'negotiate'
-        parsed.reason = 'stc_installment_leak_blocked'
+        parsed.reason = 'installment_leak_blocked'
         // Never substitute a canned "your promise is recorded" line regardless
         // of what the customer's CURRENT message actually says — that was the
         // exact production bug ("اي طلب؟" answered with a fabricated promise
@@ -1665,7 +1675,7 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
         // but still answers whatever the customer is currently asking.
         const corrected = await regenerateWithCorrection(
           client, modelId, systemPrompt, turns, text,
-          'لا يجوز ذكر أو اقتراح التقسيط في ردك على هذا العميل (محفظة STC لا تسمح به إلا بطلب صريح من العميل لم يحدث هنا) — أعد الصياغة بدون أي ذكر للتقسيط/الأقساط، مع الإجابة الكاملة على ما سأله العميل أو قاله في رسالته الحالية.',
+          'لا يجوز ذكر أو اقتراح التقسيط في ردك على هذا العميل (لا يُطرح إلا بطلب صريح من العميل لم يحدث هنا) — أعد الصياغة بدون أي ذكر للتقسيط/الأقساط، مع الإجابة الكاملة على ما سأله العميل أو قاله في رسالته الحالية.',
         )
         parsed.message = corrected ?? 'تمام، خلنا نكمل بخصوص ملفك.'
       }
@@ -1794,7 +1804,7 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
           // bank only varies the WORDING while asking the customer the exact
           // same thing again, which is the literal complaint this fixes.
           const note = signals.refusesToPay
-            ? 'كررت سؤال السداد بصياغة قريبة من ردك السابق، والعميل رفض السداد بصريح العبارة من قبل — لا تسأل عن موعد/مقدار السداد مرة أخرى، تعامل مع رفضه مباشرة (وضّح حقه المحفوظ أو اعرض تسجيل اعتراض رسمي).'
+            ? 'كررت سؤال السداد بصياغة قريبة من ردك السابق، والعميل رفض السداد بصريح العبارة من قبل (وليس معترضاً على صحة الدين) — لا تسأل عن موعد/مقدار السداد مرة أخرى، ولا تطرح فكرة "تسجيل اعتراض" من عندك أبداً (هو لم يعترض)، فقط وضّح له بهدوء أن المديونية مسجَّلة وثابتة وأن الرفض لا يلغيها، واسأله بشكل مختلف عن سبب تردده.'
             : 'كررت سؤالاً سبق أن طرحته بصياغة مشابهة جداً — راجع رسائل العميل السابقة وانتقل للخطوة التالية الفعلية بدل إعادة نفس السؤال.'
           const corrected = await regenerateWithCorrection(client, modelId, systemPrompt, turns, text, note)
           if (corrected) {

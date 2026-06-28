@@ -4,6 +4,22 @@ import { resolveCompanyProfile, type OutcomeMeta } from '@/lib/company-import-pr
 
 const log = createLogger('debt-status-classifier')
 
+// Claude via OpenRouter often ignores response_format:json_object and wraps
+// the JSON in markdown fences anyway — same proven extractor used in
+// ai-collector-agent.ts for the main reply parsing.
+function extractJson(raw: string): any | null {
+  if (!raw) return null
+  let s = String(raw).trim()
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  try { return JSON.parse(s) } catch {}
+  const first = s.indexOf('{')
+  const last = s.lastIndexOf('}')
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(s.slice(first, last + 1)) } catch {}
+  }
+  return null
+}
+
 /**
  * Classifies the customer's latest message against the closed list of
  * contact-outcome categories for their specific company (from "تصنيفات
@@ -53,8 +69,8 @@ export async function classifyDebtOutcome(args: {
     const raw = completion.choices[0]?.message?.content
     if (!raw) return null
 
-    const parsed = JSON.parse(raw) as { category?: string | null }
-    const category = parsed.category?.trim() ?? null
+    const parsed = extractJson(raw) as { category?: string | null } | null
+    const category = parsed?.category?.trim() ?? null
     if (!category) return null
 
     // Closed-set enforcement — reject anything not literally in the list,

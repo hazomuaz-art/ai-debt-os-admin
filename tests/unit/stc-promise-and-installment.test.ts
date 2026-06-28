@@ -154,7 +154,7 @@ describe('أ) STC never proposes installments on its own', () => {
     expect(systemPrompt).not.toMatch(/إن أصرّ فعلاً على التقسيط بعد محاولتك/)
   })
 
-  it('Mobily (non-STC) keeps the original generic installment-negotiation wording unchanged', async () => {
+  it('Mobily (non-STC) now bans proactively proposing installments too — the ban is universal, not STC-only', async () => {
     mockContext.verified_debt_data.portfolio_name = 'موبايلي'
     const customerContextEngine = await import('@/lib/customer-context-engine')
     ;(customerContextEngine.buildCustomer360Context as any).mockResolvedValueOnce({
@@ -165,8 +165,8 @@ describe('أ) STC never proposes installments on its own', () => {
     await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ما عندي المبلغ كامل الحين' })
 
     const systemPrompt = lastCreateCallMessages[0].content as string
-    expect(systemPrompt).toContain('إن أصرّ فعلاً على التقسيط بعد محاولتك')
-    expect(systemPrompt).not.toContain('ممنوع منعاً باتاً أن تقترح أو تذكر التقسيط ابتداءً')
+    expect(systemPrompt).toContain('ممنوع منعاً باتاً أن تقترح أو تذكر التقسيط ابتداءً')
+    expect(systemPrompt).toContain('فقط إذا طلب العميل التقسيط بنفسه وبشكل صريح')
   })
 })
 
