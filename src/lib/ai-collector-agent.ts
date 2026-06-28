@@ -9,7 +9,7 @@ import {
 } from '@/lib/customer-context-engine'
 import { getPlaybookForPortfolio, renderPlaybookForPrompt } from '@/lib/company-playbook'
 import { classifyInsuranceCase, detectInsuranceObjectionSignals, renderInsuranceCaseFile } from '@/lib/insurance-engine'
-import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply, detectStcReviewSignal, recordStcReview } from '@/lib/legal-escalation'
+import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply, detectStcReviewSignal, recordStcReview, trackRefusalForLegalEscalation, generateLawyerPersonaReply } from '@/lib/legal-escalation'
 import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
 import { renderStcKnowledgeForCaseFile, detectStcFieldMeaningQuestion } from '@/lib/stc-knowledge'
 import { renderMobilyKnowledgeForCaseFile, detectMobilyFieldMeaningQuestion } from '@/lib/mobily-knowledge'
@@ -793,6 +793,30 @@ export async function runCollectorAgent(args: {
   if (forcedDebtId) {
     const openEsc = await getOpenEscalation(args.company_id, forcedDebtId)
     if (openEsc) {
+      // 'repeated_refusal' is the one escalation type that actually
+      // converses — a dynamic "lawyer persona" reply, not the fixed line.
+      // Needs a quick case summary; cheap inline fetch since `ctx` (the
+      // full case file) isn't built yet at this point in the pipeline.
+      if (openEsc.escalation_type === 'repeated_refusal') {
+        log.info('legal escalation lock active — lawyer persona reply', { debt_id: forcedDebtId })
+        let caseSummary = 'لا تفاصيل إضافية متاحة.'
+        try {
+          const { data: debtRow } = await createServiceClient()
+            .from('debts').select('current_balance, currency, reference_number, portfolio:portfolios(name_ar, name)')
+            .eq('id', forcedDebtId).maybeSingle()
+          if (debtRow) {
+            const d = debtRow as any
+            caseSummary = `الجهة: ${d.portfolio?.name_ar ?? d.portfolio?.name ?? 'غير محدد'} | المبلغ المتأخر: ${d.current_balance ?? '—'} ${d.currency ?? 'SAR'} | الرقم المرجعي: ${d.reference_number ?? '—'}`
+          }
+        } catch { /* keep default summary */ }
+        const lawyerReply = await generateLawyerPersonaReply({
+          customerMessage: text, caseSummary, reason: openEsc.reason,
+        })
+        return {
+          shouldReply: true, action: 'human_review',
+          reason: 'legal_escalation_locked_lawyer_persona', message: lawyerReply,
+        }
+      }
       log.info('legal escalation lock active — zero LLM call', { debt_id: forcedDebtId, escalation_type: openEsc.escalation_type })
       return {
         shouldReply: true,
@@ -833,6 +857,13 @@ export async function runCollectorAgent(args: {
   // "Mobily"), so it never affects STC or any other telecom portfolio.
   const mobilyProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'mobily')
   const isMobilyPortfolio = !!resolvedPortfolioName && !!mobilyProfile?.aliases.includes(resolvedPortfolioName)
+  // Owner-specified exclusion (2026-06-28) from the repeated-refusal →
+  // lawyer-persona escalation: STC, Saudi Energy, and National Water never
+  // get this automatic escalation, regardless of refusal count.
+  const saudiEnergyProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'saudi_energy')
+  const isSaudiEnergyPortfolio = !!resolvedPortfolioName && !!saudiEnergyProfile?.aliases.includes(resolvedPortfolioName)
+  const nationalWaterProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'national_water')
+  const isNationalWaterPortfolio = !!resolvedPortfolioName && !!nationalWaterProfile?.aliases.includes(resolvedPortfolioName)
   const playbook = await getPlaybookForPortfolio({
     company_id: args.company_id,
     portfolio_id: resolvedPortfolioId,
@@ -848,6 +879,14 @@ export async function runCollectorAgent(args: {
     : null
   const insuranceCase = insuranceRow ? classifyInsuranceCase(insuranceRow) : null
   const insuranceObjection = playbook.category === 'insurance' ? detectInsuranceObjectionSignals(text) : null
+
+  // ── Repeated-refusal tracking (feeds the legal-escalation-check cron,
+  // which opens a 'repeated_refusal' escalation after 3+ refusals + 48h).
+  // Excluded entirely for STC, Saudi Energy, and National Water per owner
+  // instruction. Fire-and-forget — never blocks or affects this reply.
+  if (forcedDebtId && signals.refusesToPay && !isStcPortfolio && !isSaudiEnergyPortfolio && !isNationalWaterPortfolio) {
+    void trackRefusalForLegalEscalation({ debt_id: forcedDebtId })
+  }
 
   // ── Mandatory legal escalation — checked deterministically BEFORE the
   // LLM call (legal_threat/lawyer_mention/complaint apply to every sector

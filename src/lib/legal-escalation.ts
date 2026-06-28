@@ -9,6 +9,15 @@ export type EscalationType =
   | 'legal_threat' | 'lawyer_mention' | 'complaint'
   | 'fault_dispute' | 'recourse_dispute' | 'third_party_dispute' | 'recovered_deduction'
   | 'playbook_mandated'
+  // Owner-specified business rule (2026-06-28): 3+ explicit refusals to pay
+  // (signals.refusesToPay), 48h after the first one, with no resolution —
+  // opened automatically by the legal-escalation-check cron, never by the
+  // live agent directly. Unlike every other type, the lock this opens does
+  // NOT use the fixed renderLegalPersonaReply() line — ai-collector-agent.ts
+  // generates a real, dynamic, persuasive "lawyer persona" reply per turn
+  // instead (see generateLawyerPersonaReply). Never opened for STC, Saudi
+  // Energy, or National Water portfolios — excluded explicitly.
+  | 'repeated_refusal'
   // Non-freezing review buckets — used for portfolios (e.g. STC) whose
   // policy bans the legal/lockout path entirely. These never go through
   // openEscalation()/the legal persona lock; see recordStcReview() below.
@@ -217,14 +226,101 @@ const ESCALATION_TYPE_LABELS: Record<EscalationType, string> = {
   third_party_dispute: 'نزاع طرف ثالث',
   recovered_deduction: 'مراجعة حذف مسترد',
   playbook_mandated: 'تصعيد إلزامي بالسياسة',
+  repeated_refusal: 'رفض/مماطلة متكررة',
   customer_complaint: 'شكوى عميل',
   stc_review: 'مراجعة عميل',
 }
 
 // The ONLY reply allowed while a debt is under legal escalation — fixed,
 // deterministic, zero LLM call. No negotiation, no pressure, no payment
-// request, no discount/installment offer, ever.
+// request, no discount/installment offer, ever. Does NOT apply to
+// 'repeated_refusal' — that type uses generateLawyerPersonaReply() instead
+// (a real, dynamic, persuasive reply), called separately by the caller.
 export function renderLegalPersonaReply(escalationType: EscalationType): string {
   const label = ESCALATION_TYPE_LABELS[escalationType] ?? 'مراجعة قانونية'
   return `معك إدارة الشؤون القانونية. ملفك محوّل للمراجعة القانونية حالياً بخصوص: ${label}. سيتم التواصل معك من الجهة المختصة، ولا داعي لمتابعة الموضوع مع المحصّل.`
+}
+
+// ── Repeated-refusal tracking (feeds the legal-escalation-check cron) ──
+// Owner-specified rule: 3+ explicit refusals (signals.refusesToPay), 48h
+// after the FIRST one, with no resolution → cron opens a 'repeated_refusal'
+// escalation automatically. This function only counts; the cron decides
+// when the threshold+delay are actually met. Called on every turn where
+// the customer explicitly refuses to pay, for portfolios that allow it.
+export async function trackRefusalForLegalEscalation(args: { debt_id: string }): Promise<void> {
+  const supabase = createServiceClient()
+  try {
+    const { data: debt } = await supabase.from('debts').select('metadata').eq('id', args.debt_id).maybeSingle()
+    const meta = ((debt as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}) as Record<string, unknown>
+    const existing = meta.refusal_tracking as { count?: number; first_at?: string } | undefined
+    const count = (existing?.count ?? 0) + 1
+    const first_at = existing?.first_at ?? new Date().toISOString()
+    await supabase.from('debts').update({
+      metadata: { ...meta, refusal_tracking: { count, first_at } },
+    }).eq('id', args.debt_id)
+  } catch (err) {
+    log.warn('trackRefusalForLegalEscalation failed: ' + (err instanceof Error ? err.message : String(err)), { debt_id: args.debt_id })
+  }
+}
+
+// Clears the counter once an escalation actually opens (or the debt is
+// otherwise resolved) so it doesn't immediately re-trigger after closing.
+export async function resetRefusalTracking(debt_id: string): Promise<void> {
+  const supabase = createServiceClient()
+  try {
+    const { data: debt } = await supabase.from('debts').select('metadata').eq('id', debt_id).maybeSingle()
+    const meta = ((debt as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}) as Record<string, unknown>
+    const { refusal_tracking, ...rest } = meta
+    void refusal_tracking
+    await supabase.from('debts').update({ metadata: rest }).eq('id', debt_id)
+  } catch (err) {
+    log.warn('resetRefusalTracking failed: ' + (err instanceof Error ? err.message : String(err)), { debt_id })
+  }
+}
+
+// ── Dynamic "lawyer persona" reply for the 'repeated_refusal' lock ──
+// Unlike every other escalation type (fixed, zero-LLM-call reply), this
+// type is meant to actually converse: a professional, formal Saudi legal
+// advisor persona explaining the GENERAL legal consequences of unpaid debt
+// (commercial/consumer collection, enforcement law, the right to pursue the
+// matter through the competent judicial/execution authorities) and trying
+// to persuade the customer to settle or commit to a real payment date —
+// without citing specific article/law numbers (to avoid stating inaccurate
+// legal detail) and without ever threatening unprofessionally. Falls back
+// to the fixed renderLegalPersonaReply() line on any API failure.
+export async function generateLawyerPersonaReply(args: {
+  customerMessage: string
+  caseSummary: string
+  reason: string
+}): Promise<string> {
+  if (!process.env.OPENROUTER_API_KEY) return renderLegalPersonaReply('repeated_refusal')
+  try {
+    const OpenAI = (await import('openai')).default
+    const client = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' })
+    const systemPrompt = `أنت "المستشار القانوني" — محامٍ سعودي محترف يتابع ملفات الديون المتأخرة بعد تكرار رفض العميل السداد أو مماطلته المستمرة (السبب: ${args.reason}).
+
+أسلوبك:
+- فصحى قانونية رسمية مبسطة (لا عامية، لا لهجة "خالد" المحصّل السابقة) — جملك واضحة ومباشرة، هادئة وحازمة، لا تستجدي ولا تهدد بأسلوب غير مهني.
+- تشرح للعميل بشكل عام (بدون ذكر أرقام مواد أو أنظمة محددة لأنك لا تملك مرجعاً قانونياً دقيقاً الآن) أن الدين المتأخر يبقى حقاً واجب السداد، وأن الجهة الدائنة تملك حق اتخاذ الإجراءات النظامية اللازمة عبر الجهات المختصة (مثل جهات التنفيذ أو القضاء) إن لم تتم تسوية الملف وديّاً.
+- هدفك الحقيقي: إقناعه بالتعاون والوصول لتسوية أو تحديد موعد سداد فعلي **الآن**، قبل تصعيد الإجراءات أكثر — أنت لا تريد الوصول للتصعيد القانوني الكامل، وتفضّل الحل الودي إن استجاب.
+- إن أعطى العميل تاريخاً أو مبلغاً فعلياً جديداً، تعامل معه بشكل بنّاء واعترف بجهده، لكن وضّح أن الملف يبقى تحت المراجعة القانونية حتى يتم السداد الفعلي.
+- رد بجملتين إلى ثلاث جمل كحد أقصى، فصيحة ومباشرة.
+
+ملف القضية: ${args.caseSummary}`
+
+    const completion = await client.chat.completions.create({
+      model: 'anthropic/claude-sonnet-4.6',
+      temperature: 0.5,
+      max_tokens: 220,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: args.customerMessage },
+      ],
+    })
+    const text = completion.choices?.[0]?.message?.content?.trim()
+    return text || renderLegalPersonaReply('repeated_refusal')
+  } catch (err) {
+    log.warn('generateLawyerPersonaReply failed — falling back to fixed line: ' + (err instanceof Error ? err.message : String(err)), {})
+    return renderLegalPersonaReply('repeated_refusal')
+  }
 }
