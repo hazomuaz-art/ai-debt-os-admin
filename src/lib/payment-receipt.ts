@@ -45,6 +45,12 @@ export async function processInboundReceipt(args: {
     return
   }
 
+  // Persist the original file the customer actually sent — previously this
+  // was OCR'd then discarded forever, leaving nothing to show a human
+  // reviewer or pull up later in a dispute/audit. Non-critical: a storage
+  // failure never blocks recording the payment itself.
+  const receiptPath = args.source === 'text' ? null : await uploadReceiptFile(svc, args)
+
   // Load the debt + the expected collection account (our beneficiary) so we can
   // actually MATCH the transfer instead of blindly trusting the amount.
   const { data: debt } = args.debt_id
@@ -131,7 +137,7 @@ export async function processInboundReceipt(args: {
       company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
       title: 'إيصال يحتاج مراجعة يدوية',
       message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن تعذّر قراءة المبلغ تلقائياً.`,
-      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr }, is_resolved: false,
+      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr, receipt_path: receiptPath }, is_resolved: false,
     })
     await addTimeline(svc, args, 'payment', 'إيصال استُلم — يحتاج مراجعة يدوية (تعذّر قراءة المبلغ)', ocr)
     await replyAndLog(svc, args, 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
@@ -146,6 +152,7 @@ export async function processInboundReceipt(args: {
     payment_date: payDate,
     verification_status: autoVerify ? 'verified' : 'pending_verification',
     ocr_data: ocr,
+    receipt_url: receiptPath,
     notes: noteBits,
   }).select('id').single()
 
@@ -220,6 +227,33 @@ export async function processInboundReceipt(args: {
   }
 
   await replyAndLog(svc, args, reply)
+}
+
+// Uploads the original receipt (image/PDF) to the private 'payment-receipts'
+// bucket so it can be reviewed or pulled up later — previously discarded
+// right after OCR. Returns the storage path (not a public URL — the bucket
+// is private; a signed URL is generated on demand at download time) or null
+// if the upload fails (never blocks recording the payment itself).
+async function uploadReceiptFile(
+  svc: ReturnType<typeof createServiceClient>,
+  args: { company_id: string; customer_id: string; source: ReceiptSource; data: string },
+): Promise<string | null> {
+  try {
+    const ext = args.source === 'pdf' ? 'pdf' : 'jpg'
+    const contentType = args.source === 'pdf' ? 'application/pdf' : 'image/jpeg'
+    const path = `${args.company_id}/${args.customer_id}/${Date.now()}.${ext}`
+    const buffer = Buffer.from(args.data, 'base64')
+
+    const { error } = await svc.storage.from('payment-receipts').upload(path, buffer, { contentType })
+    if (error) {
+      log.error('receipt upload failed', new Error(error.message))
+      return null
+    }
+    return path
+  } catch (e) {
+    log.error('receipt upload failed', e as Error)
+    return null
+  }
 }
 
 // Adds a timeline entry so the customer page / history / dashboards reflect the

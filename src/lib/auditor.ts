@@ -128,6 +128,7 @@ const EXPECTED_PAGES = [
   { path: '/dashboard/admin/integrations',  name: 'Integrations' },
   { path: '/dashboard/admin/portfolios',    name: 'Portfolios' },
   { path: '/dashboard/admin/legal-escalations', name: 'Legal Escalations' },
+  { path: '/dashboard/admin/payments',      name: 'Payments' },
   { path: '/dashboard/admin/health',        name: 'System Health' },
 ]
 
