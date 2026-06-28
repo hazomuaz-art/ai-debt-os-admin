@@ -165,17 +165,19 @@ export async function processInboundReceipt(args: {
     else if (d.status === 'promised' || d.status === 'overdue') upd.status = 'active'
     await svc.from('debts').update(upd).eq('id', args.debt_id)
 
-    // Any open promise is now kept → mark it so the agent stops chasing it.
-    // 'fulfilled' is NOT a valid promises.status (DB CHECK only allows
-    // pending|kept|broken|rescheduled|partial) — this update has been
-    // silently rejected by Postgres on every single payment ever since
-    // this code was written (Supabase doesn't throw on a CHECK violation
-    // here, it only returns `{ error }`, which was never checked), so
-    // promises never actually left 'pending' after being paid.
+    // An open promise is fully "kept" only if this payment actually closes
+    // the debt — a partial payment against a full-amount promise is only
+    // PARTIALLY honored, not kept. Previously this always wrote 'kept'
+    // regardless of remaining balance, which would make "وعد بالسداد"
+    // compliance reporting (the promises page's "نسبة الالتزام") count a
+    // half-paid promise as fully honored.
+    const promiseOutcome = newBal <= 0 ? 'kept' : 'partial'
+    const promiseUpd: Record<string, unknown> = { status: promiseOutcome }
+    if (promiseOutcome === 'kept') promiseUpd.fulfilled_at = new Date().toISOString()
     const { error: promiseUpdErr } = await svc.from('promises')
-      .update({ status: 'kept', fulfilled_at: new Date().toISOString() })
+      .update(promiseUpd)
       .eq('company_id', args.company_id).eq('debt_id', args.debt_id).eq('status', 'pending')
-    if (promiseUpdErr) log.error('failed to mark promise as kept', { error: promiseUpdErr.message, debt_id: args.debt_id })
+    if (promiseUpdErr) log.error('failed to mark promise outcome', { error: promiseUpdErr.message, debt_id: args.debt_id, promiseOutcome })
 
     await addTimeline(svc, args, 'payment',
       `سداد مؤكَّد ${amount} ${currency}${newBal <= 0 ? ' — سُدّدت المديونية بالكامل' : ` — المتبقي ${newBal} ${currency}`} (${matchMeta.beneficiary})`, ocr)
@@ -205,7 +207,13 @@ export async function processInboundReceipt(args: {
       })
     }
 
-    reply = `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. ${newBal <= 0 ? 'تم سداد المديونية بالكامل، شكراً لك.' : `المتبقي ${newBal} ${currency}.`}`
+    // Partial payment must still be followed up to get a date for the
+    // REMAINDER (full amount, not a new multi-payment plan) — never an
+    // installment/objection suggestion unless the customer raises that
+    // idea themselves; this is just asking when the rest will be paid.
+    reply = newBal <= 0
+      ? `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. تم سداد المديونية بالكامل، شكراً لك.`
+      : `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. المتبقي ${newBal} ${currency} — متى تقدر تسدد باقي المبلغ؟`
   } else {
     // Match incomplete (beneficiary mismatch, unknown, or a typed-text
     // claim with no attachment to verify) → never auto-verified. Always
