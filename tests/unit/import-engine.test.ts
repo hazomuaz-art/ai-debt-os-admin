@@ -107,6 +107,18 @@ describe('import-engine — resolveClusterMapping (general, content-driven disam
     })
     expect(resolutions.full_name.resolvedHeader).toBe('CUSTOMER_REF_X')
   })
+
+  it('a SADAD/reference number column is never mistaken for current_balance just because it looks numeric (real production bug: customer billed SAR 880,001 instead of SAR 1,250.50)', () => {
+    const headers = ['اسم العميل', 'مبلغ المديونية', 'Sadad_NUMBER']
+    const rows = [['عبدالرحمن سعيد', '1250.5', '880001']]
+    const cluster = clusterRowsByLayout(headers, rows)[0]
+    const { resolutions } = resolveClusterMapping(headers, rows, cluster)
+    expect(resolutions.original_amount.resolvedHeader).toBe('مبلغ المديونية')
+    // Sadad_NUMBER must NOT be picked as current_balance — it has no real
+    // amount header signal, only an accidental numeric content shape.
+    expect(resolutions.current_balance.resolvedHeader).toBeNull()
+    expect(resolutions.current_balance.needsMapping).toBe(false)
+  })
 })
 
 describe('import-engine — analyzeImportFile (end-to-end, no DB writes)', () => {

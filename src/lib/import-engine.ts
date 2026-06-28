@@ -171,6 +171,22 @@ function looksLikePhone(v: string): boolean {
   return /^(05|9665|966|5)\d{7,8}$/.test(d) || (d.length >= 9 && d.length <= 13)
 }
 
+// A header that reads as an identifier/reference NUMBER (SADAD number,
+// invoice number, product number...) must never be claimed as an amount
+// field (original_amount/current_balance) purely because its values happen
+// to look numeric — confirmed real bug: a "Sadad_NUMBER" column (a billing
+// reference id, e.g. 880001) had no header alias for any amount field, so
+// it fell through to content-shape scoring alone, which can't distinguish
+// a 6-digit reference number from a real balance. General fix, not specific
+// to this one file: any header naming it a "number/ID/code" is excluded
+// from amount-field candidacy unless it ALSO carries a real amount keyword.
+function looksLikeIdentifierHeader(header: string): boolean {
+  const h = stripInvisible(norm(header))
+  const hasAmountWord = /مبلغ|رصيد|مديونية|دين|قيمة|amount|balance|debt|outstanding|remaining|unpaid/.test(h)
+  if (hasAmountWord) return false
+  return /sadad|سداد|invoice|فاتورة|\bid\b|\bno\.?\b|number|رقم|code|كود/.test(h)
+}
+
 function looksLikeAmount(v: string): boolean {
   const t = toAsciiDigits(v.trim()).replace(/[,،\s]/g, '')
   if (!/^\d+(\.\d+)?$/.test(t) || Number(t) <= 0) return false
@@ -374,6 +390,11 @@ export function resolveClusterMapping(
         0, ...ALL_FIELDS.filter(f => f !== field).map(f => headerScore(header, f)),
       )
       if (bestOtherFieldScore >= 0.6 && bestOtherFieldScore > hScore) continue
+
+      // A reference/ID-style header (SADAD number, invoice number...) can
+      // never win an amount field PURELY on content shape — only if its
+      // header itself actually scored for this amount field.
+      if ((field === 'original_amount' || field === 'current_balance') && hScore === 0 && looksLikeIdentifierHeader(header)) continue
 
       const cScore = contentScore(field, sampleByCol[i] ?? [])
       if (hScore === 0 && cScore === 0) continue
