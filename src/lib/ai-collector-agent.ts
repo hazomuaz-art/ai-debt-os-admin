@@ -296,6 +296,18 @@ function detectSignals(text: string) {
   }
 }
 
+// Single shared definition (was previously duplicated/reinvented at three
+// separate call sites with slightly different regexes) of: "did the
+// customer's CURRENT message actually ask/request something?" Every guard
+// in this file that might substitute a canned "your promise is recorded"
+// line MUST check this first and never bury a real question — root cause of
+// multiple confirmed production bugs ("ايش المنتج؟", "اي طلب؟", "وعد ايش؟" all
+// answered with a bare promise-confirmation that ignored the actual question).
+function customerAskedSomething(text: string, signals: ReturnType<typeof detectSignals>): boolean {
+  const askedQ = /[؟?]/.test(text) || /(متى|كم|وش|ايش|إيش|مين|ليش|ليه|هل|أي\s|اي\s|كيف)/.test(text)
+  return askedQ || signals.asksDetails || signals.asksCompany || signals.asksWhoAreYou || signals.asksWhyAmountChanged
+}
+
 function isRobotic(reply: string) {
   return hasAny(reply, [
     'أنا هنا للمساعدة',
@@ -1337,8 +1349,15 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       // No timing expressed at all → it's an intention, not a dated promise.
       parsed.promised_date = null
       parsed.promise_text = null
-      if (openPromiseRec) {
-        // A promise is ALREADY on file → acknowledge it, never re-ask.
+      // 🔴 The model chose action=record_promise but the customer's CURRENT
+      // message has no real timing in it — this is exactly the misjudgment
+      // that produced multiple confirmed production bugs: the model picked
+      // record_promise on a plain question ("اي طلب؟", "وعد ايش؟") and the
+      // code below used to blindly confirm/ask about payment, ignoring the
+      // actual question. Always check first.
+      if (openPromiseRec && !customerAskedSomething(text, signals)) {
+        // A promise is ALREADY on file and the customer asked nothing →
+        // acknowledge it, never re-ask.
         const dt = dateOnly(openPromiseRec.promised_date)
         log.warn('record_promise w/o timing but promise already on file — acknowledging', { dt })
         parsed.message = dt
@@ -1346,6 +1365,18 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
           : 'تمام، الوعد مسجّل عندي. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.'
         parsed.action = 'reply'
         parsed.reason = 'promise_already_on_file'
+      } else if (customerAskedSomething(text, signals)) {
+        // The model misclassified a real question as record_promise. Never
+        // confirm/ask about a promise here — answer what they actually asked.
+        log.warn('record_promise misclassification — customer asked a real question, regenerating an answer instead', { customer_text: text.slice(0, 80) })
+        const dt = openPromiseRec ? dateOnly(openPromiseRec.promised_date) : null
+        const corrected = await regenerateWithCorrection(
+          client, modelId, systemPrompt, turns, text,
+          `لم يذكر العميل توقيتاً حقيقياً للسداد في رسالته الحالية — هو يسأل سؤالاً، فلا تتعامل مع رسالته كوعد سداد ولا تسأله متى يسدد. أجب على سؤاله الفعلي مباشرة من ملف القضية${dt ? ` (ملاحظة: يوجد وعد سداد سابق مسجّل بتاريخ ${dt}، لا تكرر سؤاله عنه إلا إذا سأل عنه فعلاً)` : ''}.`,
+        )
+        parsed.message = corrected ?? parsed.message
+        parsed.action = 'reply'
+        parsed.reason = 'record_promise_misclassified_question_answered'
       } else {
         log.warn('record_promise without any timing — asking once', { customer_text: text.slice(0, 80) })
         parsed.message = 'تمام، بس عشان أرتّبها صح — متى تقدر تسدد؟'
@@ -1590,7 +1621,21 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       parsed.reason = 'promise_disputed_needs_review'
       parsed.promised_date = null
       parsed.promise_text = null
-      parsed.message = 'طيب، بس بمراجعة هذي النقطة من عندنا — متى كان آخر تواصل بخصوص موعد السداد من جهتك؟'
+      // If the denial is ALL the customer said, the fixed clarification line
+      // is fine. But if their current message also asks something else
+      // ("ماوعدتك بشي، طيب وش رقم حسابي؟"), the fixed line must not bury that
+      // second question — same class of bug fixed elsewhere in this file.
+      const otherQuestion = signals.asksDetails || signals.asksCompany || signals.asksWhoAreYou || signals.asksWhyAmountChanged
+        || /[؟?]/.test(text.replace(/ماوعدتك|مو وعدتك|ماوعدتك|انا ما وعدت|أنا ما وعدت|لم اعدك|لم أعدك|ما قلت لك بسدد|ما قلت بسدد|مين قال|وين قلت|ما اتفقنا|متى وعدتك|وعدتك متى/g, ''))
+      if (otherQuestion) {
+        const corrected = await regenerateWithCorrection(
+          client, modelId, systemPrompt, turns, text,
+          'العميل ينفي أنه وعد بشيء، وأيضاً سأل سؤالاً آخر في نفس رسالته — لا تؤكد له أي وعد متنازَع عليه، لكن أجب على سؤاله الآخر مباشرة من ملف القضية، واذكر أن نقطة الوعد قيد المراجعة.',
+        )
+        parsed.message = corrected ?? 'طيب، بس بمراجعة هذي النقطة من عندنا — متى كان آخر تواصل بخصوص موعد السداد من جهتك؟'
+      } else {
+        parsed.message = 'طيب، بس بمراجعة هذي النقطة من عندنا — متى كان آخر تواصل بخصوص موعد السداد من جهتك؟'
+      }
     }
 
     // (H) INFO_REQUEST must answer the question ONLY — no payment pressure,
@@ -1773,9 +1818,7 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
         // timing. Substituting a bare "your promise is recorded" over a real
         // question was a confirmed production bug (customer asked "ايش المنتج؟"
         // twice and got "الوعد مسجّل..." both times).
-        const customerAskedSomething =
-          isQ(text) || signals.asksDetails || signals.asksCompany || signals.asksWhoAreYou || signals.asksWhyAmountChanged
-        if ((openPromiseRec || promiseForcedFromTemporalRef) && !customerAskedSomething) {
+        if ((openPromiseRec || promiseForcedFromTemporalRef) && !customerAskedSomething(text, signals)) {
           const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
           parsed.message = dt
             ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك.`
@@ -1832,10 +1875,7 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
     // Same rule as the repeated-question guard: never bury a real customer
     // question under a "your promise is recorded" line. Only substitute the
     // promise confirmation when the customer did NOT ask anything.
-    const askedQ = /[؟?]/.test(text) || /(متى|كم|وش|ايش|إيش|مين|ليش|ليه|هل|أي\s|اي\s|كيف)/.test(text)
-    const customerAskedSomething =
-      askedQ || signals.asksDetails || signals.asksCompany || signals.asksWhoAreYou || signals.asksWhyAmountChanged
-    if ((openPromiseRec || promiseForcedFromTemporalRef) && !customerAskedSomething) {
+    if ((openPromiseRec || promiseForcedFromTemporalRef) && !customerAskedSomething(text, signals)) {
       const dt = dateOnly((openPromiseRec ?? { promised_date: parsed.promised_date }).promised_date)
       parsed.message = dt
         ? `تمام، الوعد مسجّل عندي بتاريخ ${dt}. بانتظار سدادك.`

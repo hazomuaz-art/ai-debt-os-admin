@@ -252,6 +252,70 @@ describe('Date understanding — government support program payouts', () => {
   })
 })
 
+describe('Real incident — model misclassifies a plain question as record_promise', () => {
+  it('"اي طلب؟" with an existing promise on file gets answered, not buried by a promise confirmation', async () => {
+    // Exact production bug (2026-06-27): customer asked "اي طلب؟" right after
+    // "بسدد اقساط"; the model itself chose action=record_promise (a
+    // misjudgment — no timing in "اي طلب؟" at all), and the code unconditionally
+    // confirmed the OLD promise on file, ignoring the question entirely.
+    mockContext = baseContext([
+      { direction: 'outbound', content: 'سجّلت طلبك، وبارفعه للمراجعة.' },
+    ])
+    mockContext.recent_promises = [{ promised_date: '2026-07-01', status: 'pending' }]
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'record_promise', reason: 'x', message: 'تمام، سجلت وعدك بالسداد.', promised_date: null, promise_text: null })
+    mockRegeneratedMessage = 'طلب التقسيط اللي رفعته قيد المراجعة من الإدارة، بنتواصل معك بالنتيجة.'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'اي طلب؟' })
+
+    expect(d.reason).toBe('record_promise_misclassified_question_answered')
+    expect(d.message).toBe(mockRegeneratedMessage)
+  })
+
+  it('"وعد ايش؟" with no promise on file at all also gets answered, not asked about payment timing', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'record_promise', reason: 'x', message: 'تمام، الوعد مسجّل.', promised_date: null, promise_text: null })
+    mockRegeneratedMessage = 'ما يوجد أي وعد مسجّل عندي من جهتك — هل تقصد شيئاً معيناً؟'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وعد ايش؟' })
+
+    expect(d.reason).toBe('record_promise_misclassified_question_answered')
+    expect(d.message).toBe(mockRegeneratedMessage)
+  })
+
+  it('a genuine no-timing promise intention ("بسدد" alone, no question) still asks for the date once — unaffected by the fix', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'record_promise', reason: 'x', message: 'تمام.', promised_date: null, promise_text: null })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد' })
+
+    expect(d.reason).toBe('promise_needs_timing')
+    expect(d.message).toBe('تمام، بس عشان أرتّبها صح — متى تقدر تسدد؟')
+  })
+})
+
+describe('Real incident — denying a promise while also asking something else', () => {
+  it('"ماوعدتك بشي، وايش رقم حسابي؟" answers the account question too, not just the denial', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، الوعد مسجّل عندي.' })
+    mockRegeneratedMessage = 'رقم حسابك هو 5229482833. وبخصوص الوعد، نقطة قيد المراجعة من جهتنا.'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ماوعدتك بشي، وايش رقم حسابي؟' })
+
+    expect(d.reason).toBe('promise_disputed_needs_review')
+    expect(d.message).toBe(mockRegeneratedMessage)
+  })
+
+  it('a bare denial with nothing else gets the fixed clarification line (unaffected by the fix)', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام، الوعد مسجّل عندي.' })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ماوعدتك انا بشي' })
+
+    expect(d.reason).toBe('promise_disputed_needs_review')
+    expect(d.message).toBe('طيب، بس بمراجعة هذي النقطة من عندنا — متى كان آخر تواصل بخصوص موعد السداد من جهتك؟')
+  })
+})
+
 describe('Root fix — all customer replies routed through Sonnet (not Haiku)', () => {
   it('a routine GENERAL intent reply uses Sonnet, never Haiku', async () => {
     mockContext = baseContext([])
