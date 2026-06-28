@@ -116,51 +116,11 @@ function hasTemporalRef(raw: string): boolean {
   )
 }
 
-// §6 layer 2: a commitment verb plus a vague time hint that layer-1's
-// lexicon didn't recognise — these are exactly the cases worth running the
-// (expensive) structured-extraction fallback on, instead of on every message.
+// Payment-commitment verbs — used to decide when it's worth consulting the
+// Temporal Intelligence Engine even though the simple lexicon (hasTemporalRef)
+// didn't already flag the message as a promise (e.g. "بسدد بعد العيد" — a
+// clear holiday reference, just outside hasTemporalRef's word list).
 const COMMITMENT_VERBS = ['أسدد', 'اسدد', 'بسدد', 'أحول', 'احول', 'بحول', 'بدفع', 'ادفع', 'أدفع']
-const VAGUE_TIME_HINT = /(قريب|قريباً|بسرعة|على طول|بعدين|لاحقاً|لاحقا|بأقرب وقت|في أقرب وقت)/
-
-function hasCommitmentWithVagueTiming(text: string): boolean {
-  return hasAny(text, COMMITMENT_VERBS) && VAGUE_TIME_HINT.test(text)
-}
-
-// §6 layer 2 — structured-extraction fallback. Only called when layer 1
-// (the lexicon in hasTemporalRef) misses BUT the message still carries
-// commitment language with a vague time reference the lexicon doesn't yet
-// cover. Every case caught here is logged so the lexicon can be expanded
-// later — this is a safety net, not a replacement for the lexicon.
-async function detectTemporalRefStructured(
-  client: OpenAI, text: string, todayISO: string
-): Promise<{ has_temporal_ref: boolean; resolved_date: string | null; confidence: number } | null> {
-  try {
-    const r = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
-      temperature: 0,
-      max_tokens: 120,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `استخرج فقط: هل تتضمن رسالة العميل إشارة زمنية فعلية لموعد سداد (حتى لو غامضة)، وإن وُجدت حوّلها لتاريخ تقريبي YYYY-MM-DD اعتماداً على تاريخ اليوم ${todayISO}. أعد JSON فقط: {"has_temporal_ref": boolean, "resolved_date": "YYYY-MM-DD أو null", "confidence": 0 إلى 1}.`,
-        },
-        { role: 'user', content: text },
-      ],
-    })
-    const raw = r.choices[0]?.message?.content ?? ''
-    const obj = extractJson(raw)
-    if (!obj || typeof obj !== 'object') return null
-    return {
-      has_temporal_ref: !!obj.has_temporal_ref,
-      resolved_date: typeof obj.resolved_date === 'string' ? obj.resolved_date : null,
-      confidence: typeof obj.confidence === 'number' ? obj.confidence : 0,
-    }
-  } catch (err) {
-    log.warn('temporal-ref layer-2 extraction failed', { error: String((err as any)?.message ?? err) })
-    return null
-  }
-}
 
 // Only unambiguous farewell/thanks phrases — short acks like "طيب" or "تمام"
 // are often mid-negotiation responses expecting a follow-up push, not an
@@ -1316,8 +1276,36 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
   // declining a NOW-commitment, not making one. Never force-record a
   // promise in that case.
   const negatesImmediateTiming = /(مو|ما|ماني|مب)\s*(الحين|اليوم|بكرا|بكرة|بكره)/.test(norm(text))
+
+  // Temporal Intelligence Engine — promoted from Shadow Mode (2026-06-28) to
+  // the live, authoritative resolver for BOTH whether this is a real promise
+  // AND what date it resolves to. Computed once, here, early enough to also
+  // feed the forcing check right below (so a clear-but-lexicon-unknown
+  // reference like "بعد العيد" can force record_promise too, not just
+  // correct the date on a promise the model already chose on its own).
+  // Gated on a cheap pre-check (lexicon hit OR a commitment verb present) so
+  // the engine is never called on every single message. Fails closed to
+  // null on any error — never blocks or breaks the reply.
+  let engineResolution: { resolved: boolean; resolved_date: string | null; confidence: string | null; reference_type: string; needs_clarification: boolean } | null = null
+  if (hasTemporalRef(text) || hasAny(text, COMMITMENT_VERBS)) {
+    try {
+      const { resolveTemporalExpression } = await import('@/lib/temporal-engine')
+      engineResolution = await resolveTemporalExpression(text, {
+        messageTimestamp: args.messageTimestamp ? new Date(args.messageTimestamp) : new Date(),
+        countryCode: 'SA',
+        companyId: args.company_id,
+        portfolioId: resolvedPortfolioId ?? null,
+        customerId: args.customer_id,
+        debtId: args.debt_id ?? null,
+        customerSalaryDay: null,
+      })
+    } catch (err) {
+      log.warn('Temporal Engine resolution failed — falling back to model/lexicon date', { error: String((err as any)?.message ?? err) })
+    }
+  }
+
   let promiseForcedFromTemporalRef = false
-  if (hasTemporalRef(text) && !negatesImmediateTiming && parsed.action !== 'record_promise' && !signals.deniesDebt && !signals.deniesPromise) {
+  if ((hasTemporalRef(text) || !!engineResolution?.resolved) && !negatesImmediateTiming && parsed.action !== 'record_promise' && !signals.deniesDebt && !signals.deniesPromise) {
     log.warn('forcing record_promise — customer message has an explicit temporal reference the model did not classify as a promise', { original_action: parsed.action, text_preview: text.slice(0, 80) })
     parsed.action = 'record_promise'
     parsed.reason = 'promise_forced_from_temporal_ref'
@@ -1352,28 +1340,28 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
     // customer's literal words, that they actually expressed REAL timing.
     // signals.promise (bare "بسدد" with no date) is deliberately NOT enough on
     // its own — that case still asks once for the specific date below.
-    let isRealPromise = hasTemporalRef(text)
-    // §6 layer 2 — only spend a model call when layer 1 missed AND the
-    // message looks like a vague commitment ("بسدد قريب") that's worth the
-    // extra check, rather than on every single record_promise candidate.
-    if (!isRealPromise && hasCommitmentWithVagueTiming(text)) {
-      const layer2 = await detectTemporalRefStructured(client, text, todayStr)
-      if (layer2 && layer2.has_temporal_ref && layer2.confidence >= 0.6) {
-        log.info('temporal-ref layer-2 caught a promise layer-1 missed — candidate for lexicon expansion', {
-          text_preview: text.slice(0, 80), resolved_date: layer2.resolved_date, confidence: layer2.confidence,
-        })
-        isRealPromise = true
-        if (layer2.resolved_date && isSaneDate(layer2.resolved_date, todayStr) && !validDate) {
-          parsed.promised_date = layer2.resolved_date
-        }
-      }
-    }
+    // isRealPromise reuses the SAME engineResolution computed earlier
+    // (alongside the forcing check above) — the engine is the authoritative
+    // source for both "is this a promise" and "what date", computed once.
+    let isRealPromise = hasTemporalRef(text) || !!engineResolution?.resolved
     if (isRealPromise) {
       parsed.promise_text = promiseText || null
-      // `promised_date` is NOT NULL in the DB → always store one. Prefer the
-      // model's sane date; otherwise a near follow-up checkpoint from today.
-      // The real verbal promise is preserved in promise_text either way.
-      if (!parsed.promised_date || !isSaneDate(String(parsed.promised_date), todayStr)) parsed.promised_date = addDaysISO(todayStr, 3)
+      // `promised_date` is NOT NULL in the DB → always store one.
+      // Priority: (1) Temporal Engine's resolution, when it actually
+      // resolved a date — most accurate, real KB-backed computation;
+      // (2) the model's own sane date; (3) a generic +3-day follow-up
+      // checkpoint as the last resort. The real verbal promise is preserved
+      // in promise_text regardless of which date source won.
+      if (engineResolution?.resolved && engineResolution.resolved_date && isSaneDate(engineResolution.resolved_date, todayStr)) {
+        if (parsed.promised_date && parsed.promised_date !== engineResolution.resolved_date) {
+          log.info('Temporal Engine date overrides model-guessed date', {
+            model_date: parsed.promised_date, engine_date: engineResolution.resolved_date, reference_type: engineResolution.reference_type,
+          })
+        }
+        parsed.promised_date = engineResolution.resolved_date
+      } else if (!parsed.promised_date || !isSaneDate(String(parsed.promised_date), todayStr)) {
+        parsed.promised_date = addDaysISO(todayStr, 3)
+      }
       // The model's ORIGINAL message is stale/wrong here (it's whatever it
       // said before we force-reclassified its action — e.g. "متى تقدر
       // تسدد؟"). Replace it with a clean acknowledgment so the customer is
@@ -1426,78 +1414,6 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
   } else {
     parsed.promised_date = null
     parsed.promise_text = null
-  }
-
-  // ════════════════════════════════════════════════════════════════════
-  //  Temporal Intelligence Engine — Phase 1 SHADOW MODE ONLY.
-  //  Runs the new engine in parallel for observability — NEVER reads its
-  //  result into `parsed` (action/message/promised_date are already final
-  //  at this point, set entirely by the logic above). Fire-and-forget: any
-  //  failure here is caught and logged, never thrown, never adds latency to
-  //  the customer-facing reply.
-  //
-  //  Gated by the NEW engine's own quickScan(), never the OLD lexicon
-  //  (hasTemporalRef/signals.promise/hasCommitmentWithVagueTiming) — a gate
-  //  built from the old lexicon would only cover what the OLD system
-  //  already knows, defeating the purpose of Shadow Mode, which exists to
-  //  observe the NEW engine's full coverage (salary, gov programs,
-  //  holidays, composites...) including everything the old system can't
-  //  see at all. quickScan() runs the same resolver list/priority order as
-  //  the full engine, synchronously, with zero separate keyword list to
-  //  maintain in this file — the engine is the only source of truth for
-  //  "does this look temporal".
-  // ════════════════════════════════════════════════════════════════════
-  const { quickScan } = await import('@/lib/temporal-engine')
-  if (quickScan(text, args.messageTimestamp ? new Date(args.messageTimestamp) : new Date())) {
-    const oldDecisionSnapshot = {
-      hasTemporalRef: hasTemporalRef(text),
-      forcedPromise: promiseForcedFromTemporalRef,
-      action: parsed.action,
-      promised_date: parsed.promised_date ?? null,
-      promise_text: parsed.promise_text ?? null,
-    }
-    ;(async () => {
-      try {
-        const { resolveTemporalExpression } = await import('@/lib/temporal-engine')
-        const newDecision = await resolveTemporalExpression(text, {
-          messageTimestamp: args.messageTimestamp ? new Date(args.messageTimestamp) : new Date(),
-          countryCode: 'SA',
-          companyId: args.company_id,
-          portfolioId: resolvedPortfolioId ?? null,
-          customerId: args.customer_id,
-          debtId: args.debt_id ?? null,
-          customerSalaryDay: null,
-        })
-
-        const datesMatch = oldDecisionSnapshot.promised_date === newDecision.resolved_date
-        let mismatchReason: string | null = null
-        if (!datesMatch) {
-          if (!oldDecisionSnapshot.promised_date && newDecision.resolved_date) mismatchReason = 'old_found_nothing_new_resolved_a_date'
-          else if (oldDecisionSnapshot.promised_date && !newDecision.resolved_date) mismatchReason = 'old_forced_a_date_new_needs_clarification_or_unresolved'
-          else mismatchReason = 'both_resolved_but_to_different_dates'
-        }
-
-        log.info('temporal_engine_shadow_comparison', {
-          source_expression: text.slice(0, 200),
-          old_decision: oldDecisionSnapshot,
-          new_decision: {
-            resolved: newDecision.resolved,
-            resolved_date: newDecision.resolved_date,
-            confidence: newDecision.confidence,
-            reference_type: newDecision.reference_type,
-            needs_clarification: newDecision.needs_clarification,
-            clarification_reason: newDecision.clarification_reason,
-          },
-          dates_match: datesMatch,
-          mismatch_reason: mismatchReason,
-          explanation: newDecision.explanation,
-          engine_version: newDecision.engine_version,
-          kb_version: newDecision.kb_version,
-        })
-      } catch (err) {
-        log.error('temporal_engine_shadow_comparison failed — shadow mode only, never affects the live decision', err as Error)
-      }
-    })().catch(() => {})
   }
 
   // ════════════════════════════════════════════════════════════════════

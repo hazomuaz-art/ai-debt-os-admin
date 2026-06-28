@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Proves Phase 1 (Shadow Mode) of the Temporal Intelligence Engine:
-//   1) the OLD decision pipeline's output is NEVER changed by the new
-//      engine, even when the new engine disagrees completely.
-//   2) every temporal message triggers a structured comparison log with
-//      ALL required fields (old/new decision, match flag, mismatch reason,
-//      confidence, explanation, engine_version, kb_version).
-//   3) a non-temporal message never even calls the new engine (no noise).
-//   4) a failure inside the new engine is swallowed — never affects the
-//      live decision or throws.
+// Proves the Temporal Intelligence Engine's promotion from Shadow Mode to
+// the LIVE, authoritative date resolver (2026-06-28):
+//   1) when the engine resolves a date, that date is what actually gets
+//      stored/returned — not the model's own guess, not the generic
+//      "+3 days" fallback.
+//   2) the engine can catch a promise the simple lexicon (hasTemporalRef)
+//      misses entirely (e.g. a holiday-only expression).
+//   3) an engine failure (throws) never breaks the reply — falls back
+//      gracefully to the model's date or the generic fallback.
+//   4) a non-temporal, non-commitment message never even calls the engine.
 
 let mockModelContent = ''
 let mockContext: any = {}
@@ -26,9 +27,6 @@ vi.mock('@/lib/logger', () => ({
 }))
 
 vi.mock('@/lib/temporal-engine', async () => {
-  // quickScan is the real implementation — it's a sync, DB-free resolver
-  // scan, safe to run for real in tests. Only resolveTemporalExpression
-  // (which hits Supabase via the KB loader) is mocked.
   const actual = await vi.importActual<any>('@/lib/temporal-engine')
   return {
     ...actual,
@@ -125,138 +123,71 @@ beforeEach(() => {
   logCalls.length = 0
 })
 
-describe('Shadow Mode — old decision is NEVER changed by the new engine', () => {
-  it('new engine disagreeing completely does not change the returned action/date', async () => {
-    // New engine says "needs clarification, no date" — directly contradicts
-    // what the old pipeline will deterministically produce below.
-    mockEngineResolution = defaultEngineResolution({ resolved: false, resolved_date: null, confidence: null, needs_clarification: true, clarification_reason: 'ambiguous_or_reference' })
+describe('Temporal Engine — LIVE, authoritative date resolution', () => {
+  it('the resolved date from the engine is what actually gets stored/returned, overriding the generic fallback', async () => {
+    mockEngineResolution = defaultEngineResolution({ resolved_date: '2026-07-05' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
 
-    // This is exactly what the OLD pipeline alone produces (same as
-    // temporal-parsing-layer.test.ts) — proves Shadow Mode is read-only.
     expect(d.action).toBe('record_promise')
-    expect(d.reason).toBe('promise_forced_from_temporal_ref')
-    expect(d.promised_date).toBeTruthy()
+    expect(d.promised_date).toBe('2026-07-05')
   })
 
-  it('new engine resolving a DIFFERENT date than old still does not change the returned date', async () => {
-    mockEngineResolution = defaultEngineResolution({ resolved_date: '2099-12-31' })
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
+  it('the engine date OVERRIDES a different, sane date the model guessed on its own', async () => {
+    mockEngineResolution = defaultEngineResolution({ resolved_date: '2026-08-15' })
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'record_promise', reason: 'x', message: 'تمام', promised_date: '2026-07-20', promise_text: 'بداية الشهر' })
 
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
 
-    expect(d.promised_date).not.toBe('2099-12-31')
+    expect(d.promised_date).toBe('2026-08-15') // engine wins, not the model's 2026-07-20
   })
 
-  it('an engine that THROWS never breaks the live decision', async () => {
+  it('catches a promise the simple lexicon misses entirely (holiday expression) and resolves its date', async () => {
+    mockEngineResolution = defaultEngineResolution({ reference_type: 'holiday', resolved_date: '2026-12-24', confidence: 'medium' })
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد العيد' })
+
+    expect(d.action).toBe('record_promise')
+    expect(d.promised_date).toBe('2026-12-24')
+  })
+
+  it('an engine that THROWS never breaks the reply — falls back to the generic +3-day checkpoint', async () => {
     mockEngineShouldThrow = true
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
 
     expect(d.action).toBe('record_promise')
-    // give the fire-and-forget shadow task a tick to run and be caught
-    await new Promise(r => setTimeout(r, 0))
-    expect(logCalls.some(c => c.level === 'error' && c.message.includes('shadow_comparison failed'))).toBe(true)
-  })
-})
-
-describe('Shadow Mode — structured comparison log', () => {
-  it('logs old_decision, new_decision, dates_match, mismatch_reason, explanation, engine_version, kb_version', async () => {
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
-    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
-    await new Promise(r => setTimeout(r, 0))
-
-    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
-    expect(shadowLog).toBeTruthy()
-    const ctx = shadowLog!.context
-    expect(ctx.old_decision).toMatchObject({ action: 'record_promise', forcedPromise: true })
-    expect(ctx.new_decision.resolved_date).toBe('2026-07-01')
-    expect(typeof ctx.dates_match).toBe('boolean')
-    expect(ctx.explanation).toBeTruthy()
-    expect(ctx.engine_version).toBe('1.0.0')
-    expect(ctx.kb_version).toBe('sa-test.1')
+    expect(d.promised_date).toBeTruthy() // still got a date, just not the engine's
+    expect(logCalls.some(c => c.level === 'warn' && c.message.includes('Temporal Engine resolution failed'))).toBe(true)
   })
 
-  it('flags mismatch_reason when old forced a date but new could not resolve one', async () => {
-    mockEngineResolution = defaultEngineResolution({ resolved: false, resolved_date: null, confidence: null, needs_clarification: true })
+  it('when the engine cannot resolve (needs_clarification), falls back to the model/generic date instead of breaking', async () => {
+    mockEngineResolution = defaultEngineResolution({ resolved: false, resolved_date: null, confidence: null, needs_clarification: true, clarification_reason: 'ambiguous_or_reference' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
-    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
-    await new Promise(r => setTimeout(r, 0))
 
-    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
-    expect(shadowLog!.context.dates_match).toBe(false)
-    expect(shadowLog!.context.mismatch_reason).toBe('old_forced_a_date_new_needs_clarification_or_unresolved')
-  })
-
-  it('dates_match is true when both pipelines agree', async () => {
-    mockEngineResolution = defaultEngineResolution({ resolved_date: '2026-06-29' }) // matches the old fallback (+3 days) for this fixed test date
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
-    await new Promise(r => setTimeout(r, 0))
 
-    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
-    expect(shadowLog!.context.old_decision.promised_date).toBe(d.promised_date)
-    expect(shadowLog!.context.dates_match).toBe(d.promised_date === '2026-06-29')
+    expect(d.action).toBe('record_promise')
+    expect(d.promised_date).toBeTruthy()
   })
-})
 
-describe('Shadow Mode — gated by quickScan(), the new engine\'s own detector (never the old lexicon)', () => {
-  it('a plain non-temporal question never calls the new engine at all — quickScan() correctly rejects it', async () => {
-    // No resolver in the engine matches this text, so quickScan() returns
-    // false and the shadow comparison never runs — same no-noise guarantee
-    // as before, but the decision now comes from the engine's own resolver
-    // loop instead of the old hasTemporalRef/signals.promise/
-    // hasCommitmentWithVagueTiming lexicon.
+  it('a plain non-temporal, non-commitment message never calls the engine at all', async () => {
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام', promised_date: null })
     await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش الشركة؟' })
-    await new Promise(r => setTimeout(r, 0))
 
-    expect(logCalls.some(c => c.message.includes('temporal_engine_shadow_comparison'))).toBe(false)
+    expect(logCalls.some(c => c.message.includes('Temporal Engine'))).toBe(false)
   })
 
-  it('gov programs (e.g. حساب المواطن) now reach the shadow comparison too — hasTemporalRef was extended to cover them deterministically', async () => {
-    // "حساب المواطن" appears nowhere in hasTemporalRef/signals.promise/
-    // hasCommitmentWithVagueTiming — before this fix, this message would
-    // never have reached the shadow comparison.
+  it('gov programs (e.g. حساب المواطن) resolve via the engine, with hasTemporalRef now also recognizing them deterministically', async () => {
     mockEngineResolution = defaultEngineResolution({ reference_type: 'gov_program', resolved_date: '2026-07-10', confidence: 'medium' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
-    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد حساب المواطن' })
-    await new Promise(r => setTimeout(r, 0))
 
-    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
-    expect(shadowLog).toBeTruthy()
-    expect(shadowLog!.context.new_decision.reference_type).toBe('gov_program')
-    expect(shadowLog!.context.old_decision.hasTemporalRef).toBe(true) // hasTemporalRef now recognizes gov-program phrases deterministically
-  })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد حساب المواطن' })
 
-  it('covers a holiday expression the old lexicon also has zero concept of', async () => {
-    mockEngineResolution = defaultEngineResolution({ reference_type: 'holiday', resolved_date: '2026-03-24', confidence: 'medium' })
-    mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
-    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد العيد' })
-    await new Promise(r => setTimeout(r, 0))
-
-    const shadowLog = logCalls.find(c => c.message.includes('temporal_engine_shadow_comparison'))
-    expect(shadowLog).toBeTruthy()
-    expect(shadowLog!.context.new_decision.reference_type).toBe('holiday')
-    expect(shadowLog!.context.old_decision.hasTemporalRef).toBe(false)
-  })
-})
-
-describe('Shadow Mode — production paths never use the new engine\'s result for any real action', () => {
-  it('action/reason/message/promised_date returned are identical to pre-Phase-1 behavior regardless of mocked engine output', async () => {
-    for (const fakeResolution of [
-      defaultEngineResolution({ resolved_date: '2030-01-01', confidence: 'low' }),
-      defaultEngineResolution({ resolved: false, needs_clarification: true, clarification_reason: 'unrecognized_expression' }),
-      null, // engine returns nothing usable
-    ]) {
-      mockEngineResolution = fakeResolution
-      mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
-      const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
-      expect(d.action).toBe('record_promise')
-      expect(d.reason).toBe('promise_forced_from_temporal_ref')
-    }
+    expect(d.action).toBe('record_promise')
+    expect(d.promised_date).toBe('2026-07-10')
   })
 })
