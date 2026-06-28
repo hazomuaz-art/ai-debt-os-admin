@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveCompanyProfile } from '@/lib/company-import-profiles'
 
 export async function buildCustomerDebtContext(params: {
   company_id: string
@@ -16,7 +17,7 @@ export async function buildCustomerDebtContext(params: {
 
   const debtQuery = supabase
     .from('debts')
-    .select('id, portfolio_id, reference_number, original_amount, current_balance, currency, status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name, category)')
+    .select('id, portfolio_id, reference_number, original_amount, current_balance, currency, status, original_sub_status, priority, due_date, last_payment_date, next_follow_up, product_type, creditor_name, account_number, notes, metadata, created_at, portfolio:portfolios(name, category)')
     .eq('company_id', params.company_id)
     .eq('customer_id', params.customer_id)
 
@@ -244,6 +245,14 @@ export async function buildCustomerDebtContext(params: {
     (collAccounts ?? []).find((a: any) => !a.portfolio_id) ??
     (collAccounts ?? [])[0] ?? null
 
+  // Last known company-specific outcome classification (e.g. "مماطل",
+  // "وعد بالسداد") — informs the agent's tone on this turn without it
+  // needing to re-derive the whole history.
+  const lastOutcomeLabel = (debt as any)?.original_sub_status ?? null
+  const portfolioNameForProfile = (debt as any)?.portfolio?.name ?? null
+  const outcomeProfile = portfolioNameForProfile ? resolveCompanyProfile(portfolioNameForProfile) : null
+  const lastOutcomeMeta = lastOutcomeLabel ? outcomeProfile?.outcomeMeta[lastOutcomeLabel] : null
+
   return {
     collection_account: collectionAccount,
     // ══════════════════════════════════════════════════════════════
@@ -260,6 +269,7 @@ export async function buildCustomerDebtContext(params: {
       '⛔ ممنوع منعاً باتاً أن توافق على تقسيط أو تقترح مبلغاً شهرياً أو عدد دفعات أو أي سداد جزئي ما لم يكن هناك تقسيط معتمد فعلاً في النظام. أي تقسيط جديد يحتاج موافقة الإدارة، ومهمتك فقط رفع الطلب لا الموافقة عليه.',
       'استخدم اللهجة السعودية البيضاء. كن مهنياً ومختصراً.',
       'لا ترسل أكثر من جملتين في الرد الواحد.',
+      ...(lastOutcomeMeta ? [`📌 آخر تصنيف معروف لهذا العميل: ${lastOutcomeMeta.meaning} ${lastOutcomeMeta.behavior}`] : []),
     ],
 
     // ══════════════════════════════════════════════════════════════

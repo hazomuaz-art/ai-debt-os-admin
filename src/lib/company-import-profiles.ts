@@ -27,6 +27,22 @@ export type PortfolioCategory =
   | 'telecom' | 'insurance' | 'utility' | 'recruitment'
   | 'government' | 'finance' | 'agriculture' | 'other'
 
+// Internal debt-status enum — must match the `debts_status_check` CHECK
+// constraint in the database exactly.
+export type DebtStatus =
+  | 'active' | 'in_progress' | 'promised' | 'partial' | 'in_negotiation'
+  | 'payment_plan' | 'settled' | 'written_off' | 'legal' | 'disputed'
+
+// What a single company-specific outcome category (e.g. "وعد بالسداد")
+// means for the agent and the system. Data only — no logic — so correcting
+// any individual category later is a one-line edit, never a code change.
+export type OutcomeMeta = {
+  status:     DebtStatus | null  // null = this category does not imply a debt-status change
+  isTerminal: boolean            // true = stop auto-replies, route to human review (never auto-decided by AI)
+  meaning:    string             // short Arabic context line injected into the agent's prompt
+  behavior:   string             // short Arabic behavior instruction for the agent's next reply
+}
+
 export type CompanyImportProfile = {
   key:               string
   nameAr:            string
@@ -35,11 +51,90 @@ export type CompanyImportProfile = {
   aliases:           string[]          // lowercased, trimmed
   columnAliases?:    Record<string, string>  // lowercased header -> standard field
   outcomeCategories: string[]
+  outcomeMeta:       Record<string, OutcomeMeta>
 }
 
 const norm = (s: string) => s.toLowerCase().trim()
 
-export const COMPANY_IMPORT_PROFILES: CompanyImportProfile[] = [
+// ────────────────────────────────────────────────────────────────────────
+// Default classification rules — applied uniformly to every company's
+// outcome-category list so corrections stay centralized in one place.
+// Order matters: first matching rule wins.
+// ────────────────────────────────────────────────────────────────────────
+const OUTCOME_RULES: Array<{ test: (label: string) => boolean; meta: Omit<OutcomeMeta, 'meaning' | 'behavior'> & { meaningTpl: string; behaviorTpl: string } }> = [
+  {
+    test: l => l.includes('وعد بالسداد') || l.includes('بيفيد بالسداد'),
+    meta: { status: 'promised', isTerminal: false,
+      meaningTpl: 'العميل وعد بالسداد ("${label}").',
+      behaviorTpl: 'ثبّت الوعد بتاريخ محدد، وذكّره بلطف قرب الموعد. لا تكرر نفس السؤال إن كان قد أعطى تاريخاً فعلاً.' },
+  },
+  {
+    test: l => l.includes('سداد كامل') || (l.includes('تم السداد') && !l.includes('جزئ')),
+    meta: { status: 'settled', isTerminal: false,
+      meaningTpl: 'تم سداد المديونية بالكامل ("${label}").',
+      behaviorTpl: 'اشكر العميل وأغلق الموضوع بلطف، لا تطلب أي سداد إضافي.' },
+  },
+  {
+    test: l => l.includes('سداد جزئ'),
+    meta: { status: 'partial', isTerminal: false,
+      meaningTpl: 'العميل سدد جزءاً من المديونية فقط ("${label}").',
+      behaviorTpl: 'اشكره على الجزء المسدد، واسأل بلطف عن موعد تسديد الباقي.' },
+  },
+  {
+    test: l => l.includes('مماطل'),
+    meta: { status: 'in_negotiation', isTerminal: false,
+      meaningTpl: 'العميل مصنَّف كمماطل سابقاً ("${label}") — وعود متكررة بدون التزام فعلي.',
+      behaviorTpl: 'كن أكثر حزماً ومباشرة، واطلب تاريخاً ومبلغاً محددين، لا تقبل وعوداً غامضة جديدة.' },
+  },
+  {
+    test: l => l.includes('معترض') || l.includes('انكر') || l.includes('أنكر') || l.includes('بينات غير صحيحة'),
+    meta: { status: 'disputed', isTerminal: false,
+      meaningTpl: 'العميل يعترض على المديونية أو ينكر وجودها ("${label}").',
+      behaviorTpl: 'لا تطالبه بالسداد مباشرة، اطلب توضيح سبب الاعتراض ووجّهه لقسم المراجعة عند الحاجة.' },
+  },
+  {
+    test: l => l.includes('متوفي') || l.includes('مسجون') || l.includes('مفلس'),
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'حالة تحتاج مراجعة بشرية فورية — لا يمكن للذكاء الاصطناعي أن يقرر بشأنها ("${label}").',
+      behaviorTpl: 'لا ترسل أي رد تلقائي إضافي بخصوص السداد على هذا الأساس، الملف يحتاج تدخل بشري.' },
+  },
+  {
+    test: l => l.includes('الرقم خطأ') || l.includes('رقم التواصل غير صحيح') || l.includes('الرقم مغلق') || l.includes('لا يوجد بيانات تواصل'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'مشكلة في بيانات التواصل، ليست تغيّراً في حالة الدين ("${label}").',
+      behaviorTpl: 'لا علاقة لهذا بمنطق السداد، يحتاج فقط تحديث بيانات الاتصال من الإدارة.' },
+  },
+  {
+    test: l => l.includes('طلب أقساط') || l.includes('طلب اقساط') || l.includes('طلب مهلة') || l.includes('طلب تسوية') || l.includes('تفاوض'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل طلب تقسيطاً أو تسوية أو مهلة ("${label}") — يحتاج موافقة إدارة.',
+      behaviorTpl: 'أفهمه أن طلبه رُفع للمراجعة، لا توافق على أي تقسيط أو تسوية من عندك مباشرة.' },
+  },
+]
+
+const DEFAULT_META = (label: string): OutcomeMeta => ({
+  status: null, isTerminal: false,
+  meaning: `حالة عامة محدَّثة على الملف ("${label}").`,
+  behavior: 'تابع المحادثة بشكل طبيعي، لا تغيير مطلوب في الأسلوب.',
+})
+
+function buildOutcomeMeta(categories: string[]): Record<string, OutcomeMeta> {
+  const out: Record<string, OutcomeMeta> = {}
+  for (const label of categories) {
+    const rule = OUTCOME_RULES.find(r => r.test(label))
+    out[label] = rule
+      ? {
+          status: rule.meta.status,
+          isTerminal: rule.meta.isTerminal,
+          meaning: rule.meta.meaningTpl.replace('${label}', label),
+          behavior: rule.meta.behaviorTpl,
+        }
+      : DEFAULT_META(label)
+  }
+  return out
+}
+
+const RAW_PROFILES: Omit<CompanyImportProfile, 'outcomeMeta'>[] = [
   {
     key: 'mobily', nameAr: 'موبايلي', nameEn: 'Mobily', category: 'telecom',
     aliases: ['mobily', 'موبايلي', 'موبايلى'],
@@ -182,6 +277,11 @@ export const COMPANY_IMPORT_PROFILES: CompanyImportProfile[] = [
     ],
   },
 ]
+
+export const COMPANY_IMPORT_PROFILES: CompanyImportProfile[] = RAW_PROFILES.map(p => ({
+  ...p,
+  outcomeMeta: buildOutcomeMeta(p.outcomeCategories),
+}))
 
 export function findCompanyProfile(key: string): CompanyImportProfile | null {
   return COMPANY_IMPORT_PROFILES.find(p => p.key === key) ?? null

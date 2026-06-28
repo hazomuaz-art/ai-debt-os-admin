@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: latestDebt } = await supabase
-      .from('debts').select('id, current_balance').eq('customer_id', c.id)
+      .from('debts').select('id, current_balance, status, portfolio:portfolios(name)').eq('customer_id', c.id)
       .not('status', 'in', '("settled","written_off")')
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     const debt_id = (latestDebt as { id: string } | null)?.id ?? null
@@ -266,6 +266,55 @@ export async function POST(request: NextRequest) {
           promised_date: aiDecision.promised_date, customer_message: mergedText,
           promise_text: aiDecision.promise_text ?? null,
         })
+      }
+
+      // Company-specific outcome classification (from "تصنيفات جميع
+      // الشركات.xlsx") — only runs for the 11 known company profiles;
+      // manual/generic portfolios get null and are untouched.
+      if (debt_id) {
+        const portfolioName = (latestDebt as { portfolio?: { name?: string } } | null)?.portfolio?.name ?? null
+        const { classifyDebtOutcome } = await import('@/lib/debt-status-classifier')
+        const outcome = await classifyDebtOutcome({ portfolio_name: portfolioName, customer_message: mergedText })
+
+        if (outcome) {
+          const { category, meta } = outcome
+          const oldStatus = (latestDebt as { status?: string } | null)?.status ?? null
+
+          await supabase.from('debts').update({
+            original_sub_status: category,
+            normalized_status: meta.status ?? oldStatus,
+            ...(meta.status ? { status: meta.status } : {}),
+            updated_at: new Date().toISOString(),
+          }).eq('id', debt_id)
+
+          await supabase.from('collection_status_history').insert({
+            company_id: c.company_id, customer_id: c.id, debt_id,
+            source_system: 'ai_agent',
+            old_status: oldStatus, new_status: category,
+            normalized_status: meta.status,
+            changed_by_name: 'AI Agent',
+            raw_payload: { customer_message: mergedText },
+            changed_at: new Date().toISOString(),
+          })
+
+          await supabase.from('timeline_events').insert({
+            company_id: c.company_id, customer_id: c.id, debt_id,
+            event_type: 'outcome_classified', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+            summary: `تصنيف الحالة: ${category}`,
+            detail: meta.meaning, occurred_at: new Date().toISOString(),
+          })
+
+          if (meta.isTerminal) {
+            await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+            await supabase.from('system_alerts').insert({
+              company_id: c.company_id, severity: 'high', alert_type: 'outcome_needs_human_review',
+              title: `يحتاج مراجعة بشرية: ${category}`,
+              message: `العميل ${c.full_name} صُنّف بحالة "${category}" — ${meta.meaning} تم إيقاف الرد التلقائي على هذا العميل.`,
+              metadata: { customer_id: c.id, debt_id, category },
+              is_resolved: false, created_at: new Date().toISOString(),
+            })
+          }
+        }
       }
     })
 
