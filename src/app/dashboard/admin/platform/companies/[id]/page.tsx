@@ -27,7 +27,9 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
     .eq('id', user.id)
     .single()
 
-  if (!profile?.company_id || profile.role !== 'admin') {
+  // Lets an admin view/manage ANY other company's users by URL id — same
+  // cross-tenant gap as platform/companies/page.tsx, same fix.
+  if (!profile?.company_id || profile.role !== 'admin' || profile.company_id !== process.env.PLATFORM_OWNER_COMPANY_ID) {
     redirect('/dashboard/admin')
   }
 

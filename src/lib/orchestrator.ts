@@ -117,7 +117,7 @@ function buildModuleMap(r: PipelineResult): OrchestratorResult['modules'] {
     approvals:  status('approvals'),
     campaigns:  status('campaigns'),
     whatsapp:   status('whatsapp'),
-    revenue:    'not_applicable', // attributed separately via revenue_events
+    revenue:    'not_applicable', // attributed separately via collection_attribution (revenue-attribution.ts)
   }
 }
 

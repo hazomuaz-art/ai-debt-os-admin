@@ -18,16 +18,33 @@ export async function POST(
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name')
+      .select('full_name, company_id')
       .eq('id', user.id)
       .single()
-      
+
+    if (!profile?.company_id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const actorName = profile?.full_name || 'User'
+
+    // Every debt this route can be called for must belong to the caller's
+    // own company — without this, any authenticated user from ANY company
+    // could mutate another company's debt by guessing/knowing its id.
+    const { data: debt, error: debtErr } = await supabase
+      .from('debts')
+      .select('id, company_id')
+      .eq('id', debtId)
+      .eq('company_id', profile.company_id)
+      .maybeSingle()
+    if (debtErr || !debt) {
+      return NextResponse.json({ error: 'Debt not found' }, { status: 404 })
+    }
 
     switch (action) {
       case 'promise_to_pay':
         // 1. Insert into promises
         await supabase.from('promises').insert({
+          company_id: profile.company_id,
           debt_id: debtId,
           promised_amount: amount,
           promised_date: date,
@@ -35,12 +52,13 @@ export async function POST(
           channel: 'manual',
           notes: `مسجل يدوياً بواسطة ${actorName}`
         })
-        
+
         // 2. Update debt status to promised
-        await supabase.from('debts').update({ status: 'promised' }).eq('id', debtId)
-        
+        await supabase.from('debts').update({ status: 'promised' }).eq('id', debtId).eq('company_id', profile.company_id)
+
         // 3. Log to timeline
         await supabase.from('timeline_events').insert({
+          company_id: profile.company_id,
           debt_id: debtId,
           event_type: 'promise_made',
           summary: 'تسجيل وعد بالسداد',
@@ -53,10 +71,11 @@ export async function POST(
 
       case 'dispute':
         // 1. Update debt status to disputed
-        await supabase.from('debts').update({ status: 'disputed' }).eq('id', debtId)
-        
+        await supabase.from('debts').update({ status: 'disputed' }).eq('id', debtId).eq('company_id', profile.company_id)
+
         // 2. Log to timeline
         await supabase.from('timeline_events').insert({
+          company_id: profile.company_id,
           debt_id: debtId,
           event_type: 'disputed',
           summary: 'تسجيل اعتراض من العميل',
@@ -69,13 +88,14 @@ export async function POST(
 
       case 'human_handoff':
         // 1. Update status or metadata
-        await supabase.from('debts').update({ 
+        await supabase.from('debts').update({
           status: 'in_progress',
           assigned_to: user.id
-        }).eq('id', debtId)
-        
+        }).eq('id', debtId).eq('company_id', profile.company_id)
+
         // 2. Log to timeline
         await supabase.from('timeline_events').insert({
+          company_id: profile.company_id,
           debt_id: debtId,
           event_type: 'human_handoff',
           summary: 'تحويل للتدخل البشري',
@@ -88,10 +108,11 @@ export async function POST(
 
       case 'follow_up':
         // 1. Just mark as in_progress
-        await supabase.from('debts').update({ status: 'in_progress' }).eq('id', debtId)
-        
+        await supabase.from('debts').update({ status: 'in_progress' }).eq('id', debtId).eq('company_id', profile.company_id)
+
         // 2. Log to timeline
         await supabase.from('timeline_events').insert({
+          company_id: profile.company_id,
           debt_id: debtId,
           event_type: 'status_change',
           summary: 'إضافة للمتابعة',
@@ -106,11 +127,12 @@ export async function POST(
         const updateData: any = {}
         if (note !== undefined) updateData.notes = note
         if (follow_up_date !== undefined) updateData.next_follow_up = follow_up_date
-        
-        await supabase.from('debts').update(updateData).eq('id', debtId)
-        
+
+        await supabase.from('debts').update(updateData).eq('id', debtId).eq('company_id', profile.company_id)
+
         // Log to timeline
         await supabase.from('timeline_events').insert({
+          company_id: profile.company_id,
           debt_id: debtId,
           event_type: 'note_added',
           summary: 'تحديث بيانات المتابعة',

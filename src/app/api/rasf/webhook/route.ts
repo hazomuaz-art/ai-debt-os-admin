@@ -19,6 +19,21 @@ function normalizePhone(phone: string) {
 export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
 
+  // Unauthenticated previously — anyone who found this URL could inject
+  // arbitrary customer/timeline data using the full service-role client.
+  // Enforced once RASF_WEBHOOK_SECRET is configured on both sides; logged
+  // loudly if still unset so the gap stays visible rather than silent.
+  const expectedSecret = process.env.RASF_WEBHOOK_SECRET
+  if (expectedSecret) {
+    const provided = req.headers.get('x-webhook-secret') ?? req.nextUrl.searchParams.get('secret')
+    if (provided !== expectedSecret) {
+      log.warn('Rasf webhook rejected — missing/invalid secret')
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    }
+  } else {
+    log.error('RASF_WEBHOOK_SECRET is not set — this endpoint is unauthenticated and publicly writable')
+  }
+
   let payload: any
   try {
     payload = await req.json()

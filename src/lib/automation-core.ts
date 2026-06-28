@@ -1,4 +1,7 @@
 ﻿import { scoringFallback } from '@/lib/ai-engine'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('automation-core')
 
 type SupabaseAny = any
 
@@ -27,19 +30,21 @@ function safeText(v: unknown) {
 export async function processDebtAutomation(input: ProcessDebtInput) {
   const { supabase, company_id, debt_id, customer_id, source = 'automation_core' } = input
 
-  const { data: debt } = await supabase
+  const { data: debt, error: debtErr } = await supabase
     .from('debts')
     .select('*')
     .eq('id', debt_id)
     .eq('company_id', company_id)
     .maybeSingle()
+  if (debtErr) log.error('failed to load debt', debtErr, { debt_id, company_id })
 
-  const { data: customer } = await supabase
+  const { data: customer, error: customerErr } = await supabase
     .from('customers')
     .select('*')
     .eq('id', customer_id)
     .eq('company_id', company_id)
     .maybeSingle()
+  if (customerErr) log.error('failed to load customer', customerErr, { customer_id, company_id })
 
   if (!debt || !customer) return { ok: false, reason: 'missing debt or customer' }
 

@@ -52,6 +52,13 @@ export type CollectorDecision = {
   // agent never re-asks. Set by the model for any timing expression, however
   // phrased; we do NOT keyword-match it.
   promise_text?: string | null
+  // The debt id the agent ACTUALLY reasoned about internally (via
+  // forcedDebtId resolution, which can differ from the caller-supplied
+  // args.debt_id for multi-portfolio customers). Callers must use THIS for
+  // any side-effect write (promise/dispute/installment-request), never the
+  // id they originally passed in — otherwise the record can attach to the
+  // wrong debt.
+  resolvedDebtId?: string | null
 }
 
 type HistoryItem = {
@@ -775,6 +782,7 @@ export async function runCollectorAgent(args: {
         return {
           shouldReply: true, action: 'human_review',
           reason: 'legal_escalation_locked_lawyer_persona', message: lawyerReply,
+          resolvedDebtId: forcedDebtId,
         }
       }
       log.info('legal escalation lock active — zero LLM call', { debt_id: forcedDebtId, escalation_type: openEsc.escalation_type })
@@ -783,6 +791,7 @@ export async function runCollectorAgent(args: {
         action: 'human_review',
         reason: 'legal_escalation_locked',
         message: renderLegalPersonaReply(openEsc.escalation_type),
+        resolvedDebtId: forcedDebtId,
       }
     }
   }
@@ -880,6 +889,7 @@ export async function runCollectorAgent(args: {
         action: 'human_review',
         reason: 'legal_escalation_opened',
         message: renderLegalPersonaReply(mandatory.escalation_type),
+        resolvedDebtId: forcedDebtId,
       }
     }
 
@@ -1822,6 +1832,11 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       }
     }
   }
+
+  // Carries the debt id the agent ACTUALLY reasoned about (may differ from
+  // args.debt_id for multi-portfolio customers) so the webhook's
+  // side-effect writes (promise/dispute/installment) attach to the right one.
+  parsed.resolvedDebtId = forcedDebtId
 
   log.info('agent decision', {
     intent,

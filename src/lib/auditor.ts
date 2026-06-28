@@ -94,7 +94,7 @@ const EXPECTED_ROUTES = [
   { path: '/api/orchestrator',        method: 'POST', name: 'Orchestrator' },
   { path: '/api/auditor',             method: 'GET',  name: 'Auditor' },
   { path: '/api/jobs/worker',         method: 'GET',  name: 'Job worker (cron)' },
-  { path: '/api/whatsapp/webhook',    method: 'POST', name: 'WhatsApp webhook' },
+  { path: '/api/whatsapp/waha-webhook', method: 'POST', name: 'WhatsApp webhook' },
   { path: '/api/whatsapp/send',       method: 'POST', name: 'WhatsApp send' },
   { path: '/api/sync',                method: 'POST', name: 'Collection sync' },
   { path: '/api/modules/timeline',    method: 'GET',  name: 'Timeline module' },

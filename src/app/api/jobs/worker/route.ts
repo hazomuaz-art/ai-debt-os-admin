@@ -257,7 +257,7 @@ async function processJob(supabase: ReturnType<typeof createServiceClient>, job:
       const { phone, message, company_id, customer_id, debt_id } = payload
       if (!phone || !message) throw new Error('send_whatsapp: missing phone or message')
 
-      const result = await sendWhatsAppMessage({ to: phone, message })
+      const result = await sendWhatsAppMessage({ to: phone, message, company_id })
 
       await supabase.from('messages').insert({
         company_id,

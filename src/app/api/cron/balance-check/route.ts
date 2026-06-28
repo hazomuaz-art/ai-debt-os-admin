@@ -18,7 +18,10 @@ const ALERT_PHONE  = process.env.BALANCE_ALERT_PHONE
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.APP_SECRET}` && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Enforced whenever a secret is actually configured, regardless of
+    // NODE_ENV — the old check only enforced in NODE_ENV==='production',
+    // leaving every cron route open with zero auth on any other deploy target.
+    if (process.env.APP_SECRET || process.env.CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const balance = await getOpenRouterBalance()

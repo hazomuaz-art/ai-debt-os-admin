@@ -156,6 +156,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Previously the ONLY "auth" was company_id inside the request body
+    // itself — anyone who could reach this URL and supply/guess a real
+    // company_id could write debts/customers/payments for that company
+    // using the full service-role client. Verify against that company's
+    // own collection_api token (the same credential configured in
+    // /dashboard/admin/integrations for outbound calls — reused here to
+    // authenticate inbound ones, since there is no separate secret field).
+    const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '')
+    const { data: integ } = await sb.from('integration_settings')
+      .select('config').eq('company_id', companyId).eq('integration_name', 'collection_api').maybeSingle()
+    const expectedToken = (integ?.config as Record<string, string> | undefined)?.token
+    if (!expectedToken || !apiKey || apiKey !== expectedToken) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     if (!payload.customer?.full_name && !payload.customer?.phone && !payload.customer?.whatsapp && !payload.customer?.national_id && !payload.external_customer_id) {
       return NextResponse.json(
         { success: false, error: 'customer full_name, phone, whatsapp, national_id, or external_customer_id required' },

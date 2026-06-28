@@ -25,7 +25,12 @@ export default async function PlatformCompaniesPage() {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.company_id || profile.role !== 'admin') {
+  // This page lists EVERY company on the platform (cross-tenant) — checking
+  // only role==='admin' let ANY company's admin view every other company's
+  // name/plan/usage/financials by navigating here directly. Restricted to
+  // the platform owner's own company, same env-var pattern as
+  // DEFAULT_COMPANY_ID used elsewhere in this codebase.
+  if (!profile?.company_id || profile.role !== 'admin' || profile.company_id !== process.env.PLATFORM_OWNER_COMPANY_ID) {
     redirect('/dashboard/admin')
   }
 

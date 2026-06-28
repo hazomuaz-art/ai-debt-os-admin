@@ -73,6 +73,12 @@ export async function recordPromise(args: {
 
   await supabase.from('debts').update({ status: 'promised' }).eq('id', args.debt_id)
 
+  // A customer who just made a promise is no longer "refusing" — clear any
+  // accumulated refusal count so the 3-refusals/48h legal-escalation trigger
+  // doesn't fire later off stale refusals from before this cooperation.
+  const { resetRefusalTracking } = await import('@/lib/legal-escalation')
+  await resetRefusalTracking(args.debt_id)
+
   // Reflect the promise on the customer timeline immediately so the profile,
   // history and follow-ups all stay in sync (not stuck in one part of the app).
   try {

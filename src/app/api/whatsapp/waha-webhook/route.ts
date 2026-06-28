@@ -228,10 +228,15 @@ export async function POST(request: NextRequest) {
         company_id: c.company_id, customer_id: c.id, debt_id, message: mergedText, messageTimestamp: latestTimestamp,
       })
 
+      // The agent may internally resolve a DIFFERENT debt than the one this
+      // webhook picked (multi-portfolio customers) — every side-effect write
+      // below must attach to that one, not the webhook's own guess.
+      const effectiveDebtId = aiDecision.resolvedDebtId ?? debt_id
+
       if (aiDecision.shouldReply && aiDecision.message) {
         const waResult = await sendWhatsAppMessage({ to: phone, message: aiDecision.message, company_id: c.company_id })
         await supabase.from('messages').insert({
-          company_id: c.company_id, customer_id: c.id, debt_id,
+          company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
           channel: 'whatsapp', direction: 'outbound', content: aiDecision.message,
           status: waResult.status === 'sent' ? 'sent' : 'failed',
           whatsapp_message_id: waResult.message_id || null,
@@ -240,7 +245,7 @@ export async function POST(request: NextRequest) {
         })
         if (waResult.status === 'sent') {
           await processEvent({
-            debt_id: debt_id ?? 'temp', company_id: c.company_id,
+            debt_id: effectiveDebtId ?? 'temp', company_id: c.company_id,
             source: 'ai_reply',
             data: { message: aiDecision.message, action: aiDecision.action },
           }).catch(e => log.error('pipeline failed', e as Error))
@@ -248,11 +253,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Dispute → open dispute + approval (dedup), with full context
-      if (aiDecision.action === 'record_dispute' && debt_id) {
+      if (aiDecision.action === 'record_dispute' && effectiveDebtId) {
         const { recordDispute } = await import('@/lib/dispute')
         await recordDispute({
           company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
-          debt_id, customer_message: mergedText, agent_reason: aiDecision.reason,
+          debt_id: effectiveDebtId, customer_message: mergedText, agent_reason: aiDecision.reason,
         })
       }
 
@@ -260,20 +265,20 @@ export async function POST(request: NextRequest) {
       // knows how to notify the customer about on approve/reject (see
       // src/app/api/modules/approvals/route.ts PATCH) — this action was
       // computed by the agent before today but never actually acted on here.
-      if (aiDecision.action === 'record_installment_request' && debt_id) {
+      if (aiDecision.action === 'record_installment_request' && effectiveDebtId) {
         const { recordInstallmentRequest } = await import('@/lib/installment-request')
         await recordInstallmentRequest({
           company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
-          debt_id, customer_message: mergedText, agent_reason: aiDecision.reason,
+          debt_id: effectiveDebtId, customer_message: mergedText, agent_reason: aiDecision.reason,
         })
       }
 
       // Promise → record ONLY with the date the agent extracted from the
       // customer's own current message (never fabricated).
-      if (aiDecision.action === 'record_promise' && debt_id && aiDecision.promised_date) {
+      if (aiDecision.action === 'record_promise' && effectiveDebtId && aiDecision.promised_date) {
         const { recordPromise } = await import('@/lib/promise')
         await recordPromise({
-          company_id: c.company_id, customer_id: c.id, debt_id,
+          company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
           promised_amount: Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0),
           promised_date: aiDecision.promised_date, customer_message: mergedText,
           promise_text: aiDecision.promise_text ?? null,
@@ -283,7 +288,7 @@ export async function POST(request: NextRequest) {
       // Company-specific outcome classification (from "تصنيفات جميع
       // الشركات.xlsx") — only runs for the 11 known company profiles;
       // manual/generic portfolios get null and are untouched.
-      if (debt_id) {
+      if (effectiveDebtId) {
         const portfolioName = (latestDebt as { portfolio?: { name?: string } } | null)?.portfolio?.name ?? null
         const { classifyDebtOutcome } = await import('@/lib/debt-status-classifier')
         const outcome = await classifyDebtOutcome({ portfolio_name: portfolioName, customer_message: mergedText })
@@ -297,10 +302,10 @@ export async function POST(request: NextRequest) {
             normalized_status: meta.status ?? oldStatus,
             ...(meta.status ? { status: meta.status } : {}),
             updated_at: new Date().toISOString(),
-          }).eq('id', debt_id)
+          }).eq('id', effectiveDebtId)
 
           await supabase.from('collection_status_history').insert({
-            company_id: c.company_id, customer_id: c.id, debt_id,
+            company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
             source_system: 'ai_agent',
             old_status: oldStatus, new_status: category,
             normalized_status: meta.status,
@@ -310,7 +315,7 @@ export async function POST(request: NextRequest) {
           })
 
           await supabase.from('timeline_events').insert({
-            company_id: c.company_id, customer_id: c.id, debt_id,
+            company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
             event_type: 'outcome_classified', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
             summary: `تصنيف الحالة: ${category}`,
             detail: meta.meaning, occurred_at: new Date().toISOString(),
@@ -322,7 +327,7 @@ export async function POST(request: NextRequest) {
               company_id: c.company_id, severity: 'high', alert_type: 'outcome_needs_human_review',
               title: `يحتاج مراجعة بشرية: ${category}`,
               message: `العميل ${c.full_name} صُنّف بحالة "${category}" — ${meta.meaning} تم إيقاف الرد التلقائي على هذا العميل.`,
-              metadata: { customer_id: c.id, debt_id, category },
+              metadata: { customer_id: c.id, debt_id: effectiveDebtId, category },
               is_resolved: false, created_at: new Date().toISOString(),
             })
           }
