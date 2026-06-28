@@ -305,12 +305,20 @@ function isNonSaudiDialect(reply: string) {
 }
 
 // Conservative: only flag a reply as "repeated" if it is essentially the SAME
-// message as a previous one (near-exact). Never flag substantive replies that
-// carry a number/amount/date — those are real answers, not robotic filler.
+// message as a previous one (near-exact — see the 0.85 containment ratio
+// below). Previously also skipped this check entirely whenever the reply
+// contained ANY digit (meant to avoid flagging legitimate repeated balance/
+// account-number answers as "robotic filler") — but that blanket bypass
+// meant the agent could send the literal same balance/date reminder
+// verbatim multiple times in a row and never get caught, since debt-
+// collection replies almost always contain a figure. The ratio+containment
+// check below already only matches near-IDENTICAL text, so two different
+// sentences that happen to both mention the same balance never collide —
+// removing the bypass closes the loophole without reintroducing false
+// positives on legitimately-repeated numbers phrased differently.
 function isRepeated(reply: string, prevOutbound: string[]) {
   const r = reply.replace(/\s+/g, ' ').trim()
   if (!r || r.length < 20) return false
-  if (/\d/.test(r)) return false // contains a figure → treat as a real answer
   return prevOutbound.some(p => {
     const old = p.replace(/\s+/g, ' ').trim()
     if (!old || old.length < 20) return false

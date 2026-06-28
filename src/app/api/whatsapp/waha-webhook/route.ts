@@ -300,6 +300,22 @@ export async function POST(request: NextRequest) {
           promised_date: aiDecision.promised_date, customer_message: mergedText,
           promise_text: aiDecision.promise_text ?? null,
         })
+      } else if (aiDecision.action === 'record_promise' && effectiveDebtId && !aiDecision.promised_date) {
+        // The agent's internal guards should always force a date before
+        // reaching here (see ai-collector-agent.ts's record_promise date
+        // validation) — this should never actually fire. But if some
+        // unanticipated path ever slips through with no date, the customer
+        // may have just been told "your promise is recorded" while nothing
+        // gets saved. Never let that be silent — same pattern as the
+        // payment-receipt "couldn't read the amount" alert.
+        log.error('record_promise with no promised_date — nothing saved, flagging for review', new Error('missing promised_date'), { debt_id: effectiveDebtId })
+        await supabase.from('system_alerts').insert({
+          company_id: c.company_id, severity: 'warning', alert_type: 'promise_not_recorded',
+          title: 'وعد سداد لم يُسجَّل تلقائياً',
+          message: `العميل ${c.full_name} قد يكون أُخبر بأن وعده مسجَّل، لكن لم يُستخرج تاريخ صريح من رسالته — راجع المحادثة وسجّل الوعد يدوياً إذا لزم.`,
+          metadata: { customer_id: c.id, debt_id: effectiveDebtId, customer_message: mergedText },
+          is_resolved: false, created_at: new Date().toISOString(),
+        })
       }
 
       // Company-specific outcome classification (from "تصنيفات جميع
