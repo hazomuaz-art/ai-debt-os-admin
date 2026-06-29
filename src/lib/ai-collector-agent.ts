@@ -190,12 +190,33 @@ function detectRequestedGraceDays(text: string): number | null {
 // Specific, checkable reasons for a dispute (as opposed to a bare "معترض"
 // with nothing behind it) — used to stop the model from escalating to
 // admin before it has even asked the customer why.
+// Real production bug: a customer said "والله ما اتزكر اني اخدت شي" (vague
+// memory doubt — not an objection, not a denial, no reason given at all),
+// and the model recorded record_dispute on the very first such message with
+// zero clarifying question. This phrase matches none of the SPECIFIC
+// reasons below, but it also never tripped any DISPUTE-intent keyword
+// (detectSignals' dispute/deniesDebt/angry/wrongNumber), so the deterministic
+// guard further below — which used to only fire when intent==='DISPUTE' —
+// never even engaged. Two separate things must be true before a dispute is
+// ever recorded: (1) a SPECIFIC reason (this list), OR (2) the customer
+// EXPLICITLY says they're disputing/objecting (a clear declaration, even
+// without elaborating why) — a bare expression of doubt/forgetfulness is
+// neither and must always be met with a clarifying question first.
 function hasSpecificDisputeReason(text: string): boolean {
   return hasAny(text, [
     'سددت', 'دفعت', 'حولت', 'مش انا', 'مو انا', 'ما اشتريت', 'مش اشتريت',
     'ليس لي', 'مش بيتي', 'مو بيتي', 'رقم غلط', 'مش دين', 'مو دين',
     'انكر', 'أنكر', 'تامين عندي', 'كان عندي تامين', 'باعت العقار', 'بعت العقار',
     'مالك جديد', 'مستاجر', 'مستأجر', 'خطأ في المبلغ', 'مبلغ غلط', 'زيادة في المبلغ',
+  ])
+}
+
+function hasExplicitDisputeDeclaration(text: string): boolean {
+  return hasAny(text, [
+    'معترض', 'اعتراض', 'متنازع', 'نزاع', 'ما اوافق على المبلغ', 'ما أوافق على المبلغ',
+    'مو موافق على المبلغ', 'لا اوافق', 'لا أوافق', 'مو راضي عن المبلغ', 'مرفوض المبلغ',
+    'هذا مو حسابي', 'مو حسابي', 'الحساب مو لي', 'ما عندي مديونية', 'ما علي مديونية',
+    'dispute', 'i object',
   ])
 }
 
@@ -1279,7 +1300,7 @@ ${intentPrompts[intent]}
 🔴 تذكير أخير لا تنساه: لا تخترع بيانات، لا تكرر سؤالاً مُجاباً، التزم بما اتُّفق عليه، وردك قصير وبشري.`
 
   const requestedGraceDays = detectRequestedGraceDays(text)
-  const disputeReasonGiven = hasSpecificDisputeReason(text)
+  const disputeReasonGiven = hasSpecificDisputeReason(text) || hasExplicitDisputeDeclaration(text)
 
   // §9: ALL customer-facing replies go through Sonnet. Haiku was previously
   // used for "routine" intents (GREETING/GENERAL/INTRODUCTION) but production
@@ -1383,9 +1404,17 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
     }
   }
 
-  // 2) Never let the model escalate a vague dispute to admin before it has
-  // actually asked the customer for a specific reason.
-  if (intent === 'DISPUTE' && !disputeReasonGiven && parsed.action === 'record_dispute') {
+  // 2) Never let the model record a dispute the customer never actually
+  // raised. Real production bug: "والله ما اتزكر اني اخدت شي" (a vague
+  // expression of doubt, no reason, no explicit objection) never tripped
+  // any DISPUTE-intent signal, so intent stayed GENERAL — and this guard,
+  // previously gated on intent==='DISPUTE', never engaged at all, letting
+  // the model record_dispute completely ungoverned. The check now applies
+  // to record_dispute regardless of which intent got computed, since the
+  // ONLY thing that may ever justify recording a dispute is the customer's
+  // own message containing a real reason or an explicit dispute statement
+  // — never an inference from intent classification.
+  if (!disputeReasonGiven && parsed.action === 'record_dispute') {
     log.warn('premature dispute escalation guard fired', { intent, original: parsed.message.slice(0, 80) })
     parsed.message = 'تمام، بس عشان أقدر أساعدك بسرعة — وضّح لي إيش بالضبط سبب اعتراضك على المبلغ؟'
     parsed.action = 'request_clarification'

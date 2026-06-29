@@ -99,7 +99,17 @@ function scheduleBurstProcessing(
   // since every new message in the burst mutates this same object in place.
   entry.timer = setTimeout(() => {
     pendingBursts.delete(customerId)
-    run(entry!.texts.join('\n'), entry!.latestTimestamp).catch(() => {})
+    // Real bug found in production: this used to be `.catch(() => {})` —
+    // any exception ANYWHERE inside `run` (classification, promise/dispute
+    // recording, the case-note update at the very end...) silently killed
+    // everything after the point of failure for that turn, with zero log
+    // trace. This is exactly why a real customer's case note froze at one
+    // point in a long conversation and never updated again afterward, even
+    // though replies kept sending fine (the send happens before the failure
+    // point) — there was no way to even know it had stopped. Always log now.
+    run(entry!.texts.join('\n'), entry!.latestTimestamp).catch(err => {
+      log.error('burst-processed run() failed — see which step inside it threw', err as Error, { customerId })
+    })
   }, BURST_DEBOUNCE_MS)
 }
 
