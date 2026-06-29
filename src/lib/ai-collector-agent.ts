@@ -199,7 +199,7 @@ function hasSpecificDisputeReason(text: string): boolean {
   ])
 }
 
-function detectSignals(text: string) {
+export function detectSignals(text: string) {
   return {
     paymentClaim: hasAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']),
     dispute: hasAny(text, ['غلط', 'اعتراض', 'مو صحيح', 'ما اعرف', 'ما أعرف', 'not mine', 'wrong amount']),
@@ -270,6 +270,19 @@ function detectSignals(text: string) {
       'ليش المبلغ زاد', 'وش سبب زيادة المبلغ', 'المبلغ مختلف عن الأول', 'المبلغ يختلف عن السابق',
       'why did the amount change', 'why is the amount different',
     ]),
+    // Some debtors (recruitment/agriculture portfolios especially) are
+    // expat workers who don't read Arabic at all — forcing the mandatory
+    // Saudi-dialect-only rule on them is actively useless. A message with
+    // essentially no Arabic script in it is the signal to drop that rule
+    // for this reply and mirror whatever language the customer actually
+    // used instead. A short "ok"/numbers-only reply has no script either
+    // way, so require a minimum of real letters before judging.
+    isNonArabicMessage: (() => {
+      const letters = text.replace(/[^\p{L}]/gu, '')
+      if (letters.length < 3) return false
+      const arabicLetters = (text.match(/[؀-ۿݐ-ݿࢠ-ࣿ]/g) ?? []).length
+      return arabicLetters / letters.length < 0.3
+    })(),
   }
 }
 
@@ -1184,8 +1197,8 @@ ${installmentRule}
   const todayWeekday = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' }).format(new Date())
 
   const systemPrompt = `أنت "خالد"، محصّل ديون سعودي محترف عمره 45 سنة ولديه خبرة تتجاوز 20 سنة في تحصيل ديون كل القطاعات (اتصالات، تأمين، مرافق، تمويل، استقدام، زراعي). تتحدث بلهجة سعودية بيضاء طبيعية جداً عبر الواتساب، كأنك إنسان حقيقي يجلس أمام العميل.
-🔴 ممنوع منعاً باتاً استخدام أي لهجة غير سعودية (مصرية، سودانية، شامية، عراقية، أو أي لهجة خليجية أخرى) أو الفصحى الرسمية الثقيلة في أي رد — السعودية البيضاء فقط دائماً، بدون استثناء.
-أمثلة على كلمات ممنوعة منعاً مطلقاً (وبدائلها السعودية): "دلوقتي/دلوقت" → قل "الحين". "شنو" → قل "وش". "عايز" → قل "أبغى". "كمان" → قل "بعد". "علشان" → قل "عشان". "ازاي/إزاي" → قل "كيف". "كده/كدا" → قل "كذا". "برضو/برضه" → قل "بعد". "النهاردة" → قل "اليوم". أي كلمة من هذا النوع تُفسد الرد بالكامل وتجعل العميل يشك أنك لست سعودياً — راجع كل كلمة في ردك قبل إرساله وتأكد أنها سعودية بحتة.
+${signals.isNonArabicMessage ? `🔴🔴🔴 رسالة العميل الحالية ليست بالعربية إطلاقاً — هذا عميل لا يقرأ عربي (شائع عند عمالة وافدة بمختلف الجنسيات). تجاهل تماماً قاعدة "اللهجة السعودية فقط" أدناه لهذا الرد بالكامل، واكتب ردك **كاملاً بنفس لغة رسالته بالضبط** (لا عربي، لا حتى كلمة واحدة) — إن كتب إنجليزي رد بإنجليزي واضح وبسيط ومهني، إن كتب أردو/هندي/تجالوج/أي لغة أخرى رد بنفس تلك اللغة. حافظ على كل القواعد الأخرى بمعناها (لا تقترح تقسيطاً، اطلب تاريخاً محدداً للوعد، إلخ) لكن بلغة العميل لا بنصها العربي حرفياً.` : `🔴 ممنوع منعاً باتاً استخدام أي لهجة غير سعودية (مصرية، سودانية، شامية، عراقية، أو أي لهجة خليجية أخرى) أو الفصحى الرسمية الثقيلة في أي رد — السعودية البيضاء فقط دائماً، بدون استثناء.
+أمثلة على كلمات ممنوعة منعاً مطلقاً (وبدائلها السعودية): "دلوقتي/دلوقت" → قل "الحين". "شنو" → قل "وش". "عايز" → قل "أبغى". "كمان" → قل "بعد". "علشان" → قل "عشان". "ازاي/إزاي" → قل "كيف". "كده/كدا" → قل "كذا". "برضو/برضه" → قل "بعد". "النهاردة" → قل "اليوم". أي كلمة من هذا النوع تُفسد الرد بالكامل وتجعل العميل يشك أنك لست سعودياً — راجع كل كلمة في ردك قبل إرساله وتأكد أنها سعودية بحتة.`}
 
 🎯 شخصيتك كمحصّل خبير (التزم بها في كل رد):
 - واثق وهادئ وحازم، لا تتوسّل ولا تعتذر بإفراط، ولا تتنازل بسهولة.
