@@ -30,8 +30,17 @@ export type InsuranceCaseFile = {
   traffic_dept: string | null
 }
 
+// MidGulf's imported data column is named accident_number (مرادف لنفس
+// "رقم الحادث/المطالبة" الذي تسميه التعاونية recovery_number) — بدون هذا
+// fallback كان رقم الحادث يختفي بالكامل لكل عميل ميدغلف (راجع
+// portfolio-data-fields.ts: midgulf.fields has 'accident_number', not
+// 'recovery_number').
+function getRecoveryNumber(row: Record<string, any>): string | null {
+  return row.recovery_number ?? row.accident_number ?? null
+}
+
 function hasAccidentData(row: Record<string, any>): boolean {
-  return !!(row.recovery_number || row.accident_date || row.accident_city || row.plate_number)
+  return !!(getRecoveryNumber(row) || row.accident_date || row.accident_city || row.plate_number)
 }
 
 // Deterministic rule, driven ONLY by which columns are actually populated:
@@ -54,7 +63,7 @@ export function classifyInsuranceCase(row: Record<string, any> | null | undefine
     claim_type,
     recourse_reason: reason,
     fault_percentage: r.fault_percentage ?? null,
-    recovery_number: r.recovery_number ?? null,
+    recovery_number: getRecoveryNumber(r),
     accident_date: r.accident_date ?? null,
     accident_city: r.accident_city ?? null,
     vehicle_type: r.vehicle_type ?? null,
