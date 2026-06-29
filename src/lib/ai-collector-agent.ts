@@ -979,17 +979,26 @@ export async function runCollectorAgent(args: {
   })
 
   // ── Intent router ──
-  type AgentIntent = 'GREETING' | 'INTRODUCTION' | 'INFO_REQUEST' | 'NEGOTIATION' | 'DISPUTE' | 'GENERAL'
+  type AgentIntent = 'GREETING' | 'SELF_INTRO' | 'INTRODUCTION' | 'INFO_REQUEST' | 'NEGOTIATION' | 'DISPUTE' | 'GENERAL'
   let intent: AgentIntent = 'GENERAL'
 
   const balance = ctx.verified_debt_data?.current_balance != null ? String(ctx.verified_debt_data.current_balance) : null
   const creditor = ctx.verified_debt_data?.creditor_name ?? null
   const isTelecom = String(ctx.verified_debt_data?.portfolio_category ?? '').toLowerCase() === 'telecom'
   const historyText = chronological.map(h => h.content).join(' ')
-  const hasMentionedDebt = (balance && historyText.includes(balance)) || (creditor && historyText.includes(creditor))
+  // Deliberately the AMOUNT only, not the creditor name — the SELF_INTRO
+  // stage now names the creditor ("وكيل [الجهة]") before the amount is ever
+  // revealed, so creditor-name presence alone can no longer be used as a
+  // proxy for "the debt itself has been disclosed".
+  const hasMentionedDebt = !!(balance && historyText.includes(balance))
   // True only on the very first inbound ever (no prior outbound from us yet) —
   // we greet first and bring up the debt only once the customer has replied.
   const isFirstEverContact = chronological.every(h => h.direction !== 'outbound')
+  // The agent must confirm it's speaking to the right person ("معي الأخ
+  // فلان؟") BEFORE naming itself/the company, and only name itself AFTER
+  // that confirmation, before ever revealing the debt — three distinct
+  // stages, never collapsed into one message.
+  const hasIntroducedSelf = historyText.includes('خالد الدويحي') || historyText.includes('مصدر الرؤية')
 
   // Explicit identity/company/detail questions and bare debt denials are
   // checked FIRST, with priority over the staged greeting→introduction flow
@@ -1012,7 +1021,9 @@ export async function runCollectorAgent(args: {
     intent = 'DISPUTE'
   } else if (!hasMentionedDebt && isFirstEverContact && !signals.angry && !signals.dispute) {
     intent = 'GREETING'
-  } else if (!hasMentionedDebt && chronological.length <= 3 && !signals.angry && !signals.dispute) {
+  } else if (!hasMentionedDebt && !hasIntroducedSelf && chronological.length <= 3 && !signals.angry && !signals.dispute) {
+    intent = 'SELF_INTRO'
+  } else if (!hasMentionedDebt && chronological.length <= 5 && !signals.angry && !signals.dispute) {
     intent = 'INTRODUCTION'
   } else if (signals.angry || signals.dispute || signals.wrongNumber) {
     intent = 'DISPUTE'
@@ -1046,14 +1057,21 @@ export async function runCollectorAgent(args: {
   - الهدف: تبدو كمحصّل يحاور ويحاول الحل، لا كموظف يحوّل كل شيء للإدارة فوراً ولا كمن يطرح حلولاً لم يطلبها العميل.`
 
   const intentPrompts: Record<AgentIntent, string> = {
-    GREETING: `【 مهمتك الآن: الترحيب فقط 】
-- هذه أول رسالة من العميل ولم تتحدثا من قبل. رحّب به بتحية طبيعية وعرّف نفسك باسمك فقط (خالد) دون ذكر "محصّل ديون" ودون ذكر الجهة الدائنة ولا المبلغ ولا أي تفاصيل عن المديونية إطلاقاً في هذه الرسالة.
-- اسأله سؤالاً عاماً لطيفاً (مثل: كيف حالك / إيش أخبارك) وانتظر رده.
-- 🔴 ممنوع تماماً ذكر أي شيء عن الدين أو المبلغ أو الجهة الدائنة في هذه الرسالة بالذات — هذا يأتي في ردك التالي بعد أن يرد العميل.
+    GREETING: `【 مهمتك الآن: تأكيد الهوية فقط — لا تعريف بنفسك ولا بالدين 】
+- هذه أول رسالة من العميل ولم تتحدثا من قبل. ابدأ بتحية طبيعية (السلام عليكم).
+- 🔴 لا تذكر اسمك ولا أنك خالد ولا أي شركة في هذه الرسالة إطلاقاً.
+- اسأله سؤال تأكيد هوية: "معي الأخ [اسمه]؟" أو "معي الأخت [اسمها]؟" حسب اسمه في ملف القضية، وانتظر تأكيده.
+- 🔴 ممنوع تماماً ذكر أي شيء عن الدين أو المبلغ أو الجهة الدائنة أو اسمك في هذه الرسالة بالذات.
 - سطر واحد قصير فقط.`,
-    INTRODUCTION: `【 مهمتك الآن: التقديم 】
-- العميل ردّ على ترحيبك. الآن وفقط الآن عرّفه أنك تتواصل من طرف الجهة الدائنة بخصوص المديونية القائمة.
-- اذكر اسم الجهة والمبلغ مرة واحدة فقط، ثم اسأله مباشرة: متى يقدر يسدد؟
+    SELF_INTRO: `【 مهمتك الآن: التعريف بنفسك وبالجهة فقط — لا تذكر الدين بعد 】
+- العميل أكّد أنه الشخص المطلوب (أو رد بشكل عام يفهم منه ذلك). الآن، وفقط الآن، عرّف نفسك: "معك خالد الدويحي من شركة مصدر الرؤية، وكيل [اسم الجهة الدائنة من ملف القضية]".
+- استخدم اسم الجهة الدائنة الحقيقي من "ملف القضية" بالضبط — لا تخترع اسماً ولا تتركه عاماً.
+- 🔴 ممنوع ذكر المبلغ أو أي تفصيل عن المديونية في هذه الرسالة — فقط التعريف بنفسك وبالجهة. اسأله سؤالاً عاماً يفتح الحوار (مثل: كيف حالك معهم / تعرف سبب تواصلي معك؟) أو فقط انتظر رده.
+- سطر أو سطرين قصيرين فقط.
+- ⚠️ إذا أنكر العميل أنه الشخص المطلوب ("مين فلان"، "غلط الرقم"، إلخ) في رده الحالي: لا تكمل التعريف بالجهة، تعامل مع هذا كرقم خطأ بدلاً من ذلك.`,
+    INTRODUCTION: `【 مهمتك الآن: ذكر تفاصيل الدين 】
+- العميل سبق وأكّد هويته وعرفت نفسك له. الآن وفقط الآن عرّفه بتفاصيل المديونية القائمة.
+- اذكر اسم الجهة (إن لم تكن ذكرتها قبل) والمبلغ مرة واحدة فقط، ثم اسأله مباشرة: متى يقدر يسدد؟
 - سؤال واحد فقط، لا أكثر.`,
     INFO_REQUEST: `【 مهمتك الآن: الرد المباشر على سؤال العميل من بيانات النظام 】
 - العميل سأل سؤالاً مباشراً: من أنت، أو وش الشركة/الجهة، أو طلب تفاصيل أكثر عن ملفه.
@@ -1831,7 +1849,7 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
           } else {
             // Regeneration itself failed (API error) — last-resort neutral
             // line, logged distinctly so a recurring failure here is visible.
-            parsed.message = (intent === 'GREETING' || intent === 'INFO_REQUEST')
+            parsed.message = (intent === 'GREETING' || intent === 'SELF_INTRO' || intent === 'INFO_REQUEST')
               ? 'تمام، وضّح لي بس وش المطلوب بالضبط؟'
               : 'فهمت كلامك، بس محتاجين نتفق على خطوة عملية الحين — وش رأيك؟'
             parsed.reason = 'repeated_question_guard_regeneration_failed'
@@ -1894,7 +1912,7 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
         parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action
         parsed.reason = 'anti_repetition_guard_regenerated'
       } else {
-        parsed.message = (intent === 'GREETING' || intent === 'INFO_REQUEST')
+        parsed.message = (intent === 'GREETING' || intent === 'SELF_INTRO' || intent === 'INFO_REQUEST')
           ? 'تمام، تفضل بسؤالك.'
           : 'فهمت كلامك، بس محتاجين نتفق على شي عملي الحين — وش رأيك؟'
         parsed.action = parsed.action === 'silent' ? 'reply' : parsed.action

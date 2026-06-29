@@ -20,9 +20,13 @@ export async function generateOpeningMessage(args: {
 
   const c = ctx.verified_customer_data ?? {}
   const d = ctx.verified_debt_data ?? {}
-  const name = c.customer_name ? ` ${String(c.customer_name).split(' ')[0]}` : ''
+  const name = c.customer_name ? String(c.customer_name).split(' ')[0] : null
 
-  const fallback = `السلام عليكم${name}، معك خالد. كيف حالك؟`
+  // Opening move is an identity check, not a self-introduction yet — "معي
+  // الأخ/الأخت فلان؟" and wait for confirmation. Only once the customer
+  // confirms does the agent name itself and the company (separate later
+  // stage in ai-collector-agent.ts's intent router).
+  const fallback = name ? `السلام عليكم، معي الأخ ${name}؟` : 'السلام عليكم، معي الأخ الكريم؟'
 
   if (!process.env.OPENROUTER_API_KEY) {
     return fallback
@@ -52,10 +56,10 @@ ${facts || 'لا توجد بيانات كافية'}
 
 ═══ المهمة ═══
 اكتب رسالة افتتاح أولى لبدء محادثة واتساب مع هذا العميل (لم تتواصل معه من قبل إطلاقاً):
-- ابدأ بتحية مناسبة (السلام عليكم) واذكر اسمه مرة واحدة إن وُجد.
-- عرّف نفسك باسم خالد فقط، بدون ذكر "قسم التحصيل" ولا أي كلمة تتعلق بالديون.
-- 🔴 ممنوع تماماً ذكر المديونية أو المبلغ أو الجهة الدائنة في هذه الرسالة. هذه رسالة ترحيب فقط — سيأتي ذكر الدين في الرد التالي بعد أن يرد العميل.
-- اسأله سؤالاً عاماً لطيفاً (مثل: كيف حالك) فقط.
+- ابدأ بتحية مناسبة (السلام عليكم).
+- 🔴 لا تعرّف نفسك باسمك ولا بالشركة في هذه الرسالة إطلاقاً — هذا يأتي لاحقاً بعد تأكيد هويته.
+- اسأله سؤال تأكيد هوية بأسلوب طبيعي: "معي الأخ [اسمه]؟" أو "معي الأخت [اسمها]؟" إن وُجد اسمه، وانتظر تأكيده.
+- 🔴 ممنوع تماماً ذكر المديونية أو المبلغ أو الجهة الدائنة في هذه الرسالة. هذه رسالة تأكيد هوية فقط — سيأتي التعريف بالنفس والدين في ردود لاحقة بعد أن يؤكد العميل.
 - سطر واحد قصير، طبيعي وبشري، بدون "عزيزي العميل".
 أعِد نص الرسالة فقط بدون أي شرح أو علامات اقتباس.`
 

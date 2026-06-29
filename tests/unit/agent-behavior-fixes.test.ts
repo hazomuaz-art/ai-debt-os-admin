@@ -179,3 +179,36 @@ describe('ج) a pure greeting mid-conversation never jumps to the debt', () => {
     expect(lastCreateCallMessages.length).toBeGreaterThan(0) // went through the LLM as normal
   })
 })
+
+describe('د) three-stage opening: identity confirmation -> self-introduction -> debt details', () => {
+  it('after the customer confirms identity (no debt/self-intro mentioned yet), the agent is routed to SELF_INTRO, not straight to the debt', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'السلام عليكم، معي الأخ سعد؟' },
+      { direction: 'inbound', content: 'نعم أنا سعد' },
+    ]
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'x',
+      message: 'معك خالد الدويحي من شركة مصدر الرؤية، وكيل بنك الإنماء.',
+    })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'نعم أنا سعد' })
+
+    const systemPrompt = lastCreateCallMessages[0].content as string
+    expect(systemPrompt).toContain('مهمتك الآن: التعريف بنفسك وبالجهة فقط')
+    expect(systemPrompt).not.toContain('مهمتك الآن: ذكر تفاصيل الدين')
+  })
+
+  it('once the agent has already introduced itself, the NEXT turn moves on to revealing the debt (INTRODUCTION), not SELF_INTRO again', async () => {
+    mockContext.recent_messages = [
+      { direction: 'outbound', content: 'السلام عليكم، معي الأخ سعد؟' },
+      { direction: 'inbound', content: 'نعم أنا سعد' },
+      { direction: 'outbound', content: 'معك خالد الدويحي من شركة مصدر الرؤية، وكيل بنك الإنماء.' },
+      { direction: 'inbound', content: 'تمام، تفضل' },
+    ]
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'عندك مديونية 800 ريال، متى تقدر تسدد؟' })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'تمام، تفضل' })
+
+    const systemPrompt = lastCreateCallMessages[0].content as string
+    expect(systemPrompt).toContain('مهمتك الآن: ذكر تفاصيل الدين')
+    expect(systemPrompt).not.toContain('مهمتك الآن: التعريف بنفسك وبالجهة فقط')
+  })
+})
