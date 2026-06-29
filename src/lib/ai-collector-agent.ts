@@ -624,6 +624,23 @@ export function buildCaseFile(ctx: any, stcRow?: Record<string, any> | null, mob
   const mobilyKnowledge = renderMobilyKnowledgeForCaseFile(mobilyRow)
   if (mobilyKnowledge) lines.push(mobilyKnowledge)
 
+  // علم-تم (Tamm) sector context — static knowledge true for every customer
+  // on this portfolio (not row-specific data, since no real file has been
+  // imported for it yet). "تم" هي منصة المرور الحكومية التي تديرها شركة
+  // "عِلم" (Elm) — تتيح إصدار/تجديد رخص المركبات، نقل الملكية، الاستعلام عن
+  // المخالفات، والتفويض. عملاؤها غالباً حسابات أعمال (مكاتب تأجير، مؤسسات،
+  // معارض سيارات) لا أفراد عاديين، فالمديونية هي رسوم استخدام/اشتراك هذي
+  // الخدمات المرورية، وليست غرامة مرورية مباشرة. Confirmed by the user
+  // 2026-06-29 — not invented.
+  const alamTamProfile = COMPANY_IMPORT_PROFILES.find(p => p.key === 'alam_tam')
+  if (alamTamProfile?.aliases.includes(String(d.portfolio_name ?? '').toLowerCase().trim())) {
+    lines.push('')
+    lines.push('【 معرفة تشغيلية خاصة بـ علم - تم (منصة تم الحكومية) 】')
+    lines.push('- "تم" منصة مرورية حكومية تديرها شركة "عِلم" بالتعاون مع المديرية العامة للمرور — تقدّم: استخراج/تجديد رخص المركبات، نقل ملكية، الاستعلام عن المخالفات المرورية، والتفويض.')
+    lines.push('- عملاء هذي المحفظة عادةً حسابات أعمال (مكاتب تأجير سيارات، مؤسسات، معارض سيارات) لا أفراد عاديين.')
+    lines.push('- المديونية هي رسوم استخدام/اشتراك هذي الخدمات المرورية عبر المنصة — وليست غرامة مرورية مباشرة من المرور نفسه. اشرح هذا للعميل إذا سأل عن طبيعة المبلغ.')
+  }
+
   return lines.join('\n')
 }
 
