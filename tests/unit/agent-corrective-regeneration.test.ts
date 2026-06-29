@@ -139,13 +139,28 @@ describe('Real incident — repeated "متى تقدر تسدد؟" after explicit
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تقدر تسدد المبلغ؟' })
     mockRegeneratedMessage = 'تمام، فهمت رفضك. المبلغ يبقى مسجلاً عليك وحقك محفوظ لو عندك اعتراض رسمي.'
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ارفعوها للمحكمه' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بس ما ابغى اسدد خلصت معاك' })
 
     expect(d.reason).toBe('repeated_question_guard_regenerated')
     // Proves real regeneration happened (distinct, model-produced text) —
     // NOT a pick from the old static 14-phrase bank.
     expect(d.message).toBe(mockRegeneratedMessage)
     expect(d.message).not.toMatch(/متى تقدر تسدد|كم تقدر تسدد/)
+  })
+})
+
+describe('Customer invokes a lawyer/court themselves -> immediate lawyer persona, not the normal guard pipeline', () => {
+  it('"ارفعوها للمحكمه" switches to the lawyer persona immediately (not the STC/Energy/Water-excluded portfolios)', async () => {
+    mockContext = baseContext([])
+    // generateLawyerPersonaReply doesn't JSON-parse — whatever the mocked
+    // client returns IS the reply text verbatim.
+    mockModelContent = 'الدين يبقى مستحقاً نظاماً، ونحتفظ بحق اتخاذ الإجراءات اللازمة إن لم تتم التسوية وديّاً. هل تفضّل ترتيب السداد الآن؟'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ارفعوها للمحكمه' })
+
+    expect(d.reason).toBe('customer_invoked_legal_challenge')
+    expect(d.action).toBe('human_review')
+    expect(d.message).toBe(mockModelContent)
   })
 })
 
