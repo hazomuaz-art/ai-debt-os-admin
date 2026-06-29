@@ -92,3 +92,43 @@ export async function recordPromise(args: {
     log.error('promise timeline insert failed', e as Error)
   }
 }
+
+/**
+ * Marks the debt's currently-open promise (status 'pending') as 'broken'.
+ *
+ * Real production gap this fixes: nothing in the system ever transitioned a
+ * promise out of 'pending' except an actual payment arriving (which marks
+ * it 'kept'/'partial' — see payment-receipt.ts). A customer who explicitly
+ * retracted their own promise mid-conversation ("ما اتفقت معك على شي
+ * وماراح اسدد") was left showing as a standing, unresolved promise forever
+ * — the promises page kept saying "واعد" even though the conversation
+ * itself showed the opposite. Called from the webhook whenever
+ * signals.deniesPromise or signals.refusesToPay fires against a debt that
+ * has an open promise on file.
+ */
+export async function markOpenPromiseBroken(args: {
+  debt_id: string
+  customer_message: string
+}): Promise<void> {
+  const supabase = createServiceClient()
+  const { data: existing } = await supabase
+    .from('promises').select('id, company_id, customer_id')
+    .eq('debt_id', args.debt_id).eq('status', 'pending')
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (!existing) return
+
+  const row = existing as { id: string; company_id: string; customer_id: string }
+  await supabase.from('promises').update({ status: 'broken' }).eq('id', row.id)
+  log.info('promise marked broken — customer explicitly retracted/refused', { debt_id: args.debt_id, promise_id: row.id })
+
+  try {
+    await supabase.from('timeline_events').insert({
+      company_id: row.company_id, customer_id: row.customer_id, debt_id: args.debt_id,
+      event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+      summary: 'العميل تراجع عن وعده/رفض السداد', detail: `كلام العميل: "${args.customer_message}"`,
+      occurred_at: new Date().toISOString(),
+    })
+  } catch (e) {
+    log.error('promise-broken timeline insert failed', e as Error)
+  }
+}

@@ -47,13 +47,17 @@ vi.mock('@/lib/whatsapp', () => ({
 vi.mock('@/lib/payment-receipt', () => ({ processInboundReceipt: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/automation-pipeline', () => ({ processEvent: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/dispute', () => ({ recordDispute: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/promise', () => ({ recordPromise: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/promise', () => ({
+  recordPromise: vi.fn().mockResolvedValue(undefined),
+  markOpenPromiseBroken: vi.fn().mockResolvedValue(undefined),
+}))
 
 vi.mock('@/lib/ai-collector-agent', () => ({
   runCollectorAgent: vi.fn().mockImplementation(async (args: any) => {
     runCollectorAgentCalls.push(args)
     return mockAiDecision
   }),
+  detectSignals: vi.fn().mockReturnValue({ deniesPromise: false, refusesToPay: false }),
 }))
 
 import { POST } from '@/app/api/whatsapp/waha-webhook/route'

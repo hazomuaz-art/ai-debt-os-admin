@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'No due promises found.' })
   }
 
-  const results = { sent: 0, failed: 0 }
+  const results = { sent: 0, failed: 0, broken: 0 }
 
   for (const promise of duePromises) {
     const debt = promise.debts
@@ -89,17 +89,24 @@ export async function GET(req: NextRequest) {
         })
 
         if (sendResult.status === 'sent') {
-          // Mark as followed_up to avoid re-spamming the same promise
-          await supabase
-            .from('promises')
-            .update({ status: 'followed_up' })
-            .eq('id', promise.id)
+          // NOTE: this used to update promises.status to 'followed_up', but
+          // that value has never been valid against promises_status_check
+          // (only pending/kept/broken/rescheduled/partial are allowed) — the
+          // update silently failed every single time since this cron
+          // shipped. The messages-based idempotency check above (20h lookback
+          // on metadata->>promise_id) is what actually prevents re-spamming
+          // the same promise same-day; status stays 'pending' on purpose
+          // here, since a reminder being sent doesn't change whether the
+          // promise itself was kept or broken — see the grace-period check
+          // further below for the real resolution of an overdue promise.
 
-          // Log to timeline
+          // Log to timeline. 'bot_action' was ALSO not a valid event_type
+          // (same constraint as above) — this insert had been failing
+          // silently too; 'ai_reply' is the correct, valid fit.
           await supabase.from('timeline_events').insert({
             company_id: promise.company_id,
             debt_id: debt.id,
-            event_type: 'bot_action',
+            event_type: 'ai_reply',
             channel: 'whatsapp',
             summary: 'تم إرسال تذكير تلقائي بالوعد',
             detail: `الرسالة: ${reminderMsg}`,
@@ -117,7 +124,32 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ 
+  // Real production gap: nothing anywhere ever resolved a promise to
+  // 'broken' on its own — only an actual payment ever moved it out of
+  // 'pending' (to 'kept'/'partial'). A promise whose date passed with no
+  // payment and no reschedule just sat as "pending" forever, even weeks
+  // later, making the promises page permanently inaccurate. A grace period
+  // (rather than marking broken the instant the date passes) avoids
+  // penalizing a customer who pays a day or two late.
+  const BROKEN_GRACE_DAYS = 3
+  const graceCutoff = new Date(Date.now() - BROKEN_GRACE_DAYS * 86400000).toISOString()
+  const { data: overduePromises } = await supabase
+    .from('promises').select('id, company_id, customer_id, debt_id')
+    .eq('status', 'pending').lte('promised_date', graceCutoff)
+  let markedBroken = 0
+  for (const p of (overduePromises ?? []) as any[]) {
+    await supabase.from('promises').update({ status: 'broken' }).eq('id', p.id)
+    await supabase.from('timeline_events').insert({
+      company_id: p.company_id, customer_id: p.customer_id, debt_id: p.debt_id,
+      event_type: 'status_change', channel: 'system', actor_type: 'system',
+      summary: 'انتهى موعد الوعد بدون سداد ولا تجديد',
+      occurred_at: new Date().toISOString(),
+    })
+    markedBroken++
+  }
+  results.broken = markedBroken
+
+  return NextResponse.json({
     message: 'Finished processing promises',
     results 
   })

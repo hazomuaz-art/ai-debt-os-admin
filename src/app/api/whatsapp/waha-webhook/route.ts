@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
     // Run the collector agent and reply (sendWhatsAppMessage routes via WAHA).
     // Debounced/merged across a rapid-fire burst — see scheduleBurstProcessing.
     scheduleBurstProcessing(c.id, text, messageTimestamp, async (mergedText, latestTimestamp) => {
-      const { runCollectorAgent } = await import('@/lib/ai-collector-agent')
+      const { runCollectorAgent, detectSignals } = await import('@/lib/ai-collector-agent')
       const { processEvent } = await import('@/lib/automation-pipeline')
 
       const aiDecision = await runCollectorAgent({
@@ -328,6 +328,21 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // Real production gap: nothing in the system ever marked a promise
+      // 'broken' when the customer explicitly retracted/refused it mid-
+      // conversation ("ما اتفقت معك على شي وماراح اسدد") — only an actual
+      // payment ever resolved a promise (to 'kept'/'partial'). The promises
+      // page kept showing it as a standing, open promise forever, directly
+      // contradicting what the conversation itself showed. This fires
+      // independently of which action the model chose this turn.
+      if (effectiveDebtId) {
+        const turnSignals = detectSignals(mergedText)
+        if (turnSignals.deniesPromise || turnSignals.refusesToPay) {
+          const { markOpenPromiseBroken } = await import('@/lib/promise')
+          await markOpenPromiseBroken({ debt_id: effectiveDebtId, customer_message: mergedText })
+        }
+      }
+
       // Company-specific outcome classification (from "تصنيفات جميع
       // الشركات.xlsx") — only runs for the 11 known company profiles;
       // manual/generic portfolios get null and are untouched.
@@ -357,9 +372,16 @@ export async function POST(request: NextRequest) {
             changed_at: new Date().toISOString(),
           })
 
+          // 'outcome_classified' is NOT a valid timeline_events.event_type
+          // (CHECK constraint only allows a fixed list) — this insert has
+          // been silently failing every single time a classification
+          // happened since this feature shipped (Supabase JS doesn't throw
+          // on a constraint violation, it just returns an unchecked error).
+          // 'status_change' is the correct semantic fit since this event IS
+          // exactly that — a status change driven by the classification.
           await supabase.from('timeline_events').insert({
             company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
-            event_type: 'outcome_classified', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+            event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
             summary: `تصنيف الحالة: ${category}`,
             detail: meta.meaning, occurred_at: new Date().toISOString(),
           })

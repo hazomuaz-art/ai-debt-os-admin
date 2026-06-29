@@ -249,9 +249,12 @@ export function detectSignals(text: string) {
     // The customer explicitly denies having made any promise at all ("ما
     // وعدتك بشي") — distinct from deniesDebt (denying the debt itself). The
     // agent must NEVER restate/confirm the existing promise in this case.
+    // Real production gap: a customer said "ما اتفقت معك على شي" (different
+    // conjugation of "اتفقنا" the list didn't cover) and it never matched,
+    // so the resulting "broken promise" never got recorded anywhere either.
     deniesPromise: hasAny(text, [
       'ما وعدتك', 'مو وعدتك', 'ماوعدتك', 'انا ما وعدت', 'أنا ما وعدت', 'لم اعدك', 'لم أعدك',
-      'ما قلت لك بسدد', 'ما قلت بسدد', 'مين قال', 'وين قلت', 'ما اتفقنا', 'متى وعدتك', 'وعدتك متى',
+      'ما قلت لك بسدد', 'ما قلت بسدد', 'مين قال', 'وين قلت', 'ما اتفقنا', 'ما اتفقت', 'متى وعدتك', 'وعدتك متى',
     ]),
     // Explicit refusal to pay (distinct from deniesDebt — customer here does
     // NOT dispute the debt exists, they're simply refusing/unwilling, or
