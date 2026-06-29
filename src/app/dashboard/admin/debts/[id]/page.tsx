@@ -264,11 +264,36 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             )}
           </div>
 
+          {/* AI Case Note & Recommendation — auto-updated after every real
+              exchange (no "conversation ended" event exists in this system),
+              so a human can know "what happened" without reading the whole
+              thread. */}
+          {debt.metadata?.case_note && (
+            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-5">
+                <BrainCircuit className="text-indigo-400" size={20} />
+                <h2 className="text-lg font-bold text-white">ملخص الحالة (محدَّث تلقائياً)</h2>
+              </div>
+              <p className="text-slate-200 leading-relaxed bg-[#0d1117] p-4 rounded-xl border border-[#222a36]">{debt.metadata.case_note}</p>
+              {debt.metadata.recommended_approach && (
+                <div className="mt-4 flex items-start gap-2 bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-xl">
+                  <Target className="text-indigo-400 shrink-0 mt-0.5" size={18} />
+                  <p className="text-indigo-200 text-sm font-bold">{debt.metadata.recommended_approach}</p>
+                </div>
+              )}
+              {debt.metadata.case_note_updated_at && (
+                <p className="text-[#5f6b7e] text-xs mt-3">
+                  آخر تحديث: {new Date(debt.metadata.case_note_updated_at).toLocaleString('ar-SA')}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Collector Note & Follow-up */}
-          <CollectorNotePanel 
-            debtId={debt.id} 
-            currentNote={debt.notes} 
-            currentFollowUpDate={debt.next_follow_up} 
+          <CollectorNotePanel
+            debtId={debt.id}
+            currentNote={debt.notes}
+            currentFollowUpDate={debt.next_follow_up}
           />
 
           {/* Payment History */}

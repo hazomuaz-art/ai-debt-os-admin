@@ -366,6 +366,17 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      // Running case note — there's no "conversation ended" event in this
+      // system (every message is processed independently), so this updates
+      // after every real exchange instead, so it's always current.
+      if (effectiveDebtId && aiDecision.shouldReply && aiDecision.message) {
+        const { updateCaseNote } = await import('@/lib/case-note')
+        await updateCaseNote({
+          company_id: c.company_id, debt_id: effectiveDebtId,
+          customer_message: mergedText, agent_message: aiDecision.message,
+        })
+      }
     })
 
     return NextResponse.json({ status: 'ok' })
