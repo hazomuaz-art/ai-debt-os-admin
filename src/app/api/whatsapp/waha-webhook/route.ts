@@ -388,8 +388,15 @@ export async function POST(request: NextRequest) {
 
           if (meta.isTerminal) {
             await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+            // 'high' is not a valid system_alerts.severity (the real CHECK
+            // constraint only allows info/warning/error/critical) — this
+            // insert has been failing silently every time a terminal
+            // outcome (deceased/imprisoned/bankrupt) was classified, since
+            // the feature shipped. 'critical' is the correct fit — these
+            // are exactly the cases meant to stop AI replies and need a
+            // human immediately.
             await supabase.from('system_alerts').insert({
-              company_id: c.company_id, severity: 'high', alert_type: 'outcome_needs_human_review',
+              company_id: c.company_id, severity: 'critical', alert_type: 'outcome_needs_human_review',
               title: `يحتاج مراجعة بشرية: ${category}`,
               message: `العميل ${c.full_name} صُنّف بحالة "${category}" — ${meta.meaning} تم إيقاف الرد التلقائي على هذا العميل.`,
               metadata: { customer_id: c.id, debt_id: effectiveDebtId, category },

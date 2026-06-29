@@ -21,12 +21,18 @@ export async function recordInstallmentRequest(args: {
 }): Promise<void> {
   const supabase = createServiceClient()
 
+  // 'payment_plan' was never a valid approvals.approval_type (the real
+  // CHECK constraint only allows large_settlement/discount/
+  // legal_escalation/stop_followup/write_off/ai_learning/campaign_launch/
+  // custom) — every installment request built this session has been
+  // failing to save silently since it shipped, despite the log line below
+  // claiming success. Found during the full-system constraint audit.
   const { data: existing } = await supabase
     .from('approvals')
     .select('id')
     .eq('company_id', args.company_id)
     .eq('entity_type', 'debts').eq('entity_id', args.debt_id)
-    .in('approval_type', ['payment_plan', 'custom'])
+    .eq('approval_type', 'custom')
     .eq('status', 'pending')
     .limit(1).maybeSingle()
   if (existing) {
@@ -37,8 +43,8 @@ export async function recordInstallmentRequest(args: {
   const { data: debt } = await supabase
     .from('debts').select('current_balance, currency').eq('id', args.debt_id).maybeSingle()
 
-  await supabase.from('approvals').insert({
-    company_id: args.company_id, approval_type: 'payment_plan', entity_type: 'debts', entity_id: args.debt_id,
+  const { error } = await supabase.from('approvals').insert({
+    company_id: args.company_id, approval_type: 'custom', entity_type: 'debts', entity_id: args.debt_id,
     title: `طلب تقسيط: ${args.customer_name ?? ''}`,
     description: [
       `العميل يطلب التقسيط لمديونية بقيمة ${debt?.current_balance ?? ''} ${debt?.currency ?? ''}.`,
@@ -48,8 +54,10 @@ export async function recordInstallmentRequest(args: {
     status: 'pending', priority: 'medium',
     requested_data: {
       customer_id: args.customer_id, reason: args.customer_message, agent_reason: args.agent_reason ?? null,
+      request_subtype: 'installment',
     },
   })
 
-  log.info('installment request recorded', { debt_id: args.debt_id })
+  if (error) log.error('installment request insert failed', new Error(error.message), { debt_id: args.debt_id })
+  else log.info('installment request recorded', { debt_id: args.debt_id })
 }

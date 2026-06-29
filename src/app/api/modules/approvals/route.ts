@@ -29,7 +29,13 @@ export async function GET(_req: NextRequest) {
           if ((a.entity_type === 'debt' || a.entity_type === 'debts') && a.entity_id) {
              const d: any = debtMap.get(a.entity_id)
              if (d && d.customers) {
-               if (a.approval_type === 'custom' || a.approval_type === 'payment_plan') {
+               // approval_type alone can no longer distinguish an
+               // installment request from a dispute or any other custom
+               // approval — both now correctly use approval_type='custom'
+               // (the only valid value either could ever use against the
+               // real CHECK constraint). requested_data.request_subtype is
+               // the actual distinguishing field now.
+               if (a.requested_data?.request_subtype === 'installment') {
                  a.title = `طلب تقسيط: ${d.customers.full_name}`
                  a.description = `العميل يطلب التقسيط لمديونية بقيمة ${d.current_balance} ${d.currency}`
                }
@@ -89,7 +95,11 @@ export async function PATCH(req: NextRequest) {
       // Post-decision automation
       try {
         if ((approval.entity_type === 'debts' || approval.entity_type === 'debt') && approval.entity_id) {
-          if (approval.approval_type === 'payment_plan' || approval.approval_type === 'custom') {
+          // Same reasoning as the GET handler above — approval_type is
+          // 'custom' for both installment requests and disputes now (it's
+          // the only valid value either can use), so the actual branch
+          // must come from requested_data.request_subtype instead.
+          if (approval.requested_data?.request_subtype === 'installment') {
             const debtId = approval.entity_id
           
           // Fetch debt and customer info
@@ -153,7 +163,13 @@ export async function PATCH(req: NextRequest) {
           }
 
           // ── Dispute decision automation ──
-          if (approval.approval_type === 'dispute') {
+          // approval.approval_type === 'dispute' could NEVER match (not a
+          // valid approval_type — see dispute.ts) — this whole branch has
+          // been unreachable dead code since it was written; no dispute
+          // decision has ever actually triggered a customer notification
+          // or resolved the underlying dispute record. Fixed to check the
+          // real distinguishing field.
+          if (approval.requested_data?.request_subtype === 'dispute') {
             const debtId = approval.entity_id
             const { data: di } = await ctx.supabase
               .from('debts').select('*, customers(id, phone, whatsapp, full_name)').eq('id', debtId).single()
@@ -163,9 +179,14 @@ export async function PATCH(req: NextRequest) {
               // Accepted dispute → mark disputed + hand to human; rejected → resume collection
               await ctx.supabase.from('debts').update({ status: accepted ? 'disputed' : 'active' }).eq('id', debtId)
               await ctx.supabase.from('customers').update({ ai_paused: accepted }).eq('id', di.customers.id)
+              // 'accepted' was never a valid disputes.status (the real
+              // CHECK constraint is open/under_review/resolved/rejected/
+              // escalated) — 'resolved' is the correct value; this update
+              // also failed silently before, on top of the branch never
+              // being reached at all.
               await ctx.supabase.from('disputes')
-                .update({ status: accepted ? 'accepted' : 'rejected', resolved_by: ctx.user.id, resolved_at: new Date().toISOString() })
-                .eq('debt_id', debtId).eq('status', 'pending')
+                .update({ status: accepted ? 'resolved' : 'rejected', resolved_by: ctx.user.id, resolved_at: new Date().toISOString() })
+                .eq('debt_id', debtId).eq('status', 'open')
               if (phone) {
                 const message = accepted
                   ? `مرحباً ${di.customers.full_name}، تمت دراسة اعتراضك وقبوله مبدئياً. تم تعليق المطالبة الآلية وسيتواصل معك موظف مختص لاستكمال المراجعة.`

@@ -78,8 +78,14 @@ export async function recordDispute(args: {
 
   if (error) { log.error('failed to insert dispute', error); return }
 
-  await supabase.from('approvals').insert({
-    company_id: args.company_id, approval_type: 'dispute', entity_type: 'debt', entity_id: args.debt_id,
+  // 'dispute' was never a valid approvals.approval_type (the real CHECK
+  // constraint only allows large_settlement/discount/legal_escalation/
+  // stop_followup/write_off/ai_learning/campaign_launch/custom) — this
+  // insert has been failing silently every single time a dispute was
+  // recorded, since the function shipped. 'custom' is the correct fallback
+  // (the real dispute_type is preserved in requested_data already).
+  const { error: apprErr } = await supabase.from('approvals').insert({
+    company_id: args.company_id, approval_type: 'custom', entity_type: 'debt', entity_id: args.debt_id,
     title: `اعتراض عميل: ${args.customer_name ?? ''}`,
     description: [
       `كلام العميل: "${args.customer_message}"`,
@@ -88,11 +94,13 @@ export async function recordDispute(args: {
     ].filter(Boolean).join('\n'),
     status: 'pending', priority: 'high',
     requested_data: {
+      request_subtype: 'dispute',
       customer_id: args.customer_id, dispute_id: disp?.id ?? null,
       reason: args.customer_message, agent_reason: args.agent_reason ?? null,
       dispute_type, conversation_excerpt: excerpt,
     },
   })
+  if (apprErr) log.error('failed to insert dispute approval', new Error(apprErr.message), { debt_id: args.debt_id })
 
   // Attribution: the AI opened this dispute/escalation. `amount` here is
   // contextual (the outstanding balance at the time), never collected
