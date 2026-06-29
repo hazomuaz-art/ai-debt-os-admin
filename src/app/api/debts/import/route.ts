@@ -406,6 +406,23 @@ export async function POST(request: NextRequest) {
           if (d && !isNaN(d.getTime())) dueDate = d.toISOString().split('T')[0]
         }
 
+        // Same parsing as due_date — last_payment_date only ever resolves
+        // via an explicit company column alias (see import-engine.ts), so a
+        // company's profile claiming this field always means a real header
+        // for it exists in that company's file.
+        let lastPaymentDate: string | null = null
+        if (f.last_payment_date) {
+          const raw = f.last_payment_date.replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+          const parts = raw.split(/[\/\-\.]/)
+          let d: Date | null = null
+          if (parts.length === 3) {
+            if (parts[0].length === 4)  d = new Date(`${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`)
+            else if (parseInt(parts[0]) > 12) d = new Date(`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`)
+            else d = new Date(`${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`)
+          }
+          if (d && !isNaN(d.getTime())) lastPaymentDate = d.toISOString().split('T')[0]
+        }
+
         const portfolioId = forcedPortfolioId
           ?? (rowProfile ? await ensureCompanyPortfolio(supabase, profile.company_id, rowProfile) : null)
           ?? await lookupPortfolio(supabase, profile.company_id, f.portfolio_name, portfolioCache)
@@ -429,6 +446,7 @@ export async function POST(request: NextRequest) {
           status,
           priority,
           due_date:         dueDate,
+          last_payment_date: lastPaymentDate,
           product_type:     f.product_type  || null,
           account_number:   f.account_number || null,
           notes:            f.notes         || null,

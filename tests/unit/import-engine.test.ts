@@ -108,6 +108,22 @@ describe('import-engine — resolveClusterMapping (general, content-driven disam
     expect(resolutions.full_name.resolvedHeader).toBe('CUSTOMER_REF_X')
   })
 
+  // Regression: National Water's and Saudi Energy's company profiles have
+  // declared a 'last payment date' -> 'last_payment_date' column alias for a
+  // long time, but 'last_payment_date' was never in StandardField/ALL_FIELDS
+  // — the resolver's `for (const field of ALL_FIELDS)` loop could never even
+  // check that alias, so it silently never resolved for any company, ever,
+  // despite debts.last_payment_date being a real column. Now fixed.
+  it('last_payment_date resolves via a company column alias (previously could never match — not in ALL_FIELDS)', () => {
+    const headers = ['اسم العميل', 'مبلغ المديونية', 'Last Payment Date']
+    const rows = [['عميل', '1000', '2026-01-15']]
+    const cluster = clusterRowsByLayout(headers, rows)[0]
+    const { resolutions } = resolveClusterMapping(headers, rows, cluster, {
+      companyColumnAliases: { 'last payment date': 'last_payment_date' },
+    })
+    expect(resolutions.last_payment_date.resolvedHeader).toBe('Last Payment Date')
+  })
+
   it('a SADAD/reference number column is never mistaken for current_balance just because it looks numeric (real production bug: customer billed SAR 880,001 instead of SAR 1,250.50)', () => {
     const headers = ['اسم العميل', 'مبلغ المديونية', 'Sadad_NUMBER']
     const rows = [['عبدالرحمن سعيد', '1250.5', '880001']]

@@ -27,7 +27,7 @@ export type StandardField =
   | 'monthly_income' | 'email'
   | 'original_amount' | 'current_balance' | 'currency' | 'due_date' | 'status'
   | 'priority' | 'product_type' | 'account_number' | 'reference_number'
-  | 'notes' | 'collector_name' | 'portfolio_name'
+  | 'notes' | 'collector_name' | 'portfolio_name' | 'last_payment_date'
 
 // Fields the importer cannot proceed without (per cluster).
 export const REQUIRED_FIELDS: StandardField[] = ['full_name']
@@ -341,10 +341,15 @@ export type FieldResolution = {
 const CONFIDENCE_GAP_THRESHOLD = 0.18   // gap needed between #1 and #2 to auto-decide
 const MIN_CONFIDENCE_TO_ACCEPT = 0.35    // below this, treat as "no real candidate"
 
+// last_payment_date is intentionally NOT auto-detected from generic headers
+// (no entry in HEADER_EXACT/contentScore below) — it only ever resolves via
+// an explicit company column alias (score 0.95), since "last payment" is too
+// easily confused with due_date/created_date across different companies'
+// real files to guess generically.
 const ALL_FIELDS: StandardField[] = [
   'full_name', 'phone', 'whatsapp', 'national_id', 'city', 'employer', 'monthly_income', 'email',
   'original_amount', 'current_balance', 'currency', 'due_date', 'status', 'priority', 'product_type',
-  'account_number', 'reference_number', 'notes', 'collector_name', 'portfolio_name',
+  'account_number', 'reference_number', 'notes', 'collector_name', 'portfolio_name', 'last_payment_date',
 ]
 
 export function resolveClusterMapping(

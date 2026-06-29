@@ -172,6 +172,7 @@ const RAW_PROFILES: Omit<CompanyImportProfile, 'outcomeMeta'>[] = [
     columnAliases: {
       'last invoice date': 'due_date', 'last payment date': 'last_payment_date',
       'e-mail address': 'email', 'account status': 'status',
+      'نوع الحساب': 'product_type', 'installation blocking reason_3': 'notes',
     },
     outcomeCategories: [
       'الرقم خطأ', 'الرقم مغلق', 'الشركة مفلسه', 'المديونية لجهة حكومية',
@@ -202,7 +203,7 @@ const RAW_PROFILES: Omit<CompanyImportProfile, 'outcomeMeta'>[] = [
   {
     key: 'alam_tam', nameAr: 'علم - تم', nameEn: 'Alam Tam', category: 'government',
     aliases: ['علم تم', 'علم - تم', 'alam tam', 'alam-tam'],
-    columnAliases: { 'end date': 'due_date', 'الموقع': 'city' },
+    columnAliases: { 'end date': 'due_date', 'الموقع': 'city', 'اسم المالك': 'notes' },
     outcomeCategories: [
       'الرقم خطأ', 'الرقم مغلق', 'العميل رافض السداد', 'العميل وعد بالسداد',
       'المشترك طلب تفاصيل الاشتراك', 'المشترك طلب مهلة للسداد', 'تم التحديث',
