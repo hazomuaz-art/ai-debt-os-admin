@@ -69,16 +69,26 @@ const OUTCOME_RULES: Array<{ test: (label: string) => boolean; meta: Omit<Outcom
       behaviorTpl: 'ثبّت الوعد بتاريخ محدد، وذكّره بلطف قرب الموعد. لا تكرر نفس السؤال إن كان قد أعطى تاريخاً فعلاً.' },
   },
   {
+    // NOTE: these categories mean a payment was *actually completed*. They
+    // must NEVER be inferred from chat text alone — real payment status
+    // changes only ever come from the receipt OCR pipeline
+    // (payment-receipt.ts), which has actual evidence. A customer merely
+    // saying words like "سداد"/"جزء" in a question or hypothetical is not
+    // evidence of payment. status stays null here on purpose so this
+    // classifier (driven by free-text LLM matching) can never flip
+    // debts.status to settled/partial without a real transaction —
+    // isTerminal routes it to human review instead so a person verifies
+    // the claim before anything changes.
     test: l => l.includes('سداد كامل') || (l.includes('تم السداد') && !l.includes('جزئ')),
-    meta: { status: 'settled', isTerminal: false,
-      meaningTpl: 'تم سداد المديونية بالكامل ("${label}").',
-      behaviorTpl: 'اشكر العميل وأغلق الموضوع بلطف، لا تطلب أي سداد إضافي.' },
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'العميل يدّعي أنه سدد المديونية بالكامل ("${label}") — لم يُستلم إيصال/إثبات فعلي بعد.',
+      behaviorTpl: 'اطلب منه صورة الإيصال لتأكيد السداد قبل إغلاق الملف. لا تغيّر حالة الدين بناءً على كلامه فقط.' },
   },
   {
     test: l => l.includes('سداد جزئ'),
-    meta: { status: 'partial', isTerminal: false,
-      meaningTpl: 'العميل سدد جزءاً من المديونية فقط ("${label}").',
-      behaviorTpl: 'اشكره على الجزء المسدد، واسأل بلطف عن موعد تسديد الباقي.' },
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'العميل يدّعي أنه سدد جزءاً من المديونية ("${label}") — لم يُستلم إيصال/إثبات فعلي بعد.',
+      behaviorTpl: 'اطلب منه صورة إيصال التحويل لتأكيد المبلغ المسدد فعلاً قبل أي تحديث لحالة الملف. لا تغيّر حالة الدين بناءً على كلامه فقط.' },
   },
   {
     test: l => l.includes('مماطل'),

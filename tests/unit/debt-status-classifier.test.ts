@@ -44,4 +44,22 @@ describe('company outcome category metadata completeness', () => {
       }
     }
   })
+
+  // Regression: a real customer's plain-text reply (no payment, no receipt)
+  // got misclassified by the text-only LLM classifier as "سداد جزئى" (partial
+  // payment completed), which then auto-flipped debts.status to 'partial' —
+  // a status the system has no other evidence for. Payment-completion claims
+  // from raw chat text must NEVER auto-set debts.status; they must require a
+  // human to verify (isTerminal=true, status=null) since only the receipt
+  // OCR pipeline (payment-receipt.ts) has real evidence of an actual payment.
+  it('payment-completion categories ("سداد كامل"/"سداد جزئ") never auto-set debts.status from text alone', () => {
+    for (const profile of COMPANY_IMPORT_PROFILES) {
+      for (const [category, meta] of Object.entries(profile.outcomeMeta)) {
+        if (category.includes('سداد كامل') || category.includes('سداد جزئ') || (category.includes('تم السداد') && !category.includes('جزئ'))) {
+          expect(meta.status, `${profile.key}/"${category}" claims payment completion but auto-sets status without evidence`).toBeNull()
+          expect(meta.isTerminal, `${profile.key}/"${category}" should route to human review, not auto-decide`).toBe(true)
+        }
+      }
+    }
+  })
 })
