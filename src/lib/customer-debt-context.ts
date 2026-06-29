@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveCompanyProfile } from '@/lib/company-import-profiles'
+import { analyzeCustomerStrategyHistory } from '@/lib/customer-strategy-history'
 
 export async function buildCustomerDebtContext(params: {
   company_id: string
@@ -233,6 +234,12 @@ export async function buildCustomerDebtContext(params: {
     ],
   }
 
+  // This customer's OWN real history — which agent action preceded a
+  // promise they actually kept vs broke, and what objections they've
+  // raised before. null when there isn't enough resolved history yet
+  // (never a guessed/generic pattern).
+  const provenStrategyHistory = await analyzeCustomerStrategyHistory(params.company_id, params.customer_id)
+
   // Collection account (where the customer transfers) — portfolio-specific or company default
   const portfolioId = (debt as any)?.portfolio_id ?? null
   const { data: collAccounts } = await supabase
@@ -334,6 +341,7 @@ export async function buildCustomerDebtContext(params: {
       should_be_careful: ['disputed', 'legal'].includes(String(debt?.status ?? '')),
     },
     negotiation_profile,
+    proven_strategy_history: provenStrategyHistory,
     summary: {
       customer_name: customer?.full_name ?? null,
       phone: customer?.phone ?? null,

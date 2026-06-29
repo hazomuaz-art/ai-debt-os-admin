@@ -1159,6 +1159,15 @@ ${signals.asksWhyAmountChanged && ctx.verified_debt_data?.original_amount != nul
 - اشرح الفرق للعميل بوضوح (سداد جزئي سابق و/أو رسوم تأخير حسب الحال) بدون اختراع تفاصيل غير موجودة هنا.` : ''}
 
 قراءة سلوك العميل: النوع=${np.behavior_type ?? 'غير محدد'} | الاستراتيجية المقترحة=${np.recommended_strategy ?? 'غير محدد'}
+${(() => {
+  const h = ctx.proven_strategy_history as { effectiveActions?: string[]; ineffectiveActions?: string[]; pastObjectionTypes?: string[] } | null
+  if (!h) return ''
+  const lines: string[] = []
+  if (h.effectiveActions?.length) lines.push(`نجح من قبل مع هذا العميل بالذات: ${h.effectiveActions.join(', ')} (التزم بوعده بعدها) — استخدم أسلوباً مشابهاً.`)
+  if (h.ineffectiveActions?.length) lines.push(`فشل من قبل مع هذا العميل بالذات: ${h.ineffectiveActions.join(', ')} (كسر وعده بعدها) — تجنّب تكرار هذا الأسلوب بالضبط.`)
+  if (h.pastObjectionTypes?.length) lines.push(`اعتراضات سابقة فعلية من هذا العميل: ${h.pastObjectionTypes.join(', ')}.`)
+  return lines.length ? `📌 تاريخ هذا العميل الفعلي (لا تخمين، من سجله الحقيقي):\n${lines.join('\n')}` : ''
+})()}
 
 ═══════════════ ${intentPrompts[intent].split('\n')[0].replace(/【|】/g, '').trim()} ═══════════════
 ${intentPrompts[intent]}

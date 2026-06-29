@@ -6,7 +6,7 @@ import {
   Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
   Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Package,
-  FlaskConical, TrendingUp, Phone, Brain, Scale, HeartPulse, Building2
+  FlaskConical, TrendingUp, Phone, Brain, Scale, HeartPulse, Building2, LineChart
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,7 @@ export function Sidebar({ profile, isPlatformOwner }: { profile: any; isPlatform
         { href: `/dashboard/${role}/portfolios`,  label: t.nav.portfolios, icon: Briefcase, roles: ['admin'] },
         { href: `/dashboard/${role}/cost-center`, label: t.nav.cost_center, icon: DollarSign, roles: ['admin'] },
         { href: `/dashboard/${role}/analytics`,   label: t.nav.analytics, icon: BarChart2, roles: ['admin'] },
+        { href: `/dashboard/${role}/strategy-insights`, label: isRTL ? 'التحليل الاستراتيجي' : 'Strategy Insights', icon: LineChart, roles: ['admin', 'manager'] },
         { href: `/dashboard/${role}/team`,        label: t.nav.team, icon: ShieldCheck, roles: ['admin', 'manager'] },
         { href: `/dashboard/${role}/campaigns`,   label: t.nav.campaigns, icon: Megaphone, roles: ['admin'] },
         { href: `/dashboard/${role}/payments`,    label: isRTL ? 'المدفوعات' : 'Payments', icon: Wallet, roles: ['admin'] },
