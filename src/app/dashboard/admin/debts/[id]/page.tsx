@@ -139,6 +139,34 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
+  // Other debts for the SAME real person (matched by national_id) under any
+  // other portfolio within this same company (الكهرباء/المياه/موبايلي/...) —
+  // never crosses company_id, so this never reveals anything between
+  // different client companies on the platform, only within one company's
+  // own portfolios. PostgREST can't filter a top-level select by a joined
+  // table's column directly, so this is an explicit two-step lookup:
+  // customers sharing the same national_id, then debts for those customers.
+  const { data: sameNationalIdCustomers } = debt.customer?.national_id
+    ? await supabase.from('customers').select('id')
+        .eq('company_id', debt.company_id).eq('national_id', debt.customer.national_id)
+    : { data: null }
+  // Always include the current customer record itself — covers the common
+  // case where the SAME customer row already has multiple debts across
+  // portfolios (the import route reuses one customer record when it
+  // recognizes a returning national_id/phone). The national_id cross-match
+  // above only adds value when import matching missed a duplicate and
+  // created two separate customer rows for the same real person.
+  const relatedCustomerIds = Array.from(new Set([
+    debt.customer_id,
+    ...((sameNationalIdCustomers ?? []).map((c: any) => c.id)),
+  ]))
+  const { data: relatedDebts } = await supabase
+    .from('debts')
+    .select('id, reference_number, current_balance, currency, status, portfolio:portfolios(name)')
+    .eq('company_id', debt.company_id)
+    .in('customer_id', relatedCustomerIds)
+    .neq('id', debt.id)
+
   // Portfolio-specific fields (Mobily, STC, التعاونية, ...) — same data
   // the importer routes into customer_data_<table>, also editable manually.
   let portfolioData: Record<string, unknown> | null = null
@@ -456,6 +484,24 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               )}
             </div>
           </div>
+
+          {relatedDebts && relatedDebts.length > 0 && (
+            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertTriangle size={18} className="text-amber-400" />
+                <h2 className="font-bold text-white">مطالبات أخرى لهذا العميل ({relatedDebts.length})</h2>
+              </div>
+              <div className="space-y-2">
+                {(relatedDebts as any[]).map(rd => (
+                  <Link key={rd.id} href={`/dashboard/admin/debts/${rd.id}`}
+                    className="flex justify-between items-center p-3 rounded-xl bg-[#0b0e14] border border-[#222a36] hover:border-amber-400/50 transition-colors">
+                    <span className="text-[#8b95a7] text-sm">{rd.portfolio?.name ?? '—'} — {rd.reference_number ?? '—'}</span>
+                    <span className="font-bold text-white">{formatCurrency(rd.current_balance, rd.currency)}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {portfolioConfig && portfolioData && (
             <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">

@@ -497,3 +497,34 @@ export function analyzeImportFile(
   })
   return { clusters: reports, needsAnyMapping: reports.some(r => r.needsMapping) }
 }
+
+// ── Multi-phone-number extraction ──────────────────────────────────────────
+// A single "أرقام التواصل" cell can legitimately hold more than one real
+// number for the same customer (their own + a relative's), separated by
+// whatever the source file's author used (/, comma, newline, multiple
+// spaces). Any non-numeric text mixed into the same cell (a name, a note)
+// is discarded automatically — it simply fails the digit-shape check below,
+// never stored, never silently "deleted" elsewhere (it was never a real
+// number to begin with).
+const SAUDI_MOBILE_RE = /^9665\d{8}$/
+
+function normalizeSaudiMobile(token: string): string | null {
+  const digits = token.replace(/\D/g, '')
+  if (!digits) return null
+  let normalized = digits
+  if (normalized.startsWith('0') && normalized.length === 10) normalized = '966' + normalized.slice(1)
+  else if (normalized.length === 9 && normalized.startsWith('5')) normalized = '966' + normalized
+  return SAUDI_MOBILE_RE.test(normalized) ? normalized : null
+}
+
+export function extractPhoneNumbers(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const tokens = String(raw).split(/[\/,;\n]+|\s{2,}/).map(t => t.trim()).filter(Boolean)
+  const seen = new Set<string>()
+  const valid: string[] = []
+  for (const token of tokens) {
+    const n = normalizeSaudiMobile(token)
+    if (n && !seen.has(n)) { seen.add(n); valid.push(n) }
+  }
+  return valid
+}

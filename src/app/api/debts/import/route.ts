@@ -9,7 +9,7 @@ import { parseCSVBuffer } from '@/lib/csv-parser'
 import { processEventBatch, type PipelineEvent } from '@/lib/automation-pipeline'
 import { findCompanyProfile, resolveCompanyProfile, type CompanyImportProfile } from '@/lib/company-import-profiles'
 import { buildPortfolioPayload, upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
-import { clusterRowsByLayout, resolveClusterMapping, type StandardField } from '@/lib/import-engine'
+import { clusterRowsByLayout, resolveClusterMapping, extractPhoneNumbers, type StandardField } from '@/lib/import-engine'
 
 // Arabic status mapping
 const STATUS_MAP: Record<string, string> = {
@@ -377,6 +377,27 @@ export async function POST(request: NextRequest) {
           if (custErr || !newCust)
             throw new Error(`Customer create failed: ${custErr?.message}`)
           customerId = (newCust as { id: string }).id
+        }
+
+        // A "contact numbers" cell can legitimately hold more than one real
+        // number for the same customer (their own + a relative's). The
+        // FIRST valid number is already customers.phone (unchanged behavior
+        // above) — every valid number found, including that first one, is
+        // additionally recorded here so a later cron can try the next one
+        // if the primary never replies. Any non-numeric text in the same
+        // cell never reaches this far — extractPhoneNumbers() only returns
+        // tokens that match a real Saudi mobile shape. Re-imports of the
+        // same customer only ever ADD a newly-seen number (UNIQUE
+        // constraint on customer_id+phone silently no-ops on a repeat).
+        const allPhoneNumbers = extractPhoneNumbers(f.phone)
+        if (allPhoneNumbers.length > 0) {
+          await supabase.from('customer_contacts').upsert(
+            allPhoneNumbers.map((phone, i) => ({
+              company_id: profile.company_id, customer_id: customerId, phone,
+              is_primary: i === 0, source: 'import' as const,
+            })),
+            { onConflict: 'customer_id,phone', ignoreDuplicates: true },
+          )
         }
 
         if (rowProfile) {

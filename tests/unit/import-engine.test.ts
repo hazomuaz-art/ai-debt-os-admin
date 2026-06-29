@@ -1,5 +1,38 @@
 import { describe, it, expect } from 'vitest'
-import { clusterRowsByLayout, resolveClusterMapping, analyzeImportFile } from '@/lib/import-engine'
+import { clusterRowsByLayout, resolveClusterMapping, analyzeImportFile, extractPhoneNumbers } from '@/lib/import-engine'
+
+describe('import-engine — extractPhoneNumbers (multi-phone-per-customer support)', () => {
+  it('extracts a single Saudi mobile number', () => {
+    expect(extractPhoneNumbers('0501234567')).toEqual(['966501234567'])
+  })
+
+  it('extracts multiple numbers separated by a slash, dropping the leading zero on each', () => {
+    expect(extractPhoneNumbers('0501234567/0559876543')).toEqual(['966501234567', '966559876543'])
+  })
+
+  it('extracts multiple numbers separated by a comma or newline', () => {
+    expect(extractPhoneNumbers('0501234567, 0559876543')).toEqual(['966501234567', '966559876543'])
+    expect(extractPhoneNumbers('0501234567\n0559876543')).toEqual(['966501234567', '966559876543'])
+  })
+
+  it('ignores any non-number text mixed into the same cell (a name, a label) instead of treating it as a phone', () => {
+    expect(extractPhoneNumbers('0501234567 (أخوه) / ملاحظة عامة')).toEqual(['966501234567'])
+  })
+
+  it('accepts an already-international-format number', () => {
+    expect(extractPhoneNumbers('+966501234567')).toEqual(['966501234567'])
+  })
+
+  it('deduplicates the same number appearing twice in one cell', () => {
+    expect(extractPhoneNumbers('0501234567 / 0501234567')).toEqual(['966501234567'])
+  })
+
+  it('returns an empty list for null/empty/garbage input', () => {
+    expect(extractPhoneNumbers(null)).toEqual([])
+    expect(extractPhoneNumbers('')).toEqual([])
+    expect(extractPhoneNumbers('لا يوجد رقم')).toEqual([])
+  })
+})
 
 describe('import-engine — clusterRowsByLayout', () => {
   it('groups rows by which columns are non-empty (structural, not positional)', () => {
