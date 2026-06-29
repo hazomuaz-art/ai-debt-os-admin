@@ -224,11 +224,17 @@ async function loadCtx(debtId: string, companyId: string): Promise<Ctx | null> {
 // Step: Timeline event
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 'refusal'/'dispute'/'payment_claim'/'legal_escalation' were never valid
+// timeline_events.event_type values (only a fixed list is allowed — see
+// timeline_events_event_type_check) — every timeline insert for these 4
+// event sources has been silently failing since this map was written,
+// undetectable because the catch block below can never catch a Postgres
+// constraint violation (Supabase JS returns {error}, it doesn't throw).
 const EVENT_TYPE_MAP: Record<EventSource, string> = {
   csv_import: 'status_change', excel_import: 'status_change', api_sync: 'status_change',
   webhook_whatsapp: 'whatsapp_in', webhook_evolution: 'whatsapp_in', webhook_call: 'call_in',
   payment_update: 'payment', promise_update: 'promise_to_pay',
-  refusal_detected: 'refusal', dispute_detected: 'dispute', payment_claim_detected: 'payment_claim', legal_escalation_detected: 'legal_escalation',
+  refusal_detected: 'status_change', dispute_detected: 'status_change', payment_claim_detected: 'payment', legal_escalation_detected: 'escalation',
   collector_note: 'collector_note', debt_update: 'status_change',
   customer_update: 'status_change', manual: 'ai_analysis', ai_reply: 'ai_analysis',
 }
@@ -269,7 +275,12 @@ async function stepTimeline(
     ai_reply:         `رد آلي من الوكيل على ${ctx.customer.full_name}`,
   }
   try {
-    await createServiceClient().from('timeline_events').insert({
+    // Supabase JS never throws on a constraint violation — it returns
+    // {error}. This catch block alone could never have caught the
+    // EVENT_TYPE_MAP bug above; checking {error} explicitly now so a
+    // future invalid value here is caught immediately instead of silently
+    // vanishing again.
+    const { error: teErr } = await createServiceClient().from('timeline_events').insert({
       company_id:  ctx.debt.company_id,
       customer_id: ctx.debt.customer_id,
       debt_id:     ctx.debt.id,
@@ -292,6 +303,7 @@ async function stepTimeline(
       metadata:    { source, reference: ctx.debt.reference_number },
       occurred_at: new Date().toISOString(),
     })
+    if (teErr) { log.warn(`timeline(${ctx.debt.id}): ` + teErr.message); return false }
     return true
   } catch (err) {
     log.warn(`timeline(${ctx.debt.id}): ` + (err instanceof Error ? err.message : String(err)))
@@ -823,11 +835,16 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
   const isWebhook = String(event.source ?? '').includes('webhook')
 
   if (impact.timeline) {
-    await sb.from('timeline_events').insert({
+    // 'ai_system_impact' was never a valid timeline_events.event_type
+    // (only a fixed list is allowed) — this insert has been silently
+    // failing every time since it shipped; 'ai_analysis' is the correct,
+    // valid semantic fit. done.push() below used to fire unconditionally
+    // regardless of whether the insert actually succeeded — now gated on it.
+    const { error: teErr } = await sb.from('timeline_events').insert({
       company_id: ctx.debt.company_id,
       customer_id: ctx.debt.customer_id,
       debt_id: ctx.debt.id,
-      event_type: 'ai_system_impact',
+      event_type: 'ai_analysis',
       channel: isWebhook ? 'whatsapp' : 'system',
       summary,
       detail: JSON.stringify({ message, impact, source: event.source }).slice(0, 1000),
@@ -836,7 +853,8 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
       metadata: { source: event.source, debt_id: ctx.debt.id, ai_system_impact: true },
       occurred_at: new Date().toISOString(),
     })
-    done.push('ai_impact:timeline')
+    if (teErr) log.error('ai_system_impact timeline insert failed', new Error(teErr.message), { debt_id: ctx.debt.id })
+    else done.push('ai_impact:timeline')
   }
 
   // ai_memory disabled — see stepMemory() above.

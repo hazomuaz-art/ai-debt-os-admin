@@ -132,11 +132,18 @@ export async function recordStcReview(args: {
       message: args.reason,
       metadata: { customer_id: args.customer_id, debt_id: args.debt_id, portfolio_id: args.portfolio_id ?? null },
     })
-    await supabase.from('timeline_events').insert({
+    // args.escalation_type (e.g. 'customer_complaint') is never a valid
+    // timeline_events.event_type — that column only accepts a fixed list
+    // (whatsapp_in/whatsapp_out/.../escalation/...). Using 'escalation'
+    // here (the real dynamic value is still preserved in summary/detail)
+    // is what actually lets this insert succeed instead of silently
+    // failing every time, which is what was happening before.
+    const { error: teErr } = await supabase.from('timeline_events').insert({
       company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-      event_type: args.escalation_type, channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+      event_type: 'escalation', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
       summary: args.escalation_type, detail: args.reason, occurred_at: new Date().toISOString(),
     })
+    if (teErr) log.warn('recordStcReview timeline insert failed: ' + teErr.message, { debt_id: args.debt_id })
   } catch (err) {
     log.warn('recordStcReview failed: ' + (err instanceof Error ? err.message : String(err)), { debt_id: args.debt_id })
   }
@@ -203,12 +210,20 @@ export async function openEscalation(args: {
       metadata: { customer_id: args.customer_id, debt_id: args.debt_id, escalation_type: args.escalation_type },
     })
 
-    await supabase.from('timeline_events').insert({
+    // Same bug, more serious here: 'legal_escalation' was never a valid
+    // event_type either (real value is in summary instead) — meant every
+    // critical legal escalation ever opened silently never showed up in
+    // the timeline. This catch block also could never have caught a
+    // constraint-violation failure here even before this fix, since
+    // Supabase JS returns {error} rather than throwing — checking it
+    // explicitly now.
+    const { error: teErr } = await supabase.from('timeline_events').insert({
       company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-      event_type: 'legal_escalation', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+      event_type: 'escalation', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
       summary: `تصعيد قانوني (${args.escalation_type})`, detail: args.reason,
       occurred_at: new Date().toISOString(),
     })
+    if (teErr) log.warn('openEscalation timeline insert failed: ' + teErr.message, { debt_id: args.debt_id })
 
     return (data as { id: string }).id
   } catch (err) {

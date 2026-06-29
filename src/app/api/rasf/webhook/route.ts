@@ -149,16 +149,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
-  await supabase.from('timeline_events').insert({
+  // This insert was doubly broken: 'whatsapp_inbound' is not a valid
+  // timeline_events.event_type (the real value is 'whatsapp_in'), AND
+  // title/description aren't real columns on this table (they're
+  // summary/detail) — every Rasf inbound message has silently failed to
+  // log to the timeline since this route shipped. `.then(() => null)`
+  // discarded the result either way, so this was never visible.
+  const { error: teErr } = await supabase.from('timeline_events').insert({
     company_id: customer.company_id,
     customer_id: customer.id,
     debt_id: latestDebt?.id ?? null,
-    event_type: 'whatsapp_inbound',
-    title: 'Rasf WhatsApp inbound message',
-    description: String(text),
+    event_type: 'whatsapp_in',
+    channel: 'whatsapp',
+    actor_type: 'customer',
+    summary: 'رسالة واردة عبر Rasf',
+    detail: String(text),
     occurred_at: new Date().toISOString(),
     metadata: { provider: 'rasf', message_id: eventId, phone }
-  }).then(() => null)
+  })
+  if (teErr) log.error('Rasf timeline_events insert failed', new Error(teErr.message))
 
   return NextResponse.json({
     ok: true,

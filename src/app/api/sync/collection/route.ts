@@ -1,6 +1,9 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { processEvent } from '@/lib/automation-pipeline'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/sync/collection')
 
 type IncomingPayload = {
   event_type?: string
@@ -509,19 +512,27 @@ export async function POST(req: NextRequest) {
     })
 
     if (payload.remark || payload.event_type) {
-      await sb.from('timeline_events').insert({
+      // Both 'collection_sync' AND 'collection_system' were invalid values
+      // (timeline_events.event_type/channel only accept a fixed list) —
+      // this insert has been failing silently on every sync that reached
+      // here since this route shipped. The external system's own
+      // payload.event_type is preserved in metadata instead of forced into
+      // a column it can never validly satisfy.
+      const { error: teErr } = await sb.from('timeline_events').insert({
         company_id: companyId,
         customer_id: customerId,
         debt_id: debtId,
-        event_type: payload.event_type || 'collection_sync',
-        channel: 'collection_system',
+        event_type: 'status_change',
+        channel: 'system',
         summary: payload.remark ? payload.remark.slice(0, 120) : 'Collection system sync',
         detail: payload.remark || null,
         actor_type: 'system',
         actor_name: 'Collection System',
         ai_used: false,
+        metadata: { external_event_type: payload.event_type ?? null },
         occurred_at: new Date().toISOString(),
       })
+      if (teErr) log.error('collection sync timeline insert failed', new Error(teErr.message))
     }
 
     if (debtId) {
