@@ -341,6 +341,20 @@ export type PromiseStatus  = 'pending' | 'kept' | 'broken' | 'rescheduled' | 'pa
 export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'cancelled'
 export type ApprovalType   = 'large_settlement' | 'discount' | 'legal_escalation' | 'stop_followup' | 'write_off' | 'ai_learning' | 'campaign_launch' | 'custom'
 export type AlertSeverity  = 'info' | 'warning' | 'error' | 'critical'
+// Must match timeline_events_event_type/_actor_type/_channel_check exactly
+// (supabase/migrations) — a full-system audit (2026-06-29) found 9 separate
+// inserts using values outside these real constraints, all failing
+// silently for months since Supabase's JS client never throws on a
+// constraint violation. These types + insertTimelineEvent() in
+// src/lib/timeline.ts are the permanent fix: any future invalid literal is
+// now a compile error (tsc, run before every deploy) instead of a silent
+// runtime failure discovered later by a user complaint.
+export type TimelineEventType =
+  | 'whatsapp_in' | 'whatsapp_out' | 'call_in' | 'call_out' | 'ai_reply' | 'collector_note'
+  | 'promise_to_pay' | 'payment' | 'status_change' | 'ai_analysis' | 'rule_triggered'
+  | 'campaign' | 'human_handoff' | 'escalation'
+export type TimelineActorType = 'ai' | 'collector' | 'customer' | 'system' | 'campaign'
+export type TimelineChannel = 'whatsapp' | 'call' | 'email' | 'sms' | 'system' | 'ai' | 'manual'
 export type FeatureFlagStatus = 'disabled' | 'internal_test' | 'limited' | 'production'
 
 export interface SystemConfig {

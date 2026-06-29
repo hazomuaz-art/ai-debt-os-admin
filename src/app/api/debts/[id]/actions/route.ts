@@ -1,31 +1,35 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
+import { insertTimelineEvent } from '@/lib/timeline'
+import type { TimelineEventType } from '@/types/index'
 
 const log = createLogger('api/debts/actions')
 
-// Every Supabase call's error is now checked and logged. Found during a
-// full-system audit: every single timeline_events insert in this route used
-// an invalid event_type ('promise_made', 'disputed', 'note_added' — none of
-// these exist in timeline_events_event_type_check) AND an invalid
-// actor_type ('human' — not in timeline_events_actor_type_check, which only
-// allows ai/collector/customer/system/campaign). Supabase's JS client never
-// throws on a constraint violation, it just returns {error}, and nothing
-// here ever checked it — so EVERY manual collector action (promise, dispute,
-// handoff, follow-up, note) has silently failed to write to the timeline,
-// for every company, since this route was built. The debt-status update
-// itself (a separate call) succeeded fine, which is why the visible status
-// changed but the timeline entry never appeared.
+// Found during a full-system audit: every single timeline_events insert in
+// this route used an invalid event_type ('promise_made', 'disputed',
+// 'note_added' — none of these exist in timeline_events_event_type_check)
+// AND an invalid actor_type ('human' — not in
+// timeline_events_actor_type_check, which only allows
+// ai/collector/customer/system/campaign). Supabase's JS client never throws
+// on a constraint violation, it just returns {error}, and nothing here ever
+// checked it — so EVERY manual collector action (promise, dispute, handoff,
+// follow-up, note) has silently failed to write to the timeline, for every
+// company, since this route was built. The debt-status update itself (a
+// separate call) succeeded fine, which is why the visible status changed
+// but the timeline entry never appeared. Now routes through
+// insertTimelineEvent() (src/lib/timeline.ts), whose event_type parameter
+// is typed against the real constraint — passing an invalid value here
+// again would be a compile error, not a silent failure.
 async function logTimeline(
-  supabase: ReturnType<typeof createClient>,
-  row: { company_id: string; debt_id: string; event_type: string; summary: string; detail?: string; actor_name: string },
+  _supabase: ReturnType<typeof createClient>,
+  row: { company_id: string; debt_id: string; event_type: TimelineEventType; summary: string; detail?: string; actor_name: string },
 ) {
-  const { error } = await supabase.from('timeline_events').insert({
+  await insertTimelineEvent({
     company_id: row.company_id, debt_id: row.debt_id,
-    event_type: row.event_type, summary: row.summary, detail: row.detail ?? null,
+    event_type: row.event_type, channel: 'manual', summary: row.summary, detail: row.detail ?? null,
     actor_type: 'collector', actor_name: row.actor_name, ai_used: false,
   })
-  if (error) log.error('timeline_events insert failed', new Error(error.message), { event_type: row.event_type })
 }
 
 export async function POST(
