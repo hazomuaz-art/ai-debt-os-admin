@@ -10,9 +10,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 let mockCustomerRow: any = { id: 'cust-1', company_id: 'co-1', full_name: 'حذيفه', ai_paused: false }
 let mockDupRow: any = null
+let mockContentDupRow: any = null
 let mockLatestDebt: any = { id: 'd1', current_balance: 1000 }
 let runCollectorAgentCalls: any[] = []
 let mockAiDecision: any = { shouldReply: true, action: 'reply', reason: 'x', message: 'تمام.' }
+
+// A chainable query-builder mock: any sequence of .eq()/.gte()/.not()/.order()
+// calls is supported (each just returns the same chain object), terminated
+// by either .limit().maybeSingle() (single-row dup checks) or
+// .not().order().limit().maybeSingle() (latest-debt lookup). The content-dup
+// check resolves to mockContentDupRow; everything else resolves to mockDupRow
+// — distinguished by whether `.eq('content', ...)` was ever called in the chain.
+function makeEqChain(table: string, sawContentEq: boolean): any {
+  const chain: any = {
+    eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, sawContentEq || col === 'content')),
+    gte: vi.fn().mockImplementation(() => makeEqChain(table, sawContentEq)),
+    not: vi.fn().mockImplementation(() => ({
+      order: vi.fn().mockImplementation(() => ({ limit: vi.fn().mockImplementation(() => ({ maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockLatestDebt })) })) })),
+    })),
+    limit: vi.fn().mockImplementation(() => ({
+      maybeSingle: vi.fn().mockImplementation(async () => ({ data: sawContentEq ? mockContentDupRow : mockDupRow })),
+    })),
+  }
+  return chain
+}
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn().mockImplementation(() => ({
@@ -25,13 +46,7 @@ vi.mock('@/lib/supabase/server', () => ({
             })),
           })),
         })),
-        eq: vi.fn().mockImplementation(() => ({
-          eq: vi.fn().mockImplementation(() => ({ limit: vi.fn().mockImplementation(() => ({ maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockDupRow })) })) })),
-          not: vi.fn().mockImplementation(() => ({
-            order: vi.fn().mockImplementation(() => ({ limit: vi.fn().mockImplementation(() => ({ maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockLatestDebt })) })) })),
-          })),
-          limit: vi.fn().mockImplementation(() => ({ maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockDupRow })) })),
-        })),
+        eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, col === 'content')),
       })),
       insert: vi.fn().mockResolvedValue({ data: null, error: null }),
       update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),

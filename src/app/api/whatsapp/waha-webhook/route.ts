@@ -209,6 +209,28 @@ export async function POST(request: NextRequest) {
       if (dup) { log.info('duplicate inbound webhook ignored', { msgId }); return NextResponse.json({ status: 'ok' }) }
     }
 
+    // Secondary content-based guard: a NOWEB session resync (e.g. after a
+    // reconnect/restart) can replay recent chat history as fresh "message"
+    // webhook events carrying a DIFFERENT internal message id for content
+    // already processed — the msgId check above can't catch that since the
+    // id genuinely differs. If the exact same text from the exact same
+    // customer was already recorded inbound in the last 10 minutes, treat
+    // this as a resync replay rather than a real new message (a customer
+    // retyping the identical text within 10 minutes on purpose is rare
+    // enough that silently dropping it is the safer failure mode vs. the
+    // bot replying twice).
+    if (text) {
+      const replayWindowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const { data: recentDup } = await supabase
+        .from('messages').select('id').eq('customer_id', c.id).eq('direction', 'inbound')
+        .eq('content', text).gte('sent_at', replayWindowStart)
+        .limit(1).maybeSingle()
+      if (recentDup) {
+        log.info('duplicate inbound content ignored (likely session resync replay)', { customer_id: c.id })
+        return NextResponse.json({ status: 'ok' })
+      }
+    }
+
     const { data: latestDebt } = await supabase
       .from('debts').select('id, current_balance, status, portfolio:portfolios(name)').eq('customer_id', c.id)
       .not('status', 'in', '("settled","written_off")')
