@@ -15,6 +15,17 @@ import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
 
+  // Defense-in-depth: the debts RLS policy already enforces
+  // company_id = get_user_company_id() at the database level (verified
+  // directly against the real policy during a full-system audit), so this
+  // was never actually exploitable — but every other data-access point in
+  // this app scopes by company_id explicitly too, and this page was the
+  // one place that didn't. Hardens against a future RLS policy regression.
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+  if (!profile?.company_id) notFound()
+
   const { data: debt } = await supabase
     .from('debts')
     .select(`
@@ -26,6 +37,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
       ai_scores(*)
     `)
     .eq('id', params.id)
+    .eq('company_id', profile.company_id)
     .single()
 
   if (!debt) notFound()
