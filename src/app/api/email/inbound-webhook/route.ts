@@ -30,6 +30,21 @@ export async function POST(req: NextRequest) {
   const text = String(payload?.text ?? '').trim()
   if (!from || !text) return NextResponse.json({ status: 'ok' })
 
+  // KNOWN LIMITATION, flagged honestly rather than guessed around: this
+  // matches a customer by email alone, across ALL companies on the
+  // platform, with no company-scoping at the match step. The equivalent
+  // WhatsApp webhook does the same thing (matches by phone with no
+  // company_id filter) and that is safe in practice because each WAHA
+  // session is dedicated to exactly one company — the inbound channel
+  // itself already implies the company. That assumption does NOT
+  // necessarily hold for email: depending on which provider is chosen,
+  // inbound mail for every company on the platform could hit this same
+  // webhook URL, so if two different companies ever have a customer
+  // sharing the same email address, `.limit(1)` could non-deterministically
+  // pick the wrong one. Resolve this properly once a real provider is
+  // chosen — most (Postmark/Mailgun) support a distinct inbound address or
+  // a routing token per sender identity, which should be used to scope
+  // this query by company_id, same as every other route in this app.
   const supabase = createServiceClient()
   const { data: customer } = await supabase
     .from('customers').select('id, company_id, full_name, ai_paused')
