@@ -10,18 +10,19 @@ import { processEventBatch, type PipelineEvent } from '@/lib/automation-pipeline
 import { findCompanyProfile, resolveCompanyProfile, type CompanyImportProfile } from '@/lib/company-import-profiles'
 import { buildPortfolioPayload, upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
 import { clusterRowsByLayout, resolveClusterMapping, extractPhoneNumbers, type StandardField } from '@/lib/import-engine'
+import { normalizePhone } from '@/lib/whatsapp'
 
 // Arabic status mapping
 const STATUS_MAP: Record<string, string> = {
   'active': 'active', 'pending': 'pending', 'in_negotiation': 'in_negotiation',
   'payment_plan': 'payment_plan', 'settled': 'settled', 'legal': 'legal', 'written_off': 'written_off',
-  'نشط': 'active', 'فعال': 'active', 'جديد': 'active',
-  'معلق': 'pending', 'قيد المعالجة': 'pending',
-  'قيد التفاوض': 'in_negotiation', 'تفاوض': 'in_negotiation',
-  'خطة سداد': 'payment_plan', 'تقسيط': 'payment_plan',
-  'مسدد': 'settled', 'مدفوع': 'settled', 'منتهي': 'settled',
-  'قانوني': 'legal', 'محكمة': 'legal',
-  'مشطوب': 'written_off', 'معدوم': 'written_off',
+  'نشط': 'active', 'فعال': 'active', 'جديد': 'active', 'مفتوح': 'active', 'قيد التحصيل': 'active',
+  'معلق': 'pending', 'قيد المعالجة': 'pending', 'انتظار': 'pending', 'موقوف': 'pending',
+  'قيد التفاوض': 'in_negotiation', 'تفاوض': 'in_negotiation', 'تحت التفاوض': 'in_negotiation',
+  'خطة سداد': 'payment_plan', 'تقسيط': 'payment_plan', 'اتفاقية سداد': 'payment_plan', 'جدولة': 'payment_plan',
+  'مسدد': 'settled', 'مدفوع': 'settled', 'منتهي': 'settled', 'مغلق': 'settled', 'مسوّى': 'settled', 'مسوى': 'settled', 'تسوية': 'settled',
+  'قانوني': 'legal', 'محكمة': 'legal', 'إجراء قانوني': 'legal', 'اجراء قانوني': 'legal',
+  'مشطوب': 'written_off', 'معدوم': 'written_off', 'شطب': 'written_off', 'هالك': 'written_off',
 }
 
 function mapStatus(raw: string | undefined): string {
@@ -349,12 +350,18 @@ export async function POST(request: NextRequest) {
           existing = data
         }
 
+        // Auto-derive WhatsApp from phone when no explicit whatsapp column:
+        // Saudi numbers starting with 05... → 966..., already-966 kept as-is.
+        const resolvedWhatsapp = f.whatsapp
+          ? f.whatsapp.replace(/[^\d+]/g, '')
+          : (f.phone ? normalizePhone(f.phone) : null)
+
         if (existing) {
           customerId = (existing as { id: string }).id
           await supabase.from('customers').update({
             full_name:      f.full_name,
             ...(f.phone         && { phone:          f.phone.replace(/[^\d+]/g, '') }),
-            ...(f.whatsapp      && { whatsapp:        f.whatsapp.replace(/[^\d+]/g, '') }),
+            ...(resolvedWhatsapp && { whatsapp:       resolvedWhatsapp }),
             ...(f.city          && { city:            f.city }),
             ...(f.employer      && { employer:        f.employer }),
             ...(f.email         && { email:           f.email }),
@@ -366,7 +373,7 @@ export async function POST(request: NextRequest) {
             created_by:     user.id,
             full_name:      f.full_name,
             phone:          f.phone?.replace(/[^\d+]/g, '') || null,
-            whatsapp:       f.whatsapp?.replace(/[^\d+]/g, '') || null,
+            whatsapp:       resolvedWhatsapp || null,
             national_id:    f.national_id || null,
             city:           f.city || null,
             employer:       f.employer || null,

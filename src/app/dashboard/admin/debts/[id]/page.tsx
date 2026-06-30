@@ -12,6 +12,7 @@ import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldA
 import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
+import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
@@ -184,11 +185,16 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   // the importer routes into customer_data_<table>, also editable manually.
   let portfolioData: Record<string, unknown> | null = null
   let portfolioConfig: ReturnType<typeof getPortfolioTableConfig> = null
+  let outcomeCategories: string[] | null = null
   if (debt.portfolio_id) {
     const { data: portfolioRow } = await supabase
       .from('portfolios').select('metadata').eq('id', debt.portfolio_id).maybeSingle()
-    const companyKey = (portfolioRow?.metadata as Record<string, unknown> | null)?.company_key as string | undefined
+    const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
+    const companyKey = meta.company_key as string | undefined
     portfolioConfig = getPortfolioTableConfig(companyKey)
+    if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
+      outcomeCategories = meta.outcome_categories as string[]
+    }
     if (portfolioConfig) {
       const { data: row } = await supabase
         .from(portfolioConfig.table).select('*')
@@ -475,6 +481,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 <div className="flex items-center gap-2">
                   <span className="font-bold font-mono text-white" dir="ltr">{debt.customer?.whatsapp || '—'}</span>
                   {debt.customer?.whatsapp && <SendWhatsAppButton debtId={debt.id} phone={debt.customer.whatsapp} customerName={debt.customer.full_name} small />}
+                  {debt.customer?.id && <EditWhatsAppButton customerId={debt.customer.id} currentWhatsapp={debt.customer.whatsapp} />}
                 </div>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-slate-50">
@@ -519,6 +526,22 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     <span className="text-[#8b95a7] text-sm">{rd.portfolio?.name ?? '—'} — {rd.reference_number ?? '—'}</span>
                     <span className="font-bold text-white">{formatCurrency(rd.current_balance, rd.currency)}</span>
                   </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {outcomeCategories && outcomeCategories.length > 0 && (
+            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
+                <Target className="text-amber-400" size={20} />
+                <h2 className="text-lg font-bold text-white">تصنيفات النتائج</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {outcomeCategories.map((cat: string) => (
+                  <span key={cat} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#222a36] text-slate-300 border border-[#2c3543]">
+                    {cat}
+                  </span>
                 ))}
               </div>
             </div>

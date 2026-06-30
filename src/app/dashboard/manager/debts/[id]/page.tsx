@@ -12,6 +12,7 @@ import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldA
 import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
+import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
 
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -119,6 +120,16 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .limit(5)
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
+
+  let outcomeCategories: string[] | null = null
+  if (debt.portfolio_id) {
+    const { data: portfolioRow } = await supabase
+      .from('portfolios').select('metadata').eq('id', debt.portfolio_id).maybeSingle()
+    const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
+    if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
+      outcomeCategories = meta.outcome_categories as string[]
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
@@ -353,6 +364,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 <div className="flex items-center gap-2">
                   <span className="font-bold font-mono text-white" dir="ltr">{debt.customer?.whatsapp || '—'}</span>
                   {debt.customer?.whatsapp && <SendWhatsAppButton debtId={debt.id} phone={debt.customer.whatsapp} customerName={debt.customer.full_name} small />}
+                  {debt.customer?.id && <EditWhatsAppButton customerId={debt.customer.id} currentWhatsapp={debt.customer.whatsapp} />}
                 </div>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-slate-50">
@@ -383,6 +395,22 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               )}
             </div>
           </div>
+
+          {outcomeCategories && outcomeCategories.length > 0 && (
+            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
+                <Target className="text-amber-400" size={20} />
+                <h2 className="text-lg font-bold text-white">تصنيفات النتائج</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {outcomeCategories.map((cat: string) => (
+                  <span key={cat} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#222a36] text-slate-300 border border-[#2c3543]">
+                    {cat}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <h2 className="text-sm font-bold text-[#8b95a7] mb-3">المحصّل المسؤول</h2>

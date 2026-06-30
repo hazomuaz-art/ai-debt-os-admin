@@ -1,6 +1,6 @@
 'use client'
 
-import { Printer } from 'lucide-react'
+import { Printer, Download } from 'lucide-react'
 
 type PrintMessage = {
   id: string
@@ -33,7 +33,7 @@ export default function PrintConversationButton({
   creditorName?: string | null
   messages: PrintMessage[]
 }) {
-  function handlePrint() {
+  function buildHtmlContent() {
     const sorted = [...messages].sort((a, b) =>
       new Date(a.sent_at || a.created_at || 0).getTime() - new Date(b.sent_at || b.created_at || 0).getTime())
 
@@ -49,7 +49,7 @@ export default function PrintConversationButton({
         </div>`
     }).join('')
 
-    const html = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="utf-8">
@@ -71,7 +71,24 @@ export default function PrintConversationButton({
   ${rows || '<p>لا توجد رسائل لعرضها.</p>'}
 </body>
 </html>`
+  }
 
+  function handleDownload() {
+    const html = buildHtmlContent()
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const safeName = (customerName || 'محادثة').replace(/[^؀-ۿa-zA-Z0-9]/g, '_')
+    a.download = `محادثة_${safeName}_${debtReference || ''}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  function handlePrint() {
+    const html = buildHtmlContent()
     const win = window.open('', '_blank', 'width=800,height=900')
     if (!win) return
     win.document.write(html)
@@ -85,12 +102,21 @@ export default function PrintConversationButton({
   }
 
   return (
-    <button
-      onClick={handlePrint}
-      className="flex items-center gap-1.5 text-xs font-bold text-[#8b95a7] hover:text-white bg-[#222a36] hover:bg-[#2a3340] px-3 py-1.5 rounded-lg border border-[#222a36] transition-colors"
-      title="طباعة المحادثة"
-    >
-      <Printer size={14} /> طباعة المحادثة
-    </button>
+    <div className="flex gap-2">
+      <button
+        onClick={handleDownload}
+        className="flex items-center gap-1.5 text-xs font-bold text-[#8b95a7] hover:text-white bg-[#222a36] hover:bg-[#2a3340] px-3 py-1.5 rounded-lg border border-[#222a36] transition-colors"
+        title="تحميل المحادثة"
+      >
+        <Download size={14} /> تحميل
+      </button>
+      <button
+        onClick={handlePrint}
+        className="flex items-center gap-1.5 text-xs font-bold text-[#8b95a7] hover:text-white bg-[#222a36] hover:bg-[#2a3340] px-3 py-1.5 rounded-lg border border-[#222a36] transition-colors"
+        title="طباعة المحادثة"
+      >
+        <Printer size={14} /> طباعة
+      </button>
+    </div>
   )
 }

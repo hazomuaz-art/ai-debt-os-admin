@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, parseQuery, errors } from '@/lib/api'
+import { normalizePhone } from '@/lib/whatsapp'
 import { z } from 'zod'
 
 const customersQuerySchema = z.object({
@@ -41,5 +42,36 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: data ?? [], count, page, limit })
+  })
+}
+
+const patchSchema = z.object({
+  id:       z.string().uuid(),
+  whatsapp: z.string().min(9).max(20),
+})
+
+export async function PATCH(request: NextRequest) {
+  return withAuth(async (ctx) => {
+    let body: unknown
+    try { body = await request.json() } catch { return errors.badRequest('Invalid JSON') }
+
+    const parsed = patchSchema.safeParse(body)
+    if (!parsed.success) return errors.badRequest('Invalid payload')
+
+    const { id, whatsapp } = parsed.data
+    const normalized = normalizePhone(whatsapp)
+
+    if (!/^\d{10,15}$/.test(normalized) || normalized.startsWith('0')) {
+      return errors.badRequest('رقم واتساب غير صحيح')
+    }
+
+    const { error } = await ctx.supabase
+      .from('customers')
+      .update({ whatsapp: normalized })
+      .eq('id', id)
+      .eq('company_id', ctx.profile.company_id)
+
+    if (error) return errors.internal()
+    return NextResponse.json({ success: true, whatsapp: normalized })
   })
 }
