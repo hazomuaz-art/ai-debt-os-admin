@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { extractReceipt, extractReceiptFromPdf, extractReceiptFromText, type ReceiptData } from '@/lib/receipt-ocr'
 import { recordAttribution } from '@/lib/revenue-attribution'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('payment-receipt')
@@ -133,11 +134,11 @@ export async function processInboundReceipt(args: {
 
   // No readable amount (e.g. scanned image-only PDF) → flag for review, never drop.
   if (!amount) {
-    await svc.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: args.company_id, severity: 'info', alert_type: 'payment_review',
       title: 'إيصال يحتاج مراجعة يدوية',
       message: `العميل ${args.customer_name ?? ''} أرسل ${srcLabel} لكن تعذّر قراءة المبلغ تلقائياً.`,
-      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr, receipt_path: receiptPath }, is_resolved: false,
+      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr, receipt_path: receiptPath },
     })
     await addTimeline(svc, args, 'payment', 'إيصال استُلم — يحتاج مراجعة يدوية (تعذّر قراءة المبلغ)', ocr)
     await replyAndLog(svc, args, 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
@@ -224,11 +225,11 @@ export async function processInboundReceipt(args: {
       : args.source === 'text'
         ? 'مطالبة سداد نصية بدون مرفق — لا يمكن التحقق آلياً'
         : `لا يوجد رقم حساب/سداد/IBAN مطابق في الإيصال (ثقة القراءة ${ocr.confidence}%)`
-    await svc.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: args.company_id, severity: beneficiary === 'mismatch' ? 'warning' : 'info',
       alert_type: 'payment_review', title: 'إيصال دفع يحتاج مراجعة',
       message: `العميل ${args.customer_name ?? ''}: ${srcLabel} بمبلغ ${amount} ${currency} — ${reason}.`,
-      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ...matchMeta, ocr }, is_resolved: false,
+      metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ...matchMeta, ocr },
     })
     await addTimeline(svc, args, 'payment', `إيصال بمبلغ ${amount} ${currency} — ${reason}`, ocr)
     reply = 'وصلنا الإيصال، وبنراجع مطابقته على الحساب ونتأكد من البيانات.'

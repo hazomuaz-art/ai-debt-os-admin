@@ -356,6 +356,9 @@ export type TimelineEventType =
 export type TimelineActorType = 'ai' | 'collector' | 'customer' | 'system' | 'campaign'
 export type TimelineChannel = 'whatsapp' | 'call' | 'email' | 'sms' | 'system' | 'ai' | 'manual'
 export type FeatureFlagStatus = 'disabled' | 'internal_test' | 'limited' | 'production'
+// Must match disputes_status_check / disputes_dispute_type_check exactly.
+export type DisputeStatus = 'open' | 'under_review' | 'resolved' | 'rejected' | 'escalated'
+export type DisputeType = 'amount_wrong' | 'already_paid' | 'not_my_debt' | 'service_issue' | 'other'
 
 export interface SystemConfig {
   id:              string

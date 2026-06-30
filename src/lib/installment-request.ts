@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { insertApproval } from '@/lib/approvals'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('installment-request')
@@ -43,7 +44,7 @@ export async function recordInstallmentRequest(args: {
   const { data: debt } = await supabase
     .from('debts').select('current_balance, currency').eq('id', args.debt_id).maybeSingle()
 
-  const { error } = await supabase.from('approvals').insert({
+  const created = await insertApproval({
     company_id: args.company_id, approval_type: 'custom', entity_type: 'debts', entity_id: args.debt_id,
     title: `طلب تقسيط: ${args.customer_name ?? ''}`,
     description: [
@@ -51,13 +52,13 @@ export async function recordInstallmentRequest(args: {
       `كلام العميل: "${args.customer_message}"`,
       args.agent_reason ? `تقييم الوكيل: ${args.agent_reason}` : null,
     ].filter(Boolean).join('\n'),
-    status: 'pending', priority: 'medium',
+    priority: 'medium',
     requested_data: {
       customer_id: args.customer_id, reason: args.customer_message, agent_reason: args.agent_reason ?? null,
       request_subtype: 'installment',
     },
   })
 
-  if (error) log.error('installment request insert failed', new Error(error.message), { debt_id: args.debt_id })
+  if (!created) log.error('installment request insert failed', new Error('insertApproval returned null'), { debt_id: args.debt_id })
   else log.info('installment request recorded', { debt_id: args.debt_id })
 }

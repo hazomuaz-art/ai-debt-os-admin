@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
+import type { AlertSeverity } from '@/types/index'
 
 const log = createLogger('cron/whatsapp-health')
 
@@ -31,14 +33,12 @@ export async function GET(req: NextRequest) {
   const company_id = (lastMsg as { company_id?: string } | null)?.company_id ?? null
 
   // raise an alert only if no unresolved one of the same type exists
-  const raise = async (alert_type: string, severity: string, title: string, message: string, metadata: object) => {
+  const raise = async (alert_type: string, severity: AlertSeverity, title: string, message: string, metadata: Record<string, unknown>) => {
     let q = supabase.from('system_alerts').select('id').eq('alert_type', alert_type).eq('is_resolved', false)
     q = company_id ? q.eq('company_id', company_id) : q.is('company_id', null)
     const { data: existing } = await q.limit(1).maybeSingle()
     if (existing) return false
-    await supabase.from('system_alerts').insert({
-      company_id, alert_type, severity, title, message, metadata, is_read: false, is_resolved: false,
-    })
+    await insertSystemAlert({ company_id, alert_type, severity, title, message, metadata })
     return true
   }
 

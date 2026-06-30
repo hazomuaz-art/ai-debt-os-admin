@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
 import type { InsuranceObjectionSignals, InsuranceCaseFile } from '@/lib/insurance-engine'
 import type { EscalationRule } from '@/lib/company-playbook'
@@ -124,7 +125,7 @@ export async function recordStcReview(args: {
 }): Promise<void> {
   const supabase = createServiceClient()
   try {
-    await supabase.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: args.company_id,
       severity: 'info',
       alert_type: args.escalation_type,
@@ -201,7 +202,7 @@ export async function openEscalation(args: {
 
     await supabase.from('debts').update({ status: 'legal' }).eq('id', args.debt_id)
 
-    await supabase.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: args.company_id,
       severity: 'critical',
       alert_type: 'legal_escalation',

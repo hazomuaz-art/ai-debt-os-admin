@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizePhone, sendWhatsAppMessage } from '@/lib/whatsapp'
 import { processInboundReceipt } from '@/lib/payment-receipt'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('webhook/waha')
@@ -319,12 +320,11 @@ export async function POST(request: NextRequest) {
         // gets saved. Never let that be silent — same pattern as the
         // payment-receipt "couldn't read the amount" alert.
         log.error('record_promise with no promised_date — nothing saved, flagging for review', new Error('missing promised_date'), { debt_id: effectiveDebtId })
-        await supabase.from('system_alerts').insert({
+        await insertSystemAlert({
           company_id: c.company_id, severity: 'warning', alert_type: 'promise_not_recorded',
           title: 'وعد سداد لم يُسجَّل تلقائياً',
           message: `العميل ${c.full_name} قد يكون أُخبر بأن وعده مسجَّل، لكن لم يُستخرج تاريخ صريح من رسالته — راجع المحادثة وسجّل الوعد يدوياً إذا لزم.`,
           metadata: { customer_id: c.id, debt_id: effectiveDebtId, customer_message: mergedText },
-          is_resolved: false, created_at: new Date().toISOString(),
         })
       }
 
@@ -395,12 +395,11 @@ export async function POST(request: NextRequest) {
             // the feature shipped. 'critical' is the correct fit — these
             // are exactly the cases meant to stop AI replies and need a
             // human immediately.
-            await supabase.from('system_alerts').insert({
+            await insertSystemAlert({
               company_id: c.company_id, severity: 'critical', alert_type: 'outcome_needs_human_review',
               title: `يحتاج مراجعة بشرية: ${category}`,
               message: `العميل ${c.full_name} صُنّف بحالة "${category}" — ${meta.meaning} تم إيقاف الرد التلقائي على هذا العميل.`,
               metadata: { customer_id: c.id, debt_id: effectiveDebtId, category },
-              is_resolved: false, created_at: new Date().toISOString(),
             })
           }
         }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/verify-delivery')
@@ -136,12 +137,12 @@ export async function GET(req: NextRequest) {
         .from('system_alerts').select('id').eq('alert_type', 'whatsapp_session_broken')
         .eq('is_resolved', false).contains('metadata', { customer_id: customerId }).limit(1).maybeSingle()
       if (!existingAlert) {
-        await supabase.from('system_alerts').insert({
+        await insertSystemAlert({
           company_id: (msgs[0] as { company_id: string }).company_id, severity: 'critical',
           alert_type: 'whatsapp_session_broken',
           title: 'جلسة واتساب معطوبة مع عميل — لا تصل أي رسالة',
           message: `لم تصل أي رسالة لهذا العميل رغم إعادة المحاولة. توقف النظام عن الإرسال له تلقائياً. الحل: اطلب من العميل إرسال أي رسالة للبوت أولاً لإعادة فتح الجلسة.`,
-          metadata: { customer_id: customerId, stuck_count: msgs.length }, is_read: false, is_resolved: false,
+          metadata: { customer_id: customerId, stuck_count: msgs.length },
         })
       }
       continue
@@ -214,11 +215,11 @@ export async function GET(req: NextRequest) {
       .from('system_alerts').select('id').eq('alert_type', 'whatsapp_delivery_unconfirmed')
       .eq('is_resolved', false).is('company_id', null).limit(1).maybeSingle()
     if (!existing) {
-      await supabase.from('system_alerts').insert({
+      await insertSystemAlert({
         company_id: null, severity: 'warning', alert_type: 'whatsapp_delivery_unconfirmed',
         title: 'رسائل واتساب لم يتأكد تسليمها',
         message: `${result.correctedToFailed} رسالة لم تصل فعلياً رغم ظهورها "مرسَلة" — تم تصحيح حالتها إلى "فشل" (أقصى رسالة واحدة أُعيد إرسالها لكل عميل، لا إعادة إرسال جماعية).`,
-        metadata: result, is_read: false, is_resolved: false,
+        metadata: result,
       })
     }
   }

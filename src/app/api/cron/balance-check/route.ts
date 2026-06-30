@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOpenRouterBalance } from '@/lib/provider-balance'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
+import type { AlertSeverity } from '@/types/index'
 
 const log = createLogger('cron/balance-check')
 
@@ -30,15 +32,12 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const result: Record<string, unknown> = { ...balance }
 
-  const raise = async (alert_type: string, severity: string, title: string, message: string) => {
+  const raise = async (alert_type: string, severity: AlertSeverity, title: string, message: string) => {
     const { data: existing } = await supabase
       .from('system_alerts').select('id').eq('alert_type', alert_type).eq('is_resolved', false)
       .is('company_id', null).limit(1).maybeSingle()
     if (existing) return false
-    await supabase.from('system_alerts').insert({
-      company_id: null, alert_type, severity, title, message,
-      metadata: balance, is_read: false, is_resolved: false,
-    })
+    await insertSystemAlert({ company_id: null, alert_type, severity, title, message, metadata: balance })
     if (ALERT_PHONE) {
       const wr = await sendWhatsAppMessage({ to: ALERT_PHONE, message: `⚠️ ${title}\n${message}` })
       if (wr.status !== 'sent') log.error('balance alert WhatsApp send failed', undefined, { error: wr.error })
