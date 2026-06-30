@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import RecordPaymentModal from '@/components/debt/RecordPaymentModal'
 import UpdateDebtStatusSelect from '@/components/debt/UpdateDebtStatusSelect'
-import DebtSubStatusSelect from '@/components/debt/DebtSubStatusSelect'
 import ScoreDebtButton from '@/components/ai/ScoreDebtButton'
 import EditDebtModal from '@/components/debt/EditDebtModal'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
@@ -122,16 +121,6 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
-  let outcomeCategories: string[] | null = null
-  if (debt.portfolio_id) {
-    const { data: portfolioRow } = await supabase
-      .from('portfolios').select('metadata').eq('id', debt.portfolio_id).maybeSingle()
-    const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
-    if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
-      outcomeCategories = meta.outcome_categories as string[]
-    }
-  }
-
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
       
@@ -197,13 +186,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
                 <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} />
+                {debt.original_sub_status && (
+                  <p className="text-xs text-amber-400 mt-1.5 font-bold">
+                    تصنيف الوكيل: {debt.original_sub_status}
+                  </p>
+                )}
               </div>
-              {outcomeCategories && outcomeCategories.length > 0 && (
-                <div>
-                  <p className="text-[#8b95a7] text-sm font-bold mb-2">تصنيف الشركة</p>
-                  <DebtSubStatusSelect debtId={debt.id} currentSubStatus={debt.original_sub_status} categories={outcomeCategories} />
-                </div>
-              )}
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
                 <span className={`inline-flex px-3 py-1.5 rounded-lg text-sm font-bold border ${

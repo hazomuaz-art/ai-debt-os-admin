@@ -352,52 +352,6 @@ export async function updateDebtStatusAction(debtId: string, status: DebtStatus)
   }
 }
 
-// Manual selection of a company-specific outcome category (e.g. "معترض
-// على الخط" for موبايلي) — distinct from the generic system-wide `status`
-// enum above. Mirrors what the AI auto-classifier already writes to the
-// same `original_sub_status` column (see classifyDebtOutcome in the WAHA
-// webhook), so a human collector can set/correct it the same way.
-export async function updateDebtSubStatusAction(debtId: string, subStatus: string) {
-  try {
-    const { supabase, user, profile } = await requireAuth()
-
-    const { data: existing } = await supabase
-      .from('debts')
-      .select('id, customer_id, company_id, original_sub_status')
-      .eq('id', debtId)
-      .eq('company_id', profile.company_id)
-      .single()
-
-    if (!existing) return { error: 'Debt not found' }
-
-    const { error } = await supabase
-      .from('debts')
-      .update({ original_sub_status: subStatus, updated_at: new Date().toISOString() })
-      .eq('id', debtId)
-
-    if (error) return { error: error.message }
-
-    const { insertTimelineEvent } = await import('@/lib/timeline')
-    await insertTimelineEvent({
-      company_id: profile.company_id,
-      customer_id: existing.customer_id,
-      debt_id: debtId,
-      event_type: 'status_change',
-      channel: 'manual',
-      actor_type: 'collector',
-      actor_name: user.email ?? null,
-      summary: `تصنيف الحالة (يدوي): ${subStatus}`,
-    })
-
-    revalidatePath('/dashboard/admin/debts')
-    revalidatePath('/dashboard/manager/debts')
-    revalidatePath('/dashboard/collector/debts')
-    return { data: { original_sub_status: subStatus } }
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Unknown error' }
-  }
-}
-
 export async function assignDebtAction(debtId: string, collectorId: string) {
   try {
     const { supabase, user, profile } = await requireAuth()

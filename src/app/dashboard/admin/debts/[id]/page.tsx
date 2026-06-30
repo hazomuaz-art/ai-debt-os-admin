@@ -13,7 +13,6 @@ import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
-import DebtSubStatusSelect from '@/components/debt/DebtSubStatusSelect'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
@@ -186,16 +185,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   // the importer routes into customer_data_<table>, also editable manually.
   let portfolioData: Record<string, unknown> | null = null
   let portfolioConfig: ReturnType<typeof getPortfolioTableConfig> = null
-  let outcomeCategories: string[] | null = null
   if (debt.portfolio_id) {
     const { data: portfolioRow } = await supabase
       .from('portfolios').select('metadata').eq('id', debt.portfolio_id).maybeSingle()
     const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
     const companyKey = meta.company_key as string | undefined
     portfolioConfig = getPortfolioTableConfig(companyKey)
-    if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
-      outcomeCategories = meta.outcome_categories as string[]
-    }
     if (portfolioConfig) {
       const { data: row } = await supabase
         .from(portfolioConfig.table).select('*')
@@ -289,13 +284,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
                 <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} />
+                {debt.original_sub_status && (
+                  <p className="text-xs text-amber-400 mt-1.5 font-bold">
+                    تصنيف الوكيل: {debt.original_sub_status}
+                  </p>
+                )}
               </div>
-              {outcomeCategories && outcomeCategories.length > 0 && (
-                <div>
-                  <p className="text-[#8b95a7] text-sm font-bold mb-2">تصنيف الشركة</p>
-                  <DebtSubStatusSelect debtId={debt.id} currentSubStatus={debt.original_sub_status} categories={outcomeCategories} />
-                </div>
-              )}
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
                 <span className={`inline-flex px-3 py-1.5 rounded-lg text-sm font-bold border ${
