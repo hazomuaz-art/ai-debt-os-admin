@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldAlert, CheckCircle, BrainCircuit, Wallet, Calendar, AlertTriangle, FileText, BellRing, Target } from 'lucide-react'
 import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
+import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
@@ -383,9 +384,17 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
           {/* Message History */}
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-            <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-5">
-              <MessageSquare className="text-blue-500" size={20} />
-              <h2 className="text-lg font-bold text-white">سجل المراسلات</h2>
+            <div className="flex items-center justify-between gap-2 border-b border-[#222a36] pb-4 mb-5">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="text-blue-500" size={20} />
+                <h2 className="text-lg font-bold text-white">سجل المراسلات</h2>
+              </div>
+              <PrintConversationButton
+                customerName={debt.customer?.full_name}
+                debtReference={debt.reference_number}
+                creditorName={debt.creditor_name}
+                messages={debt.messages ?? []}
+              />
             </div>
             {debt.messages?.length > 0 ? (
               <div className="space-y-4 max-h-[500px] overflow-y-auto pe-2 custom-scrollbar">

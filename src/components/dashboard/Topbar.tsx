@@ -11,7 +11,7 @@ export function Topbar({ profile }: { profile: any }) {
   const alertsHref = role === 'admin' ? '/dashboard/admin/alerts' : `/dashboard/${role}`
 
   return (
-    <header className="bg-[#0d1117] border-b border-[#1c2330] py-4 px-8 flex justify-between items-center shrink-0 z-10">
+    <header className="bg-[#0d1117] border-b border-[#1c2330] py-4 px-8 flex justify-between items-center shrink-0 z-10 print:hidden">
       <div className="flex-1">
         <h1 className="text-xl font-bold text-white tracking-tight">{locale === 'ar' ? `مرحباً بك ${name} !` : `Welcome ${name}!`}</h1>
       </div>

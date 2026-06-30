@@ -83,7 +83,7 @@ export function Sidebar({ profile, isPlatformOwner }: { profile: any; isPlatform
   ].map(g => ({ ...g, items: g.items.filter(i => i.roles.includes(role)) })).filter(g => g.items.length > 0)
 
   return (
-    <aside className="w-60 bg-[#0d1117] border-l border-[#1c2330] flex flex-col shrink-0 z-0 pt-6 pb-4">
+    <aside className="w-60 bg-[#0d1117] border-l border-[#1c2330] flex flex-col shrink-0 z-0 pt-6 pb-4 print:hidden">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-6 mb-6">
         <div className="w-9 h-9 rounded-xl bg-[#10b981] flex items-center justify-center text-white">
