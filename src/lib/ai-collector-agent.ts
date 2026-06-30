@@ -74,9 +74,20 @@ function norm(text: string) {
   return String(text ?? '').trim().toLowerCase()
 }
 
+// Real production gap found in a full-system audit: every multi-word
+// Arabic keyword phrase (e.g. "ما اتفقنا", "ما راح اسدد") required the
+// EXACT spacing of that phrase. Saudi WhatsApp users extremely commonly
+// drop the space right after "ما" ("مارح اسدد", "ماقدر", "مابي") — a real,
+// high-frequency typing pattern, not an edge case — which silently failed
+// every single one of the 33 hasAny() call sites across every signal
+// (refusesToPay, deniesPromise, deniesDebt, dispute, etc.) for any message
+// typed that way. Fixed once, here, for all of them at once: falls back to
+// a space-stripped comparison only when the normal spaced match misses.
 function hasAny(text: string, words: string[]) {
   const v = norm(text)
-  return words.some(w => v.includes(w.toLowerCase()))
+  if (words.some(w => v.includes(w.toLowerCase()))) return true
+  const vCompact = v.replace(/\s+/g, '')
+  return words.some(w => vCompact.includes(w.toLowerCase().replace(/\s+/g, '')))
 }
 
 // Convert Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) numerals to ASCII
@@ -254,7 +265,14 @@ export function detectSignals(text: string) {
     // so the resulting "broken promise" never got recorded anywhere either.
     deniesPromise: hasAny(text, [
       'ما وعدتك', 'مو وعدتك', 'ماوعدتك', 'انا ما وعدت', 'أنا ما وعدت', 'لم اعدك', 'لم أعدك',
-      'ما قلت لك بسدد', 'ما قلت بسدد', 'مين قال', 'وين قلت', 'ما اتفقنا', 'ما اتفقت', 'متى وعدتك', 'وعدتك متى',
+      'ما قلت لك بسدد', 'ما قلت بسدد', 'مين قال', 'وين قلت',
+      // 'ما اتفق' (the verb stem alone, not a specific conjugation like
+      // 'اتفقنا') is a substring match (see hasAny below), so it covers
+      // 'ما اتفقنا'/'ما اتفقت'/'ما اتفقتوا'/etc in one entry — this is what
+      // the original "ما اتفقنا"-only version should have been from the
+      // start instead of needing a second near-duplicate entry per
+      // conjugation found one at a time in production.
+      'ما اتفق', 'متى وعدتك', 'وعدتك متى',
     ]),
     // Explicit refusal to pay (distinct from deniesDebt — customer here does
     // NOT dispute the debt exists, they're simply refusing/unwilling, or
