@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import RecordPaymentModal from '@/components/debt/RecordPaymentModal'
 import UpdateDebtStatusSelect from '@/components/debt/UpdateDebtStatusSelect'
+import DebtSubStatusSelect from '@/components/debt/DebtSubStatusSelect'
 import ScoreDebtButton from '@/components/ai/ScoreDebtButton'
 import EditDebtModal from '@/components/debt/EditDebtModal'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
@@ -197,6 +198,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
                 <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} />
               </div>
+              {outcomeCategories && outcomeCategories.length > 0 && (
+                <div>
+                  <p className="text-[#8b95a7] text-sm font-bold mb-2">تصنيف الشركة</p>
+                  <DebtSubStatusSelect debtId={debt.id} currentSubStatus={debt.original_sub_status} categories={outcomeCategories} />
+                </div>
+              )}
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
                 <span className={`inline-flex px-3 py-1.5 rounded-lg text-sm font-bold border ${
@@ -395,22 +402,6 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               )}
             </div>
           </div>
-
-          {outcomeCategories && outcomeCategories.length > 0 && (
-            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
-                <Target className="text-amber-400" size={20} />
-                <h2 className="text-lg font-bold text-white">تصنيفات النتائج</h2>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {outcomeCategories.map((cat: string) => (
-                  <span key={cat} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#222a36] text-slate-300 border border-[#2c3543]">
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <h2 className="text-sm font-bold text-[#8b95a7] mb-3">المحصّل المسؤول</h2>

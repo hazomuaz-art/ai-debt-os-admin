@@ -13,6 +13,7 @@ import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
+import DebtSubStatusSelect from '@/components/debt/DebtSubStatusSelect'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
@@ -289,6 +290,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
                 <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} />
               </div>
+              {outcomeCategories && outcomeCategories.length > 0 && (
+                <div>
+                  <p className="text-[#8b95a7] text-sm font-bold mb-2">تصنيف الشركة</p>
+                  <DebtSubStatusSelect debtId={debt.id} currentSubStatus={debt.original_sub_status} categories={outcomeCategories} />
+                </div>
+              )}
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
                 <span className={`inline-flex px-3 py-1.5 rounded-lg text-sm font-bold border ${
@@ -526,22 +533,6 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                     <span className="text-[#8b95a7] text-sm">{rd.portfolio?.name ?? '—'} — {rd.reference_number ?? '—'}</span>
                     <span className="font-bold text-white">{formatCurrency(rd.current_balance, rd.currency)}</span>
                   </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {outcomeCategories && outcomeCategories.length > 0 && (
-            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
-                <Target className="text-amber-400" size={20} />
-                <h2 className="text-lg font-bold text-white">تصنيفات النتائج</h2>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {outcomeCategories.map((cat: string) => (
-                  <span key={cat} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#222a36] text-slate-300 border border-[#2c3543]">
-                    {cat}
-                  </span>
                 ))}
               </div>
             </div>
