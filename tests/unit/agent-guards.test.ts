@@ -134,9 +134,15 @@ function baseContext(): any {
       current_balance: 2344, currency: 'SAR', creditor_name: 'بنك الإنماء',
       reference_number: 'REF-99', status: 'promised', portfolio_category: 'finance',
     },
+    // Includes a prior self-introduction turn so `hasIntroducedSelf` in the
+    // intent router reads true — these fixtures simulate a MID-conversation
+    // exchange (testing promise/dispute/forbidden-phrase guards), not the
+    // very first greeting/self-intro turn, so intent must not land on
+    // SELF_INTRO here (that has its own dedicated enforcement guard/tests).
     recent_messages: [
       { direction: 'inbound', content: 'بسدد يوم 25' },
       { direction: 'outbound', content: 'متى تقدر تسدد المبلغ؟' },
+      { direction: 'outbound', content: 'معك خالد الدويحي من شركة مصدر الرؤية، وكيل بنك الإنماء.' },
     ],
     recent_promises: [{ status: 'pending', promised_amount: 2344, promised_date: '2026-06-25' }],
     recent_approvals: [], recent_payments: [],

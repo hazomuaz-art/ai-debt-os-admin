@@ -209,23 +209,27 @@ export async function POST(request: NextRequest) {
       if (dup) { log.info('duplicate inbound webhook ignored', { msgId }); return NextResponse.json({ status: 'ok' }) }
     }
 
-    // Secondary content-based guard: a NOWEB session resync (e.g. after a
-    // reconnect/restart) can replay recent chat history as fresh "message"
-    // webhook events carrying a DIFFERENT internal message id for content
-    // already processed — the msgId check above can't catch that since the
-    // id genuinely differs. If the exact same text from the exact same
-    // customer was already recorded inbound in the last 10 minutes, treat
-    // this as a resync replay rather than a real new message (a customer
-    // retyping the identical text within 10 minutes on purpose is rare
-    // enough that silently dropping it is the safer failure mode vs. the
-    // bot replying twice).
+    // Secondary content-based guard: a NOWEB session resync (container
+    // restart, VPS reboot, WhatsApp forcing a re-auth, a network blip — not
+    // just a deliberate manual restart) can replay recent chat history as
+    // fresh "message" webhook events carrying a DIFFERENT internal message
+    // id for content already processed — the msgId check above can't catch
+    // that since the id genuinely differs. A resync can happen at any time
+    // in a long-running production system, so this is intentionally NOT a
+    // short time-boxed window (a narrow window only protects against a
+    // replay that happens to land within it — a real production incident
+    // showed a replay landing 3+ minutes after the original). Instead: does
+    // this EXACT text from this SAME customer already exist anywhere among
+    // their last 5 inbound messages, regardless of age? A customer
+    // genuinely retyping the identical text days apart is rare enough that
+    // silently dropping it is the safer failure mode vs. the bot replying
+    // twice to a stale replayed message.
     if (text) {
-      const replayWindowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      const { data: recentDup } = await supabase
-        .from('messages').select('id').eq('customer_id', c.id).eq('direction', 'inbound')
-        .eq('content', text).gte('sent_at', replayWindowStart)
-        .limit(1).maybeSingle()
-      if (recentDup) {
+      const { data: recentInbound } = await supabase
+        .from('messages').select('content').eq('customer_id', c.id).eq('direction', 'inbound')
+        .order('sent_at', { ascending: false }).limit(5)
+      const isReplay = (recentInbound ?? []).some((m: { content: string | null }) => m.content === text)
+      if (isReplay) {
         log.info('duplicate inbound content ignored (likely session resync replay)', { customer_id: c.id })
         return NextResponse.json({ status: 'ok' })
       }

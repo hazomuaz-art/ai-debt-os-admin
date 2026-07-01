@@ -15,21 +15,25 @@ let mockLatestDebt: any = { id: 'd1', current_balance: 1000 }
 let runCollectorAgentCalls: any[] = []
 let mockAiDecision: any = { shouldReply: true, action: 'reply', reason: 'x', message: 'تمام.' }
 
-// A chainable query-builder mock: any sequence of .eq()/.gte()/.not()/.order()
-// calls is supported (each just returns the same chain object), terminated
-// by either .limit().maybeSingle() (single-row dup checks) or
-// .not().order().limit().maybeSingle() (latest-debt lookup). The content-dup
-// check resolves to mockContentDupRow; everything else resolves to mockDupRow
-// — distinguished by whether `.eq('content', ...)` was ever called in the chain.
-function makeEqChain(table: string, sawContentEq: boolean): any {
+// A chainable query-builder mock: any sequence of .eq()/.not()/.order() calls
+// is supported (each just returns the same chain object), terminated by
+// either .limit().maybeSingle() (single-row dup checks), .not().order()
+// .limit().maybeSingle() (latest-debt lookup), or a direct .order().limit()
+// with NO .maybeSingle() (the resync-replay content check, which pulls the
+// customer's last 5 inbound rows as an array). The replay check resolves to
+// mockContentDupRow (an array of recent inbound contents, default empty —
+// i.e. no replay detected); the single-row dup checks resolve to mockDupRow.
+function makeEqChain(table: string, isMessagesInboundQuery: boolean): any {
   const chain: any = {
-    eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, sawContentEq || col === 'content')),
-    gte: vi.fn().mockImplementation(() => makeEqChain(table, sawContentEq)),
+    eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, isMessagesInboundQuery || col === 'direction')),
     not: vi.fn().mockImplementation(() => ({
       order: vi.fn().mockImplementation(() => ({ limit: vi.fn().mockImplementation(() => ({ maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockLatestDebt })) })) })),
     })),
+    order: vi.fn().mockImplementation(() => ({
+      limit: vi.fn().mockImplementation(async () => ({ data: mockContentDupRow ?? [] })),
+    })),
     limit: vi.fn().mockImplementation(() => ({
-      maybeSingle: vi.fn().mockImplementation(async () => ({ data: sawContentEq ? mockContentDupRow : mockDupRow })),
+      maybeSingle: vi.fn().mockImplementation(async () => ({ data: mockDupRow })),
     })),
   }
   return chain
@@ -46,7 +50,7 @@ vi.mock('@/lib/supabase/server', () => ({
             })),
           })),
         })),
-        eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, col === 'content')),
+        eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, col === 'direction')),
       })),
       insert: vi.fn().mockResolvedValue({ data: null, error: null }),
       update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),

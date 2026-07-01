@@ -90,6 +90,27 @@ function hasAny(text: string, words: string[]) {
   return words.some(w => vCompact.includes(w.toLowerCase().replace(/\s+/g, '')))
 }
 
+// A customer DENYING they ever raised/are raising a dispute ("ما اعترضت",
+// "مو معترض", "ليش تقول اعتراض؟") must never be treated the same as them
+// actually declaring one — a bare substring match on 'اعتراض'/'معترض' can't
+// tell the two apart. Real production regression this fixes: the agent kept
+// confronting a customer who explicitly denied disputing with "our file
+// shows you objected before" — negation-blind keyword matching treated the
+// customer's OWN denial as if it were a fresh dispute declaration. Checks
+// for a negation particle in the few words immediately before the match.
+function isNegatedMatch(text: string, keyword: string): boolean {
+  const v = norm(text)
+  const idx = v.indexOf(keyword.toLowerCase())
+  if (idx === -1) return false
+  const before = v.slice(Math.max(0, idx - 12), idx)
+  return /(^|\s)(ما|لا|مو|مب|مانيش|ماني|ولا|مش)(\s|$)/.test(before)
+}
+
+function hasAnyUnnegated(text: string, words: string[]): boolean {
+  const v = norm(text)
+  return words.some(w => v.includes(w.toLowerCase()) && !isNegatedMatch(text, w))
+}
+
 // Convert Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) numerals to ASCII
 // so that `\d` and numeric date parsing actually work on real WhatsApp text
 // like "يوم ٣٠" or "٣٠-٠٦". Without this, every Arabic-numeral date was treated
@@ -223,18 +244,29 @@ function hasSpecificDisputeReason(text: string): boolean {
 }
 
 function hasExplicitDisputeDeclaration(text: string): boolean {
-  return hasAny(text, [
-    'معترض', 'اعتراض', 'متنازع', 'نزاع', 'ما اوافق على المبلغ', 'ما أوافق على المبلغ',
+  // 'اعتراض'/'معترض'/'نزاع'/'متنازع' specifically must be negation-checked —
+  // "ما اعترضت" or "مو معترض" is the OPPOSITE of a declaration. The other
+  // phrases below ("ما اوافق على المبلغ", "ما عندي مديونية", ...) are
+  // themselves already negation-shaped statements of the dispute itself, so
+  // they're intentionally left on the plain hasAny check.
+  return hasAnyUnnegated(text, ['معترض', 'اعتراض', 'متنازع', 'نزاع', 'dispute', 'i object']) || hasAny(text, [
+    'ما اوافق على المبلغ', 'ما أوافق على المبلغ',
     'مو موافق على المبلغ', 'لا اوافق', 'لا أوافق', 'مو راضي عن المبلغ', 'مرفوض المبلغ',
     'هذا مو حسابي', 'مو حسابي', 'الحساب مو لي', 'ما عندي مديونية', 'ما علي مديونية',
-    'dispute', 'i object',
   ])
 }
 
 export function detectSignals(text: string) {
   return {
     paymentClaim: hasAny(text, ['سددت', 'دفعت', 'حولت', 'ايصال', 'إيصال', 'paid', 'receipt', 'transfer']),
-    dispute: hasAny(text, ['غلط', 'اعتراض', 'مو صحيح', 'ما اعرف', 'ما أعرف', 'not mine', 'wrong amount']),
+    // Narrowed twice: (1) 'ما اعرف'/'ما أعرف' ("I don't know") removed
+    // entirely — it means "I don't know [when/whether/...]" in the vast
+    // majority of real messages (e.g. "ما اعرف متى بقدر اسدد" is a
+    // NEGOTIATION reply, not a dispute) and was firing false-positive DISPUTE
+    // routing on totally unrelated replies. (2) the dispute-declaring words
+    // are now negation-checked — "ما اعتراض عندي" must not match the same as
+    // "عندي اعتراض".
+    dispute: hasAnyUnnegated(text, ['غلط', 'اعتراض', 'مو صحيح', 'not mine', 'wrong amount']),
     installment: hasAny(text, ['تقسيط', 'اقساط', 'أقساط', 'installment', 'installments']),
     promise: hasAny(text, ['بسدد', 'اسدد', 'بسددها', 'نهاية الشهر', 'بكرة', 'بكره', 'الخميس', 'الراتب', 'salary', 'tomorrow']),
     hardship: hasAny(text, ['ما عندي', 'ظروف', 'فلوس', 'راتب', 'متعسر', 'ما اقدر', 'ما أقدر']),
@@ -1413,6 +1445,13 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
 
   // ── Deterministic guards — don't just hope the model followed the prompt ──
 
+  // Snapshot of the model's own reason BEFORE any deterministic guard below
+  // touches it — used further down (D2/D3) to tell whether an earlier,
+  // higher-priority guard already substituted this turn's reply. Those
+  // guards answer a real customer question/promise/policy violation directly
+  // and must always win over a generic intent-stage phrasing check.
+  const reasonBeforeGuards = parsed.reason
+
   // 1) Never let a grace period beyond the 30-day policy max slip through,
   // even if the model's reply sounds like it agreed (e.g. "ما عندي مشكلة").
   if (requestedGraceDays !== null && requestedGraceDays > 30) {
@@ -1991,6 +2030,65 @@ ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح
       }
     }
   }
+  // (D2) Real regression this fixes: `hasIntroducedSelf` (used to decide
+  // whether the SELF_INTRO stage should fire again) is a plain substring
+  // check on 'خالد الدويحي'/'مصدر الرؤية' against the conversation history.
+  // The (D) guard earlier only enforces that phrase when the customer
+  // explicitly asks "من أنت؟" — but the SELF_INTRO STAGE ITSELF (the
+  // scripted "معك خالد الدويحي من شركة مصدر الرؤية..." turn) was never
+  // enforced the same way, so the model was free to paraphrase it
+  // differently (e.g. drop "الدويحي", or say "معك خالد من مصدر الرؤية").
+  // The very next turn's `hasIntroducedSelf` check would then read false,
+  // and the agent introduced itself AGAIN — the exact "keeps reintroducing
+  // itself" bug reported repeatedly. Enforcing the canonical phrase here,
+  // guarantees the substring check downstream can never miss it again.
+  // Runs LAST (after every other deterministic guard above already had a
+  // chance to answer a real question/promise/policy issue directly) and
+  // only fires if nothing else already changed the model's own reason —
+  // a genuine answer to a real question always wins over this check.
+  if (intent === 'SELF_INTRO' && parsed.action === 'reply' && parsed.reason === reasonBeforeGuards) {
+    const m = parsed.message
+    if (!m.includes('خالد الدويحي') || !m.includes('مصدر الرؤية')) {
+      log.warn('self-introduction-stage guard fired — canonical phrase missing, would have broken next-turn detection', { original: m.slice(0, 80) })
+      parsed.message = companyVal
+        ? `معك خالد الدويحي من شركة مصدر الرؤية، وكيل ${companyVal}.`
+        : 'معك خالد الدويحي من شركة مصدر الرؤية.'
+      parsed.action = 'reply'
+      parsed.reason = 'self_introduction_stage'
+    }
+  }
+
+  // (D3) Real regression this fixes: the case file always includes the
+  // "open dispute / pending dispute" facts (see buildCaseFile) so the model
+  // can answer if asked — but nothing stopped it from proactively
+  // volunteering "you have a dispute under review" as a filler line in
+  // GENERAL/INFO_REQUEST turns where the customer never raised the topic at
+  // all, or worse, right after the customer explicitly DENIED ever
+  // disputing anything. This produced both the "cold, keeps repeating a
+  // disclaimer" feel and the "tells the customer they're disputing when
+  // they're not" complaint. Deterministic code-level suppression, not just
+  // a prompt instruction, since the model repeatedly ignored the prompt
+  // instruction alone across multiple real conversations.
+  // Gated on `parsed.reason === reasonBeforeGuards` for the same reason as
+  // (D2) above: if an earlier deterministic guard (premature-dispute guard,
+  // repeated-question guard, forbidden-phrase guard, ...) already produced
+  // this turn's final message, that correction always wins — this check
+  // only applies to the model's OWN untouched output.
+  if (intent !== 'DISPUTE' && intent !== 'INFO_REQUEST' && parsed.message.includes('اعتراض') && parsed.reason === reasonBeforeGuards) {
+    const customerRaisedDisputeNow = hasAnyUnnegated(text, ['اعتراض', 'معترض']) || signals.dispute || signals.deniesDebt
+    if (!customerRaisedDisputeNow) {
+      log.warn('unsolicited-dispute-mention guard fired — stripping proactive dispute reference the customer did not raise this turn', { intent, original: parsed.message.slice(0, 80) })
+      const corrected = await regenerateWithCorrection(
+        client, modelId, systemPrompt, turns, text,
+        'ردك السابق ذكر "الاعتراض المسجّل" رغم أن العميل لم يسأل عنه ولم يثره في رسالته الحالية — أعد الرد بدون أي إشارة للاعتراض إطلاقاً، وركّز فقط على ما قاله العميل الآن.',
+      )
+      if (corrected) {
+        parsed.message = corrected
+        parsed.reason = 'unsolicited_dispute_mention_regenerated'
+      }
+    }
+  }
+
 
   // Carries the debt id the agent ACTUALLY reasoned about (may differ from
   // args.debt_id for multi-portfolio customers) so the webhook's
