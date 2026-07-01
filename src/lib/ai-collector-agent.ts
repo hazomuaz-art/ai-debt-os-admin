@@ -1091,21 +1091,25 @@ export async function runCollectorAgent(args: {
   // negligible cost (one lightweight text-only query, no tokens). This
   // guarantees the "never repeat, no matter how long the conversation"
   // requirement independently of whatever window the model itself sees.
-  let prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content)
-  if (forcedDebtId) {
+  // Started now but NOT awaited until right before it's actually needed
+  // (just before the anti-repetition check, after the LLM call below) — the
+  // DB round-trip overlaps with the model API call's latency instead of
+  // adding to it serially. A first version of this fix awaited it here
+  // eagerly on every single turn, which measurably slowed every reply even
+  // when the result ended up unused.
+  const fullOutboundHistoryPromise: Promise<{ content: string | null }[] | null> = (async () => {
+    if (!forcedDebtId) return null
     try {
-      const { data: fullOutboundHistory } = await createServiceClient()
+      const { data } = await createServiceClient()
         .from('messages').select('content').eq('debt_id', forcedDebtId).eq('direction', 'outbound')
         .order('sent_at', { ascending: true }).limit(500)
-      if (fullOutboundHistory?.length) {
-        prevOutbound = fullOutboundHistory.map((m: { content: string | null }) => m.content ?? '')
-      }
+      return data ?? null
     } catch (err) {
-      // Non-fatal — falls back to the (smaller, upstream-capped) chronological
-      // window already computed above rather than breaking the whole reply.
       log.warn('full outbound history query for repeat-check failed — using capped fallback window', { debt_id: forcedDebtId, error: String(err) })
+      return null
     }
-  }
+  })()
+  let prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content)
   const lastAgentMessage = prevOutbound[prevOutbound.length - 1] ?? ''
   const hasHistory = chronological.length > 0
 
@@ -1298,14 +1302,21 @@ ${installmentRule}
   const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
   const np = ctx.negotiation_profile ?? {}
 
-  // Conversation as real message turns (chronological). Was capped to the
-  // last 10 — meaning the MODEL ITSELF had no memory of anything earlier
-  // than ~5 exchanges ago, on top of the anti-repetition guard's own
-  // separately-too-small window. Both together are the real root cause of
-  // the agent re-saying something it already told this same customer
-  // earlier in a longer conversation. Raised to match the wider history now
-  // fetched upstream (customer-debt-context.ts).
-  const turns = chronological.slice(-40).map(m => ({
+  // Conversation as real message turns (chronological). Was capped to 10
+  // (too small — the model had no memory of anything past ~5 exchanges).
+  // First widened this to 40, but that overloaded the completion call: with
+  // response_format:json_object and max_tokens:400, a much longer prompt
+  // made the model noticeably slower and — confirmed in production logs —
+  // more likely to run out of its token budget mid-JSON and fall back to
+  // unstructured prose (logged as "model returned non-JSON, using prose"),
+  // which is exactly what produced the generic "ما عندي المعلومة، راجع
+  // الشركة" deflections even for things the case file actually answers
+  // (e.g. STC/Mobily service-type questions). 20 turns is enough real
+  // context for natural, coherent replies. The separate, unlimited
+  // full-history DB check above (not fed to the model, so it costs no
+  // tokens) is what actually guarantees "never repeat, no matter how long
+  // the conversation" — that guarantee no longer depends on this number.
+  const turns = chronological.slice(-20).map(m => ({
     role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
     content: m.content,
   }))
@@ -1414,7 +1425,12 @@ ${intentPrompts[intent]}
     ai = await client.chat.completions.create({
       model: modelId,
       temperature: 0.6,
-      max_tokens: 400,
+      // Was 400 — too tight once replies need to explain something
+      // substantive (e.g. a full company knowledge-block answer); the model
+      // would run out of budget mid-JSON and fall back to unstructured
+      // prose ("model returned non-JSON, using prose" in logs). Raised for
+      // headroom.
+      max_tokens: 600,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -2149,6 +2165,13 @@ ${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعل�
 
   if (!parsed.shouldReply || !parsed.message.trim()) {
     return { ...parsed, shouldReply: false, message: '' }
+  }
+
+  // Resolved here (not earlier) so the DB round-trip ran concurrently with
+  // the LLM completion call above instead of adding to its latency.
+  const fullOutboundHistory = await fullOutboundHistoryPromise
+  if (fullOutboundHistory?.length) {
+    prevOutbound = fullOutboundHistory.map((m: { content: string | null }) => m.content ?? '')
   }
 
   if (isRobotic(parsed.message) || isRepeated(parsed.message, prevOutbound)) {
