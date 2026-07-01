@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { normalizePhone, sendWhatsAppMessage } from '@/lib/whatsapp'
 import { processInboundReceipt } from '@/lib/payment-receipt'
 import { insertSystemAlert } from '@/lib/system-alerts'
+import { insertTimelineEvent } from '@/lib/timeline'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('webhook/waha')
@@ -398,6 +399,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Wrong number → stop the collection workflow outright. Real production
+      // gap this fixes: someone replying that they aren't the customer used
+      // to get re-introduced to and kept in the normal collection flow, since
+      // nothing ever recorded this or paused outbound messages to the number.
+      // Never resumes automatically — a human must review and either correct
+      // the phone on file or confirm it's genuinely unreachable.
+      if (aiDecision.action === 'record_wrong_number') {
+        await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+        await insertTimelineEvent({
+          company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
+          event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+          summary: 'الرقم أفاد بأنه ليس العميل المطلوب — تم إيقاف التواصل التلقائي',
+          detail: mergedText.slice(0, 500),
+        })
+        await insertSystemAlert({
+          company_id: c.company_id, severity: 'warning', alert_type: 'wrong_number_reported',
+          title: `رقم غير صحيح: ${c.full_name ?? phone}`,
+          message: `الرد من الرقم ${phone} يفيد بأنه ليس العميل المطلوب. تم إيقاف الرد الآلي على هذا الرقم — راجع بيانات التواصل وحدّثها أو أعد التفعيل يدوياً.`,
+          metadata: { customer_id: c.id, debt_id: effectiveDebtId, phone, customer_message: mergedText },
+        })
+      }
+
       // Dispute → open dispute + approval (dedup), with full context
       if (aiDecision.action === 'record_dispute' && effectiveDebtId) {
         const { recordDispute } = await import('@/lib/dispute')
@@ -479,7 +502,7 @@ export async function POST(request: NextRequest) {
       if (effectiveDebtId) {
         const portfolioName = (latestDebt as { portfolio?: { name?: string } } | null)?.portfolio?.name ?? null
         const { classifyDebtOutcome } = await import('@/lib/debt-status-classifier')
-        const outcome = await classifyDebtOutcome({ portfolio_name: portfolioName, customer_message: mergedText })
+        const outcome = await classifyDebtOutcome({ portfolio_name: portfolioName, customer_message: mergedText, debt_id: effectiveDebtId })
 
         if (outcome) {
           const { category, meta } = outcome

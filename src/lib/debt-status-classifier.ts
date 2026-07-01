@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
 import { resolveCompanyProfile, type OutcomeMeta } from '@/lib/company-import-profiles'
 
@@ -31,6 +32,18 @@ function extractJson(raw: string): any | null {
 export async function classifyDebtOutcome(args: {
   portfolio_name: string | null
   customer_message: string
+  // Real production root cause this fixes: the classifier previously only
+  // ever saw the current turn's bare text in total isolation — no idea what
+  // it was actually replying to. Confirmed live in production: a customer's
+  // plain "لا" (answering an unrelated identity-confirmation question) and a
+  // hypothetical question ("طيب اذا ماسددت وش بصير؟") and an explicit denial
+  // of ever raising a dispute ("اي اعتراض انا ما قلت اني معترض") were ALL
+  // misclassified as "العميل رافض السداد" (customer refuses to pay) — none
+  // of them are an actual definitive refusal. Passing debt_id lets this
+  // function pull a few real prior turns for grounding, the same way the
+  // main collector agent and case-note generator already do; without it,
+  // behavior is unchanged (still works with bare text, e.g. from tests).
+  debt_id?: string | null
 }): Promise<{ category: string; meta: OutcomeMeta } | null> {
   if (!args.portfolio_name || !args.customer_message.trim()) return null
 
@@ -38,6 +51,25 @@ export async function classifyDebtOutcome(args: {
   if (!profile || profile.outcomeCategories.length === 0) return null
 
   if (!process.env.OPENROUTER_API_KEY) return null
+
+  let contextBlock = ''
+  if (args.debt_id) {
+    try {
+      const svc = createServiceClient()
+      const { data: history } = await svc
+        .from('messages')
+        .select('direction, content, sent_at')
+        .eq('debt_id', args.debt_id)
+        .order('sent_at', { ascending: false })
+        .limit(8)
+      const prior = (history ?? []).slice().reverse()
+        .map((m: { direction: string; content: string | null }) => `${m.direction === 'inbound' ? 'العميل' : 'الوكيل'}: ${m.content ?? ''}`)
+        .join('\n')
+      if (prior) contextBlock = `\n\nسياق المحادثة قبل هذه الرسالة (الأقدم أولاً):\n${prior}\n`
+    } catch (err) {
+      log.warn('failed to fetch conversation context for classification — proceeding with bare message', { error: String((err as any)?.message ?? err) })
+    }
+  }
 
   const client = new OpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
@@ -72,11 +104,17 @@ export async function classifyDebtOutcome(args: {
           content:
             'أنت مصنّف حالات تحصيل ديون. مهمتك مطابقة رسالة العميل بأدق تصنيف من القائمة المغلقة أدناه (كل تصنيف مذكور مع معناه الحقيقي)، أو إرجاع null إن لم ينطبق أي تصنيف بوضوح على الرسالة الحالية. ' +
             'اقرأ معنى كل تصنيف فعلياً قبل الاختيار — لا تكتفِ بالتصنيفات "الواضحة" مثل الاعتراض أو وعد السداد فقط؛ القائمة تشمل حالات تشغيلية أخرى (مشكلة رقم تواصل، طلب تقسيط/مهلة، مماطلة سابقة، حالة خاصة كوفاة/سجن/إفلاس، إلخ) وكل واحدة منها لها معنى محدد يجب اختياره متى ما انطبق فعلياً على كلام العميل. ' +
+            'اقرأ سياق المحادثة إن وُجد لتفهم معنى الرسالة الحالية فعلياً قبل التصنيف — رسالة قصيرة أو غامضة بمعزل عن السياق قد تُفهم خطأ. ' +
+            'أرجع null إلزامياً في هذه الحالات، ولا تصنّف شيئاً غامضاً كموقف نهائي: ' +
+            '(أ) ردّ قصير غامض (مثل "لا"، "طيب"، "أوك") لا يتعلق وضوحاً بالسداد أو الدين — تحقق من السياق قبل افتراض أنه عن الدين. ' +
+            '(ب) سؤال افتراضي/شرطي عن العواقب (مثل "لو ما سددت وش بصير؟") — هذا استفسار وليس رفضاً فعلياً للسداد. ' +
+            '(ج) العميل ينفي أنه قال شيئاً معيناً سابقاً (مثل "انا ما قلت اني معترض") — هذا تصحيح/نفي لكلام سابق، وليس تصنيفاً جديداً بحد ذاته. ' +
+            'اختر تصنيفاً فقط عندما تكون رسالة العميل تصريحاً واضحاً وقاطعاً ينطبق فعلياً على معنى أحد التصنيفات. ' +
             'ممنوع منعاً باتاً إخراج أي نص خارج القائمة. أرجع JSON فقط بالشكل: {"category": "النص الحرفي من القائمة" أو null}.',
         },
         {
           role: 'user',
-          content: `القائمة المغلقة لهذه الشركة:\n${list}\n\nرسالة العميل: "${args.customer_message}"`,
+          content: `القائمة المغلقة لهذه الشركة:\n${list}${contextBlock}\n\nرسالة العميل الحالية (هي فقط المطلوب تصنيفها): "${args.customer_message}"`,
         },
       ],
       response_format: { type: 'json_object' },

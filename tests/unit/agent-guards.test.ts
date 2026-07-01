@@ -779,3 +779,39 @@ describe('Per-customer SADAD number takes priority over collection_accounts (STC
     expect(d.reason).toBe('answered_from_case_file')
   })
 })
+
+describe('Wrong-number handling — must never continue the collection workflow', () => {
+  it('(RR) forces record_wrong_number even when the model tries to re-introduce itself instead', async () => {
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'model_reintroduced',
+      message: 'معك خالد الدويحي من شركة مصدر الرؤية، وكيل موبايلي.', promised_date: null,
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'مين فلان؟ ما يخصني هذا الرقم' })
+
+    expect(d.action).toBe('record_wrong_number')
+    expect(d.reason).toBe('wrong_number_forced')
+    expect(d.message).not.toContain('خالد الدويحي')
+  })
+
+  it('(SS) "الرقم غلط" on the very first-ever contact still gets recognized instead of falling into GREETING', async () => {
+    mockContext.chronological_history = [] // no prior messages at all — first contact
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'model_greeting',
+      message: 'وعليكم السلام، معي الأخ محمد؟', promised_date: null,
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'الرقم غلط' })
+
+    expect(d.action).toBe('record_wrong_number')
+  })
+
+  it('(TT) the model correctly choosing record_wrong_number on its own is left untouched (no redundant override log)', async () => {
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_wrong_number', reason: 'model_correct',
+      message: 'تمام، آسف على الإزعاج، بنراجع الرقم.', promised_date: null,
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'مو رقمي' })
+
+    expect(d.action).toBe('record_wrong_number')
+    expect(d.reason).toBe('model_correct')
+  })
+})

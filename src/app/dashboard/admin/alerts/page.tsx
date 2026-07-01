@@ -42,6 +42,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   outcome_needs_human_review: 'يحتاج مراجعة بشرية',
   unmatched_inbound_message: 'رسالة من رقم غير مرتبط بعميل',
   document_needs_review: 'مستند يحتاج مراجعة إدارية',
+  wrong_number_reported: 'رقم أفاد بأنه ليس العميل',
 }
 
 export default function AlertsPage() {

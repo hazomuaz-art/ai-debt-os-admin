@@ -131,10 +131,16 @@ describe('Real incident — dispute recorded from a vague message with no actual
     ])
     mockModelContent = JSON.stringify({
       shouldReply: true, action: 'record_dispute', reason: 'specific reason',
-      message: 'تمام، بسجّل اعتراضك بخصوص رقمك الخطأ.',
+      message: 'تمام، بسجّل اعتراضك بخصوص المبلغ.',
     })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'هذا رقم غلط مو رقمي' })
+    // Was "هذا رقم غلط مو رقمي" — that phrase is a genuine wrong-number claim
+    // ("مو رقمي" = "not my number"), correctly routed to the dedicated
+    // record_wrong_number guard now instead (see agent-guards.test.ts "Wrong-
+    // number handling"). Using a dispute-about-the-amount phrasing here keeps
+    // this test testing what it always meant to: a specific-reason DEBT
+    // dispute, not a phone-number claim.
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'المبلغ غلط، هذا مو المبلغ الصحيح اللي علي' })
 
     expect(d.action).toBe('record_dispute')
   })
