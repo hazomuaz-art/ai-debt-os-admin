@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Save inbound message
-        const { data: savedMessage } = await supabase.from('messages').insert({
+        const { data: savedMessage, error: msgInsertErr } = await supabase.from('messages').insert({
           company_id,
           customer_id: customer.id,
           channel: 'whatsapp',
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
           metadata: { instance_name, message_type: message_type || 'text' },
           sent_at: new Date().toISOString(),
         }).select('id').single()
+        if (msgInsertErr) console.error('[n8n-webhook] inbound message insert failed:', msgInsertErr.message)
 
         result = { 
           action: 'message_saved', 
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Insert payment
-        const { data: payment } = await supabase.from('payments').insert({
+        const { data: payment, error: paymentInsertErr } = await supabase.from('payments').insert({
           company_id,
           customer_id,
           debt_id,
@@ -114,6 +115,10 @@ export async function POST(request: NextRequest) {
           status: 'completed',
           notes: 'Synced via n8n',
         }).select('id').single()
+        // Was silently discarded — a failed insert here means a real payment
+        // never gets recorded (financial data loss) with zero trace, since
+        // the caller (n8n) still gets an HTTP 200 either way.
+        if (paymentInsertErr) console.error('[n8n-webhook] payment insert failed:', paymentInsertErr.message, { debt_id, amount })
 
         // Update debt balance
         if (payment) {
@@ -289,8 +294,9 @@ export async function POST(request: NextRequest) {
             
             // 3. Update Debt status
             if (active_debt_id) {
-              await supabase.from('debts').update({ status: 'in_negotiation' }).eq('id', active_debt_id)
-              
+              const { error: debtStatusErr } = await supabase.from('debts').update({ status: 'in_negotiation' }).eq('id', active_debt_id)
+              if (debtStatusErr) console.error('[ai_reply_generated] debt status update failed:', debtStatusErr.message)
+
               // Add status history
               await supabase.from('collection_status_history').insert({
                 company_id,

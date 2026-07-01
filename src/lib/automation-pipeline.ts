@@ -1000,9 +1000,10 @@ async function stepCampaigns(ctx: Ctx): Promise<void> {
       if (filter.min_balance && ctx.debt.current_balance < Number(filter.min_balance)) eligible = false
       if (filter.max_balance && ctx.debt.current_balance > Number(filter.max_balance)) eligible = false
       if (eligible) {
-        await sb.from('campaigns')
+        const { error: campUpdateErr } = await sb.from('campaigns')
           .update({ target_count: Number(camp.target_count ?? 0) + 1 })
           .eq('id', camp.id)
+        if (campUpdateErr) log.warn(`stepCampaigns(${ctx.debt.id}) campaign target_count update failed: ${campUpdateErr.message}`)
       }
     }
   } catch (err) {
@@ -1027,7 +1028,11 @@ async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
     ? `هلا ${ctx.customer.full_name}، عندك مبلغ ${waBal} ${ctx.debt.currency} (مرجع: ${ctx.debt.reference_number}). نقدر نرتب طريقة سداد تناسبك.`
     : `Hi ${ctx.customer.full_name}, reminder about your ${ctx.debt.currency} ${waBal} balance (ref: ${ctx.debt.reference_number}). We can arrange a payment plan for you.`
   try {
-    await createServiceClient().from('job_queue').insert({
+    // Was returning `true` unconditionally right after the insert call —
+    // Supabase's JS client never throws on a failed insert (constraint
+    // violation, etc.), it just returns {error}, so a silently-failed queue
+    // insert was reported as a successful WhatsApp-queue step every time.
+    const { error: queueErr } = await createServiceClient().from('job_queue').insert({
       company_id:   ctx.debt.company_id,
       job_type:     'send_whatsapp',
       payload:      { phone, message: msg, company_id: ctx.debt.company_id,
@@ -1038,6 +1043,7 @@ async function stepWhatsApp(ctx: Ctx): Promise<boolean> {
       max_attempts: 3,
       attempts:     0,
     })
+    if (queueErr) { log.warn(`stepWhatsApp(${ctx.debt.id}) job_queue insert failed: ${queueErr.message}`); return false }
     return true
   } catch (err) {
     log.warn(`stepWhatsApp(${ctx.debt.id}): ` + (err instanceof Error ? err.message : String(err)))
