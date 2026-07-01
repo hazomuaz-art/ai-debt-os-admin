@@ -463,11 +463,17 @@ export default function CampaignsPage() {
 
           {loading ? (
             <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7a54]"></div></div>
-          ) : numbers.length === 0 ? (
+          ) : numbers.filter(n => n.is_active).length === 0 ? (
             <div className="text-[#5f6b7e] text-sm py-8 text-center font-bold">لا توجد أرقام واتساب مرتبطة بعد.</div>
           ) : (
             <div className="space-y-4">
-              {numbers.map(number => (
+              {/* Real complaint this fixes: a deactivated number (is_active
+                  false — e.g. an old number replaced by a new one) kept
+                  showing up in this list forever, looking identical to an
+                  active one apart from its own connection-status badge.
+                  Deactivating a number is supposed to mean "gone from
+                  view", not just quietly ignored elsewhere in the system. */}
+              {numbers.filter(n => n.is_active).map(number => (
                 <div key={number.id} className="rounded-2xl border border-[#222a36] bg-[#0d1117] p-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between gap-3">
                     <div>
