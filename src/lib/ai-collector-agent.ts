@@ -1080,10 +1080,32 @@ export async function runCollectorAgent(args: {
   // sentence later in the conversation": this used to only look at the
   // LAST 5 outbound messages, so a sentence said 6+ replies ago was
   // completely invisible to isRepeated() below — it wasn't a fuzzy-match
-  // miss, the guard simply never saw it. Now spans every outbound message
-  // available in this conversation (bounded upstream by the 50-message
-  // fetch in customer-debt-context.ts, not re-truncated here).
-  const prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content)
+  // miss, the guard simply never saw it.
+  //
+  // The MODEL's own context (`turns` further below) is deliberately still
+  // capped (~40 turns) — feeding an LLM call the entire lifetime of a
+  // months-long debt would blow the token budget and slow every reply. But
+  // "never repeat the exact same sentence" does NOT need the LLM at all —
+  // it's a plain text-equality/containment check, so it can safely look at
+  // the debt's ENTIRE outbound history regardless of conversation length, at
+  // negligible cost (one lightweight text-only query, no tokens). This
+  // guarantees the "never repeat, no matter how long the conversation"
+  // requirement independently of whatever window the model itself sees.
+  let prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content)
+  if (forcedDebtId) {
+    try {
+      const { data: fullOutboundHistory } = await createServiceClient()
+        .from('messages').select('content').eq('debt_id', forcedDebtId).eq('direction', 'outbound')
+        .order('sent_at', { ascending: true }).limit(500)
+      if (fullOutboundHistory?.length) {
+        prevOutbound = fullOutboundHistory.map((m: { content: string | null }) => m.content ?? '')
+      }
+    } catch (err) {
+      // Non-fatal — falls back to the (smaller, upstream-capped) chronological
+      // window already computed above rather than breaking the whole reply.
+      log.warn('full outbound history query for repeat-check failed — using capped fallback window', { debt_id: forcedDebtId, error: String(err) })
+    }
+  }
   const lastAgentMessage = prevOutbound[prevOutbound.length - 1] ?? ''
   const hasHistory = chronological.length > 0
 

@@ -283,12 +283,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
-                <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} />
-                {debt.original_sub_status && (
-                  <p className="text-xs text-amber-400 mt-1.5 font-bold">
-                    تصنيف الوكيل: {debt.original_sub_status}
-                  </p>
-                )}
+                <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} companySubStatus={debt.original_sub_status} />
               </div>
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>

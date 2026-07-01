@@ -33,9 +33,18 @@ const STATUS_LABELS: Record<string, string> = {
 export default function UpdateDebtStatusSelect({
   debtId,
   currentStatus,
+  companySubStatus,
 }: {
   debtId: string
   currentStatus: string
+  // The AI agent's own company-specific classification (e.g. "حذف مسترد
+  // وجود رخصة / تجديد" for an insurance recourse claim) — free-text, set
+  // automatically by classifyDebtOutcome, never picked manually. When
+  // present, it's shown as the CURRENTLY SELECTED entry in this same
+  // dropdown (not a separate readout) so "حالة المديونية" always reflects
+  // the agent's real, specific classification when one exists, falling
+  // back to the generic status list otherwise.
+  companySubStatus?: string | null
 }) {
   const [status, setStatus] = useState(currentStatus)
   const [saving, setSaving] = useState(false)
@@ -57,6 +66,9 @@ export default function UpdateDebtStatusSelect({
       disabled={saving}
       className="input text-sm py-1 px-2"
     >
+      {companySubStatus && (
+        <option value={currentStatus}>{companySubStatus}</option>
+      )}
       {STATUSES.map(s => (
         <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
       ))}
