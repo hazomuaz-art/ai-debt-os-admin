@@ -253,7 +253,8 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                       <th className="p-3 font-bold">المبلغ</th>
                       <th className="p-3 font-bold">طريقة الدفع</th>
                       <th className="p-3 font-bold">المرجع</th>
-                      <th className="p-3 rounded-l-xl font-bold">ملاحظات</th>
+                      <th className="p-3 font-bold">ملاحظات</th>
+                      <th className="p-3 rounded-l-xl font-bold">الإيصال</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1c2330]">
@@ -264,6 +265,18 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                         <td className="p-3 text-slate-300">{p.payment_method || '—'}</td>
                         <td className="p-3 text-[#8b95a7] font-mono text-xs">{p.reference_number || '—'}</td>
                         <td className="p-3 text-[#8b95a7]">{p.notes || '—'}</td>
+                        <td className="p-3">
+                          {p.receipt_url ? (
+                            <a
+                              href={`/api/payments/${p.id}/receipt`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-emerald-500 hover:text-emerald-400 font-bold text-xs"
+                            >
+                              <FileText size={13} /> تحميل
+                            </a>
+                          ) : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
