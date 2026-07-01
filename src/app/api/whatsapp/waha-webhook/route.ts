@@ -325,6 +325,17 @@ export async function POST(request: NextRequest) {
               company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
               debt_id, phone, source: isPdf ? 'pdf' : 'image', data: b64,
             })
+            // Real gap found during a full-system audit: a document sent with
+            // NO caption text never entered scheduleBurstProcessing at all
+            // (see the early `return` right after this IIFE), which is the
+            // only other place case-note updates fire — so the running case
+            // note silently went stale on any document-only turn, receipt or
+            // not. Every real event (including "customer sent a document")
+            // must update the note, not just text turns.
+            if (debt_id) {
+              const { updateCaseNote } = await import('@/lib/case-note')
+              await updateCaseNote({ company_id: c.company_id, debt_id })
+            }
             return
           }
 

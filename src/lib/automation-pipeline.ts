@@ -23,6 +23,9 @@ import { scoreDebt, scoringFallback, type ScoreResult } from '@/lib/ai-engine'
 import { calculateDaysOverdue } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
 import { detectCustomerIntent } from '@/lib/negotiation-intent'
+import { insertTimelineEvent } from '@/lib/timeline'
+import { insertApproval } from '@/lib/approvals'
+import { insertSystemAlert } from '@/lib/system-alerts'
 
 const log = createLogger('automation-pipeline')
 
@@ -344,10 +347,13 @@ async function stepScore(ctx: Ctx): Promise<ScoreResult> {
     result = scoringFallback(scoreInput)
   }
 
-  // Persist (non-blocking on failure)
+  // Persist (non-blocking on failure — but must still be LOGGED, otherwise a
+  // failed insert here looks identical to a successful score in every log
+  // line above it, e.g. "Debt scored via AI", making the silent DB failure
+  // invisible).
   const sb = createServiceClient()
   try {
-    await sb.from('ai_scores').insert({
+    const { error: scoreInsertErr } = await sb.from('ai_scores').insert({
       company_id:             ctx.debt.company_id,
       debt_id:                ctx.debt.id,
       customer_id:            ctx.debt.customer_id,
@@ -357,7 +363,10 @@ async function stepScore(ctx: Ctx): Promise<ScoreResult> {
       recommended_strategy:   result.recommended_strategy,
       factors:                result.factors,
     })
-  } catch { /* non-critical */ }
+    if (scoreInsertErr) log.warn(`stepScore(${ctx.debt.id}) ai_scores insert failed: ${scoreInsertErr.message}`)
+  } catch (err) {
+    log.warn(`stepScore(${ctx.debt.id}) ai_scores insert threw: ` + (err instanceof Error ? err.message : String(err)))
+  }
 
   // Update debt priority
   const newPriority =
@@ -627,12 +636,13 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
     // customer's actual words) — see ai-collector-agent.ts and the
     // webhook handlers that persist it from there.
 
-    await sb.from('promises')
+    const { error: brokenErr } = await sb.from('promises')
       .update({ status: 'broken' })
       .eq('company_id', ctx.debt.company_id)
       .eq('debt_id', ctx.debt.id)
       .eq('status', 'pending')
       .lt('promised_date', today)
+    if (brokenErr) log.warn(`stepPromises(${ctx.debt.id}) mark-broken update failed: ${brokenErr.message}`)
 
     const { data: upcoming } = await sb.from('promises')
       .select('promised_date,promised_amount')
@@ -645,7 +655,7 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
 
     if (upcoming) {
       const u = upcoming as Record<string, unknown>
-      await sb.from('timeline_events').insert({
+      await insertTimelineEvent({
         company_id: ctx.debt.company_id,
         customer_id: ctx.debt.customer_id,
         debt_id: ctx.debt.id,
@@ -653,7 +663,6 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
         channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
         summary: `وعد سداد قادم: ${u.promised_amount} ${ctx.debt.currency} في ${u.promised_date}`,
         actor_type: 'system',
-        occurred_at: new Date().toISOString(),
       })
     }
   } catch (err) {
@@ -681,7 +690,7 @@ async function stepApprovals(ctx: Ctx): Promise<void> {
       ctx.debt.status === 'legal'      ? 'legal_escalation' :
       ctx.debt.current_balance > 50000 ? 'large_settlement' : 'stop_followup'
 
-    await sb.from('approvals').insert({
+    await insertApproval({
       company_id:    ctx.debt.company_id,
       approval_type,
       title:         `${approval_type === 'legal_escalation' ? 'تصعيد قانوني' : approval_type === 'large_settlement' ? 'تسوية كبيرة' : 'مراجعة'}: ${ctx.customer.full_name}`,
@@ -691,7 +700,6 @@ async function stepApprovals(ctx: Ctx): Promise<void> {
       requested_data: { debt_id: ctx.debt.id, customer: ctx.customer.full_name,
                         balance: ctx.debt.current_balance, currency: ctx.debt.currency,
                         status: ctx.debt.status, reference: ctx.debt.reference_number },
-      status:        'pending',
       priority:      ctx.debt.status === 'legal' || ctx.debt.current_balance > 50000 ? 'urgent' : 'high',
       expires_at:    new Date(Date.now() + 48 * 3600000).toISOString(),
     })
@@ -723,18 +731,17 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   let changed = 0
 
   async function addTimeline(event_type: string, summary: string, detail?: Record<string, unknown>) {
-    await sb.from('timeline_events').insert({
+    await insertTimelineEvent({
       company_id: ctx.debt.company_id,
       customer_id: ctx.debt.customer_id,
       debt_id: ctx.debt.id,
-      event_type,
+      event_type: event_type as any,
       channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
       summary,
       detail: JSON.stringify({ intent, text, ...(detail ?? {}) }).slice(0, 1000),
       actor_type: 'customer',
       ai_used: true,
       metadata: { source: event?.source ?? 'unknown', intent, debt_id: ctx.debt.id },
-      occurred_at: new Date().toISOString(),
     })
     changed++
   }
@@ -744,19 +751,19 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   }
 
   if (intent === 'refusal') {
-    await sb.from('debts').update({
+    const { error: refusalErr } = await sb.from('debts').update({
       priority: 'high',
       last_contact_result: 'Customer refused to pay via inbound message',
     }).eq('id', ctx.debt.id).eq('company_id', ctx.debt.company_id)
+    if (refusalErr) log.warn(`stepLiveReactor(${ctx.debt.id}) refusal debt-update failed: ${refusalErr.message}`)
 
-    await sb.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: ctx.debt.company_id,
       severity: 'error',
       alert_type: 'customer_refusal',
       title: `رفض سداد: ${ctx.customer.full_name}`,
       message: text.slice(0, 500),
       metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, intent, source: event?.source ?? 'unknown' },
-      is_resolved: false,
     })
 
     await addTimeline('refusal_detected', `رفض سداد من العميل: ${ctx.customer.full_name}`)
@@ -764,13 +771,14 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   }
 
   if (intent === 'dispute' || intent === 'wrong_number') {
-    await sb.from('debts').update({
+    const { error: disputeErr } = await sb.from('debts').update({
       status: 'disputed',
       priority: 'high',
       last_contact_result: 'Customer dispute detected from inbound message',
     }).eq('id', ctx.debt.id).eq('company_id', ctx.debt.company_id)
+    if (disputeErr) log.warn(`stepLiveReactor(${ctx.debt.id}) dispute debt-update failed: ${disputeErr.message}`)
 
-    await sb.from('approvals').insert({
+    await insertApproval({
       company_id: ctx.debt.company_id,
       approval_type: 'stop_followup',
       title: `مراجعة اعتراض: ${ctx.customer.full_name}`,
@@ -778,7 +786,6 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
       entity_type: 'debt',
       entity_id: ctx.debt.id,
       requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message: text, intent },
-      status: 'pending',
       priority: 'high',
       expires_at: new Date(Date.now() + 48 * 3600000).toISOString(),
     })
@@ -788,7 +795,7 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   }
 
   if (intent === 'paid_claim') {
-    await sb.from('approvals').insert({
+    await insertApproval({
       company_id: ctx.debt.company_id,
       approval_type: 'stop_followup',
       title: `مراجعة إفادة سداد: ${ctx.customer.full_name}`,
@@ -796,7 +803,6 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
       entity_type: 'debt',
       entity_id: ctx.debt.id,
       requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message: text, intent },
-      status: 'pending',
       priority: 'urgent',
       expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
     })
@@ -806,14 +812,13 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   }
 
   if (intent === 'legal_threat' || intent === 'angry') {
-    await sb.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: ctx.debt.company_id,
       severity: 'warning',
       alert_type: intent === 'legal_threat' ? 'legal_escalation' : 'angry_customer',
       title: `${intent === 'legal_threat' ? 'تصعيد قانوني' : 'عميل غاضب'}: ${ctx.customer.full_name}`,
       message: text.slice(0, 500),
       metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, intent, source: event?.source ?? 'unknown' },
-      is_resolved: false,
     })
 
     await addTimeline(intent === 'legal_threat' ? 'legal_escalation_detected' : 'angry_customer_detected', text.slice(0, 120))
@@ -875,7 +880,7 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
       .limit(1)
 
     if (!(existingPromise?.length)) {
-      await sb.from('promises').insert({
+      const { error: promiseInsertErr } = await sb.from('promises').insert({
         company_id: ctx.debt.company_id,
         customer_id: ctx.debt.customer_id,
         debt_id: ctx.debt.id,
@@ -885,21 +890,21 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
         status: 'pending',
         notes: message ? `AI system impact promise: ${message}` : summary,
       })
-      done.push('ai_impact:promise')
+      if (promiseInsertErr) log.warn(`stepAISystemImpact(${ctx.debt.id}) promise insert failed: ${promiseInsertErr.message}`)
+      else done.push('ai_impact:promise')
     } else {
       done.push('ai_impact:promise_exists')
     }
   }
 
   if (impact.alert) {
-    await sb.from('system_alerts').insert({
+    await insertSystemAlert({
       company_id: ctx.debt.company_id,
       severity: riskImpact === 'critical' ? 'error' : 'warning',
       alert_type: riskImpact === 'critical' ? 'ai_critical_event' : 'ai_risk_event',
       title: `AI Alert: ${ctx.customer.full_name}`,
       message: summary.slice(0, 500),
       metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, source: event.source, impact, message },
-      is_resolved: false,
     })
     done.push('ai_impact:alert')
   }
@@ -913,7 +918,7 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
       .maybeSingle()
 
     if (!existingApproval) {
-      await sb.from('approvals').insert({
+      const inserted = await insertApproval({
         company_id: ctx.debt.company_id,
         approval_type: 'stop_followup',
         title: `AI Review: ${ctx.customer.full_name}`,
@@ -921,11 +926,10 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
         entity_type: 'debt',
         entity_id: ctx.debt.id,
         requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message, impact },
-        status: 'pending',
         priority: riskImpact === 'critical' ? 'urgent' : 'high',
         expires_at: new Date(Date.now() + 48 * 3600000).toISOString(),
       })
-      done.push('ai_impact:approval')
+      if (inserted) done.push('ai_impact:approval')
     } else {
       done.push('ai_impact:approval_exists')
     }
@@ -937,16 +941,17 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
     if (riskImpact === 'critical') patch.status = 'disputed'
     patch.last_contact_result = summary.slice(0, 250)
 
-    await sb.from('debts')
+    const { error: debtUpdateErr } = await sb.from('debts')
       .update(patch)
       .eq('company_id', ctx.debt.company_id)
       .eq('id', ctx.debt.id)
 
-    done.push('ai_impact:debt_update')
+    if (debtUpdateErr) log.warn(`stepAISystemImpact(${ctx.debt.id}) debt update failed: ${debtUpdateErr.message}`)
+    else done.push('ai_impact:debt_update')
   }
 
   if (impact.ai_action) {
-    await sb.from('ai_actions').insert({
+    const { error: actionInsertErr } = await sb.from('ai_actions').insert({
       company_id: ctx.debt.company_id,
       debt_id: ctx.debt.id,
       customer_id: ctx.debt.customer_id,
@@ -960,7 +965,8 @@ async function stepAISystemImpact(ctx: Ctx, event: PipelineEvent, score: ScoreRe
       scheduled_for: new Date().toISOString().split('T')[0],
       metadata: { source: event.source, ai_system_impact: impact },
     })
-    done.push('ai_impact:ai_action')
+    if (actionInsertErr) log.warn(`stepAISystemImpact(${ctx.debt.id}) ai_actions insert failed: ${actionInsertErr.message}`)
+    else done.push('ai_impact:ai_action')
   }
 
   done.push('ai_impact:dashboard_ready')

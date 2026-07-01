@@ -21,6 +21,7 @@ export async function insertApproval(row: {
   description: string
   priority: 'low' | 'medium' | 'high' | 'urgent'
   requested_data?: Record<string, unknown>
+  expires_at?: string
 }): Promise<{ id: string } | null> {
   const supabase = createServiceClient()
   const { data, error } = await supabase.from('approvals').insert({
@@ -29,6 +30,7 @@ export async function insertApproval(row: {
     title: row.title, description: row.description,
     status: 'pending', priority: row.priority,
     requested_data: row.requested_data ?? {},
+    ...(row.expires_at ? { expires_at: row.expires_at } : {}),
   }).select('id').single()
   if (error) { log.error('approvals insert failed', new Error(error.message), { approval_type: row.approval_type }); return null }
   return data as { id: string }
