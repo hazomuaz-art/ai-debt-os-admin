@@ -19,19 +19,23 @@ function normalizePhone(phone: string) {
 export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
 
-  // Unauthenticated previously — anyone who found this URL could inject
-  // arbitrary customer/timeline data using the full service-role client.
-  // Enforced once RASF_WEBHOOK_SECRET is configured on both sides; logged
-  // loudly if still unset so the gap stays visible rather than silent.
+  // Real gap found during a full-system security audit: when
+  // RASF_WEBHOOK_SECRET was unset, this fell through to processing the
+  // request anyway (only logging an error) — meaning the route was live and
+  // fully open to the public internet, able to inject arbitrary
+  // customer/timeline data via the full service-role client. Confirmed live
+  // in production: the env var was never set, so this was genuinely
+  // exploitable, not theoretical. Fail CLOSED (503, service disabled) when
+  // unconfigured, never fail open — same fix as email/inbound-webhook.
   const expectedSecret = process.env.RASF_WEBHOOK_SECRET
-  if (expectedSecret) {
-    const provided = req.headers.get('x-webhook-secret') ?? req.nextUrl.searchParams.get('secret')
-    if (provided !== expectedSecret) {
-      log.warn('Rasf webhook rejected — missing/invalid secret')
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
-  } else {
-    log.error('RASF_WEBHOOK_SECRET is not set — this endpoint is unauthenticated and publicly writable')
+  if (!expectedSecret) {
+    log.error('RASF_WEBHOOK_SECRET is not set — rasf webhook is disabled until configured')
+    return NextResponse.json({ ok: false, error: 'Service not configured' }, { status: 503 })
+  }
+  const provided = req.headers.get('x-webhook-secret') ?? req.nextUrl.searchParams.get('secret')
+  if (provided !== expectedSecret) {
+    log.warn('Rasf webhook rejected — missing/invalid secret')
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   let payload: any

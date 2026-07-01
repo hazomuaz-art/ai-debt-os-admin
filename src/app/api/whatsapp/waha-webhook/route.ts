@@ -130,13 +130,19 @@ export async function POST(request: NextRequest) {
     // here. Enforced once WAHA_WEBHOOK_SECRET is configured on this app;
     // fails loud while unset rather than silently staying open.
     const expectedSecret = process.env.WAHA_WEBHOOK_SECRET
-    if (expectedSecret) {
-      if (request.headers.get('x-webhook-secret') !== expectedSecret) {
-        log.warn('WAHA webhook rejected — missing/invalid secret')
-        return NextResponse.json({ status: 'ok' })
-      }
-    } else {
-      log.error('WAHA_WEBHOOK_SECRET is not set — this webhook is unauthenticated and publicly triggerable')
+    if (!expectedSecret) {
+      // Same fail-open bug found and fixed platform-wide (2026-07-01
+      // security audit) in email/inbound-webhook and rasf/webhook — this one
+      // is currently safe in production because WAHA_WEBHOOK_SECRET IS
+      // configured, but hardened to fail CLOSED instead of open for the
+      // moment it ever isn't (accidental env var removal/rename), rather
+      // than silently reopening the platform's main customer-facing channel.
+      log.error('WAHA_WEBHOOK_SECRET is not set — waha webhook is disabled until configured')
+      return NextResponse.json({ status: 'service not configured' }, { status: 503 })
+    }
+    if (request.headers.get('x-webhook-secret') !== expectedSecret) {
+      log.warn('WAHA webhook rejected — missing/invalid secret')
+      return NextResponse.json({ status: 'ok' })
     }
 
     const body = await request.json().catch(() => ({} as any))

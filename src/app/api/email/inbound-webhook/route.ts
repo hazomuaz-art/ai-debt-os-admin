@@ -16,12 +16,22 @@ const log = createLogger('webhook/email')
 // automatically (messages.channel already allows 'email' — no migration
 // needed for that part).
 export async function POST(req: NextRequest) {
+  // Real gap found during a full-system security audit: when
+  // EMAIL_INBOUND_SECRET was unset, this fell through to processing the
+  // request anyway (only logging an error) — meaning the route was live and
+  // fully open to the public internet, able to write messages/trigger the
+  // AI agent against any customer whose email happened to match an
+  // attacker-supplied `from`. Confirmed live in production: the env var was
+  // never set, so this was genuinely exploitable, not theoretical. Same
+  // fix pattern as waha-webhook/rasf-webhook: fail CLOSED (503, service
+  // disabled) when unconfigured, never fail open.
+  if (!process.env.EMAIL_INBOUND_SECRET) {
+    log.error('EMAIL_INBOUND_SECRET is not set — email inbound webhook is disabled until configured')
+    return NextResponse.json({ error: 'Service not configured' }, { status: 503 })
+  }
   const secret = req.headers.get('x-webhook-secret')
   if (secret !== process.env.EMAIL_INBOUND_SECRET) {
-    if (process.env.EMAIL_INBOUND_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    log.error('EMAIL_INBOUND_SECRET is not set — this webhook is unauthenticated and publicly triggerable')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const payload = await req.json().catch(() => null)
