@@ -53,6 +53,15 @@ export async function GET(req: NextRequest) {
 
   const results = { sent: 0, failed: 0, skipped_limit: 0, skipped_inactive: 0, skipped_window: 0 }
   const sentCountDelta: Record<string, number> = {}
+  // Real bug this fixes: `num.sent_today` is read ONCE per row from the
+  // initial batch select — if two queue rows in the same BATCH_SIZE=20
+  // batch share the same WhatsApp number, both evaluated the daily_limit
+  // check against the same stale pre-batch count and could both pass even
+  // though the first send should have already pushed the number over its
+  // cap. Track the running count in-memory per number, seeded from the
+  // real DB value, and increment it immediately after each successful send
+  // within this same loop.
+  const runningSentToday: Record<string, number> = {}
 
   for (const row of queueRows ?? []) {
     const r = row as any
@@ -69,9 +78,18 @@ export async function GET(req: NextRequest) {
       continue // leave pending — will be picked up in the next run, in-window
     }
 
-    const lastSentDay = num.last_sent_at ? String(num.last_sent_at).slice(0, 10) : null
-    const sentTodaySoFar = lastSentDay === today ? (num.sent_today ?? 0) : 0
-    if (sentTodaySoFar >= (num.daily_limit ?? 0)) {
+    if (!(num.id in runningSentToday)) {
+      const lastSentDay = num.last_sent_at ? String(num.last_sent_at).slice(0, 10) : null
+      runningSentToday[num.id] = lastSentDay === today ? (num.sent_today ?? 0) : 0
+    }
+    const sentTodaySoFar = runningSentToday[num.id]
+    // A null/unset daily_limit used to be treated as 0 (0 >= 0 is always
+    // true), which silently blocked EVERY send for that number forever —
+    // looking identical to "working as intended, just idle". A configured
+    // limit is still honored exactly; only a genuinely unset one falls back
+    // to a conservative default instead of a de-facto permanent block.
+    const effectiveLimit = num.daily_limit ?? 200
+    if (sentTodaySoFar >= effectiveLimit) {
       results.skipped_limit++
       continue // leave pending — retried once the daily window resets
     }
@@ -99,9 +117,10 @@ export async function GET(req: NextRequest) {
     })
 
     if (sendResult.status === 'sent') {
+      runningSentToday[num.id] = sentTodaySoFar + 1
       await supabase.from('campaign_send_queue').update({ status: 'sent', processed_at: new Date().toISOString() }).eq('id', r.id)
       await supabase.from('portfolio_whatsapp_numbers').update({
-        sent_today: sentTodaySoFar + 1, last_sent_at: new Date().toISOString(),
+        sent_today: runningSentToday[num.id], last_sent_at: new Date().toISOString(),
       }).eq('id', num.id)
       sentCountDelta[r.campaign_id] = (sentCountDelta[r.campaign_id] ?? 0) + 1
       results.sent++
@@ -117,11 +136,17 @@ export async function GET(req: NextRequest) {
   }
 
   for (const [campaignId, delta] of Object.entries(sentCountDelta)) {
-    const { data: c } = await supabase.from('campaigns').select('sent_count, status').eq('id', campaignId).maybeSingle()
+    const { data: c } = await supabase.from('campaigns').select('sent_count, status, started_at').eq('id', campaignId).maybeSingle()
+    const wasScheduled = (c as any)?.status === 'scheduled'
+    // `started_at: undefined` relied on supabase-js/JSON.stringify silently
+    // dropping the key when the campaign wasn't newly started — fragile
+    // (a future serialization change would send an explicit null and stomp
+    // the real started_at on every later update). Only include the key at
+    // all when it should actually change.
     await supabase.from('campaigns').update({
       sent_count: ((c as any)?.sent_count ?? 0) + delta,
-      status: (c as any)?.status === 'scheduled' ? 'running' : (c as any)?.status,
-      started_at: (c as any)?.status === 'scheduled' ? new Date().toISOString() : undefined,
+      status: wasScheduled ? 'running' : (c as any)?.status,
+      ...(wasScheduled ? { started_at: new Date().toISOString() } : {}),
     }).eq('id', campaignId)
   }
 

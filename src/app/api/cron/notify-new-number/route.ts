@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     // dedup: skip if we already sent the notice in the last 7 days
     const { data: prev } = await supabase
       .from('messages').select('id')
-      .eq('customer_id', t.id).eq("metadata->>source", 'new_number_notice')
+      .eq('customer_id', t.id).eq('company_id', t.company_id).eq("metadata->>source", 'new_number_notice')
       .gte('sent_at', new Date(Date.now() - 7 * 86400000).toISOString())
       .limit(1).maybeSingle()
     if (prev) { results.skipped++; continue }

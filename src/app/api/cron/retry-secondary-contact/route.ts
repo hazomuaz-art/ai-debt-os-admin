@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     if (results.tried_secondary >= MAX_PER_RUN) break
 
     const { data: customer } = await supabase
-      .from('customers').select('id, full_name, ai_paused').eq('id', customerId).maybeSingle()
+      .from('customers').select('id, full_name, ai_paused').eq('id', customerId).eq('company_id', secondary.company_id).maybeSingle()
     if (!customer || customer.ai_paused) { results.skipped++; continue }
 
     // Zero reply EVER, and the first outbound attempt was long enough ago.
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       // Mark every untried/primary contact that's gone silent this long as
       // no_reply, then move to the next untried secondary number.
       await supabase.from('customer_contacts').update({ status: 'no_reply' })
-        .eq('customer_id', customerId).eq('is_primary', true).neq('status', 'wrong_number')
+        .eq('customer_id', customerId).eq('company_id', secondary.company_id).eq('is_primary', true).neq('status', 'wrong_number')
 
       const message = await generateOpeningMessage({ company_id: secondary.company_id, customer_id: customerId, debt_id: debt.id })
       const sendResult = await sendWhatsAppMessage({ to: secondary.phone, message, company_id: secondary.company_id })
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
       await supabase.from('customer_contacts')
         .update({ status: sendResult.status === 'sent' ? 'delivered' : 'untried' })
-        .eq('customer_id', customerId).eq('phone', secondary.phone)
+        .eq('customer_id', customerId).eq('company_id', secondary.company_id).eq('phone', secondary.phone)
 
       if (sendResult.status === 'sent') results.tried_secondary++; else results.failed++
     } catch (e) {

@@ -32,38 +32,66 @@ export async function GET(req: NextRequest) {
     .eq('direction', 'outbound').order('created_at', { ascending: false }).limit(1).maybeSingle()
   const company_id = (lastMsg as { company_id?: string } | null)?.company_id ?? null
 
-  // raise an alert only if no unresolved one of the same type exists
-  const raise = async (alert_type: string, severity: AlertSeverity, title: string, message: string, metadata: Record<string, unknown>) => {
+  // raise an alert only if no unresolved one of the same type exists.
+  // `forCompanyId` defaults to the single-tenant fallback (`company_id`,
+  // derived from the most recent message) but the per-number connection
+  // check below always passes the number's OWN company_id explicitly, so a
+  // secondary number's alert is never misattributed to whichever company
+  // happened to send the most recent message platform-wide.
+  const raise = async (alert_type: string, severity: AlertSeverity, title: string, message: string, metadata: Record<string, unknown>, forCompanyId: string | null = company_id) => {
     let q = supabase.from('system_alerts').select('id').eq('alert_type', alert_type).eq('is_resolved', false)
-    q = company_id ? q.eq('company_id', company_id) : q.is('company_id', null)
+    q = forCompanyId ? q.eq('company_id', forCompanyId) : q.is('company_id', null)
     const { data: existing } = await q.limit(1).maybeSingle()
     if (existing) return false
-    await insertSystemAlert({ company_id, alert_type, severity, title, message, metadata })
+    await insertSystemAlert({ company_id: forCompanyId, alert_type, severity, title, message, metadata })
     return true
   }
 
-  // 1) connection state — WAHA session status (WORKING == connected)
-  const base = (process.env.WAHA_API_URL ?? '').replace(/\/$/, '')
-  const session = process.env.WAHA_SESSION || 'default'
-  const apikey = process.env.WAHA_API_KEY
-  let state = 'unknown'
-  try {
-    const r = await fetch(`${base}/api/sessions/${session}`, { headers: { 'X-Api-Key': apikey ?? '' } })
-    const j = await r.json()
-    // WAHA reports "WORKING" when the session is connected and authenticated.
-    state = j?.status === 'WORKING' ? 'open' : String(j?.status ?? 'unknown').toLowerCase()
-  } catch (e) {
-    log.error('WAHA session status check failed', e)
+  // 1) connection state — WAHA session status (WORKING == connected).
+  // Real gap this fixes: this only ever checked the ONE hardcoded default
+  // WAHA_SESSION/WAHA_API_URL env pair — a company with multiple WhatsApp
+  // numbers (portfolio_whatsapp_numbers, used by send-campaign-queue) could
+  // have a SECONDARY number silently disconnected forever and this check
+  // would never notice, since "some other number is healthy" was enough to
+  // make the single hardcoded check pass. Now checks every active number
+  // and raises a per-company, per-number alert.
+  const defaultBase = (process.env.WAHA_API_URL ?? '').replace(/\/$/, '')
+  const defaultSession = process.env.WAHA_SESSION || 'default'
+  const defaultApikey = process.env.WAHA_API_KEY
+
+  const { data: activeNumbers } = await supabase
+    .from('portfolio_whatsapp_numbers')
+    .select('id, company_id, instance_name, api_url, display_name, is_active')
+    .eq('is_active', true)
+
+  const numbersToCheck = (activeNumbers?.length ?? 0) > 0
+    ? (activeNumbers as any[])
+    : [{ id: 'default', company_id, instance_name: defaultSession, api_url: defaultBase, display_name: 'default' }]
+
+  const connectionAlerts: Record<string, unknown> = {}
+  for (const num of numbersToCheck) {
+    const base = (num.api_url || defaultBase).replace(/\/$/, '')
+    const session = num.instance_name || defaultSession
+    let state = 'unknown'
+    try {
+      const r = await fetch(`${base}/api/sessions/${session}`, { headers: { 'X-Api-Key': defaultApikey ?? '' } })
+      const j = await r.json()
+      state = j?.status === 'WORKING' ? 'open' : String(j?.status ?? 'unknown').toLowerCase()
+    } catch (e) {
+      log.error('WAHA session status check failed', e, { session })
+    }
+    connectionAlerts[session] = state
+    if (state !== 'open') {
+      await raise(
+        'whatsapp_disconnected', 'critical',
+        `انقطاع اتصال واتساب (${num.display_name || session})`,
+        `رقم واتساب "${num.display_name || session}" غير متصل حالياً (الحالة: ${state}). الوكيل لا يستطيع إرسال أو استقبال الرسائل عبر هذا الرقم حتى تتم إعادة الربط.`,
+        { state, session, whatsapp_number_id: num.id },
+        num.company_id ?? company_id,
+      )
+    }
   }
-  result.state = state
-  if (state !== 'open') {
-    result.connectionAlert = await raise(
-      'whatsapp_disconnected', 'critical',
-      'انقطاع اتصال واتساب',
-      `رقم واتساب غير متصل حالياً (الحالة: ${state}). الوكيل لا يستطيع إرسال أو استقبال الرسائل حتى تتم إعادة الربط.`,
-      { state, session },
-    )
-  }
+  result.connectionStates = connectionAlerts
 
   // 2) delivery health — outbound messages sent in the last 3h, old enough
   // (>10 min) to have been acked, that never reached "delivered"/"read".

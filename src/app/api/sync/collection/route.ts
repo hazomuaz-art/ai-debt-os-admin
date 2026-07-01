@@ -207,11 +207,15 @@ export async function POST(req: NextRequest) {
       customerId = data?.id ?? null
     }
 
+    // Exact match, not substring (`ilike %phone%`) — a partial/substring match
+    // could match a DIFFERENT existing customer whose number happens to
+    // contain this one as a digit sequence, silently overwriting the wrong
+    // customer's record on sync.
     if (!customerId && phone) {
       const { data } = await sb.from('customers')
         .select('id')
         .eq('company_id', companyId)
-        .ilike('phone', `%${phone}%`)
+        .eq('phone', phone)
         .maybeSingle()
       customerId = data?.id ?? null
     }
@@ -220,7 +224,7 @@ export async function POST(req: NextRequest) {
       const { data } = await sb.from('customers')
         .select('id')
         .eq('company_id', companyId)
-        .ilike('whatsapp', `%${whatsapp}%`)
+        .eq('whatsapp', whatsapp)
         .maybeSingle()
       customerId = data?.id ?? null
     }

@@ -92,6 +92,17 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
+        // The only auth here is one shared platform-wide N8N_WEBHOOK_SECRET —
+        // if that secret ever leaks, a caller could otherwise record a fake
+        // payment (and shrink the real balance) against ANY company's debt
+        // by supplying a mismatched company_id/debt_id pair. Verify the debt
+        // actually belongs to the claimed company before writing anything.
+        const { data: debtOwnerCheck } = await supabase
+          .from('debts').select('id').eq('id', debt_id).eq('company_id', company_id).maybeSingle()
+        if (!debtOwnerCheck) {
+          return NextResponse.json({ error: 'debt_id does not belong to company_id' }, { status: 403 })
+        }
+
         // Insert payment
         const { data: payment } = await supabase.from('payments').insert({
           company_id,
@@ -138,6 +149,12 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
+        const { data: statusDebtOwnerCheck } = await supabase
+          .from('debts').select('id').eq('id', debt_id).eq('company_id', company_id).maybeSingle()
+        if (!statusDebtOwnerCheck) {
+          return NextResponse.json({ error: 'debt_id does not belong to company_id' }, { status: 403 })
+        }
+
         // Save to status history (dynamic status mapping)
         await supabase.from('collection_status_history').insert({
           company_id,
@@ -164,6 +181,16 @@ export async function POST(request: NextRequest) {
 
         if (!company_id || !customer_id || !message_content) {
           return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+        }
+
+        // Same cross-tenant risk as payment_synced above — this branch sends
+        // a real WhatsApp message and can change a debt's status, so a
+        // mismatched customer_id/company_id pair must be rejected outright
+        // rather than silently acting on whichever customer_id was supplied.
+        const { data: customerOwnerCheck } = await supabase
+          .from('customers').select('id').eq('id', customer_id).eq('company_id', company_id).maybeSingle()
+        if (!customerOwnerCheck) {
+          return NextResponse.json({ error: 'customer_id does not belong to company_id' }, { status: 403 })
         }
 
         let phone = phone_number

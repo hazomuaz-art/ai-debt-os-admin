@@ -287,10 +287,21 @@ export async function ensurePortfolioForCreditor(supabase: any, companyId: strin
     .from('portfolios').select('id')
     .eq('company_id', companyId).eq('name', name).maybeSingle()
   if (existing) return existing.id
-  const { data: created } = await supabase
+  // 'auto_creditor' is not a valid source_system (real CHECK constraint only
+  // allows manual/debit_collect/tamiuzz/api) — this insert was silently
+  // failing every time (Supabase JS never throws on a constraint violation),
+  // so `created` was always null and every case created via this path had
+  // no portfolio linked at all. 'manual' is the correct fit — this path
+  // fires from manually creating a case in the dashboard, not an automated
+  // import.
+  const { data: created, error } = await supabase
     .from('portfolios')
-    .insert({ company_id: companyId, name, name_ar: name, is_active: true, source_system: 'auto_creditor' })
+    .insert({ company_id: companyId, name, name_ar: name, is_active: true, source_system: 'manual' })
     .select('id').single()
+  if (error) {
+    log.error('ensurePortfolioForCreditor: portfolio creation failed', error)
+    return null
+  }
   return created?.id ?? null
 }
 
