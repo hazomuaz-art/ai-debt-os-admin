@@ -64,7 +64,9 @@
       "PowerShell(cd D:\\\\ai-debt-os-admin; powershell -ExecutionPolicy Bypass -File deploy.ps1 \"fix: auditor cleanup, health nav, disable ai_memory, server-action test fix\")",
       "Read(//c/Users/X13/Downloads/**)",
       "Bash(python3 -c ' *)",
-      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@72.62.30.109 \"pm2 restart ai-debt-os-admin && sleep 2 && curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' http://localhost\")"
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@72.62.30.109 \"pm2 restart ai-debt-os-admin && sleep 2 && curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' http://localhost\")",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }

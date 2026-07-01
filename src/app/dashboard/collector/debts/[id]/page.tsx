@@ -14,6 +14,7 @@ import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
 import { resolveCompanyProfile, findCompanyProfile } from '@/lib/company-import-profiles'
+import CustomerDocumentsPanel from '@/components/debt/CustomerDocumentsPanel'
 
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -120,6 +121,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .order('assigned_at', { ascending: false })
     .limit(5)
 
+  const { data: customerDocuments } = await supabase
+    .from('customer_documents')
+    .select('id, doc_type, ai_summary, needs_admin_review, storage_path, source, created_at')
+    .eq('debt_id', debt.id)
+    .order('created_at', { ascending: false })
+
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
   let outcomeCategories: string[] | null = null
@@ -170,6 +177,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           
           {/* Quick Actions Panel */}
           <QuickActionsPanel debtId={debt.id} currentStatus={debt.status} />
+
+          {/* Documents sent by the customer (receipts + everything else) */}
+          <CustomerDocumentsPanel documents={customerDocuments ?? []} />
 
           {/* Debt Overview */}
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">

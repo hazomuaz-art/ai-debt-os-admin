@@ -17,6 +17,7 @@ import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
 import UnifiedTimeline from '@/components/debt/UnifiedTimeline'
+import CustomerDocumentsPanel from '@/components/debt/CustomerDocumentsPanel'
 import { getPortfolioTableConfig } from '@/lib/portfolio-data-fields'
 import { resolveCompanyProfile, findCompanyProfile } from '@/lib/company-import-profiles'
 
@@ -152,6 +153,12 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .order('assigned_at', { ascending: false })
     .limit(5)
 
+  const { data: customerDocuments } = await supabase
+    .from('customer_documents')
+    .select('id, doc_type, ai_summary, needs_admin_review, storage_path, source, created_at')
+    .eq('debt_id', debt.id)
+    .order('created_at', { ascending: false })
+
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
   // Other debts for the SAME real person (matched by national_id) under any
@@ -267,6 +274,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             statusHistory={collectionStatusHistory ?? []}
             currency={debt.currency}
           />
+
+          {/* Documents sent by the customer (receipts + everything else) */}
+          <CustomerDocumentsPanel documents={customerDocuments ?? []} />
 
           {/* Debt Overview */}
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">

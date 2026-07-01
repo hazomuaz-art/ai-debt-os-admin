@@ -186,8 +186,27 @@ export async function POST(request: NextRequest) {
     const mimetype: string = String(payload?.media?.mimetype ?? '')
     const hasReceiptMedia = !!mediaUrl && (mimetype.startsWith('image/') || mimetype === 'application/pdf')
     if (from.endsWith('@g.us')) { log.info('group message ignored', { from }); return NextResponse.json({ status: 'ok' }) }
+    if (!from) return NextResponse.json({ status: 'ok' })
     // Accept the message if it has text OR a receipt-type attachment.
-    if (!from || (!text && !hasReceiptMedia)) return NextResponse.json({ status: 'ok' })
+    if (!text && !hasReceiptMedia) {
+      // Real gap found during a full-system audit: an attachment type we
+      // don't classify (not image/pdf — e.g. a Word/Excel file, audio note)
+      // sent with no caption text used to vanish completely, with zero trace
+      // anywhere (no log line, no alert) — indistinguishable from nothing
+      // having happened at all. Still nothing to act on automatically (no
+      // classifier for arbitrary file types), but now at least visible to
+      // staff instead of silently dropped.
+      if (mediaUrl) {
+        log.warn('unsupported inbound attachment type — not stored, no reply sent', { from, mimetype })
+        await insertSystemAlert({
+          company_id: null, severity: 'warning', alert_type: 'unsupported_attachment_type',
+          title: 'مرفق بصيغة غير مدعومة من عميل',
+          message: `أرسل الرقم ${from} مرفقاً بصيغة (${mimetype || 'غير معروفة'}) لا يدعمها النظام حالياً للتصنيف — راجعه يدوياً إذا لزم.`,
+          metadata: { from, mimetype },
+        })
+      }
+      return NextResponse.json({ status: 'ok' })
+    }
 
     const phone = await resolvePhone(from, session)
     if (!phone) { log.warn('could not resolve phone', { from }); return NextResponse.json({ status: 'ok' }) }
