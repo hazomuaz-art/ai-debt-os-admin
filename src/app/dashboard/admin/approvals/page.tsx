@@ -44,7 +44,14 @@ export default function ApprovalsPage() {
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  // Real complaint this fixes: a new pending approval (e.g. an installment
+  // request) never appeared until the admin manually refreshed the page —
+  // there was no indication anything new needed a decision. Poll every 20s.
+  useEffect(() => {
+    void load()
+    const interval = setInterval(() => void load(), 20_000)
+    return () => clearInterval(interval)
+  }, [load])
 
   async function act(id: string, status: 'approved' | 'rejected', paymentPlan?: any) {
     await fetch('/api/modules/approvals', {
@@ -142,7 +149,18 @@ export default function ApprovalsPage() {
                           {prLabel}
                         </span>
                         <span className="bg-[#0b0e14] text-slate-300 text-xs px-2.5 py-0.5 rounded-md font-bold">
-                          {TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')}
+                          {(() => {
+                            // Real complaint this fixes: dispute AND installment
+                            // requests both use approval_type='custom' (the real
+                            // DB constraint has no dedicated value for either), so
+                            // this badge showed the same generic "مخصص" label for
+                            // both — the admin couldn't tell what kind of request
+                            // it was without opening/reading the full description.
+                            const subtype = (item as any).requested_data?.request_subtype
+                            if (subtype === 'installment') return 'طلب تقسيط'
+                            if (subtype === 'dispute') return 'اعتراض على المديونية'
+                            return TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')
+                          })()}
                         </span>
                       </div>
                       {item.description && <p className="text-[#8b95a7] text-sm mb-2 leading-relaxed whitespace-pre-wrap">{item.description}</p>}

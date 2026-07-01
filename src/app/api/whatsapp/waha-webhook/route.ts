@@ -334,13 +334,25 @@ export async function POST(request: NextRequest) {
 
       // Promise → record ONLY with the date the agent extracted from the
       // customer's own current message (never fabricated).
+      //
+      // Real gap this fixes: this always recorded the promise as if the
+      // customer committed to the FULL current_balance, even when they
+      // explicitly named a smaller amount (e.g. "بسدد 200 الشهر" against a
+      // 789 balance) — there was no way to tell "promised full payment"
+      // apart from "promised a partial/installment amount" anywhere in the
+      // system. aiDecision.promised_partial_amount is only set by the model
+      // when the customer's own words specified a smaller number.
       if (aiDecision.action === 'record_promise' && effectiveDebtId && aiDecision.promised_date) {
         const { recordPromise } = await import('@/lib/promise')
+        const fullBalance = Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0)
+        const partial = aiDecision.promised_partial_amount
+        const isPartial = typeof partial === 'number' && partial > 0 && partial < fullBalance
         await recordPromise({
           company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
-          promised_amount: Number((latestDebt as { current_balance?: number } | null)?.current_balance ?? 0),
+          promised_amount: isPartial ? partial : fullBalance,
           promised_date: aiDecision.promised_date, customer_message: mergedText,
           promise_text: aiDecision.promise_text ?? null,
+          promise_type: isPartial ? 'partial' : 'full',
         })
       } else if (aiDecision.action === 'record_promise' && effectiveDebtId && !aiDecision.promised_date) {
         // The agent's internal guards should always force a date before

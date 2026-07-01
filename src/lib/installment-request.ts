@@ -28,11 +28,18 @@ export async function recordInstallmentRequest(args: {
   // custom) — every installment request built this session has been
   // failing to save silently since it shipped, despite the log line below
   // claiming success. Found during the full-system constraint audit.
+  //
+  // A second, separate bug found later: entity_type was 'debts' (plural)
+  // here while every other approval-writer in the codebase (dispute.ts) and
+  // the admin approvals dashboard's own data (all 75 real rows) consistently
+  // use 'debt' (singular). The approvals API route does defensively accept
+  // both spellings, but this mismatch meant an admin who filters/searches
+  // by the real convention could still miss these — fixed to match.
   const { data: existing } = await supabase
     .from('approvals')
     .select('id')
     .eq('company_id', args.company_id)
-    .eq('entity_type', 'debts').eq('entity_id', args.debt_id)
+    .eq('entity_type', 'debt').eq('entity_id', args.debt_id)
     .eq('approval_type', 'custom')
     .eq('status', 'pending')
     .limit(1).maybeSingle()
@@ -45,7 +52,7 @@ export async function recordInstallmentRequest(args: {
     .from('debts').select('current_balance, currency').eq('id', args.debt_id).maybeSingle()
 
   const created = await insertApproval({
-    company_id: args.company_id, approval_type: 'custom', entity_type: 'debts', entity_id: args.debt_id,
+    company_id: args.company_id, approval_type: 'custom', entity_type: 'debt', entity_id: args.debt_id,
     title: `طلب تقسيط: ${args.customer_name ?? ''}`,
     description: [
       `العميل يطلب التقسيط لمديونية بقيمة ${debt?.current_balance ?? ''} ${debt?.currency ?? ''}.`,

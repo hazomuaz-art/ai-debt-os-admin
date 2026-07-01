@@ -19,10 +19,27 @@ const SEV_ARABIC: Record<AlertSeverity, string> = {
 }
 
 const SEV_ICONS: Record<AlertSeverity, JSX.Element> = {
-  info: <Info size={20} className="text-blue-500" />, 
-  warning: <AlertTriangle size={20} className="text-amber-500" />, 
-  error: <XCircle size={20} className="text-orange-500" />, 
+  info: <Info size={20} className="text-blue-500" />,
+  warning: <AlertTriangle size={20} className="text-amber-500" />,
+  error: <XCircle size={20} className="text-orange-500" />,
   critical: <AlertOctagon size={20} className="text-rose-500" />,
+}
+
+// Real complaint this fixes: the raw machine-readable alert_type
+// (snake_case, e.g. "whatsapp_disconnected") was shown as-is, which reads
+// as noise/unclear to a non-technical user — translate the known types to
+// plain Arabic, falling back to the raw value only for a genuinely unknown
+// type so nothing silently disappears.
+const ALERT_TYPE_LABELS: Record<string, string> = {
+  whatsapp_disconnected: 'انقطاع اتصال واتساب',
+  whatsapp_delivery_failure: 'فشل تسليم رسائل واتساب',
+  whatsapp_session_broken: 'جلسة واتساب معطوبة',
+  unknown_number: 'رسالة من رقم غير معروف',
+  payment_received: 'سداد جديد',
+  sync_completed: 'مزامنة مكتملة',
+  installment_request: 'طلب تقسيط',
+  promise_not_recorded: 'وعد سداد لم يُسجَّل',
+  outcome_needs_human_review: 'يحتاج مراجعة بشرية',
 }
 
 export default function AlertsPage() {
@@ -39,7 +56,15 @@ export default function AlertsPage() {
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  // Real complaint this fixes: the page never updated on its own — a new
+  // critical alert (e.g. WhatsApp disconnected) only appeared after the
+  // user manually clicked "تحديث". Poll every 20s so new alerts surface
+  // without any action needed.
+  useEffect(() => {
+    void load()
+    const interval = setInterval(() => void load(), 20_000)
+    return () => clearInterval(interval)
+  }, [load])
 
   async function resolve(id: string) {
     setAlerts(prev => prev.filter(a => a.id !== id))
@@ -159,8 +184,8 @@ export default function AlertsPage() {
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${SEV[alert.severity]}`}>
                         {SEV_ARABIC[alert.severity]}
                       </span>
-                      <span className="bg-[#0b0e14] text-[#8b95a7] text-[10px] font-bold px-2 py-1 rounded-md font-mono">
-                        المصدر: {alert.alert_type}
+                      <span className="bg-[#0b0e14] text-[#8b95a7] text-[10px] font-bold px-2 py-1 rounded-md">
+                        {ALERT_TYPE_LABELS[alert.alert_type] ?? alert.alert_type}
                       </span>
                     </div>
                     

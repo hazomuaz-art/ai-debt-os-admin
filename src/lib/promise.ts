@@ -23,10 +23,19 @@ export async function recordPromise(args: {
   // الجاي", "بكرا"...). Stored verbatim so later turns reference the real
   // promise even when the date is only a best-effort conversion.
   promise_text?: string | null
+  // Real gap this fixes: there was no way to tell a promise to pay the
+  // FULL balance apart from a promise to pay only a PARTIAL/installment
+  // amount — every promise looked identical on the promises page regardless
+  // of what the customer actually committed to. There's no dedicated schema
+  // column for this (would need a migration), so it's tagged plainly at the
+  // front of `notes`, which the promises page already displays, making it
+  // immediately visible without a schema change.
+  promise_type?: 'full' | 'partial'
 }): Promise<void> {
   const supabase = createServiceClient()
 
   const noteParts: string[] = []
+  noteParts.push(args.promise_type === 'partial' ? '📌 نوع الوعد: سداد جزئي/تقسيط' : '📌 نوع الوعد: سداد كامل')
   if (args.promise_text) noteParts.push(`توقيت العميل: ${args.promise_text}`)
   noteParts.push(`كلام العميل: "${args.customer_message}"`)
   const notes = noteParts.join(' — ')
