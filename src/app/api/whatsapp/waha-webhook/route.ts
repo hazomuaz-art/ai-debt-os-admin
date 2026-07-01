@@ -199,7 +199,25 @@ export async function POST(request: NextRequest) {
       .or([`whatsapp.eq.${phone}`, `whatsapp.eq.+${phone}`, `phone.eq.${phone}`, `phone.eq.+${phone}`].join(','))
       .limit(1).maybeSingle()
 
-    if (!customer) { log.warn('no customer for inbound', { phone }); return NextResponse.json({ status: 'ok' }) }
+    if (!customer) {
+      // Real production gap: an inbound message from a phone that matches no
+      // customer record used to vanish with only an SSH-visible log line —
+      // no dashboard trace at all, no way for staff to discover it happened,
+      // let alone link it to the right customer manually. company_id is
+      // unknown at this point (that's exactly the problem), so this alert is
+      // platform-wide (company_id: null) — every company-scoped alerts view
+      // filters by company_id, so an admin/platform-owner view must be relied
+      // on to see these; that's an accepted tradeoff of not being able to
+      // attribute an unmatched phone to any company.
+      log.warn('no customer for inbound', { phone })
+      await insertSystemAlert({
+        company_id: null, severity: 'warning', alert_type: 'unmatched_inbound_message',
+        title: 'رسالة واردة من رقم غير مرتبط بأي عميل',
+        message: `وصلت رسالة واتساب من الرقم ${phone} ولا يوجد عميل مطابق له في النظام — راجع الرسالة واربطها يدوياً إذا لزم.`,
+        metadata: { phone, text: text || null, has_media: hasReceiptMedia, mimetype: mimetype || null },
+      })
+      return NextResponse.json({ status: 'ok' })
+    }
 
     const c = customer as { id: string; company_id: string; full_name?: string; ai_paused?: boolean }
     const msgId = String(payload?.id?._serialized ?? payload?.id ?? '').split('_').pop() ?? null
@@ -258,23 +276,92 @@ export async function POST(request: NextRequest) {
 
     if (c.ai_paused) { log.info('AI paused — skipping reply', { customer_id: c.id }); return NextResponse.json({ status: 'ok' }) }
 
-    // Payment receipt (image / PDF) → OCR verification pipeline.
+    // Any image/PDF attachment → classify its ACTUAL content first. Real
+    // production gap this fixes: every attachment used to be assumed a
+    // payment receipt outright, and if the OCR verdict was "not a receipt"
+    // the whole branch dead-ended with an early `return` — no reply, no
+    // storage, no record it was ever received. Now: analyze first, store the
+    // document under its real classification linked to the customer/debt,
+    // ALWAYS reply, and only fall into the receipt-verification pipeline once
+    // the content itself has actually been confirmed to be a receipt.
     if (hasReceiptMedia) {
       ;(async () => {
         try {
           const r = await fetch(wahaMediaUrl(mediaUrl), { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
-          if (!r.ok) { log.error('receipt media download failed', undefined, { status: r.status }); return }
+          if (!r.ok) { log.error('document media download failed', undefined, { status: r.status }); return }
           const b64 = Buffer.from(await r.arrayBuffer()).toString('base64')
-          const { processInboundReceipt } = await import('@/lib/payment-receipt')
-          await processInboundReceipt({
-            company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
-            debt_id, phone, source: mimetype === 'application/pdf' ? 'pdf' : 'image', data: b64,
+          const isPdf = mimetype === 'application/pdf'
+
+          const { classifyDocumentImage, classifyDocumentPdf } = await import('@/lib/document-classifier')
+          const classification = isPdf ? await classifyDocumentPdf(b64) : await classifyDocumentImage(b64)
+
+          // Persist the original file regardless of type — never OCR'd then
+          // discarded. Non-critical: a storage failure never blocks the reply.
+          let storagePath: string | null = null
+          try {
+            const ext = isPdf ? 'pdf' : 'jpg'
+            const path = `${c.company_id}/${c.id}/${Date.now()}.${ext}`
+            const { error: upErr } = await supabase.storage.from('customer-documents')
+              .upload(path, Buffer.from(b64, 'base64'), { contentType: mimetype || (isPdf ? 'application/pdf' : 'image/jpeg') })
+            if (!upErr) storagePath = path
+            else log.error('customer document upload failed', new Error(upErr.message))
+          } catch (e) {
+            log.error('customer document upload threw', e as Error)
+          }
+
+          await supabase.from('customer_documents').insert({
+            company_id: c.company_id, customer_id: c.id, debt_id,
+            doc_type: classification.doc_type, needs_admin_review: classification.needs_admin_review,
+            ai_summary: classification.summary, ai_confidence: classification.confidence,
+            storage_path: storagePath, source: 'whatsapp', raw_analysis: classification,
           })
+
+          // Confirmed receipt → hand off to the dedicated OCR/verification
+          // pipeline, which does its own beneficiary-matching and reply.
+          if (classification.doc_type === 'receipt') {
+            const { processInboundReceipt } = await import('@/lib/payment-receipt')
+            await processInboundReceipt({
+              company_id: c.company_id, customer_id: c.id, customer_name: c.full_name,
+              debt_id, phone, source: isPdf ? 'pdf' : 'image', data: b64,
+            })
+            return
+          }
+
+          // Every other classification still gets a reply — never silent.
+          // Saudi-dialect phrasing the user specified for anything that might
+          // require administrative review (statement/letter/judgment/proof of
+          // payment/debt waiver); a generic id/other document just gets a
+          // plain acknowledgment.
+          const ackMessage = classification.needs_admin_review
+            ? 'شكراً لك، تم استلام المستند وتحليله، وسيتم رفعه للإدارة المختصة للمراجعة، وسنقوم بإبلاغك بالنتيجة بمجرد الانتهاء.'
+            : 'استلمت المرفق، شكراً لك.'
+          const wr = await sendWhatsAppMessage({ to: phone, message: ackMessage, company_id: c.company_id })
+          await supabase.from('messages').insert({
+            company_id: c.company_id, customer_id: c.id, debt_id,
+            channel: 'whatsapp', direction: 'outbound', content: ackMessage,
+            status: wr.status === 'sent' ? 'sent' : 'failed',
+            whatsapp_message_id: wr.message_id || null,
+            metadata: { sender: 'ai', action_type: 'document_ack', source: 'document_classification', doc_type: classification.doc_type },
+            sent_at: new Date().toISOString(),
+          })
+
+          if (classification.needs_admin_review) {
+            await insertSystemAlert({
+              company_id: c.company_id, severity: 'warning', alert_type: 'document_needs_review',
+              title: `مستند يحتاج مراجعة: ${classification.doc_type}`,
+              message: `العميل ${c.full_name ?? ''} أرسل مستنداً (${classification.doc_type}) — ${classification.summary || 'راجع المرفق للتفاصيل'}.`,
+              metadata: { customer_id: c.id, debt_id, doc_type: classification.doc_type, storage_path: storagePath },
+            })
+          }
         } catch (err) {
-          log.error('WAHA receipt processing error', err as Error)
+          log.error('WAHA document processing error', err as Error)
         }
       })().catch(() => {})
-      return NextResponse.json({ status: 'ok' })
+      // If the customer sent ONLY media with no caption text, there's nothing
+      // for the conversational agent to respond to beyond the document
+      // acknowledgment handled above — stop here. If they also sent text
+      // alongside the attachment, fall through so the agent still processes it.
+      if (!text) return NextResponse.json({ status: 'ok' })
     }
 
     // Run the collector agent and reply (sendWhatsAppMessage routes via WAHA).

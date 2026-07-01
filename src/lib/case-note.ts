@@ -17,6 +17,26 @@ function extractJson(raw: string): any | null {
   if (first !== -1 && last > first) {
     try { return JSON.parse(s.slice(first, last + 1)) } catch {}
   }
+  // Real production root cause: a long, active conversation produces a
+  // longer note that got cut off mid-string by max_tokens, leaving JSON with
+  // no closing brace at all — the two parse attempts above both fail and the
+  // note silently never updates again for that debt, forever (confirmed live
+  // via a real customer stuck on a stale note for 14+ hours across 76
+  // messages while every other part of the pipeline kept working fine).
+  // max_tokens was raised to fix the truncation itself, but a huge
+  // conversation can still occasionally exceed it — this regex fallback
+  // recovers the "note" field's value even from a JSON object with no
+  // closing brace, since that field is written first and is usually intact
+  // even when "recommended_approach" gets cut off.
+  const noteMatch = s.match(/"note"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (noteMatch) {
+    try {
+      const note = JSON.parse(`"${noteMatch[1]}"`)
+      const approachMatch = s.match(/"recommended_approach"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+      const recommended_approach = approachMatch ? JSON.parse(`"${approachMatch[1]}"`) : undefined
+      return { note, recommended_approach }
+    } catch {}
+  }
   return null
 }
 
@@ -92,7 +112,16 @@ export async function updateCaseNote(args: {
     const completion = await client.chat.completions.create({
       model: 'anthropic/claude-sonnet-4.6',
       temperature: 0,
-      max_tokens: 260,
+      // Was 260 — root cause of the case note silently freezing forever on
+      // any sufficiently long/active conversation: a 3-5 sentence Arabic
+      // summary plus the recommended_approach field routinely exceeds 260
+      // tokens once there's real substance to summarize (promises, disputes,
+      // multiple topics), truncating the JSON mid-string so it can never be
+      // parsed — confirmed live in production (a real debt stuck on a
+      // 14+ hour stale note across 76 messages, logging "no usable note" on
+      // every single turn since). 600 gives enough headroom for a genuinely
+      // long conversation's summary without ever hitting this ceiling.
+      max_tokens: 600,
       messages: [
         {
           role: 'system',

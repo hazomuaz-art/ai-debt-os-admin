@@ -40,6 +40,8 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   installment_request: 'طلب تقسيط',
   promise_not_recorded: 'وعد سداد لم يُسجَّل',
   outcome_needs_human_review: 'يحتاج مراجعة بشرية',
+  unmatched_inbound_message: 'رسالة من رقم غير مرتبط بعميل',
+  document_needs_review: 'مستند يحتاج مراجعة إدارية',
 }
 
 export default function AlertsPage() {

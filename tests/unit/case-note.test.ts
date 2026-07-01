@@ -79,4 +79,23 @@ describe('updateCaseNote', () => {
     await expect(updateCaseNote({ company_id: 'c', debt_id: 'missing' })).resolves.toBeUndefined()
     expect(updateCalls.length).toBe(0)
   })
+
+  // Regression for the real production bug: a long/active conversation
+  // produces a note long enough that the model's JSON response gets cut off
+  // mid-string with no closing brace — confirmed live (a debt stuck on a
+  // stale note for 14+ hours across 76 messages, "no usable note" logged on
+  // every turn). The note field is written first and is usually intact even
+  // when the response is truncated right after it — must still recover it.
+  it('recovers the note from a truncated JSON response (no closing brace) instead of discarding it', async () => {
+    mockModelContent = '{"note": "العميل وعد بالسداد يوم 27 من الشهر، وسبق أن تراجع عن وعد أول مرة قبل أن يؤكد مجدداً. الحالة نشطة ومتابَعة", "recommended_ap'
+    await updateCaseNote({ company_id: 'c', debt_id: 'd1' })
+    expect(updateCalls.length).toBe(1)
+    expect(updateCalls[0].metadata.case_note).toContain('وعد بالسداد يوم 27')
+  })
+
+  it('still discards a response with no recoverable note field at all', async () => {
+    mockModelContent = '{"recommended_approach": "تابع بعد 3 أيام'
+    await updateCaseNote({ company_id: 'c', debt_id: 'd1' })
+    expect(updateCalls.length).toBe(0)
+  })
 })
