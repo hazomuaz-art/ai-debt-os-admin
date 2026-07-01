@@ -138,7 +138,22 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
         log.error('WAHA send failed', undefined, { to, error: String(errMsg) })
         return { message_id: null, status: 'failed', error: String(errMsg) }
       }
-      const messageId = data?._data?.id?._serialized || data?.id?._serialized || data?.id || null
+      // Real production root cause (confirmed by directly testing the live
+      // WAHA send API): the WEBJS engine returned the message id at
+      // data._data.id._serialized / data.id._serialized, which is what the
+      // checks below originally covered. Switching the session to the
+      // NOWEB engine (done to fix an unrelated connectivity issue) changed
+      // the response shape entirely — NOWEB returns the id at
+      // `data.key.id` instead. None of the old paths matched it, so EVERY
+      // send since that engine switch saved whatsapp_message_id = null.
+      // That null id meant the inbound message.ack webhook could never
+      // match a delivery confirmation back to its row, so verify-delivery's
+      // cron saw these customers as having "zero ever-delivered messages",
+      // classified their session as broken, and started auto-retrying their
+      // most recent message — which is what actually produced the literal
+      // duplicate-text sends reported in production, all while every
+      // send had genuinely succeeded already.
+      const messageId = data?.key?.id || data?._data?.id?._serialized || data?.id?._serialized || data?.id || null
       log.info('WAHA message sent', { to, message_id: messageId })
       return { message_id: messageId, status: 'sent' }
     } catch (err) {
