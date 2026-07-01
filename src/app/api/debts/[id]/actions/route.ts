@@ -23,10 +23,17 @@ const log = createLogger('api/debts/actions')
 // again would be a compile error, not a silent failure.
 async function logTimeline(
   _supabase: ReturnType<typeof createClient>,
-  row: { company_id: string; debt_id: string; event_type: TimelineEventType; summary: string; detail?: string; actor_name: string },
+  row: { company_id: string; debt_id: string; customer_id: string; event_type: TimelineEventType; summary: string; detail?: string; actor_name: string },
 ) {
+  // Real gap found during a live-traffic audit (2026-07-01): every call site
+  // in this route omitted customer_id entirely — timeline_events.customer_id
+  // is NOT NULL, so every one of these inserts (promise/dispute/handoff/
+  // follow-up/note) has been silently failing at the DB level for every
+  // manual collector action, the exact same silent-failure class the
+  // event_type/actor_type fix above already addressed, just for a column
+  // nobody had wired through yet.
   await insertTimelineEvent({
-    company_id: row.company_id, debt_id: row.debt_id,
+    company_id: row.company_id, debt_id: row.debt_id, customer_id: row.customer_id,
     event_type: row.event_type, channel: 'manual', summary: row.summary, detail: row.detail ?? null,
     actor_type: 'collector', actor_name: row.actor_name, ai_used: false,
   })
@@ -63,13 +70,14 @@ export async function POST(
     // could mutate another company's debt by guessing/knowing its id.
     const { data: debt, error: debtErr } = await supabase
       .from('debts')
-      .select('id, company_id')
+      .select('id, company_id, customer_id')
       .eq('id', debtId)
       .eq('company_id', profile.company_id)
       .maybeSingle()
     if (debtErr || !debt) {
       return NextResponse.json({ error: 'Debt not found' }, { status: 404 })
     }
+    const customerId = (debt as { customer_id: string }).customer_id
 
     switch (action) {
       case 'promise_to_pay': {
@@ -88,7 +96,7 @@ export async function POST(
         if (dErr) log.error('debt status update (promise) failed', new Error(dErr.message), { debtId })
 
         await logTimeline(supabase, {
-          company_id: profile.company_id, debt_id: debtId, event_type: 'promise_to_pay',
+          company_id: profile.company_id, debt_id: debtId, customer_id: customerId, event_type: 'promise_to_pay',
           summary: 'تسجيل وعد بالسداد', detail: `المبلغ الموعود: ${amount}، التاريخ: ${date}`, actor_name: actorName,
         })
         break
@@ -99,7 +107,7 @@ export async function POST(
         if (dErr) log.error('debt status update (dispute) failed', new Error(dErr.message), { debtId })
 
         await logTimeline(supabase, {
-          company_id: profile.company_id, debt_id: debtId, event_type: 'status_change',
+          company_id: profile.company_id, debt_id: debtId, customer_id: customerId, event_type: 'status_change',
           summary: 'تسجيل اعتراض من العميل', detail: `السبب: ${reason}`, actor_name: actorName,
         })
         break
@@ -113,7 +121,7 @@ export async function POST(
         if (hErr) log.error('debt status update (handoff) failed', new Error(hErr.message), { debtId })
 
         await logTimeline(supabase, {
-          company_id: profile.company_id, debt_id: debtId, event_type: 'human_handoff',
+          company_id: profile.company_id, debt_id: debtId, customer_id: customerId, event_type: 'human_handoff',
           summary: 'تحويل للتدخل البشري', detail: 'تم إيقاف الرد الآلي وتثبيت الملف للمحصل.', actor_name: actorName,
         })
         break
@@ -124,7 +132,7 @@ export async function POST(
         if (fErr) log.error('debt status update (follow_up) failed', new Error(fErr.message), { debtId })
 
         await logTimeline(supabase, {
-          company_id: profile.company_id, debt_id: debtId, event_type: 'status_change',
+          company_id: profile.company_id, debt_id: debtId, customer_id: customerId, event_type: 'status_change',
           summary: 'إضافة للمتابعة', actor_name: actorName,
         })
         break
@@ -139,7 +147,7 @@ export async function POST(
         if (nErr) log.error('debt note update failed', new Error(nErr.message), { debtId })
 
         await logTimeline(supabase, {
-          company_id: profile.company_id, debt_id: debtId, event_type: 'collector_note',
+          company_id: profile.company_id, debt_id: debtId, customer_id: customerId, event_type: 'collector_note',
           summary: 'تحديث بيانات المتابعة', detail: note, actor_name: actorName,
         })
         break
