@@ -44,7 +44,22 @@ export async function classifyDebtOutcome(args: {
     baseURL: 'https://openrouter.ai/api/v1',
   })
 
-  const list = profile.outcomeCategories.map((c, i) => `${i + 1}. ${c}`).join('\n')
+  // Real root cause of the agent only ever using 1-2 categories (usually
+  // "متنازع عليه"/"وعد بالسداد") despite the company having 10-30 possible
+  // outcomes: the model only ever saw the BARE category NAMES here — no
+  // explanation of what each one means or when it applies. Categories with
+  // obvious keyword overlap with what a customer literally says (dispute,
+  // payment promise) matched easily; internal collector-jargon categories
+  // (e.g. "الرقم مغلق", "خروج نهائى", "تحديث") were effectively invisible
+  // to the model since nothing explained them. `profile.outcomeMeta[c]`
+  // already has a real Arabic `meaning` line for every category (used
+  // elsewhere to drive the agent's next-turn behavior) — it just was never
+  // shown to the classifier itself. Now every category is listed WITH its
+  // meaning, giving the model actual grounding to match against instead of
+  // guessing from a bare label.
+  const list = profile.outcomeCategories
+    .map((c, i) => `${i + 1}. "${c}" — ${profile.outcomeMeta[c]?.meaning ?? c}`)
+    .join('\n')
 
   try {
     const completion = await client.chat.completions.create({
@@ -55,7 +70,8 @@ export async function classifyDebtOutcome(args: {
         {
           role: 'system',
           content:
-            'أنت مصنّف حالات تحصيل ديون. مهمتك فقط مطابقة رسالة العميل بتصنيف واحد من القائمة المغلقة أدناه، أو إرجاع null إن لم ينطبق أي تصنيف بوضوح على الرسالة الحالية. ' +
+            'أنت مصنّف حالات تحصيل ديون. مهمتك مطابقة رسالة العميل بأدق تصنيف من القائمة المغلقة أدناه (كل تصنيف مذكور مع معناه الحقيقي)، أو إرجاع null إن لم ينطبق أي تصنيف بوضوح على الرسالة الحالية. ' +
+            'اقرأ معنى كل تصنيف فعلياً قبل الاختيار — لا تكتفِ بالتصنيفات "الواضحة" مثل الاعتراض أو وعد السداد فقط؛ القائمة تشمل حالات تشغيلية أخرى (مشكلة رقم تواصل، طلب تقسيط/مهلة، مماطلة سابقة، حالة خاصة كوفاة/سجن/إفلاس، إلخ) وكل واحدة منها لها معنى محدد يجب اختياره متى ما انطبق فعلياً على كلام العميل. ' +
             'ممنوع منعاً باتاً إخراج أي نص خارج القائمة. أرجع JSON فقط بالشكل: {"category": "النص الحرفي من القائمة" أو null}.',
         },
         {
