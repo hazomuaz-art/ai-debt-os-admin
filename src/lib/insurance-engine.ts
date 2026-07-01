@@ -109,6 +109,11 @@ export function detectInsuranceObjectionSignals(text: string): InsuranceObjectio
 // (caller must skip the section entirely) when claim_type is null.
 export function renderInsuranceCaseFile(c: InsuranceCaseFile): string {
   const lines: string[] = []
+  // "البرنت": standard Saudi customer terminology for the traffic
+  // department's accident report/printout — real production incident this
+  // fixes: the agent asked the customer "وش تقصد بالبرنت؟" instead of
+  // recognizing standard domain vocabulary for this exact portfolio type.
+  lines.push('- "البرنت" (يذكرها العملاء غالباً): تقرير/إفادة الحادث الصادرة من إدارة المرور — وثيقة رسمية توضح تفاصيل الحادث والمسؤولية. إذا ذكرها العميل فهو يقصد هذا التقرير بالضبط، لا تسأله "وش تقصد؟".')
   lines.push(`- نوع المطالبة: ${c.claim_type === 'recourse' ? 'حق رجوع (كان للعميل تأمين وقت الحادث لكن سقط حقه بالتغطية بسبب مخالفة شرط من الوثيقة، والشركة عوّضت المتضرر ثم رجعت على العميل)' : 'طرف ثالث (لا يوجد تأمين ساري وقت الحادث أو لا يوجد تأمين أساساً، والشركة عوّضت المتضرر ثم تطالب العميل)'}`)
   if (c.recourse_reason) lines.push(`- سبب الرجوع المسجَّل: ${c.recourse_reason}`)
   if (c.fault_percentage != null) lines.push(`- نسبة الخطأ المسجَّلة: ${c.fault_percentage}%`)
@@ -116,7 +121,14 @@ export function renderInsuranceCaseFile(c: InsuranceCaseFile): string {
   if (c.accident_date) lines.push(`- تاريخ الحادث: ${c.accident_date}`)
   if (c.accident_city) lines.push(`- مدينة الحادث: ${c.accident_city}`)
   if (c.plate_number) lines.push(`- رقم اللوحة: ${c.plate_number}`)
+  lines.push('- إذا سأل العميل "ليش علي هذا المبلغ؟" أو ما شابه: اشرح له من السبب المسجَّل أعلاه وتفاصيل الحادث مباشرة — لا تكتفِ بذكر اسم "حق رجوع" فقط بدون تفسير.')
   lines.push('- 🔴🔴 أي اعتراض من العميل على سبب الرجوع أو نسبة الخطأ أو أي مستند يخص الحادث: لا تحسمه أنت، لا توافق ولا ترفض — فقط أكّد أنك ستفتح مراجعة للملف.')
+  // Real production incident this fixes: the agent labelled a customer who
+  // simply stated he has counter-evidence (a renewed license) as "هذا
+  // الاعتراض" in an accusatory tone — the customer never used the word
+  // "اعتراض" himself. Providing evidence is not automatically a hostile
+  // dispute; frame it as evidence intake, not confrontation.
+  lines.push('- 🔴 إذا ذكر العميل أن عنده مستنداً يثبت خلاف المسؤولية (تجديد رخصة، وثيقة تأمين، إفادة مرور مختلفة، شهادة...) دون أن يستخدم هو نفسه كلمة "اعتراض": هذا تقديم دليل يستحق أخذه بجدية، وليس اعتراضاً بالمعنى العدائي — لا تصفه للعميل بكلمة "اعتراض" أو تضعه في موقف دفاعي. تعامل معه بجدية، اطلب منه إرسال صورة المستند بوضوح، وأخبره أنك سترفعه للمراجعة الفعلية من الفريق المختص لفحصه مقابل بيانات الحادث المسجّلة.')
   lines.push('- 🔴 ممنوع أن تقرر أو تلمّح بأن المطالبة سقطت أو أُلغيت — هذا قرار بشري بعد المراجعة فقط.')
   return lines.join('\n')
 }

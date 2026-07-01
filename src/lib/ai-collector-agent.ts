@@ -972,11 +972,12 @@ export async function runCollectorAgent(args: {
   // customer_data_tawuniya/medgulf (already fetched by Phase 1's context
   // engine). Only ever built for category='insurance'; for every other
   // category this stays null and nothing insurance-specific is injected.
-  const insuranceRow = playbook.category === 'insurance'
+  const isInsurancePortfolio = playbook.category === 'insurance'
+  const insuranceRow = isInsurancePortfolio
     ? (ctx360.customerDataByPortfolio?.[resolvedPortfolioId ?? 'no_portfolio'] ?? [])[0]
     : null
   const insuranceCase = insuranceRow ? classifyInsuranceCase(insuranceRow) : null
-  const insuranceObjection = playbook.category === 'insurance' ? detectInsuranceObjectionSignals(text) : null
+  const insuranceObjection = isInsurancePortfolio ? detectInsuranceObjectionSignals(text) : null
 
   // ── Repeated-refusal tracking (feeds the legal-escalation-check cron,
   // which opens a 'repeated_refusal' escalation after 3+ refusals + 48h).
@@ -997,7 +998,7 @@ export async function runCollectorAgent(args: {
   if (forcedDebtId) {
     const mandatory = detectMandatoryEscalation({
       text,
-      isInsurancePortfolio: playbook.category === 'insurance',
+      isInsurancePortfolio,
       insuranceObjection,
       insuranceCase,
       customEscalationRules: playbook.escalation_rules,
@@ -1155,7 +1156,13 @@ export async function runCollectorAgent(args: {
   // to INFO_REQUEST so the Mobily knowledge block is answered directly,
   // never falling through to GENERAL's pressure template. Gated on Mobily.
   const asksMobilyFieldMeaning = isMobilyPortfolio && detectMobilyFieldMeaningQuestion(text)
-  if (signals.asksWhoAreYou || signals.asksCompany || signals.asksDetails || asksStcFieldMeaning || asksMobilyFieldMeaning) {
+  // Same pattern: "البرنت" ("what does البرنت mean?") must route to
+  // INFO_REQUEST so the insurance knowledge block above actually answers it
+  // — the real incident this fixes: the agent asked the customer "وش تقصد
+  // بالبرنت؟" instead of recognizing it as standard terminology for the
+  // traffic department's accident report.
+  const asksInsuranceFieldMeaning = isInsurancePortfolio && hasAny(text, ['برنت', 'البرنت'])
+  if (signals.asksWhoAreYou || signals.asksCompany || signals.asksDetails || asksStcFieldMeaning || asksMobilyFieldMeaning || asksInsuranceFieldMeaning) {
     intent = 'INFO_REQUEST'
   } else if (signals.deniesDebt) {
     intent = 'DISPUTE'
@@ -1222,6 +1229,7 @@ export async function runCollectorAgent(args: {
 - إن كانت بعض التفاصيل المطلوبة فعلاً غير موجودة في الملف (لا اسم جهة ولا رقم حساب ولا أي شيء): وضّح فقط أن هذا الجزء بالذات غير متوفر حالياً، وقل إنك ستتحقق منه، بدل التعميم بأن "كل شيء غير معروف".
 ${isStcPortfolio ? '- 🔴 إذا سأل عن "رقم الخدمة" أو "رقم الحساب" أو "نوع الخدمة" أو معنى "مع جهاز/بدون جهاز" أو معنى "تاريخ التعثر": أجب مباشرة من قسم "معرفة تشغيلية خاصة بـ STC" في ملف القضية إن وُجد — لا تحوّل للإدارة ولا تصعّد، هذي معلومة عادية تشرحها بنفسك فوراً.' : ''}
 ${isMobilyPortfolio ? '- 🔴 إذا سأل عن "رقم الخدمة" أو "رقم الحساب" أو "حالة الخدمة" أو "طريقة/رقم السداد": أجب مباشرة من قسم "معرفة تشغيلية خاصة بموبايلي" في ملف القضية. عند سؤاله عن رقم السداد، أعطه فقط الرقم الصحيح المحدّد هناك حسب حالة الخدمة (Inactive→رقم الخدمة، Closed→رقم الحساب) — ممنوع إعطاء الرقم الخطأ.' : ''}
+${isInsurancePortfolio ? '- 🔴 إذا سأل "ليش علي هذا المبلغ؟" أو عن سبب حق الرجوع أو ذكر "البرنت": أجب مباشرة من قسم "معرفة تشغيلية خاصة بمطالبات حق الرجوع" في ملف القضية (سبب حق الرجوع، تفاصيل الحادث). لا تكتفِ بترديد "حق رجوع" بدون تفسير حقيقي، ولا تسأله "وش تقصد بالبرنت؟".' : ''}
 - 🔴🔴 ممنوع منعاً باتاً إضافة أي ضغط سداد أو تذكير بموعد أو مطالبة بالدفع في هذا الرد — مهمتك الآن فقط الإجابة على سؤاله. لا تكتب "والمهم موعدك..." أو "بانتظار سدادك" أو أي جملة تعيد الحديث عن السداد، إلا إذا كان العميل نفسه سأل في رسالته الحالية عن السداد أو الموعد أو وعد به. الرد يتوقف عند الإجابة على سؤاله فقط.`,
     DISPUTE: `【 مهمتك الآن: فهم الاعتراض، مناقشته، وإقناع العميل — لا تصعيد سريع 】
 - العميل غاضب أو ينكر المديونية أو يقول الرقم خطأ أو يقول "معترض" بدون أي تفصيل.
