@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateDebtStatusAction } from '@/lib/actions/debts'
+import { updateDebtStatusAction, updateDebtCompanyCategoryAction } from '@/lib/actions/debts'
 
 const STATUSES = [
   'active',
@@ -34,44 +34,62 @@ export default function UpdateDebtStatusSelect({
   debtId,
   currentStatus,
   companySubStatus,
+  companyCategories,
 }: {
   debtId: string
   currentStatus: string
-  // The AI agent's own company-specific classification (e.g. "حذف مسترد
-  // وجود رخصة / تجديد" for an insurance recourse claim) — free-text, set
-  // automatically by classifyDebtOutcome, never picked manually. When
-  // present, it's shown as the CURRENTLY SELECTED entry in this same
-  // dropdown (not a separate readout) so "حالة المديونية" always reflects
-  // the agent's real, specific classification when one exists, falling
-  // back to the generic status list otherwise.
+  // The AI agent's own company-specific classification currently set on
+  // this debt (e.g. "حذف مسترد وجود رخصة / تجديد") — written automatically
+  // by classifyDebtOutcome when it recognizes an outcome mid-conversation.
   companySubStatus?: string | null
+  // The FULL list of this company's possible outcome categories (from
+  // company-import-profiles.ts's outcomeCategories, matching the company's
+  // own "تصنيفات الحالات" reference file) — shown as selectable options in
+  // this same dropdown so they're visibly present/verifiable per company,
+  // not just displayed after the fact once the agent happens to set one.
+  // The agent remains the primary way this gets set day-to-day; a human can
+  // also pick one directly here when needed.
+  companyCategories?: string[] | null
 }) {
-  const [status, setStatus] = useState(currentStatus)
+  const initialValue = companySubStatus && (companyCategories ?? []).includes(companySubStatus)
+    ? companySubStatus
+    : currentStatus
+  const [value, setValue] = useState(initialValue)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newStatus = e.target.value
-    setStatus(newStatus)
+    const next = e.target.value
+    setValue(next)
     setSaving(true)
-    await updateDebtStatusAction(debtId, newStatus as any)
+    if ((companyCategories ?? []).includes(next)) {
+      await updateDebtCompanyCategoryAction(debtId, next)
+    } else {
+      await updateDebtStatusAction(debtId, next as any)
+    }
     setSaving(false)
     router.refresh()
   }
 
   return (
     <select
-      value={status}
+      value={value}
       onChange={handleChange}
       disabled={saving}
       className="input text-sm py-1 px-2"
     >
-      {companySubStatus && (
-        <option value={currentStatus}>{companySubStatus}</option>
+      {companyCategories && companyCategories.length > 0 && (
+        <optgroup label="تصنيفات الشركة">
+          {companyCategories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </optgroup>
       )}
-      {STATUSES.map(s => (
-        <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
-      ))}
+      <optgroup label="حالات عامة">
+        {STATUSES.map(s => (
+          <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+        ))}
+      </optgroup>
     </select>
   )
 }

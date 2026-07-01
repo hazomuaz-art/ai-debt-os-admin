@@ -363,6 +363,54 @@ export async function updateDebtStatusAction(debtId: string, status: DebtStatus)
   }
 }
 
+// Sets the company-specific outcome classification (from company-import-
+// profiles.ts's outcomeCategories, e.g. "حذف مسترد وجود رخصة / تجديد") —
+// the same value the AI agent writes automatically via classifyDebtOutcome
+// when it recognizes an outcome mid-conversation. Exposed here so it's also
+// visible/selectable as an option in the same "حالة المديونية" dropdown,
+// not a separate manual-only control — the agent remains the primary way
+// this gets set day-to-day.
+export async function updateDebtCompanyCategoryAction(debtId: string, category: string) {
+  try {
+    const { supabase, user, profile } = await requireAuth()
+
+    const { data: existing } = await supabase
+      .from('debts')
+      .select('id, customer_id, company_id')
+      .eq('id', debtId)
+      .eq('company_id', profile.company_id)
+      .single()
+
+    if (!existing) return { error: 'Debt not found' }
+
+    const { error } = await supabase
+      .from('debts')
+      .update({ original_sub_status: category, updated_at: new Date().toISOString() })
+      .eq('id', debtId)
+
+    if (error) return { error: error.message }
+
+    const { insertTimelineEvent } = await import('@/lib/timeline')
+    await insertTimelineEvent({
+      company_id: profile.company_id,
+      customer_id: existing.customer_id,
+      debt_id: debtId,
+      event_type: 'status_change',
+      channel: 'manual',
+      actor_type: 'collector',
+      actor_name: user.email ?? null,
+      summary: `تصنيف الحالة: ${category}`,
+    })
+
+    revalidatePath('/dashboard/admin/debts')
+    revalidatePath('/dashboard/manager/debts')
+    revalidatePath('/dashboard/collector/debts')
+    return { data: { original_sub_status: category } }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 export async function assignDebtAction(debtId: string, collectorId: string) {
   try {
     const { supabase, user, profile } = await requireAuth()

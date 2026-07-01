@@ -13,6 +13,7 @@ import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
+import { resolveCompanyProfile, findCompanyProfile } from '@/lib/company-import-profiles'
 
 export default async function DebtDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -121,6 +122,20 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
+  let outcomeCategories: string[] | null = null
+  if (debt.portfolio_id) {
+    const { data: portfolioRow } = await supabase
+      .from('portfolios').select('name, metadata').eq('id', debt.portfolio_id).maybeSingle()
+    const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
+    const companyKey = meta.company_key as string | undefined
+    const companyProfile = (companyKey && findCompanyProfile(companyKey)) || resolveCompanyProfile(portfolioRow?.name ?? '')
+    if (companyProfile?.outcomeCategories?.length) {
+      outcomeCategories = companyProfile.outcomeCategories
+    } else if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
+      outcomeCategories = meta.outcome_categories as string[]
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
 
@@ -185,7 +200,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
-                <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} companySubStatus={debt.original_sub_status} />
+                <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} companySubStatus={debt.original_sub_status} companyCategories={outcomeCategories} />
               </div>
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>

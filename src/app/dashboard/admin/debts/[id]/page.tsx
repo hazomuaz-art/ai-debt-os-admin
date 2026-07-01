@@ -18,6 +18,7 @@ import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
 import UnifiedTimeline from '@/components/debt/UnifiedTimeline'
 import { getPortfolioTableConfig } from '@/lib/portfolio-data-fields'
+import { resolveCompanyProfile, findCompanyProfile } from '@/lib/company-import-profiles'
 
 // Translate AI-generated score factor names (free-form English) to Arabic by keyword.
 function factorAr(name: string): string {
@@ -185,12 +186,25 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
   // the importer routes into customer_data_<table>, also editable manually.
   let portfolioData: Record<string, unknown> | null = null
   let portfolioConfig: ReturnType<typeof getPortfolioTableConfig> = null
+  let outcomeCategories: string[] | null = null
   if (debt.portfolio_id) {
     const { data: portfolioRow } = await supabase
-      .from('portfolios').select('metadata').eq('id', debt.portfolio_id).maybeSingle()
+      .from('portfolios').select('name, metadata').eq('id', debt.portfolio_id).maybeSingle()
     const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
     const companyKey = meta.company_key as string | undefined
     portfolioConfig = getPortfolioTableConfig(companyKey)
+    // Resolve the company's outcome-category list directly from
+    // company-import-profiles.ts (the single source of truth, confirmed
+    // matching the company's own reference file) by name/alias — not just
+    // whatever got cached into portfolio.metadata at import time, which may
+    // be missing for portfolios created before this field existed or via a
+    // path that never set it.
+    const companyProfile = (companyKey && findCompanyProfile(companyKey)) || resolveCompanyProfile(portfolioRow?.name ?? '')
+    if (companyProfile?.outcomeCategories?.length) {
+      outcomeCategories = companyProfile.outcomeCategories
+    } else if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
+      outcomeCategories = meta.outcome_categories as string[]
+    }
     if (portfolioConfig) {
       const { data: row } = await supabase
         .from(portfolioConfig.table).select('*')
@@ -283,7 +297,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">حالة المديونية</p>
-                <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} companySubStatus={debt.original_sub_status} />
+                <UpdateDebtStatusSelect debtId={debt.id} currentStatus={debt.status} companySubStatus={debt.original_sub_status} companyCategories={outcomeCategories} />
               </div>
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
