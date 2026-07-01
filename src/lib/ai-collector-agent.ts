@@ -413,7 +413,7 @@ function isNonSaudiDialect(reply: string) {
 // sentences that happen to both mention the same balance never collide —
 // removing the bypass closes the loophole without reintroducing false
 // positives on legitimately-repeated numbers phrased differently.
-function isRepeated(reply: string, prevOutbound: string[]) {
+export function isRepeated(reply: string, prevOutbound: string[]) {
   const r = reply.replace(/\s+/g, ' ').trim()
   if (!r || r.length < 20) return false
   return prevOutbound.some(p => {

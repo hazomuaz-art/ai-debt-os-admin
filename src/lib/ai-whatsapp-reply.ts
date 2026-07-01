@@ -560,7 +560,7 @@ export async function generateProactiveReminder(args: {
 
   try {
     const res = await ai.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4',
+      model: 'anthropic/claude-sonnet-4.6',
       temperature: 0.4,
       max_tokens: 160,
       messages: [

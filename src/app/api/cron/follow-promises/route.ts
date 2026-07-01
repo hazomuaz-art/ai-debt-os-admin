@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateProactiveReminder } from '@/lib/ai-whatsapp-reply'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { isRepeated } from '@/lib/ai-collector-agent'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/follow-promises')
@@ -59,12 +60,38 @@ export async function GET(req: NextRequest) {
     if (alreadyReminded) { log.info('reminder already sent for this promise today — skipping', { promise_id: promise.id }); continue }
 
     try {
-      const reminderMsg = await generateProactiveReminder({
+      let reminderMsg = await generateProactiveReminder({
         company_id: promise.company_id,
         customer_id: customer.id,
         debt_id: debt.id,
         reason: `Customer promised to pay ${promise.promised_amount} on ${promise.promised_date} but payment has not been marked as received. Reach out to follow up.`,
       })
+
+      // Real production incident this fixes: this cron is exactly what fires
+      // when a customer goes silent (promise date passed, no reply at all)
+      // — but generateProactiveReminder is a separate, simpler generator
+      // with NO memory of what was already sent and NO anti-repetition
+      // check, unlike the main runCollectorAgent pipeline. It could (and
+      // did) generate near-identical wording to a message already sent
+      // earlier in this same debt's conversation. Checked against the
+      // debt's FULL outbound history (not just promise-followups), same
+      // guard the live conversation path uses.
+      if (reminderMsg) {
+        const { data: priorOutbound } = await supabase
+          .from('messages').select('content').eq('debt_id', debt.id).eq('direction', 'outbound')
+          .order('sent_at', { ascending: true }).limit(500)
+        const priorTexts = (priorOutbound ?? []).map((m: { content: string | null }) => m.content ?? '')
+        if (isRepeated(reminderMsg, priorTexts)) {
+          log.warn('proactive reminder repeated a prior message — regenerating once', { promise_id: promise.id, debt_id: debt.id })
+          const retry = await generateProactiveReminder({
+            company_id: promise.company_id,
+            customer_id: customer.id,
+            debt_id: debt.id,
+            reason: `Customer promised to pay ${promise.promised_amount} on ${promise.promised_date} but payment has not been marked as received. IMPORTANT: your first attempt repeated a message already sent to this customer — this time, phrase the reminder differently. Reach out to follow up.`,
+          })
+          reminderMsg = isRepeated(retry, priorTexts) ? '' : retry
+        }
+      }
 
       if (reminderMsg) {
         const sendResult = await sendWhatsAppMessage({
