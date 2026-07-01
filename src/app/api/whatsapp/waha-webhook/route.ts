@@ -450,13 +450,18 @@ export async function POST(request: NextRequest) {
 
       // Running case note — there's no "conversation ended" event in this
       // system (every message is processed independently), so this updates
-      // after every real exchange instead, so it's always current.
-      if (effectiveDebtId && aiDecision.shouldReply && aiDecision.message) {
+      // after every real exchange instead, so it's always current. Real gap
+      // this fixes: this was gated on `aiDecision.shouldReply && message` —
+      // if the agent's LAST turn in a conversation was a deliberate silence
+      // (e.g. the customer just said "طيب" with nothing left to add), the
+      // note froze one exchange behind what actually happened, since
+      // nothing ever ran again after that. Now updates on every processed
+      // turn regardless of whether the agent replied, so the note reflects
+      // the real latest state of the conversation, not just the state as of
+      // the last time the agent happened to send something.
+      if (effectiveDebtId) {
         const { updateCaseNote } = await import('@/lib/case-note')
-        await updateCaseNote({
-          company_id: c.company_id, debt_id: effectiveDebtId,
-          customer_message: mergedText, agent_message: aiDecision.message,
-        })
+        await updateCaseNote({ company_id: c.company_id, debt_id: effectiveDebtId })
       }
     })
 

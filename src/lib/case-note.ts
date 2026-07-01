@@ -25,8 +25,18 @@ function extractJson(raw: string): any | null {
  * "conversation ended" event in this system (every inbound message is
  * processed independently), so instead of waiting for an end-of-conversation
  * moment that never fires, this regenerates the note after every real
- * exchange. Lets a human (or a future agent run) open the debt and know
- * "what happened" in 2-3 sentences without re-reading the whole thread.
+ * exchange (including a turn the agent chose to stay silent on — see the
+ * caller in the WAHA webhook route).
+ *
+ * Real gap this fixes: this used to feed the model ONLY the previous note
+ * (already a compressed summary) plus the single latest exchange, asking it
+ * to "merge" the new bit in — a chain of summaries-of-summaries. Over a
+ * longer conversation this reliably lost or garbled earlier details, which
+ * is exactly the "not complete/accurate" symptom reported in production.
+ * Now regenerates from the REAL recent transcript every time (same
+ * generously-sized window the main collector agent itself uses), so the
+ * note is always grounded in what actually happened, not in how well the
+ * previous summary held up across several regenerations.
  *
  * Never blocks or breaks the reply pipeline — any failure here just leaves
  * the previous note in place and logs the error.
@@ -34,8 +44,6 @@ function extractJson(raw: string): any | null {
 export async function updateCaseNote(args: {
   company_id: string
   debt_id: string
-  customer_message: string
-  agent_message: string
 }): Promise<void> {
   if (!process.env.OPENROUTER_API_KEY) return
 
@@ -44,12 +52,10 @@ export async function updateCaseNote(args: {
   try {
     const { data: debt } = await svc
       .from('debts')
-      .select('status, original_sub_status, metadata')
+      .select('status, original_sub_status, metadata, customer_id')
       .eq('id', args.debt_id)
       .maybeSingle()
     if (!debt) return
-
-    const previousNote = (debt.metadata as any)?.case_note ?? null
 
     const { data: lastPromise } = await svc
       .from('promises')
@@ -58,6 +64,19 @@ export async function updateCaseNote(args: {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    // Real transcript, not a chain of summaries — the actual last ~40
+    // messages for this debt, oldest first, same window the main agent uses.
+    const { data: history } = await svc
+      .from('messages')
+      .select('direction, content, sent_at')
+      .eq('debt_id', args.debt_id)
+      .order('sent_at', { ascending: false })
+      .limit(40)
+    const transcript = (history ?? [])
+      .slice().reverse()
+      .map((m: { direction: string; content: string | null }) => `${m.direction === 'inbound' ? 'العميل' : 'الوكيل'}: ${m.content ?? ''}`)
+      .join('\n')
 
     const client = new OpenAI({
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -68,25 +87,24 @@ export async function updateCaseNote(args: {
       `حالة الدين الحالية: ${debt.status ?? 'غير محدد'}`,
       debt.original_sub_status ? `آخر تصنيف: ${debt.original_sub_status}` : null,
       lastPromise ? `آخر وعد مسجَّل: ${lastPromise.promised_date} (${lastPromise.status})` : 'لا يوجد وعد مسجَّل',
-      previousNote ? `الإفادة السابقة: ${previousNote}` : 'لا توجد إفادة سابقة',
     ].filter(Boolean).join('\n')
 
     const completion = await client.chat.completions.create({
       model: 'anthropic/claude-sonnet-4.6',
       temperature: 0,
-      max_tokens: 220,
+      max_tokens: 260,
       messages: [
         {
           role: 'system',
           content:
-            'أنت تكتب "إفادة حالة" مختصرة لملف تحصيل دين، تُقرأ من قبل محصّل بشري لاحقاً. ' +
-            'اكتب وقائع فقط من المعطيات الحقيقية أدناه — ممنوع منعاً باتاً اختراع أي تفصيل غير موجود فيها. ' +
-            'حدّث الإفادة السابقة (إن وُجدت) بدمج آخر تبادل، لا تكررها كما هي ولا تتجاهلها. ' +
-            'أرجع JSON فقط بالشكل: {"note": "2-3 جمل، الوضع الحالي وما اتُّفق عليه وأي نقطة خلاف", "recommended_approach": "جملة واحدة، خطوة عملية محددة للمتابعة"}.',
+            'أنت تكتب "إفادة حالة" مختصرة وكاملة لملف تحصيل دين، تُقرأ من قبل محصّل بشري لاحقاً بدل ما يقرأ كل المحادثة. ' +
+            'اكتب وقائع فقط من المحادثة الحقيقية والمعطيات أدناه — ممنوع منعاً باتاً اختراع أي تفصيل غير موجود فيها. ' +
+            'اقرأ المحادثة الكاملة أدناه (لا آخر رسالة فقط) وأنتج إفادة تلخّص كل ما حصل من البداية: من هو العميل وموقفه، وش اتفق عليه أو اختلف عليه، وأي نقطة معلّقة أو تحتاج متابعة — ملخّص كامل وحقيقي وليس فقط آخر تبادل. ' +
+            'أرجع JSON فقط بالشكل: {"note": "3-5 جمل، ملخّص كامل للحالة من بداية المحادثة حتى الآن، وما اتُّفق عليه وأي نقطة خلاف أو طلب معلَّق", "recommended_approach": "جملة واحدة، خطوة عملية محددة للمتابعة"}.',
         },
         {
           role: 'user',
-          content: `${facts}\n\nرسالة العميل الأخيرة: "${args.customer_message}"\nرد الوكيل: "${args.agent_message}"`,
+          content: `${facts}\n\n═══ المحادثة الكاملة (الأقدم أولاً) ═══\n${transcript || 'لا توجد رسائل سابقة'}`,
         },
       ],
       response_format: { type: 'json_object' },
@@ -96,7 +114,10 @@ export async function updateCaseNote(args: {
     const parsed = raw ? extractJson(raw) as { note?: string; recommended_approach?: string } | null : null
     const note = parsed?.note?.trim()
     const recommendedApproach = parsed?.recommended_approach?.trim()
-    if (!note) return
+    if (!note) {
+      log.warn('case note generation returned no usable note — previous note left untouched', { debt_id: args.debt_id })
+      return
+    }
 
     await svc.from('debts').update({
       metadata: {
@@ -106,6 +127,7 @@ export async function updateCaseNote(args: {
         case_note_updated_at: new Date().toISOString(),
       },
     }).eq('id', args.debt_id)
+    log.info('case note updated', { debt_id: args.debt_id })
   } catch (err) {
     log.error('updateCaseNote failed — previous note left untouched', err as Error)
   }
