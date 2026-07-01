@@ -79,10 +79,21 @@ vi.mock('@/lib/ai-collector-agent', () => ({
   detectSignals: vi.fn().mockReturnValue({ deniesPromise: false, refusesToPay: false }),
 }))
 
+// The route now fails CLOSED (503) when WAHA_WEBHOOK_SECRET is unset (see
+// the 2026-07-01 security audit fix) instead of the old fail-OPEN behavior
+// this test suite predates. Set a test secret and send the matching header
+// on every request, same as WAHA does for real in production, so these
+// tests exercise the actual burst-merge logic instead of being rejected
+// before ever reaching it.
+process.env.WAHA_WEBHOOK_SECRET = 'test-secret'
+
 import { POST } from '@/app/api/whatsapp/waha-webhook/route'
 
 function makeRequest(body: any): any {
-  return { json: async () => body } as any
+  return {
+    json: async () => body,
+    headers: { get: (name: string) => (name.toLowerCase() === 'x-webhook-secret' ? 'test-secret' : null) },
+  } as any
 }
 
 function inboundPayload(text: string, idSuffix: string, timestampSec: number) {
