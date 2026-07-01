@@ -114,7 +114,7 @@ describe('Rapid-fire message burst merging', () => {
     await POST(makeRequest(inboundPayload('ماوعدتك انا بشي', 'm1', 1000)))
     await vi.advanceTimersByTimeAsync(2000)
     await POST(makeRequest(inboundPayload('انت تستهبل؟', 'm2', 1002)))
-    await vi.advanceTimersByTimeAsync(6000)
+    await vi.advanceTimersByTimeAsync(9000)
 
     expect(runCollectorAgentCalls.length).toBe(1)
     expect(runCollectorAgentCalls[0].message).toBe('ماوعدتك انا بشي\nانت تستهبل؟')
@@ -122,7 +122,7 @@ describe('Rapid-fire message burst merging', () => {
 
   it('a single message with no follow-up still gets processed after the debounce window', async () => {
     await POST(makeRequest(inboundPayload('وش صار في موضوعي', 'm3', 2000)))
-    await vi.advanceTimersByTimeAsync(6000)
+    await vi.advanceTimersByTimeAsync(9000)
 
     expect(runCollectorAgentCalls.length).toBe(1)
     expect(runCollectorAgentCalls[0].message).toBe('وش صار في موضوعي')
@@ -134,7 +134,7 @@ describe('Rapid-fire message burst merging', () => {
     await POST(makeRequest(inboundPayload('اي طلب؟', 'm5', 3001)))
     await vi.advanceTimersByTimeAsync(1000)
     await POST(makeRequest(inboundPayload('يعني ايش الخطوة الجاية', 'm6', 3002)))
-    await vi.advanceTimersByTimeAsync(6000)
+    await vi.advanceTimersByTimeAsync(9000)
 
     expect(runCollectorAgentCalls.length).toBe(1)
     expect(runCollectorAgentCalls[0].message).toBe('بسدد اقساط\nاي طلب؟\nيعني ايش الخطوة الجاية')
@@ -145,7 +145,7 @@ describe('Rapid-fire message burst merging', () => {
     await POST(makeRequest(inboundPayload('رسالة من عميل واحد', 'm7', 4000)))
     mockCustomerRow = { id: 'cust-2', company_id: 'co-1', full_name: 'سعد', ai_paused: false }
     await POST(makeRequest({ ...inboundPayload('رسالة من عميل ثاني', 'm8', 4001), payload: { ...inboundPayload('رسالة من عميل ثاني', 'm8', 4001).payload, from: '966511111111@c.us' } }))
-    await vi.advanceTimersByTimeAsync(6000)
+    await vi.advanceTimersByTimeAsync(9000)
 
     expect(runCollectorAgentCalls.length).toBe(2)
     expect(runCollectorAgentCalls.map(c => c.customer_id).sort()).toEqual(['cust-1', 'cust-2'])

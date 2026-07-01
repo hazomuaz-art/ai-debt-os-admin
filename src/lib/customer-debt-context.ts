@@ -52,13 +52,22 @@ export async function buildCustomerDebtContext(params: {
       .order('payment_date', { ascending: false })
       .limit(8),
 
+    // Real production root cause of the agent repeating a sentence it
+    // already said earlier in the SAME conversation: this window was only
+    // 12 messages total (~6 exchanges) — anything said before that simply
+    // did not exist for the model or for the anti-repetition guard
+    // (ai-collector-agent.ts's isRepeated only compares against whatever
+    // outbound messages are in this same window). Any real negotiation
+    // easily runs past 6 exchanges, so the agent had zero memory of its own
+    // earlier statements and would naturally re-say them. Raised to cover a
+    // full realistic conversation.
     supabase
       .from('messages')
       .select('direction, channel, content, status, sent_at, metadata')
       .eq('company_id', params.company_id)
       .eq('customer_id', params.customer_id)
       .order('sent_at', { ascending: false })
-      .limit(12),
+      .limit(50),
 
     supabase
       .from('timeline_events')

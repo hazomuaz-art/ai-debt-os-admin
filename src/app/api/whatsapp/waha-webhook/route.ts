@@ -78,7 +78,12 @@ const ackToStatus: Record<number, string> = { 1: 'sent', 2: 'delivered', 3: 'rea
 // Single PM2 fork-mode process (confirmed in deploy.ps1 — no horizontal
 // scaling), so an in-process Map is sufficient; no cross-instance store needed.
 const pendingBursts = new Map<string, { texts: string[]; timer: ReturnType<typeof setTimeout>; latestTimestamp: string }>()
-const BURST_DEBOUNCE_MS = 6000
+// Raised from 6s to 9s — a real customer typing several short WhatsApp
+// bubbles in a row (thinking between them) commonly spans more than 6
+// seconds, and a message arriving just after the old window closed still
+// got its own separate, disconnected reply instead of being read as part
+// of the same thought.
+const BURST_DEBOUNCE_MS = 9000
 
 function scheduleBurstProcessing(
   customerId: string,

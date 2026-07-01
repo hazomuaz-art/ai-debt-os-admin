@@ -1076,7 +1076,14 @@ export async function runCollectorAgent(args: {
     chronological.pop()
   }
 
-  const prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content).slice(-5)
+  // Real production root cause of "the agent repeated the exact same
+  // sentence later in the conversation": this used to only look at the
+  // LAST 5 outbound messages, so a sentence said 6+ replies ago was
+  // completely invisible to isRepeated() below — it wasn't a fuzzy-match
+  // miss, the guard simply never saw it. Now spans every outbound message
+  // available in this conversation (bounded upstream by the 50-message
+  // fetch in customer-debt-context.ts, not re-truncated here).
+  const prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content)
   const lastAgentMessage = prevOutbound[prevOutbound.length - 1] ?? ''
   const hasHistory = chronological.length > 0
 
@@ -1269,8 +1276,14 @@ ${installmentRule}
   const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
   const np = ctx.negotiation_profile ?? {}
 
-  // Conversation as real message turns (chronological), capped to last 10.
-  const turns = chronological.slice(-10).map(m => ({
+  // Conversation as real message turns (chronological). Was capped to the
+  // last 10 — meaning the MODEL ITSELF had no memory of anything earlier
+  // than ~5 exchanges ago, on top of the anti-repetition guard's own
+  // separately-too-small window. Both together are the real root cause of
+  // the agent re-saying something it already told this same customer
+  // earlier in a longer conversation. Raised to match the wider history now
+  // fetched upstream (customer-debt-context.ts).
+  const turns = chronological.slice(-40).map(m => ({
     role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
     content: m.content,
   }))
@@ -1396,6 +1409,7 @@ ${text}
 ${requestedGraceDays !== null ? `- 🔴 العميل يطلب مهلة تقدّر بـ${requestedGraceDays} يوماً تقريباً. ${requestedGraceDays > 30 ? `هذا يتجاوز الحد الأقصى (30 يوماً) بكثير — ممنوع الموافقة عليه، اعرض مدة أقصر بكثير وفاوضه نزولاً.` : 'هذا ضمن الحد المسموح كحد أقصى، لكن حاول تقصيره أولاً قبل الموافقة الكاملة.'}` : ''}
 ${intent === 'DISPUTE' && !disputeReasonGiven ? '- 🔴 العميل لم يذكر سبباً محدداً للاعتراض في هذه الرسالة — لا تصعّد، اسأله عن السبب أولاً.' : ''}
 ${signals.refusesToPay ? '- 🔴🔴 العميل رفض السداد بصريح العبارة (أو طلب التوقف عن التواصل / لوّح بالمحكمة). ممنوع تكرار سؤال "متى/كم تقدر تسدد؟" بأي صياغة الآن — تعامل مع رفضه مباشرة: إن لوّح بإجراء قانوني وضّح أن المديونية تبقى مسجّلة وحقه محفوظ، إن طلب التوقف عن التواصل سجّل ذلك واعرض تسجيل اعتراض رسمي إن وُجد سبب، ولا تستمر بنفس أسلوب الضغط للسداد دون تغيير المسار.' : ''}
+${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعلاه هي عدة رسائل واتساب متتالية أرسلها العميل خلال ثوانٍ من بعض (كل سطر رسالة منفصلة) — اقرأها كلها كفكرة واحدة مترابطة، وأجب عليها **برد واحد مختصر** يغطي مضمونها كاملاً. ممنوع الرد على كل سطر لحاله أو تكرار نفس المعنى لكل رسالة.' : ''}
 
 إن كانت رسالتك الأخيرة سؤالاً وقد أجاب العميل عليه الآن، لا تعد السؤال — انتقل بالمحادثة للأمام.`,
         },
