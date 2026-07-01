@@ -114,8 +114,9 @@ export async function PATCH(req: NextRequest) {
             const newStatus = status === 'approved' ? 'payment_plan' : 'active'
             
             // Update debt status
-            await ctx.supabase.from('debts').update({ status: newStatus }).eq('id', debtId)
-            await ctx.supabase.from('collection_status_history').insert({
+            const { error: installmentStatusErr } = await ctx.supabase.from('debts').update({ status: newStatus }).eq('id', debtId)
+            if (installmentStatusErr) console.error('[approvals PATCH] installment debt status update failed:', installmentStatusErr.message)
+            const { error: installmentHistErr } = await ctx.supabase.from('collection_status_history').insert({
               company_id: ctx.profile.company_id,
               customer_id: debtInfo.customers.id,
               debt_id: debtId,
@@ -126,6 +127,7 @@ export async function PATCH(req: NextRequest) {
               changed_at: new Date().toISOString(),
               source_system: 'approvals_dashboard',
             })
+            if (installmentHistErr) console.error('[approvals PATCH] installment status history insert failed:', installmentHistErr.message)
             
             // Send WhatsApp Notification
             if (phone) {
@@ -146,7 +148,7 @@ export async function PATCH(req: NextRequest) {
                const waResult = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
                
                // Save message to history
-               await ctx.supabase.from('messages').insert({
+               const { error: approvalMsgErr } = await ctx.supabase.from('messages').insert({
                   company_id: ctx.profile.company_id,
                   customer_id: debtInfo.customers.id,
                   debt_id: debtId,
@@ -158,6 +160,7 @@ export async function PATCH(req: NextRequest) {
                   metadata: { sender: 'admin', action_type: 'approval_notification', error: waResult.error },
                   sent_at: new Date().toISOString(),
                })
+               if (approvalMsgErr) console.error('[approvals PATCH] installment notification message log failed:', approvalMsgErr.message)
             }
           }
           }
@@ -177,28 +180,32 @@ export async function PATCH(req: NextRequest) {
               const phone = di.customers.whatsapp || di.customers.phone
               const accepted = status === 'approved'
               // Accepted dispute → mark disputed + hand to human; rejected → resume collection
-              await ctx.supabase.from('debts').update({ status: accepted ? 'disputed' : 'active' }).eq('id', debtId)
-              await ctx.supabase.from('customers').update({ ai_paused: accepted }).eq('id', di.customers.id)
+              const { error: disputeDebtErr } = await ctx.supabase.from('debts').update({ status: accepted ? 'disputed' : 'active' }).eq('id', debtId)
+              if (disputeDebtErr) console.error('[approvals PATCH] dispute debt status update failed:', disputeDebtErr.message)
+              const { error: disputePauseErr } = await ctx.supabase.from('customers').update({ ai_paused: accepted }).eq('id', di.customers.id)
+              if (disputePauseErr) console.error('[approvals PATCH] dispute ai_paused update failed:', disputePauseErr.message)
               // 'accepted' was never a valid disputes.status (the real
               // CHECK constraint is open/under_review/resolved/rejected/
               // escalated) — 'resolved' is the correct value; this update
               // also failed silently before, on top of the branch never
               // being reached at all.
-              await ctx.supabase.from('disputes')
+              const { error: disputeRecordErr } = await ctx.supabase.from('disputes')
                 .update({ status: accepted ? 'resolved' : 'rejected', resolved_by: ctx.user.id, resolved_at: new Date().toISOString() })
                 .eq('debt_id', debtId).eq('status', 'open')
+              if (disputeRecordErr) console.error('[approvals PATCH] disputes record update failed:', disputeRecordErr.message)
               if (phone) {
                 const message = accepted
                   ? `مرحباً ${di.customers.full_name}، تمت دراسة اعتراضك وقبوله مبدئياً. تم تعليق المطالبة الآلية وسيتواصل معك موظف مختص لاستكمال المراجعة.`
                   : `مرحباً ${di.customers.full_name}، راجعنا اعتراضك ولم يثبت ما يلغي المديونية. يرجى سداد الرصيد المستحق (${di.current_balance} ${di.currency}) أو التواصل لترتيب حل.`
                 const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
                 const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
-                await ctx.supabase.from('messages').insert({
+                const { error: disputeMsgErr } = await ctx.supabase.from('messages').insert({
                   company_id: ctx.profile.company_id, customer_id: di.customers.id, debt_id: debtId,
                   channel: 'whatsapp', direction: 'outbound', content: message,
                   status: wr.status === 'sent' ? 'sent' : 'failed', whatsapp_message_id: wr.message_id || null,
                   metadata: { sender: 'admin', action_type: 'dispute_decision', error: wr.error }, sent_at: new Date().toISOString(),
                 })
+                if (disputeMsgErr) console.error('[approvals PATCH] dispute decision message log failed:', disputeMsgErr.message)
               }
             }
           }

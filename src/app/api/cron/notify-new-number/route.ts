@@ -49,13 +49,14 @@ export async function GET(req: NextRequest) {
     const msg = `مرحباً ${firstName}، معك خالد من قسم التحصيل. هذا رقمنا الجديد للتواصل بخصوص ملفك. تقدر ترد علينا هنا مباشرة وبنكمل معك.`
     try {
       const r = await sendWhatsAppMessage({ to: t.phone, message: msg, company_id: t.company_id })
-      await supabase.from('messages').insert({
+      const { error: notifyInsertErr } = await supabase.from('messages').insert({
         company_id: t.company_id, customer_id: t.id,
         channel: 'whatsapp', direction: 'outbound', content: msg,
         status: r.status === 'sent' ? 'sent' : 'failed', whatsapp_message_id: r.message_id || null,
         metadata: { sender: 'ai', action_type: 'reply', source: 'new_number_notice', error: r.error ?? null },
         sent_at: new Date().toISOString(),
       })
+      if (notifyInsertErr) log.error('new-number-notice message log failed', notifyInsertErr, { customer_id: t.id })
       if (r.status === 'sent') results.sent++; else results.failed++
     } catch (e) {
       log.error(`notify failed for ${t.id}`, e)

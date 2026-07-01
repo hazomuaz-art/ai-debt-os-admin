@@ -100,7 +100,7 @@ async function recordOutbound(
   supabase: any, company_id: string, customer_id: string, debt_id: string,
   content: string, r: { status: string; message_id?: string | null; error?: string | null }, source: string, action: string,
 ) {
-  await supabase.from('messages').insert({
+  const { error } = await supabase.from('messages').insert({
     company_id, customer_id, debt_id,
     channel: 'whatsapp', direction: 'outbound', content,
     status: r.status === 'sent' ? 'sent' : 'failed',
@@ -108,4 +108,8 @@ async function recordOutbound(
     sent_at: new Date().toISOString(),
     metadata: { sender: 'ai', source, action_type: action, error: r.error ?? null },
   })
+  // Real gap found during a full-system audit: not checked — the WhatsApp
+  // message was still sent to the customer either way, but a rejected
+  // insert meant it never showed up in the conversation history.
+  if (error) log.error('continue-conversations outbound log failed', error, { debt_id })
 }

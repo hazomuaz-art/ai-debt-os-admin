@@ -49,18 +49,28 @@ export async function recordPromise(args: {
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
   if (existing) {
-    await supabase.from('promises').update({
+    // Real gap found during a full-system audit: not checked — a rejected
+    // update meant the agent told the customer "سجّلت وعدك" (I recorded
+    // your promise) and logged "updated standing promise" while the actual
+    // row silently kept its old date/amount, so the dashboard and every
+    // downstream follow-up cron kept acting on stale data.
+    const { error: promiseUpdateErr } = await supabase.from('promises').update({
       promised_date: args.promised_date, promised_amount: args.promised_amount,
       notes, follow_up_at: followUp,
     }).eq('id', (existing as { id: string }).id)
-    log.info('updated standing promise', { debt_id: args.debt_id, promised_date: args.promised_date })
+    if (promiseUpdateErr) log.error('failed to update standing promise', { error: promiseUpdateErr.message, debt_id: args.debt_id })
+    else log.info('updated standing promise', { debt_id: args.debt_id, promised_date: args.promised_date })
   } else {
-    const { data: created } = await supabase.from('promises').insert({
+    const { data: created, error: promiseInsertErr } = await supabase.from('promises').insert({
       company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
       promised_amount: args.promised_amount, promised_date: args.promised_date,
       channel: 'whatsapp', status: 'pending', notes, follow_up_at: followUp,
     }).select('id').single()
-    log.info('recorded new promise', { debt_id: args.debt_id, promised_date: args.promised_date })
+    // Same gap as above: a rejected insert meant the agent believed it had
+    // recorded a brand-new promise (and told the customer so) while nothing
+    // was ever stored — the promise simply never existed anywhere.
+    if (promiseInsertErr) log.error('failed to record new promise', { error: promiseInsertErr.message, debt_id: args.debt_id })
+    else log.info('recorded new promise', { debt_id: args.debt_id, promised_date: args.promised_date })
 
     // Attribution: a genuinely NEW promise only — updating an existing
     // pending one (the `if (existing)` branch above) is the same promise
@@ -80,7 +90,8 @@ export async function recordPromise(args: {
     }
   }
 
-  await supabase.from('debts').update({ status: 'promised' }).eq('id', args.debt_id)
+  const { error: debtStatusErr } = await supabase.from('debts').update({ status: 'promised' }).eq('id', args.debt_id)
+  if (debtStatusErr) log.error('failed to set debt status to promised', { error: debtStatusErr.message, debt_id: args.debt_id })
 
   // A customer who just made a promise is no longer "refusing" — clear any
   // accumulated refusal count so the 3-refusals/48h legal-escalation trigger

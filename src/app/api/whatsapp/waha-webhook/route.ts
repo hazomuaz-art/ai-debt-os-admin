@@ -167,7 +167,8 @@ export async function POST(request: NextRequest) {
           .from('messages').select('id, status').or(match)
           .eq('direction', 'outbound').limit(1).maybeSingle()
         if (row && (rank[newStatus] ?? 0) > (rank[(row as { status: string }).status] ?? 0)) {
-          await supabase.from('messages').update({ status: newStatus }).eq('id', (row as { id: string }).id)
+          const { error: ackErr } = await supabase.from('messages').update({ status: newStatus }).eq('id', (row as { id: string }).id)
+          if (ackErr) log.warn('delivery status ack update failed', { error: ackErr.message, msgId })
         }
       }
       return NextResponse.json({ status: 'ok' })
@@ -290,7 +291,7 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     const debt_id = (latestDebt as { id: string } | null)?.id ?? null
 
-    await supabase.from('messages').insert({
+    const { error: inboundInsertErr } = await supabase.from('messages').insert({
       company_id: c.company_id, customer_id: c.id, debt_id,
       channel: 'whatsapp', direction: 'inbound',
       content: text || (mimetype === 'application/pdf' ? '📎 إيصال (PDF)' : '📎 إيصال (صورة)'),
@@ -299,6 +300,12 @@ export async function POST(request: NextRequest) {
       metadata: { provider: 'waha', from, ...(hasReceiptMedia && { media_url: mediaUrl, mimetype }) },
       sent_at: new Date().toISOString(),
     })
+    // Real gap found during a full-system audit: not checked — a rejected
+    // insert meant the customer's actual inbound message never existed in
+    // the conversation history, even though the AI agent below still
+    // processed and replied to it from the in-memory `text` — leaving a
+    // reply on record with no visible message it was replying to.
+    if (inboundInsertErr) log.error('inbound message insert failed', { error: inboundInsertErr.message, customer_id: c.id })
 
     if (c.ai_paused) { log.info('AI paused — skipping reply', { customer_id: c.id }); return NextResponse.json({ status: 'ok' }) }
 
@@ -335,12 +342,13 @@ export async function POST(request: NextRequest) {
             log.error('customer document upload threw', e as Error)
           }
 
-          await supabase.from('customer_documents').insert({
+          const { error: docInsertErr } = await supabase.from('customer_documents').insert({
             company_id: c.company_id, customer_id: c.id, debt_id,
             doc_type: classification.doc_type, needs_admin_review: classification.needs_admin_review,
             ai_summary: classification.summary, ai_confidence: classification.confidence,
             storage_path: storagePath, source: 'whatsapp', raw_analysis: classification,
           })
+          if (docInsertErr) log.error('customer_documents insert failed', new Error(docInsertErr.message), { customer_id: c.id })
 
           // Confirmed receipt → hand off to the dedicated OCR/verification
           // pipeline, which does its own beneficiary-matching and reply.
@@ -373,7 +381,7 @@ export async function POST(request: NextRequest) {
             ? 'شكراً لك، تم استلام المستند وتحليله، وسيتم رفعه للإدارة المختصة للمراجعة، وسنقوم بإبلاغك بالنتيجة بمجرد الانتهاء.'
             : 'استلمت المرفق، شكراً لك.'
           const wr = await sendWhatsAppMessage({ to: phone, message: ackMessage, company_id: c.company_id })
-          await supabase.from('messages').insert({
+          const { error: ackInsertErr } = await supabase.from('messages').insert({
             company_id: c.company_id, customer_id: c.id, debt_id,
             channel: 'whatsapp', direction: 'outbound', content: ackMessage,
             status: wr.status === 'sent' ? 'sent' : 'failed',
@@ -381,6 +389,7 @@ export async function POST(request: NextRequest) {
             metadata: { sender: 'ai', action_type: 'document_ack', source: 'document_classification', doc_type: classification.doc_type },
             sent_at: new Date().toISOString(),
           })
+          if (ackInsertErr) log.error('document ack message insert failed', new Error(ackInsertErr.message), { customer_id: c.id })
 
           if (classification.needs_admin_review) {
             await insertSystemAlert({
@@ -418,7 +427,7 @@ export async function POST(request: NextRequest) {
 
       if (aiDecision.shouldReply && aiDecision.message) {
         const waResult = await sendWhatsAppMessage({ to: phone, message: aiDecision.message, company_id: c.company_id })
-        await supabase.from('messages').insert({
+        const { error: replyInsertErr } = await supabase.from('messages').insert({
           company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
           channel: 'whatsapp', direction: 'outbound', content: aiDecision.message,
           status: waResult.status === 'sent' ? 'sent' : 'failed',
@@ -426,6 +435,12 @@ export async function POST(request: NextRequest) {
           metadata: { sender: 'ai', action_type: aiDecision.action, provider: 'waha', error: waResult.error },
           sent_at: new Date().toISOString(),
         })
+        // Real gap found during a full-system audit: not checked — the AI
+        // reply was still sent to the customer over WhatsApp either way, but
+        // a rejected insert meant it never appeared in the conversation
+        // history, making the dashboard look like the customer's message
+        // was never answered when it actually was.
+        if (replyInsertErr) log.error('AI reply message insert failed', new Error(replyInsertErr.message), { customer_id: c.id })
         if (waResult.status === 'sent') {
           await processEvent({
             debt_id: effectiveDebtId ?? 'temp', company_id: c.company_id,
@@ -442,7 +457,8 @@ export async function POST(request: NextRequest) {
       // Never resumes automatically — a human must review and either correct
       // the phone on file or confirm it's genuinely unreachable.
       if (aiDecision.action === 'record_wrong_number') {
-        await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+        const { error: pauseErr } = await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+        if (pauseErr) log.error('failed to pause AI for wrong-number report', new Error(pauseErr.message), { customer_id: c.id })
         await insertTimelineEvent({
           company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
           event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
@@ -544,14 +560,15 @@ export async function POST(request: NextRequest) {
           const { category, meta } = outcome
           const oldStatus = (latestDebt as { status?: string } | null)?.status ?? null
 
-          await supabase.from('debts').update({
+          const { error: outcomeUpdErr } = await supabase.from('debts').update({
             original_sub_status: category,
             normalized_status: meta.status ?? oldStatus,
             ...(meta.status ? { status: meta.status } : {}),
             updated_at: new Date().toISOString(),
           }).eq('id', effectiveDebtId)
+          if (outcomeUpdErr) log.error('debt outcome-classification update failed', new Error(outcomeUpdErr.message), { debt_id: effectiveDebtId, category })
 
-          await supabase.from('collection_status_history').insert({
+          const { error: statusHistErr } = await supabase.from('collection_status_history').insert({
             company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
             source_system: 'ai_agent',
             old_status: oldStatus, new_status: category,
@@ -560,6 +577,7 @@ export async function POST(request: NextRequest) {
             raw_payload: { customer_message: mergedText },
             changed_at: new Date().toISOString(),
           })
+          if (statusHistErr) log.error('collection_status_history insert failed', new Error(statusHistErr.message), { debt_id: effectiveDebtId })
 
           // 'outcome_classified' is NOT a valid timeline_events.event_type
           // (CHECK constraint only allows a fixed list) — this insert has
@@ -568,15 +586,23 @@ export async function POST(request: NextRequest) {
           // on a constraint violation, it just returns an unchecked error).
           // 'status_change' is the correct semantic fit since this event IS
           // exactly that — a status change driven by the classification.
-          await supabase.from('timeline_events').insert({
+          const { error: classifyTimelineErr } = await supabase.from('timeline_events').insert({
             company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
             event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
             summary: `تصنيف الحالة: ${category}`,
             detail: meta.meaning, occurred_at: new Date().toISOString(),
           })
+          if (classifyTimelineErr) log.error('outcome classification timeline insert failed', new Error(classifyTimelineErr.message), { debt_id: effectiveDebtId })
 
           if (meta.isTerminal) {
-            await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+            const { error: terminalPauseErr } = await supabase.from('customers').update({ ai_paused: true }).eq('id', c.id)
+            // Real gap found during a full-system audit: not checked — this
+            // is the single highest-stakes update in this block (deceased/
+            // imprisoned/bankrupt outcomes are supposed to permanently stop
+            // AI replies). A rejected update meant the "stopped" alert fired
+            // below regardless, telling staff the AI was paused for this
+            // customer while the AI kept messaging them.
+            if (terminalPauseErr) log.error('failed to pause AI for terminal outcome', new Error(terminalPauseErr.message), { customer_id: c.id, category })
             // 'high' is not a valid system_alerts.severity (the real CHECK
             // constraint only allows info/warning/error/critical) — this
             // insert has been failing silently every time a terminal

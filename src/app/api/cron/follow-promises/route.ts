@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
 
         // Always record the outbound message in the conversation (so it shows in the dashboard),
         // even if delivery failed (status reflects that).
-        await supabase.from('messages').insert({
+        const { error: reminderInsertErr } = await supabase.from('messages').insert({
           company_id: promise.company_id,
           customer_id: customer.id,
           debt_id: debt.id,
@@ -114,6 +114,7 @@ export async function GET(req: NextRequest) {
           metadata: { sender: 'ai', action_type: 'reply', source: 'promise_followup', promise_id: promise.id, error: sendResult.error ?? null },
           sent_at: new Date().toISOString(),
         })
+        if (reminderInsertErr) log.error('promise-followup message log failed', reminderInsertErr, { promise_id: promise.id })
 
         if (sendResult.status === 'sent') {
           // NOTE: this used to update promises.status to 'followed_up', but
@@ -130,7 +131,7 @@ export async function GET(req: NextRequest) {
           // Log to timeline. 'bot_action' was ALSO not a valid event_type
           // (same constraint as above) — this insert had been failing
           // silently too; 'ai_reply' is the correct, valid fit.
-          await supabase.from('timeline_events').insert({
+          const { error: reminderTimelineErr } = await supabase.from('timeline_events').insert({
             company_id: promise.company_id,
             debt_id: debt.id,
             event_type: 'ai_reply',
@@ -139,6 +140,7 @@ export async function GET(req: NextRequest) {
             detail: `الرسالة: ${reminderMsg}`,
             occurred_at: new Date().toISOString()
           })
+          if (reminderTimelineErr) log.error('promise-followup timeline insert failed', reminderTimelineErr, { promise_id: promise.id })
 
           results.sent++
         } else {
@@ -165,13 +167,15 @@ export async function GET(req: NextRequest) {
     .eq('status', 'pending').lte('promised_date', graceCutoff)
   let markedBroken = 0
   for (const p of (overduePromises ?? []) as any[]) {
-    await supabase.from('promises').update({ status: 'broken' }).eq('id', p.id)
-    await supabase.from('timeline_events').insert({
+    const { error: breakErr } = await supabase.from('promises').update({ status: 'broken' }).eq('id', p.id)
+    if (breakErr) { log.error('failed to mark overdue promise broken', breakErr, { promise_id: p.id }); continue }
+    const { error: brokenTimelineErr } = await supabase.from('timeline_events').insert({
       company_id: p.company_id, customer_id: p.customer_id, debt_id: p.debt_id,
       event_type: 'status_change', channel: 'system', actor_type: 'system',
       summary: 'انتهى موعد الوعد بدون سداد ولا تجديد',
       occurred_at: new Date().toISOString(),
     })
+    if (brokenTimelineErr) log.error('broken-promise timeline insert failed', brokenTimelineErr, { promise_id: p.id })
     markedBroken++
   }
   results.broken = markedBroken

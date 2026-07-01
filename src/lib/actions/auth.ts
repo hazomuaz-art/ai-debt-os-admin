@@ -129,7 +129,8 @@ export async function registerAction(formData: FormData) {
   })
 
   if (signUpError || !authData.user) {
-    await serviceClient.from('companies').delete().eq('id', company.id)
+    const { error: cleanupErr } = await serviceClient.from('companies').delete().eq('id', company.id)
+    if (cleanupErr) log.error('rollback: failed to delete orphaned company after signup failure', cleanupErr, { company_id: company.id })
     log.error('Auth user creation failed during register', signUpError)
     if (signUpError?.message?.toLowerCase().includes('already registered')) {
       return { error: 'An account with this email already exists. Try logging in.' }

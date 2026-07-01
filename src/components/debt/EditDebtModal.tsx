@@ -25,17 +25,23 @@ export default function EditDebtModal({ debt, customer }: { debt: any, customer:
     setLoading(true)
 
     try {
-      await supabase.from('customers').update({
+      // Real gap found during a full-system audit: neither update's
+      // { error } was ever checked — a rejected write (RLS, bad value,
+      // constraint) still closed the modal and refreshed as if it saved,
+      // so the user saw "success" for an edit that never actually persisted.
+      const { error: customerErr } = await supabase.from('customers').update({
         full_name: formData.full_name,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
         national_id: formData.national_id,
       }).eq('id', customer.id)
+      if (customerErr) throw customerErr
 
-      await supabase.from('debts').update({
+      const { error: debtErr } = await supabase.from('debts').update({
         current_balance: formData.current_balance,
         due_date: formData.due_date || null,
       }).eq('id', debt.id)
+      if (debtErr) throw debtErr
 
       setIsOpen(false)
       router.refresh()

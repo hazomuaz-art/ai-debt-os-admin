@@ -594,7 +594,7 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
     const fresh = rows.filter(r => !seen.has(r.alert_type))
     if (!fresh.length) return 0
 
-    await sb.from('system_alerts').insert(fresh.map(r => ({
+    const { error: alertInsertErr } = await sb.from('system_alerts').insert(fresh.map(r => ({
       company_id:  ctx.debt.company_id,
       severity:    r.severity,
       alert_type:  r.alert_type,
@@ -606,6 +606,7 @@ async function stepAlerts(ctx: Ctx, score: ScoreResult): Promise<number> {
       is_read:     false,
       is_resolved: false,
     })))
+    if (alertInsertErr) log.warn(`stepAlerts(${ctx.debt.id}) system_alerts insert failed: ${alertInsertErr.message}`)
     return fresh.length
   } catch (err) {
     log.warn(`stepAlerts(${ctx.debt.id}): ` + (err instanceof Error ? err.message : String(err)))

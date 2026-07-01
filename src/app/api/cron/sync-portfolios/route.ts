@@ -33,8 +33,9 @@ export async function GET(req: NextRequest) {
         cache.set(key, pid)
       }
       if (pid) {
-        await supabase.from('debts').update({ portfolio_id: pid }).eq('id', d.id)
-        results.assigned++
+        const { error: assignErr } = await supabase.from('debts').update({ portfolio_id: pid }).eq('id', d.id)
+        if (assignErr) { log.error(`portfolio assignment failed for debt ${d.id}`, assignErr); results.failed++ }
+        else results.assigned++
       } else { results.failed++ }
     } catch (e) {
       log.error(`portfolio sync failed for debt ${d.id}`, e)

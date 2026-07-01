@@ -11,11 +11,19 @@ export function CompleteActionButton({ actionId }: { actionId: string }) {
   async function handleComplete() {
     setLoading(true)
     const supabase = createClient()
-    await supabase
+    // Real gap found during a full-system audit: { error } was never
+    // checked — a rejected update still refreshed the page as if the action
+    // had been marked completed, when it silently hadn't.
+    const { error } = await supabase
       .from('ai_actions')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', actionId)
-    router.refresh()
+    if (error) {
+      console.error(error)
+      alert('حدث خطأ أثناء إكمال الإجراء')
+    } else {
+      router.refresh()
+    }
     setLoading(false)
   }
 

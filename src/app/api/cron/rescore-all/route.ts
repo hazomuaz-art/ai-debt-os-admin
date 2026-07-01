@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         total_payments_made: payments?.length ?? 0,
       })
 
-      await supabase.from('ai_scores').insert({
+      const { error: scoreInsertErr } = await supabase.from('ai_scores').insert({
         company_id: debt.company_id,
         debt_id: debt.id,
         customer_id: debt.customer_id,
@@ -52,9 +52,11 @@ export async function GET(req: NextRequest) {
         recommended_strategy: r.recommended_strategy,
         factors: r.factors,
       })
+      if (scoreInsertErr) log.error(`ai_scores insert failed for debt ${debt.id}`, scoreInsertErr)
 
       const newPriority = r.score < 25 ? 'critical' : r.score < 50 ? 'high' : r.score < 75 ? 'medium' : 'low'
-      await supabase.from('debts').update({ priority: newPriority }).eq('id', debt.id)
+      const { error: priorityErr } = await supabase.from('debts').update({ priority: newPriority }).eq('id', debt.id)
+      if (priorityErr) log.error(`priority update failed for debt ${debt.id}`, priorityErr)
       results.scored++
     } catch (e) {
       log.error(`rescore failed for debt ${debt.id}`, e)

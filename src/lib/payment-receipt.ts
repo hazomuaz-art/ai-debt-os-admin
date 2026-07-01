@@ -146,7 +146,7 @@ export async function processInboundReceipt(args: {
   }
 
   const payDate = (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date)) ? ocr.date : new Date().toISOString().slice(0, 10)
-  const { data: insertedPayment } = await svc.from('payments').insert({
+  const { data: insertedPayment, error: paymentInsertErr } = await svc.from('payments').insert({
     company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
     amount, currency,
     status: autoVerify ? 'completed' : 'pending',
@@ -156,6 +156,11 @@ export async function processInboundReceipt(args: {
     receipt_url: receiptPath,
     notes: noteBits,
   }).select('id').single()
+  // Real gap found during a full-system audit: not checked — a rejected
+  // insert (constraint/RLS) meant a customer's verified payment could be
+  // fully processed downstream (debt balance dropped, promise marked kept)
+  // while the payments row itself silently never existed.
+  if (paymentInsertErr) log.error('payment insert failed', { error: paymentInsertErr.message, debt_id: args.debt_id, amount })
 
   let reply: string
   if (autoVerify && args.debt_id) {
@@ -164,7 +169,14 @@ export async function processInboundReceipt(args: {
     const upd: Record<string, unknown> = { current_balance: newBal }
     if (newBal <= 0) upd.status = 'settled'
     else if (d.status === 'promised' || d.status === 'overdue') upd.status = 'active'
-    await svc.from('debts').update(upd).eq('id', args.debt_id)
+    // Real gap found during a full-system audit: the single most
+    // financially-critical write in this whole pipeline (the debt balance
+    // itself) was never checked — a rejected update would leave the debt's
+    // real balance untouched while the payment row + promise + timeline all
+    // proceeded as if the debt had been reduced/settled, silently
+    // corrupting the customer's actual owed amount.
+    const { error: debtUpdErr } = await svc.from('debts').update(upd).eq('id', args.debt_id)
+    if (debtUpdErr) log.error('debt balance update failed after verified payment', { error: debtUpdErr.message, debt_id: args.debt_id, newBal })
 
     // An open promise is fully "kept" only if this payment actually closes
     // the debt — a partial payment against a full-amount promise is only
@@ -290,7 +302,7 @@ async function replyAndLog(
   reply: string,
 ): Promise<void> {
   const wr = await sendWhatsAppMessage({ to: args.phone, message: reply, company_id: args.company_id })
-  await svc.from('messages').insert({
+  const { error: logErr } = await svc.from('messages').insert({
     company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
     channel: 'whatsapp', direction: 'outbound', content: reply,
     status: wr.status === 'sent' ? 'sent' : 'failed',
@@ -298,4 +310,5 @@ async function replyAndLog(
     metadata: { sender: 'ai', action_type: 'reply', source: 'receipt_verification' },
     sent_at: new Date().toISOString(),
   })
+  if (logErr) log.error('receipt reply message log failed', { error: logErr.message, debt_id: args.debt_id })
 }

@@ -116,27 +116,35 @@ export async function recordVerificationAttempt(args: {
 
 export async function markVerified(customer_id: string): Promise<void> {
   const supabase = createServiceClient()
-  await supabase.from('customers').update({
+  const { error } = await supabase.from('customers').update({
     verification_status: 'verified',
     verified_at: new Date().toISOString(),
   }).eq('id', customer_id)
+  if (error) log.error('failed to mark customer verified', { error: error.message, customer_id })
 }
 
 export async function incrementFailedVerification(customer_id: string, newCount: number): Promise<void> {
   const supabase = createServiceClient()
   const locked = newCount >= MAX_VERIFICATION_ATTEMPTS
-  await supabase.from('customers').update({
+  const { error } = await supabase.from('customers').update({
     verification_attempts_count: newCount,
     verification_status: locked ? 'locked' : 'unverified',
   }).eq('id', customer_id)
+  if (error) log.error('failed to update verification attempt count', { error: error.message, customer_id })
 }
 
+// Real gap found during a full-system audit: not checked — a customer
+// explicitly asking to stop being contacted got the confirmation reply
+// either way (renderOptOutConfirmation is text, sent regardless), but if
+// this update silently failed the flag never actually persisted, so the
+// system kept messaging someone who was told they'd been opted out.
 export async function setContactOptOut(customer_id: string): Promise<void> {
   const supabase = createServiceClient()
-  await supabase.from('customers').update({
+  const { error } = await supabase.from('customers').update({
     contact_opt_out: true,
     contact_opt_out_at: new Date().toISOString(),
   }).eq('id', customer_id)
+  if (error) log.error('failed to set contact opt-out', { error: error.message, customer_id })
 }
 
 export async function raiseUrgentHumanAlert(args: {
@@ -164,14 +172,16 @@ export async function raiseUrgentHumanAlert(args: {
 // ════════════════════════════════════════════════════════════════════
 export async function setPendingClarification(customer_id: string, originalMessage: string, missingField = 'company'): Promise<void> {
   const supabase = createServiceClient()
-  await supabase.from('customers').update({
+  const { error } = await supabase.from('customers').update({
     pending_clarification: { originalMessage, missingField },
   }).eq('id', customer_id)
+  if (error) log.error('failed to set pending clarification', { error: error.message, customer_id })
 }
 
 export async function clearPendingClarification(customer_id: string): Promise<void> {
   const supabase = createServiceClient()
-  await supabase.from('customers').update({ pending_clarification: null }).eq('id', customer_id)
+  const { error } = await supabase.from('customers').update({ pending_clarification: null }).eq('id', customer_id)
+  if (error) log.error('failed to clear pending clarification', { error: error.message, customer_id })
 }
 
 // ════════════════════════════════════════════════════════════════════
