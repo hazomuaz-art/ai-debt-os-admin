@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         metadata: { sender: 'ai', action_type: 'reply', source: 'new_number_notice', error: r.error ?? null },
         sent_at: new Date().toISOString(),
       })
-      if (notifyInsertErr) log.error('new-number-notice message log failed', notifyInsertErr, { customer_id: t.id })
+      if (notifyInsertErr) log.error('new-number-notice message log failed', new Error(notifyInsertErr.message), { customer_id: t.id })
       if (r.status === 'sent') results.sent++; else results.failed++
     } catch (e) {
       log.error(`notify failed for ${t.id}`, e)

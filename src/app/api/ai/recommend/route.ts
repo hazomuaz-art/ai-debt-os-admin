@@ -96,7 +96,7 @@ export async function POST(_request: NextRequest) {
 
       if (insertErr) {
         const err = insertErr as { code?: string; message?: string; details?: string; hint?: string }
-        log.error('Insert failed', insertErr, { code: err.code, message: err.message, details: err.details, hint: err.hint, sample_row: rows[0] })
+        log.error('Insert failed', new Error(err.message ?? 'unknown'), { code: err.code, message: err.message, details: err.details, hint: err.hint, sample_row: rows[0] })
         return NextResponse.json(
           { success: false, count: 0, actions: [], error: `Database insert failed: ${err.message ?? 'unknown'} (code: ${err.code ?? '?'})` },
           { status: 500 }

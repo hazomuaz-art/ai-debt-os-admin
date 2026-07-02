@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
         const { error: olderFailErr } = await supabase.from('messages').update({
           status: 'failed', metadata: { ...meta, delivery_unconfirmed: true },
         }).eq('id', (m as { id: string }).id)
-        if (olderFailErr) log.error('verify-delivery: failed to mark older stuck message failed', olderFailErr, { message_id: (m as { id: string }).id })
+        if (olderFailErr) log.error('verify-delivery: failed to mark older stuck message failed', new Error(olderFailErr.message), { message_id: (m as { id: string }).id })
         result.correctedToFailed++
       }
 
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
         const { error: newestFailErr } = await supabase.from('messages').update({
           status: 'failed', metadata: { ...newestMeta, delivery_unconfirmed: true, retry_attempted: true },
         }).eq('id', (newest as { id: string }).id)
-        if (newestFailErr) log.error('verify-delivery: failed to mark newest message failed pre-retry', newestFailErr, { message_id: (newest as { id: string }).id })
+        if (newestFailErr) log.error('verify-delivery: failed to mark newest message failed pre-retry', new Error(newestFailErr.message), { message_id: (newest as { id: string }).id })
         result.correctedToFailed++
 
         const { data: customer } = await supabase
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
             metadata: { ...newestMeta, retry_of: (newest as { id: string }).id, first_contact_retry: true },
             sent_at: new Date().toISOString(),
           })
-          if (firstRetryInsertErr) log.error('verify-delivery: first-contact retry message log failed', firstRetryInsertErr, { customer_id: customerId })
+          if (firstRetryInsertErr) log.error('verify-delivery: first-contact retry message log failed', new Error(firstRetryInsertErr.message), { customer_id: customerId })
           result.retried++
         } else {
           result.markedFailedNoResend++
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
       const { error: brokenSessionErr } = await supabase.from('messages').update({
         status: 'failed', metadata: { ...newestMeta, delivery_unconfirmed: true, session_broken: true },
       }).eq('id', (newest as { id: string }).id)
-      if (brokenSessionErr) log.error('verify-delivery: failed to mark broken-session message failed', brokenSessionErr, { message_id: (newest as { id: string }).id })
+      if (brokenSessionErr) log.error('verify-delivery: failed to mark broken-session message failed', new Error(brokenSessionErr.message), { message_id: (newest as { id: string }).id })
       result.correctedToFailed++
       result.brokenSessionsSkipped++
 
@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
         status: 'failed',
         metadata: { ...meta, delivery_unconfirmed: true },
       }).eq('id', (m as { id: string }).id)
-      if (restFailErr) log.error('verify-delivery: failed to mark older stuck message failed (healthy session)', restFailErr, { message_id: (m as { id: string }).id })
+      if (restFailErr) log.error('verify-delivery: failed to mark older stuck message failed (healthy session)', new Error(restFailErr.message), { message_id: (m as { id: string }).id })
       result.markedFailedNoResend++
       result.correctedToFailed++
     }
@@ -176,7 +176,7 @@ export async function GET(req: NextRequest) {
         status: 'failed',
         metadata: { ...meta, delivery_unconfirmed: true },
       }).eq('id', (latest as { id: string }).id)
-      if (alreadyRetriedErr) log.error('verify-delivery: failed to mark already-retried message failed', alreadyRetriedErr, { message_id: (latest as { id: string }).id })
+      if (alreadyRetriedErr) log.error('verify-delivery: failed to mark already-retried message failed', new Error(alreadyRetriedErr.message), { message_id: (latest as { id: string }).id })
       result.markedFailedNoResend++
       result.correctedToFailed++
       continue
@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
       status: 'failed',
       metadata: { ...meta, delivery_unconfirmed: true, retry_attempted: true },
     }).eq('id', (latest as { id: string }).id)
-    if (preRetryFailErr) log.error('verify-delivery: failed to mark message failed pre-retry (healthy session)', preRetryFailErr, { message_id: (latest as { id: string }).id })
+    if (preRetryFailErr) log.error('verify-delivery: failed to mark message failed pre-retry (healthy session)', new Error(preRetryFailErr.message), { message_id: (latest as { id: string }).id })
     result.correctedToFailed++
 
     if (r.status === 'sent') {
@@ -211,7 +211,7 @@ export async function GET(req: NextRequest) {
         metadata: { ...meta, retry_of: (latest as { id: string }).id },
         sent_at: new Date().toISOString(),
       })
-      if (retryInsertErr) log.error('verify-delivery: retry message log failed', retryInsertErr, { customer_id: customerId })
+      if (retryInsertErr) log.error('verify-delivery: retry message log failed', new Error(retryInsertErr.message), { customer_id: customerId })
       result.retried++
     } else {
       result.markedFailedNoResend++

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     if (!num || !num.is_active) {
       results.skipped_inactive++
       const { error: inactiveErr } = await supabase.from('campaign_send_queue').update({ status: 'failed', error: 'whatsapp_number_inactive_or_missing', processed_at: new Date().toISOString() }).eq('id', r.id)
-      if (inactiveErr) log.error('failed to mark queue row failed (inactive number)', inactiveErr, { queue_id: r.id })
+      if (inactiveErr) log.error('failed to mark queue row failed (inactive number)', new Error(inactiveErr.message), { queue_id: r.id })
       continue
     }
     if (!withinSendWindow(campaign?.send_window_start ?? null, campaign?.send_window_end ?? null)) {
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
     if (!phone || !messageText) {
       results.failed++
       const { error: noPhoneErr } = await supabase.from('campaign_send_queue').update({ status: 'failed', error: !phone ? 'no_phone' : 'no_message_text', processed_at: new Date().toISOString() }).eq('id', r.id)
-      if (noPhoneErr) log.error('failed to mark queue row failed (no phone/text)', noPhoneErr, { queue_id: r.id })
+      if (noPhoneErr) log.error('failed to mark queue row failed (no phone/text)', new Error(noPhoneErr.message), { queue_id: r.id })
       continue
     }
 
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
       metadata: { sender: 'ai', action_type: 'campaign', source: 'campaign_send_queue', campaign_id: r.campaign_id, error: sendResult.error ?? null },
       sent_at: new Date().toISOString(),
     })
-    if (campaignMsgErr) log.error('campaign message log failed', campaignMsgErr, { queue_id: r.id })
+    if (campaignMsgErr) log.error('campaign message log failed', new Error(campaignMsgErr.message), { queue_id: r.id })
 
     if (sendResult.status === 'sent') {
       runningSentToday[num.id] = sentTodaySoFar + 1
@@ -127,11 +127,11 @@ export async function GET(req: NextRequest) {
       // re-sent to the same customer on the next cron run (duplicate
       // messages), since nothing else here marks it done.
       const { error: sentStatusErr } = await supabase.from('campaign_send_queue').update({ status: 'sent', processed_at: new Date().toISOString() }).eq('id', r.id)
-      if (sentStatusErr) log.error('failed to mark queue row sent — will be re-sent next run', sentStatusErr, { queue_id: r.id })
+      if (sentStatusErr) log.error('failed to mark queue row sent — will be re-sent next run', new Error(sentStatusErr.message), { queue_id: r.id })
       const { error: numberCountErr } = await supabase.from('portfolio_whatsapp_numbers').update({
         sent_today: runningSentToday[num.id], last_sent_at: new Date().toISOString(),
       }).eq('id', num.id)
-      if (numberCountErr) log.error('failed to update portfolio number send count', numberCountErr, { number_id: num.id })
+      if (numberCountErr) log.error('failed to update portfolio number send count', new Error(numberCountErr.message), { number_id: num.id })
       sentCountDelta[r.campaign_id] = (sentCountDelta[r.campaign_id] ?? 0) + 1
       results.sent++
     } else {
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
         status: attempts >= maxAttempts ? 'failed' : 'pending',
         attempts, error: sendResult.error ?? 'send_failed', processed_at: new Date().toISOString(),
       }).eq('id', r.id)
-      if (failStatusErr) log.error('failed to update queue row after failed send', failStatusErr, { queue_id: r.id })
+      if (failStatusErr) log.error('failed to update queue row after failed send', new Error(failStatusErr.message), { queue_id: r.id })
       results.failed++
     }
   }
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
       status: wasScheduled ? 'running' : (c as any)?.status,
       ...(wasScheduled ? { started_at: new Date().toISOString() } : {}),
     }).eq('id', campaignId)
-    if (campaignProgressErr) log.error('campaign progress update failed', campaignProgressErr, { campaign_id: campaignId })
+    if (campaignProgressErr) log.error('campaign progress update failed', new Error(campaignProgressErr.message), { campaign_id: campaignId })
   }
 
   return NextResponse.json({ message: 'Finished send-campaign-queue', results })

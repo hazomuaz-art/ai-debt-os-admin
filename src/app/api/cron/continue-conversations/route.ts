@@ -111,5 +111,5 @@ async function recordOutbound(
   // Real gap found during a full-system audit: not checked — the WhatsApp
   // message was still sent to the customer either way, but a rejected
   // insert meant it never showed up in the conversation history.
-  if (error) log.error('continue-conversations outbound log failed', error, { debt_id })
+  if (error) log.error('continue-conversations outbound log failed', new Error(error.message), { debt_id })
 }

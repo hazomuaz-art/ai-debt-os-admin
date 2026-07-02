@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
       // no_reply, then move to the next untried secondary number.
       const { error: primaryNoReplyErr } = await supabase.from('customer_contacts').update({ status: 'no_reply' })
         .eq('customer_id', customerId).eq('company_id', secondary.company_id).eq('is_primary', true).neq('status', 'wrong_number')
-      if (primaryNoReplyErr) log.error('failed to mark primary contact no_reply', primaryNoReplyErr, { customer_id: customerId })
+      if (primaryNoReplyErr) log.error('failed to mark primary contact no_reply', new Error(primaryNoReplyErr.message), { customer_id: customerId })
 
       const message = await generateOpeningMessage({ company_id: secondary.company_id, customer_id: customerId, debt_id: debt.id })
       const sendResult = await sendWhatsAppMessage({ to: secondary.phone, message, company_id: secondary.company_id })
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
         sent_at: new Date().toISOString(),
         metadata: { sender: 'ai', source: 'retry_secondary_contact', to_secondary_phone: secondary.phone },
       })
-      if (secondaryInsertErr) log.error('secondary-contact message log failed', secondaryInsertErr, { customer_id: customerId })
+      if (secondaryInsertErr) log.error('secondary-contact message log failed', new Error(secondaryInsertErr.message), { customer_id: customerId })
 
       const { error: secondaryStatusErr } = await supabase.from('customer_contacts')
         .update({ status: sendResult.status === 'sent' ? 'delivered' : 'untried' })
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       // cron run from re-selecting it (relying on the anyInbound/firstOutbound
       // checks above for dedup, not this status field, until this update
       // actually succeeds).
-      if (secondaryStatusErr) log.error('failed to update secondary contact status', secondaryStatusErr, { customer_id: customerId })
+      if (secondaryStatusErr) log.error('failed to update secondary contact status', new Error(secondaryStatusErr.message), { customer_id: customerId })
 
       if (sendResult.status === 'sent') results.tried_secondary++; else results.failed++
     } catch (e) {

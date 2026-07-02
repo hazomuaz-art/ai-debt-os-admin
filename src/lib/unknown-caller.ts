@@ -84,7 +84,7 @@ export async function handleUnknownCaller(args: {
       phone: args.phone, attempts_count: candidates.length ? 1 : 0,
       last_message: args.message, status: 'pending',
     })
-    if (insertErr) log.error('failed to create unmatched_contacts row', insertErr, { phone: args.phone })
+    if (insertErr) log.error('failed to create unmatched_contacts row', new Error(insertErr.message), { phone: args.phone })
   }
 
   if (!candidates.length) {
@@ -106,7 +106,7 @@ export async function handleUnknownCaller(args: {
       attempts_count: attempts, last_message: args.message,
       status: gaveUp ? 'given_up' : 'pending', updated_at: new Date().toISOString(),
     }).eq('phone', args.phone)
-    if (updErr) log.error('failed to update unmatched_contacts attempt count', updErr, { phone: args.phone })
+    if (updErr) log.error('failed to update unmatched_contacts attempt count', new Error(updErr.message), { phone: args.phone })
 
     if (gaveUp) {
       await insertSystemAlert({
@@ -135,13 +135,13 @@ export async function handleUnknownCaller(args: {
     company_id: match.company_id, customer_id: match.customer_id, phone: args.phone,
     is_primary: false, status: 'delivered', source: 'inbound_self_identified',
   })
-  if (linkErr) log.error('failed to link new number as secondary contact', linkErr, { phone: args.phone, customer_id: match.customer_id })
+  if (linkErr) log.error('failed to link new number as secondary contact', new Error(linkErr.message), { phone: args.phone, customer_id: match.customer_id })
 
   const { error: resolveErr } = await supabase.from('unmatched_contacts').update({
     status: 'resolved', matched_customer_id: match.customer_id, matched_debt_id: match.debt_id,
     updated_at: new Date().toISOString(),
   }).eq('phone', args.phone)
-  if (resolveErr) log.error('failed to mark unmatched_contacts resolved', resolveErr, { phone: args.phone })
+  if (resolveErr) log.error('failed to mark unmatched_contacts resolved', new Error(resolveErr.message), { phone: args.phone })
 
   return { matched: match, reply: null }
 }
