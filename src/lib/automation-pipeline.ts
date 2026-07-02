@@ -26,6 +26,8 @@ import { detectCustomerIntent } from '@/lib/negotiation-intent'
 import { insertTimelineEvent } from '@/lib/timeline'
 import { insertApproval } from '@/lib/approvals'
 import { insertSystemAlert } from '@/lib/system-alerts'
+import { recordDispute } from '@/lib/dispute'
+import { recordPaymentClaim } from '@/lib/payment-claim'
 
 const log = createLogger('automation-pipeline')
 
@@ -674,34 +676,59 @@ async function stepPromises(ctx: Ctx, event?: PipelineEvent): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Step: Approvals
 // ─────────────────────────────────────────────────────────────────────────────
+// How long a decided (or still-pending) large-balance/legal review approval
+// suppresses a fresh duplicate for the same debt. Real duplication bug this
+// fixes: the old dedup only checked for a currently-PENDING approval, so
+// once an admin approved or rejected one, the very next pipeline run (every
+// AI reply) recreated an identical one — nothing about the debt had changed,
+// only the fact that it had already been reviewed.
+const APPROVAL_REVIEW_COOLDOWN_DAYS = 7
+
 async function stepApprovals(ctx: Ctx): Promise<void> {
+  // Real duplication this fixes: 'disputed' status used to also trigger this
+  // generic review, alongside src/lib/dispute.ts's recordDispute() — which
+  // already handles disputes with full customer context and real
+  // PATCH-time effects. Two independent triggers reacting to the same
+  // 'disputed' status produced two different-looking approvals per dispute.
+  // Only genuinely separate signals (large balance, legal status) remain here.
   const needsApproval =
     (ctx.debt.status === 'legal' && ctx.debt.current_balance > 10000) ||
-    ctx.debt.current_balance > 50000 ||
-    ctx.debt.status === 'disputed'
+    ctx.debt.current_balance > 50000
   if (!needsApproval) return
   try {
     const sb = createServiceClient()
+    const cooldownCutoff = new Date(Date.now() - APPROVAL_REVIEW_COOLDOWN_DAYS * 86400000).toISOString()
     const { data: ex } = await sb.from('approvals')
       .select('id').eq('company_id', ctx.debt.company_id)
-      .eq('entity_id', ctx.debt.id).in('status', ['pending']).maybeSingle()
+      .eq('entity_id', ctx.debt.id)
+      .in('approval_type', ['legal_escalation', 'large_settlement'])
+      .gte('created_at', cooldownCutoff)
+      .limit(1).maybeSingle()
     if (ex) return
 
-    const approval_type =
-      ctx.debt.status === 'legal'      ? 'legal_escalation' :
-      ctx.debt.current_balance > 50000 ? 'large_settlement' : 'stop_followup'
+    const approval_type = ctx.debt.status === 'legal' ? 'legal_escalation' : 'large_settlement'
+    const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : null
+
+    const reasonLine =
+      approval_type === 'legal_escalation'
+        ? `الدين بحالة "قانونية" ورصيده يتجاوز 10,000 ${ctx.debt.currency} — يحتاج موافقة إدارية قبل الاستمرار بالتصعيد القانوني.`
+        : `رصيد الدين (${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}) يتجاوز الحد المسموح للتحصيل الآلي (50,000 ${ctx.debt.currency}) — يحتاج مراجعة وتفويض إداري صريح للاستمرار.`
 
     await insertApproval({
       company_id:    ctx.debt.company_id,
       approval_type,
-      title:         `${approval_type === 'legal_escalation' ? 'تصعيد قانوني' : approval_type === 'large_settlement' ? 'تسوية كبيرة' : 'مراجعة'}: ${ctx.customer.full_name}`,
-      description:   `${ctx.debt.reference_number} — ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency} — ${ctx.debt.status}`,
+      title:         `${approval_type === 'legal_escalation' ? 'تصعيد قانوني' : 'رصيد كبير يحتاج تفويض'}: ${ctx.customer.full_name}`,
+      description:   [
+        reasonLine,
+        `المرجع: ${ctx.debt.reference_number} — الرصيد: ${ctx.debt.current_balance.toLocaleString()} ${ctx.debt.currency}${daysOverdue !== null ? ` — متأخر ${daysOverdue} يوم` : ''}${ctx.debt.last_contact_result ? ` — آخر نتيجة تواصل: ${ctx.debt.last_contact_result}` : ''}`,
+        `القرار: الموافقة = تفويض إداري بالاستمرار. الرفض = إيقاف حتى مراجعة إضافية.`,
+      ].join('\n'),
       entity_type:   'debt',
       entity_id:     ctx.debt.id,
       requested_data: { debt_id: ctx.debt.id, customer: ctx.customer.full_name,
                         balance: ctx.debt.current_balance, currency: ctx.debt.currency,
                         status: ctx.debt.status, reference: ctx.debt.reference_number },
-      priority:      ctx.debt.status === 'legal' || ctx.debt.current_balance > 50000 ? 'urgent' : 'high',
+      priority:      'urgent',
       expires_at:    new Date(Date.now() + 48 * 3600000).toISOString(),
     })
   } catch (err) {
@@ -779,16 +806,23 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
     }).eq('id', ctx.debt.id).eq('company_id', ctx.debt.company_id)
     if (disputeErr) log.warn(`stepLiveReactor(${ctx.debt.id}) dispute debt-update failed: ${disputeErr.message}`)
 
-    await insertApproval({
+    // Real duplication this fixes: this used to build its own separate,
+    // bare approval (approval_type='stop_followup', no request_subtype) for
+    // every dispute-looking message, alongside src/lib/dispute.ts's
+    // recordDispute() — which already does this properly (real customer
+    // context/excerpt, request_subtype='dispute', and real PATCH-time
+    // effects in the approvals dashboard). Two independent mechanisms
+    // reacting to the same signal produced two differently-shaped,
+    // duplicate approvals per dispute, only one of which actually did
+    // anything when decided. recordDispute() already dedupes against any
+    // open/under_review dispute for this debt, so calling it here is safe
+    // to repeat on every qualifying message.
+    await recordDispute({
       company_id: ctx.debt.company_id,
-      approval_type: 'stop_followup',
-      title: `مراجعة اعتراض: ${ctx.customer.full_name}`,
-      description: text.slice(0, 1000),
-      entity_type: 'debt',
-      entity_id: ctx.debt.id,
-      requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message: text, intent },
-      priority: 'high',
-      expires_at: new Date(Date.now() + 48 * 3600000).toISOString(),
+      customer_id: ctx.customer.id,
+      customer_name: ctx.customer.full_name,
+      debt_id: ctx.debt.id,
+      customer_message: text,
     })
 
     await addTimeline('dispute_detected', `اعتراض يحتاج مراجعة: ${ctx.customer.full_name}`)
@@ -796,16 +830,18 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   }
 
   if (intent === 'paid_claim') {
-    await insertApproval({
+    // Real dead-end this fixes: the old bare approval here (approval_type=
+    // 'stop_followup', no request_subtype) had no PATCH-time effect —
+    // approving/rejecting it changed nothing, and nothing stopped a fresh
+    // duplicate firing on the customer's next reply. recordPaymentClaim()
+    // (src/lib/payment-claim.ts) dedupes against an existing pending claim
+    // and is wired to a real decision in the approvals PATCH route.
+    await recordPaymentClaim({
       company_id: ctx.debt.company_id,
-      approval_type: 'stop_followup',
-      title: `مراجعة إفادة سداد: ${ctx.customer.full_name}`,
-      description: text.slice(0, 1000),
-      entity_type: 'debt',
-      entity_id: ctx.debt.id,
-      requested_data: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, message: text, intent },
-      priority: 'urgent',
-      expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
+      customer_id: ctx.customer.id,
+      customer_name: ctx.customer.full_name,
+      debt_id: ctx.debt.id,
+      customer_message: text,
     })
 
     await addTimeline('payment_claim_detected', `العميل أفاد بالسداد/التحويل: ${ctx.customer.full_name}`)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
+import { insertTimelineEvent } from '@/lib/timeline'
 
 export async function GET(_req: NextRequest) {
   return withAuth(async (ctx) => {
@@ -208,6 +209,64 @@ export async function PATCH(req: NextRequest) {
                 if (disputeMsgErr) console.error('[approvals PATCH] dispute decision message log failed:', disputeMsgErr.message)
               }
             }
+          }
+
+          // ── Payment-claim decision automation ──
+          // Real gap this fixes: src/lib/payment-claim.ts's recordPaymentClaim()
+          // creates a request_subtype='payment_claim' approval, but until now
+          // nothing here ever acted on the admin's decision — approving or
+          // rejecting a "customer says they paid" claim changed nothing and
+          // never told the customer anything.
+          if (approval.requested_data?.request_subtype === 'payment_claim') {
+            const debtId = approval.entity_id
+            const { data: pc } = await ctx.supabase
+              .from('debts').select('*, customers(id, phone, whatsapp, full_name)').eq('id', debtId).single()
+            if (pc && pc.customers) {
+              const phone = pc.customers.whatsapp || pc.customers.phone
+              const accepted = status === 'approved'
+              // Accepted → payment confirmed, pause AI follow-up pending manual
+              // reconciliation; rejected → no matching payment found, resume
+              // normal collection.
+              const { error: claimPauseErr } = await ctx.supabase.from('customers').update({ ai_paused: accepted }).eq('id', pc.customers.id)
+              if (claimPauseErr) console.error('[approvals PATCH] payment-claim ai_paused update failed:', claimPauseErr.message)
+              if (phone) {
+                const message = accepted
+                  ? `مرحباً ${pc.customers.full_name}، تم استلام إفادتك بالسداد وجارٍ التحقق منها. تم إيقاف المتابعة الآلية مؤقتاً لحين المطابقة.`
+                  : `مرحباً ${pc.customers.full_name}، راجعنا حسابك ولم نجد سداداً مطابقاً حتى الآن. يرجى إرسال إثبات التحويل أو سداد الرصيد المستحق (${pc.current_balance} ${pc.currency}).`
+                const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
+                const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
+                const { error: claimMsgErr } = await ctx.supabase.from('messages').insert({
+                  company_id: ctx.profile.company_id, customer_id: pc.customers.id, debt_id: debtId,
+                  channel: 'whatsapp', direction: 'outbound', content: message,
+                  status: wr.status === 'sent' ? 'sent' : 'failed', whatsapp_message_id: wr.message_id || null,
+                  metadata: { sender: 'admin', action_type: 'payment_claim_decision', error: wr.error }, sent_at: new Date().toISOString(),
+                })
+                if (claimMsgErr) console.error('[approvals PATCH] payment-claim decision message log failed:', claimMsgErr.message)
+              }
+            }
+          }
+
+          // ── Legal-escalation / large-balance review decision ──
+          // Real gap this fixes: these two types (raised by stepApprovals in
+          // automation-pipeline.ts for legal-status or >50,000 balance debts)
+          // are internal sign-off flags, not customer requests — they never
+          // had ANY effect when decided, not even an audit trail. Approving
+          // or rejecting one vanished without a trace anywhere else in the
+          // system. Logging the reviewer's decision to the debt's timeline
+          // makes it a real, visible record instead of a silent no-op.
+          if (approval.approval_type === 'legal_escalation' || approval.approval_type === 'large_settlement') {
+            const accepted = status === 'approved'
+            await insertTimelineEvent({
+              company_id: ctx.profile.company_id,
+              debt_id: approval.entity_id,
+              event_type: approval.approval_type === 'legal_escalation' ? 'escalation' : 'status_change',
+              channel: 'system',
+              actor_type: 'collector',
+              actor_name: ctx.profile.full_name || 'Admin',
+              summary: approval.approval_type === 'legal_escalation'
+                ? (accepted ? 'تمت الموافقة على الاستمرار بالتصعيد القانوني' : 'تم رفض الاستمرار بالتصعيد القانوني')
+                : (accepted ? 'تمت الموافقة على الاستمرار بتحصيل الرصيد الكبير' : 'تم رفض الاستمرار — يحتاج مراجعة إضافية'),
+            })
           }
         }
       } catch (err) {

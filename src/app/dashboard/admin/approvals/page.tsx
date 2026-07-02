@@ -159,6 +159,7 @@ export default function ApprovalsPage() {
                             const subtype = (item as any).requested_data?.request_subtype
                             if (subtype === 'installment') return 'طلب تقسيط'
                             if (subtype === 'dispute') return 'اعتراض على المديونية'
+                            if (subtype === 'payment_claim') return 'إفادة سداد'
                             return TYPE_LABELS[String(item.approval_type ?? '')] ?? String(item.approval_type ?? '')
                           })()}
                         </span>

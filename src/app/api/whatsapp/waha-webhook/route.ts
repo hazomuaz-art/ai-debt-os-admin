@@ -473,10 +473,21 @@ export async function POST(request: NextRequest) {
         // was never answered when it actually was.
         if (replyInsertErr) log.error('AI reply message insert failed', new Error(replyInsertErr.message), { customer_id: c.id })
         if (waResult.status === 'sent') {
+          // Real bug this fixes: `message` here used to be aiDecision.message
+          // (the AI's own outgoing reply) — but stepLiveReactor/
+          // stepAISystemImpact in automation-pipeline.ts read this field to
+          // classify the CUSTOMER's intent (dispute/paid_claim/refusal/
+          // promise wording). Every classification was running on what the
+          // AI said back to the customer, not what the customer actually
+          // said — confirmed live in production (an approval's "customer
+          // claim" was literally the AI's own reply text). mergedText (the
+          // customer's real inbound message, already in this closure) is
+          // the correct signal; the AI's reply is kept under its own field
+          // for anything that specifically needs it.
           await processEvent({
             debt_id: effectiveDebtId ?? 'temp', company_id: c.company_id,
             source: 'ai_reply',
-            data: { message: aiDecision.message, action: aiDecision.action },
+            data: { message: mergedText, ai_reply: aiDecision.message, action: aiDecision.action },
           }).catch(e => log.error('pipeline failed', e as Error))
         }
       }
