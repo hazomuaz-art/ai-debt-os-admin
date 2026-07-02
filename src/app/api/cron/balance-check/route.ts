@@ -48,10 +48,11 @@ export async function GET(req: NextRequest) {
   // Once the balance recovers (top-up), auto-resolve old alerts so the next
   // drop raises a fresh one instead of staying silently dismissed.
   if (balance.remaining > WARNING_USD) {
-    await supabase.from('system_alerts')
+    const { error: autoResolveErr } = await supabase.from('system_alerts')
       .update({ is_resolved: true, resolved_at: new Date().toISOString() })
       .in('alert_type', ['ai_balance_warning', 'ai_balance_critical'])
       .eq('is_resolved', false).is('company_id', null)
+    if (autoResolveErr) log.error('failed to auto-resolve stale balance alerts', autoResolveErr)
   }
 
   if (balance.remaining <= CRITICAL_USD) {

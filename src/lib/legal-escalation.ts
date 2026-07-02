@@ -200,7 +200,15 @@ export async function openEscalation(args: {
       return null
     }
 
-    await supabase.from('debts').update({ status: 'legal' }).eq('id', args.debt_id)
+    // Real gap found during a deep follow-up audit: not checked — a rejected
+    // update would leave the debt in its old status while the
+    // legal_escalations row + critical alert + timeline all say it's under
+    // legal review, an inconsistent state (the conversation lock itself is
+    // driven by getOpenEscalation() reading legal_escalations, not this
+    // status field, so replies would still correctly freeze — but every
+    // status-based view/filter in the dashboard would show it wrong).
+    const { error: debtLegalStatusErr } = await supabase.from('debts').update({ status: 'legal' }).eq('id', args.debt_id)
+    if (debtLegalStatusErr) log.warn('failed to set debt status to legal: ' + debtLegalStatusErr.message, { debt_id: args.debt_id })
 
     await insertSystemAlert({
       company_id: args.company_id,
@@ -271,9 +279,15 @@ export async function trackRefusalForLegalEscalation(args: { debt_id: string }):
     const existing = meta.refusal_tracking as { count?: number; first_at?: string } | undefined
     const count = (existing?.count ?? 0) + 1
     const first_at = existing?.first_at ?? new Date().toISOString()
-    await supabase.from('debts').update({
+    const { error: trackErr } = await supabase.from('debts').update({
       metadata: { ...meta, refusal_tracking: { count, first_at } },
     }).eq('id', args.debt_id)
+    // A silent failure here means the refusal count never actually
+    // increments — the repeated_refusal auto-escalation cron would never
+    // trigger for a genuinely repeat-refusing customer, with no trace at all
+    // (the try/catch alone can't catch this — Supabase returns {error}
+    // rather than throwing).
+    if (trackErr) log.warn('failed to persist refusal tracking: ' + trackErr.message, { debt_id: args.debt_id })
   } catch (err) {
     log.warn('trackRefusalForLegalEscalation failed: ' + (err instanceof Error ? err.message : String(err)), { debt_id: args.debt_id })
   }
@@ -288,7 +302,8 @@ export async function resetRefusalTracking(debt_id: string): Promise<void> {
     const meta = ((debt as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}) as Record<string, unknown>
     const { refusal_tracking, ...rest } = meta
     void refusal_tracking
-    await supabase.from('debts').update({ metadata: rest }).eq('id', debt_id)
+    const { error: resetErr } = await supabase.from('debts').update({ metadata: rest }).eq('id', debt_id)
+    if (resetErr) log.warn('failed to reset refusal tracking: ' + resetErr.message, { debt_id })
   } catch (err) {
     log.warn('resetRefusalTracking failed: ' + (err instanceof Error ? err.message : String(err)), { debt_id })
   }
