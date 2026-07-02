@@ -158,19 +158,22 @@ export default async function AdminDebtsPage({
                       <div className="text-[#5f6b7e] text-xs mt-0.5">{p.from_amount.replace('{amount}', formatCurrency(debt.original_amount, debt.currency))}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(debt.status)}`}>{statusLabels[debt.status] ?? debt.status}</span>
-                      {/* Real sync complaint this fixes: this column used to show
+                      {/* Real sync complaint this fixes: the badge used to show
                           only the coarse status (active/legal/disputed/settled...) —
                           most of the company's specific outcome categories (the
-                          detail page's "original_sub_status") map to the SAME
-                          generic status, so nearly every debt looked identically
-                          "active" here while the real, specific picture only
-                          appeared once you opened it. Surfacing it here too. */}
-                      {debt.original_sub_status && (
-                        <div className="text-[#8b95a7] text-[11px] mt-1 max-w-[160px] mx-auto truncate" title={debt.original_sub_status}>
-                          {debt.original_sub_status}
-                        </div>
-                      )}
+                          same "original_sub_status" shown on the detail page) map
+                          to the SAME generic status, so nearly every debt looked
+                          identically "active"/"متنازع عليه" here while the real,
+                          specific status only appeared once you opened it. The
+                          badge itself now shows the real status text — color still
+                          reflects the coarse status family (red for disputed/legal,
+                          green for settled, etc). */}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border max-w-[180px] truncate ${getStatusColor(debt.status)}`}
+                        title={debt.original_sub_status ?? undefined}
+                      >
+                        {debt.original_sub_status || statusLabels[debt.status] || debt.status}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       {latestScore ? (
