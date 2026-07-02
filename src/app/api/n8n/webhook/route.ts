@@ -120,15 +120,27 @@ export async function POST(request: NextRequest) {
         // the caller (n8n) still gets an HTTP 200 either way.
         if (paymentInsertErr) console.error('[n8n-webhook] payment insert failed:', paymentInsertErr.message, { debt_id, amount })
 
-        // Update debt balance
+        // Update debt balance. Real gap found during a deep follow-up audit:
+        // update_debt_balance_after_payment was never actually deployed as a
+        // DB function (confirmed — it doesn't exist in information_schema),
+        // and the "update manually" fallback promised in the old comment was
+        // never actually implemented — it just logged a warning and did
+        // nothing. A payment synced via this route got its own `payments`
+        // row, but the debt's current_balance never decreased. Now updates
+        // directly, same working pattern already used in payment-receipt.ts.
         if (payment) {
-          await supabase.rpc('update_debt_balance_after_payment', {
-            p_debt_id: debt_id,
-            p_amount: parseFloat(amount),
-          }).catch(() => {
-            // RPC might not exist yet, update manually
-            console.warn('[n8n-webhook] update_debt_balance_after_payment RPC not found')
-          })
+          const { data: debtRow } = await supabase
+            .from('debts').select('current_balance, status').eq('id', debt_id).maybeSingle()
+          if (debtRow) {
+            const newBal = Math.max(0, Number(debtRow.current_balance) - parseFloat(amount))
+            const upd: Record<string, unknown> = { current_balance: newBal }
+            if (newBal <= 0) upd.status = 'settled'
+            else if (debtRow.status === 'promised' || debtRow.status === 'overdue') upd.status = 'active'
+            const { error: balUpdErr } = await supabase.from('debts').update(upd).eq('id', debt_id)
+            if (balUpdErr) console.error('[n8n-webhook] debt balance update failed:', balUpdErr.message, { debt_id })
+          } else {
+            console.error('[n8n-webhook] could not fetch debt for balance update', { debt_id })
+          }
         }
 
         // Create alert
