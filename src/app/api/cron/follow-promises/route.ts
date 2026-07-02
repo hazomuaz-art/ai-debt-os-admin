@@ -59,6 +59,25 @@ export async function GET(req: NextRequest) {
       .limit(1).maybeSingle()
     if (alreadyReminded) { log.info('reminder already sent for this promise today — skipping', { promise_id: promise.id }); continue }
 
+    // Real production case that caused genuine customer confusion (confirmed
+    // via a real STC conversation): a customer with an UNDECIDED installment
+    // request open on the same debt later gave a vague timing signal
+    // ("الشهر الجاي") with no amount — the system recorded a promise
+    // defaulting to the FULL balance (the only sane default when no partial
+    // amount is given), then this cron confidently reminded them "you
+    // promised 880,001 SAR" — a number they never actually agreed to while
+    // their smaller installment request was still pending review. Skip the
+    // confident reminder entirely while a decision is still pending on this
+    // debt; the human reviewing the approval will follow up appropriately.
+    const { data: pendingApproval } = await supabase
+      .from('approvals').select('id')
+      .eq('entity_type', 'debt').eq('entity_id', debt.id).eq('status', 'pending')
+      .limit(1).maybeSingle()
+    if (pendingApproval) {
+      log.info('skipping promise reminder — an approval is still pending on this debt', { promise_id: promise.id, debt_id: debt.id })
+      continue
+    }
+
     try {
       let reminderMsg = await generateProactiveReminder({
         company_id: promise.company_id,

@@ -44,6 +44,7 @@ export function Sidebar({ profile, isPlatformOwner }: { profile: any; isPlatform
         { href: `/dashboard/${role}/analytics`,   label: t.nav.analytics, icon: BarChart2, roles: ['admin'] },
         { href: `/dashboard/${role}/strategy-insights`, label: isRTL ? 'التحليل الاستراتيجي' : 'Strategy Insights', icon: LineChart, roles: ['admin', 'manager'] },
         { href: `/dashboard/${role}/team`,        label: t.nav.team, icon: ShieldCheck, roles: ['admin', 'manager'] },
+        { href: `/dashboard/${role}/employees`,   label: isRTL ? 'دليل الموظفين' : 'Employee Directory', icon: Users, roles: ['admin'] },
         { href: `/dashboard/${role}/campaigns`,   label: t.nav.campaigns, icon: Megaphone, roles: ['admin'] },
         { href: `/dashboard/${role}/payments`,    label: isRTL ? 'المدفوعات' : 'Payments', icon: Wallet, roles: ['admin'] },
         { href: `/dashboard/${role}/promises`,    label: t.nav.promises, icon: CheckCircle, roles: ['admin'] },
