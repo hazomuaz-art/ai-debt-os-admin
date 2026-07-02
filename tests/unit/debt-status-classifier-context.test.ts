@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 let mockModelContent = ''
 let mockHistory: any[] = []
+let mockCaseNote: string | null = null
 
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
@@ -11,13 +12,21 @@ vi.mock('openai', () => ({
   })),
 }))
 
+// Distinguishes by table name — 'debts' resolves via .maybeSingle() (the
+// case-note fetch), 'messages' resolves via .order().limit() (the recent-
+// history fetch). Both queries now run independently (see
+// debt-status-classifier.ts), so the mock must support both chain shapes.
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn().mockImplementation(() => ({
-    from: vi.fn().mockImplementation(() => ({
+    from: vi.fn().mockImplementation((table: string) => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: mockHistory, error: null }),
+      maybeSingle: vi.fn().mockImplementation(async () => ({
+        data: table === 'debts' ? { metadata: mockCaseNote ? { case_note: mockCaseNote } : {} } : null,
+        error: null,
+      })),
     })),
   })),
 }))
@@ -28,6 +37,7 @@ beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'sk-or-test'
   mockModelContent = ''
   mockHistory = []
+  mockCaseNote = null
 })
 
 describe('classifyDebtOutcome — conversation context', () => {
@@ -68,6 +78,30 @@ describe('classifyDebtOutcome — conversation context', () => {
     expect(capturedPrompt).toContain('معي الأخ حذيفة؟')
     expect(capturedPrompt).toContain('سياق المحادثة')
     expect(result).toBeNull()
+  })
+
+  // Real gap this fixes: classification only ever saw the last 8 raw
+  // messages — something the customer said clearly earlier in a long
+  // conversation and never repeated was invisible to every later call. The
+  // running case note (already maintained on every real turn) now flows
+  // into the same prompt so full-history facts aren't lost.
+  it('includes the running case note as full-history context, independent of the recent-messages window', async () => {
+    mockCaseNote = 'العميل طلب خطة تقسيط والوكيل رفعها للمراجعة، ولم يصله رد بعد.'
+    mockHistory = []
+    let capturedPrompt = ''
+    mockModelContent = JSON.stringify({ category: null })
+    const openaiModule = await import('openai')
+    ;(openaiModule.default as any).mockImplementation(() => ({
+      chat: { completions: { create: vi.fn().mockImplementation(async (params: any) => {
+        capturedPrompt = params.messages[1].content
+        return { choices: [{ message: { content: mockModelContent } }] }
+      }) } },
+    }))
+
+    await classifyDebtOutcome({ portfolio_name: 'موبايلي', customer_message: 'وش صار بطلبي', debt_id: 'd1' })
+
+    expect(capturedPrompt).toContain('ملخص كامل المحادثة حتى الآن')
+    expect(capturedPrompt).toContain('خطة تقسيط')
   })
 
   it('never throws and proceeds with the bare message if fetching context fails', async () => {

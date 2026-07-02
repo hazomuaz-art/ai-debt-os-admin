@@ -54,8 +54,31 @@ export async function classifyDebtOutcome(args: {
 
   let contextBlock = ''
   if (args.debt_id) {
+    const svc = createServiceClient()
+    const blocks: string[] = []
+
+    // Real gap found in a follow-up audit: this only ever saw the last 8 RAW
+    // messages — a fact the customer stated clearly earlier in a long
+    // conversation (more than ~8 turns back) and never repeated was
+    // invisible to every later classification call, since each call gets a
+    // fresh, shallow window rather than any memory of the case so far. The
+    // running case note (updateCaseNote in case-note.ts) already summarizes
+    // the ENTIRE conversation from the start on every real turn — reusing it
+    // here gives the classifier real full-history awareness, not just a
+    // recent snippet, at zero extra LLM calls. Fetched independently from
+    // the recent-messages query below (separate try/catch each) so a
+    // failure fetching one never discards the other — that coupling was a
+    // real regression caught in testing before this ever shipped.
     try {
-      const svc = createServiceClient()
+      const { data: debtRow } = await svc
+        .from('debts').select('metadata').eq('id', args.debt_id).maybeSingle()
+      const caseNote = (debtRow?.metadata as Record<string, unknown> | null)?.case_note as string | undefined
+      if (caseNote) blocks.push(`ملخص كامل المحادثة حتى الآن:\n${caseNote}`)
+    } catch (err) {
+      log.warn('failed to fetch case note for classification context', { error: String((err as any)?.message ?? err) })
+    }
+
+    try {
       const { data: history } = await svc
         .from('messages')
         .select('direction, content, sent_at')
@@ -65,10 +88,12 @@ export async function classifyDebtOutcome(args: {
       const prior = (history ?? []).slice().reverse()
         .map((m: { direction: string; content: string | null }) => `${m.direction === 'inbound' ? 'العميل' : 'الوكيل'}: ${m.content ?? ''}`)
         .join('\n')
-      if (prior) contextBlock = `\n\nسياق المحادثة قبل هذه الرسالة (الأقدم أولاً):\n${prior}\n`
+      if (prior) blocks.push(`سياق المحادثة — آخر الرسائل قبل هذه الرسالة (الأقدم أولاً):\n${prior}`)
     } catch (err) {
-      log.warn('failed to fetch conversation context for classification — proceeding with bare message', { error: String((err as any)?.message ?? err) })
+      log.warn('failed to fetch recent messages for classification context', { error: String((err as any)?.message ?? err) })
     }
+
+    if (blocks.length) contextBlock = `\n\n${blocks.join('\n\n')}\n`
   }
 
   const client = new OpenAI({
