@@ -220,30 +220,61 @@ export async function POST(request: NextRequest) {
 
     log.info('WAHA inbound', { from, phone, hasReceiptMedia, mimetype })
 
-    const { data: customer } = await supabase
+    let { data: customer } = await supabase
       .from('customers')
       .select('id, company_id, full_name, ai_paused')
       .or([`whatsapp.eq.${phone}`, `whatsapp.eq.+${phone}`, `phone.eq.${phone}`, `phone.eq.+${phone}`].join(','))
       .limit(1).maybeSingle()
 
+    // Real gap found during a full-system audit: a phone already linked as a
+    // SECONDARY contact (customer_contacts — either from a manual/import
+    // secondary number or from a prior unknown-caller self-identification
+    // below) was never checked here, only the primary phone/whatsapp
+    // columns — so a known secondary number still hit the "unmatched" path
+    // on every single message forever, never actually resolving.
     if (!customer) {
-      // Real production gap: an inbound message from a phone that matches no
-      // customer record used to vanish with only an SSH-visible log line —
-      // no dashboard trace at all, no way for staff to discover it happened,
-      // let alone link it to the right customer manually. company_id is
-      // unknown at this point (that's exactly the problem), so this alert is
-      // platform-wide (company_id: null) — every company-scoped alerts view
-      // filters by company_id, so an admin/platform-owner view must be relied
-      // on to see these; that's an accepted tradeoff of not being able to
-      // attribute an unmatched phone to any company.
-      log.warn('no customer for inbound', { phone })
-      await insertSystemAlert({
-        company_id: null, severity: 'warning', alert_type: 'unmatched_inbound_message',
-        title: 'رسالة واردة من رقم غير مرتبط بأي عميل',
-        message: `وصلت رسالة واتساب من الرقم ${phone} ولا يوجد عميل مطابق له في النظام — راجع الرسالة واربطها يدوياً إذا لزم.`,
-        metadata: { phone, text: text || null, has_media: hasReceiptMedia, mimetype: mimetype || null },
-      })
-      return NextResponse.json({ status: 'ok' })
+      const { data: contactRow } = await supabase
+        .from('customer_contacts').select('customer_id').eq('phone', phone).limit(1).maybeSingle()
+      if (contactRow) {
+        const { data: viaContact } = await supabase
+          .from('customers').select('id, company_id, full_name, ai_paused')
+          .eq('id', (contactRow as { customer_id: string }).customer_id).maybeSingle()
+        customer = viaContact
+      }
+    }
+
+    if (!customer) {
+      // Real production gap this replaces: an inbound message from a totally
+      // unrecognized phone used to be a dead end — logged and alerted, but
+      // the agent never replied and the customer (if real) was left hanging
+      // forever. Now asks for something identifying (national ID / account
+      // number / invoice-reference number) and searches for an EXACT match
+      // before ever disclosing anything — see unknown-caller.ts.
+      const { handleUnknownCaller } = await import('@/lib/unknown-caller')
+      const result = await handleUnknownCaller({ phone, message: text || '' })
+
+      if (result.reply) {
+        // company_id genuinely isn't known yet at this point — omitted on
+        // purpose, sendWhatsAppMessage falls back to the shared default WAHA
+        // session (this platform runs one shared gateway for inbound; only
+        // outbound CAMPAIGNS use a per-portfolio override).
+        await sendWhatsAppMessage({ to: phone, message: result.reply })
+        return NextResponse.json({ status: 'ok' })
+      }
+
+      if (!result.matched) {
+        // No candidate found in the message at all (e.g. a media-only or
+        // blank turn) and not the first contact — nothing to ask again for
+        // this turn; stay silent rather than repeat the same question.
+        return NextResponse.json({ status: 'ok' })
+      }
+
+      const { data: viaMatch } = await supabase
+        .from('customers').select('id, company_id, full_name, ai_paused')
+        .eq('id', result.matched.customer_id).maybeSingle()
+      customer = viaMatch
+      if (!customer) return NextResponse.json({ status: 'ok' })
+      log.info('unknown caller resolved to existing customer', { phone, customer_id: result.matched.customer_id })
     }
 
     const c = customer as { id: string; company_id: string; full_name?: string; ai_paused?: boolean }
