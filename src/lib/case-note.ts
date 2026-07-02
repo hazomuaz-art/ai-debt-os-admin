@@ -88,10 +88,19 @@ export async function updateCaseNote(args: {
 
     // Real transcript, not a chain of summaries — the actual last ~40
     // messages for this debt, oldest first, same window the main agent uses.
+    // Real gap this fixes: the very first outbound message(s) to a customer
+    // (e.g. an identity-confirmation opener) are sent before any debt_id is
+    // resolved, so they're stored with debt_id=null — a bare debt_id filter
+    // permanently loses them once the debt resolves, leaving the case note
+    // blind to what a terse early reply ("لا") was actually answering.
+    // Scoping by customer_id (already fetched above) with debt_id match OR
+    // null keeps that opener visible, same fix applied in
+    // debt-status-classifier.ts.
     const { data: history } = await svc
       .from('messages')
       .select('direction, content, sent_at')
-      .eq('debt_id', args.debt_id)
+      .eq('customer_id', debt.customer_id)
+      .or(`debt_id.eq.${args.debt_id},debt_id.is.null`)
       .order('sent_at', { ascending: false })
       .limit(40)
     const transcript = (history ?? [])

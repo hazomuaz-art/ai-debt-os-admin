@@ -21,6 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
     from: vi.fn().mockImplementation((table: string) => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: mockHistory, error: null }),
       maybeSingle: vi.fn().mockImplementation(async () => ({
@@ -77,6 +78,35 @@ describe('classifyDebtOutcome — conversation context', () => {
 
     expect(capturedPrompt).toContain('معي الأخ حذيفة؟')
     expect(capturedPrompt).toContain('سياق المحادثة')
+    expect(result).toBeNull()
+  })
+
+  // Real production misfire this fixes: the opener message ("معي الأخ
+  // فلان؟") is sent before any debt_id resolves, so it's stored with
+  // debt_id=null — a plain debt_id filter permanently loses it once the
+  // debt resolves. Confirmed live: a customer's bare "لا" (denying being
+  // the target person) got classified as "العميل رافض السداد" because the
+  // classifier never saw the question it was answering. customer_id lets
+  // the query recover that orphaned opener.
+  it('recovers a pre-resolution opener (debt_id=null) via customer_id so the ambiguous "لا" is judged in its real context', async () => {
+    mockHistory = [
+      { direction: 'outbound', content: 'معي الأخ يزيد؟', sent_at: '2026-07-01T07:20:00Z' },
+    ]
+    let capturedPrompt = ''
+    mockModelContent = JSON.stringify({ category: null })
+    const openaiModule = await import('openai')
+    ;(openaiModule.default as any).mockImplementation(() => ({
+      chat: { completions: { create: vi.fn().mockImplementation(async (params: any) => {
+        capturedPrompt = params.messages[1].content
+        return { choices: [{ message: { content: mockModelContent } }] }
+      }) } },
+    }))
+
+    const result = await classifyDebtOutcome({
+      portfolio_name: 'موبايلي', customer_message: 'لا', debt_id: 'd1', customer_id: 'cust1',
+    })
+
+    expect(capturedPrompt).toContain('معي الأخ يزيد؟')
     expect(result).toBeNull()
   })
 

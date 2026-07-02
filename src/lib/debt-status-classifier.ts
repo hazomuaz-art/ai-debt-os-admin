@@ -44,6 +44,17 @@ export async function classifyDebtOutcome(args: {
   // main collector agent and case-note generator already do; without it,
   // behavior is unchanged (still works with bare text, e.g. from tests).
   debt_id?: string | null
+  // Real production root cause: the very first outbound message(s) to a
+  // customer (e.g. an identity-confirmation opener like "معي الأخ فلان؟")
+  // are sent before any debt has been resolved for the conversation, so
+  // they're stored with debt_id=null. Once the customer's reply resolves a
+  // debt_id, every context query below that filters strictly by debt_id
+  // permanently loses that opener — a bare "لا" answering "هل معي فلان؟"
+  // (a wrong-number denial) then gets classified with zero context and can
+  // be misread as a payment refusal. Confirmed live: exactly this happened.
+  // customer_id lets the query also pull in those orphaned pre-resolution
+  // messages that belong to the same customer.
+  customer_id?: string | null
 }): Promise<{ category: string; meta: OutcomeMeta } | null> {
   if (!args.portfolio_name || !args.customer_message.trim()) return null
 
@@ -79,12 +90,15 @@ export async function classifyDebtOutcome(args: {
     }
 
     try {
-      const { data: history } = await svc
-        .from('messages')
-        .select('direction, content, sent_at')
-        .eq('debt_id', args.debt_id)
-        .order('sent_at', { ascending: false })
-        .limit(8)
+      // customer_id + (debt_id match OR debt_id null) instead of a bare
+      // debt_id filter — see the args.customer_id comment above for why.
+      // Falls back to the old debt_id-only behavior when customer_id isn't
+      // passed (keeps existing bare-text callers/tests unaffected).
+      let query = svc.from('messages').select('direction, content, sent_at')
+      query = args.customer_id
+        ? query.eq('customer_id', args.customer_id).or(`debt_id.eq.${args.debt_id},debt_id.is.null`)
+        : query.eq('debt_id', args.debt_id)
+      const { data: history } = await query.order('sent_at', { ascending: false }).limit(8)
       const prior = (history ?? []).slice().reverse()
         .map((m: { direction: string; content: string | null }) => `${m.direction === 'inbound' ? 'العميل' : 'الوكيل'}: ${m.content ?? ''}`)
         .join('\n')

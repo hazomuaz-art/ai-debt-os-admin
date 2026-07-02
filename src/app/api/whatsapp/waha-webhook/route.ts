@@ -596,7 +596,7 @@ export async function POST(request: NextRequest) {
       if (effectiveDebtId) {
         const portfolioName = (latestDebt as { portfolio?: { name?: string } } | null)?.portfolio?.name ?? null
         const { classifyDebtOutcome } = await import('@/lib/debt-status-classifier')
-        const outcome = await classifyDebtOutcome({ portfolio_name: portfolioName, customer_message: mergedText, debt_id: effectiveDebtId })
+        const outcome = await classifyDebtOutcome({ portfolio_name: portfolioName, customer_message: mergedText, debt_id: effectiveDebtId, customer_id: c.id })
 
         if (outcome) {
           const { category, meta } = outcome

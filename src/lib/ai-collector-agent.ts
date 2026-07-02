@@ -1111,8 +1111,15 @@ export async function runCollectorAgent(args: {
   const fullOutboundHistoryPromise: Promise<{ content: string | null }[] | null> = (async () => {
     if (!forcedDebtId) return null
     try {
+      // customer_id + (debt_id match OR debt_id null) — same fix as
+      // debt-status-classifier.ts/case-note.ts: an opener message sent
+      // before the debt resolved (debt_id=null) would otherwise be
+      // permanently invisible to this repeat-check once the debt resolves.
       const { data } = await createServiceClient()
-        .from('messages').select('content').eq('debt_id', forcedDebtId).eq('direction', 'outbound')
+        .from('messages').select('content')
+        .eq('customer_id', args.customer_id)
+        .or(`debt_id.eq.${forcedDebtId},debt_id.is.null`)
+        .eq('direction', 'outbound')
         .order('sent_at', { ascending: true }).limit(500)
       return data ?? null
     } catch (err) {
