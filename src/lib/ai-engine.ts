@@ -30,6 +30,15 @@ export interface DebtScoringInput {
   payment_history:     Array<{ amount: number; date: string; status: string }>
   days_overdue:        number
   total_payments_made: number
+  // Real gap this fixes: the score/strategy shown on the debt page used to
+  // be computed purely from numbers (balance/status/overdue/DTI/payments) —
+  // zero visibility into what's actually happening in the conversation, so
+  // it felt disconnected from the real case. These are optional so existing
+  // callers that don't have this context yet keep working unchanged.
+  case_note?:          string | null
+  recent_events?:      string[]
+  open_promise?:       { amount: number; date: string } | null
+  has_open_dispute?:   boolean
 }
 
 export interface ScoreResult {
@@ -85,6 +94,10 @@ export function scoringFallback(input: DebtScoringInput): ScoreResult {
   if (recovered > 0.5)      score += 10
   else if (recovered > 0.2) score += 5
 
+  // An open, unresolved dispute means collection is genuinely uncertain
+  // right now, regardless of how favorable the numbers look otherwise.
+  if (input.has_open_dispute) score -= 20
+
   score = Math.min(100, Math.max(0, score))
 
   const risk: ScoreResult['risk_classification'] =
@@ -94,17 +107,22 @@ export function scoringFallback(input: DebtScoringInput): ScoreResult {
     score,
     risk_classification:    risk,
     collection_probability: Math.round(score * 0.85),
-    recommended_strategy:   daysOverdue > 180
-      ? 'يُنصح بالتصعيد القانوني أو دراسة إعدام الدين'
-      : daysOverdue > 90
-        ? 'التصعيد مع عرض تسوية'
-        : hasPayments
-          ? 'مواصلة التواصل والتفاوض على خطة سداد'
-          : 'بدء تواصل مباشر وتقييم مدى الاستعداد للسداد',
+    recommended_strategy:   input.has_open_dispute
+      ? 'يوجد اعتراض مفتوح — لا يُنصح بالمتابعة الآلية حتى تُحسم المراجعة'
+      : input.open_promise
+        ? `متابعة الوعد المسجَّل (${input.open_promise.amount} بتاريخ ${input.open_promise.date})`
+        : daysOverdue > 180
+          ? 'يُنصح بالتصعيد القانوني أو دراسة إعدام الدين'
+          : daysOverdue > 90
+            ? 'التصعيد مع عرض تسوية'
+            : hasPayments
+              ? 'مواصلة التواصل والتفاوض على خطة سداد'
+              : 'بدء تواصل مباشر وتقييم مدى الاستعداد للسداد',
     factors: [
       { name: 'أيام التأخر',          impact: daysOverdue === 0 ? 'positive' : daysOverdue > 90 ? 'negative' : 'neutral', weight: Math.min(10, Math.floor(daysOverdue / 18) + 1), description: daysOverdue === 0 ? 'غير متأخر' : `متأخر ${daysOverdue} يوم` },
       { name: 'سجل السداد',           impact: hasPayments ? 'positive' : 'negative', weight: hasPayments ? 7 : 4, description: hasPayments ? `${input.total_payments_made} دفعة` : 'لا توجد دفعات' },
       { name: 'نسبة الدين إلى الدخل', impact: dti < 0.5 ? 'positive' : dti > 1.0 ? 'negative' : 'neutral', weight: 5, description: income > 0 ? `النسبة: ${(dti * 100).toFixed(0)}%` : 'الدخل غير معروف' },
+      ...(input.has_open_dispute ? [{ name: 'اعتراض مفتوح', impact: 'negative' as const, weight: 8, description: 'العميل يعترض على الدين حالياً' }] : []),
     ],
   }
 }
@@ -248,11 +266,24 @@ export async function scoreDebt(input: DebtScoringInput): Promise<ScoreResult> {
     : 'Unknown'
   const recentPayments = input.payment_history.slice(0, 3).map(p => `${p.date}: ${p.amount} (${p.status})`).join('; ') || 'None'
 
+  // Real complaint this fixes: the score and recommended_strategy shown on
+  // the debt page used to come from numbers alone — no visibility into the
+  // actual conversation, so they read as generic and disconnected from the
+  // real case. These lines are only included when present so scoring still
+  // works for callers that don't have this context.
+  const contextLines = [
+    input.case_note ? `CURRENT CASE STATUS (from the real conversation): ${input.case_note}` : null,
+    input.recent_events?.length ? `RECENT EVENTS: ${input.recent_events.join(' | ')}` : null,
+    input.open_promise ? `OPEN PROMISE: promised ${input.open_promise.amount} on ${input.open_promise.date}, not yet fulfilled` : null,
+    input.has_open_dispute ? `OPEN DISPUTE: customer is currently disputing this debt — pending resolution` : null,
+  ].filter(Boolean).join('\n')
+
   const prompt = `Analyze this debt and score it. Return ONLY valid JSON.
 IMPORTANT: write "recommended_strategy", every factor "name", and every factor "description" in ARABIC. Keep "risk_classification" and "impact" in English enum values.
 DEBT: amount=${input.debt.original_amount} ${input.debt.currency}, balance=${input.debt.current_balance}, status=${input.debt.status}, overdue=${input.days_overdue}d
 CUSTOMER: employer=${input.customer.employer ?? 'Unknown'}, DTI=${dti}
 PAYMENTS: count=${input.total_payments_made}, recent=${recentPayments}
+${contextLines ? contextLines + '\n' : ''}Ground "recommended_strategy" and the factors in the real case status above when provided — not just the raw numbers.
 Return: {"score":<0-100>,"risk_classification":"<low|medium|high|critical>","collection_probability":<0-100>,"recommended_strategy":"<استراتيجية بالعربية، 100 حرف>","factors":[{"name":"<اسم العامل بالعربية، 30 حرف>","impact":"<positive|negative|neutral>","weight":<1-10>,"description":"<وصف بالعربية، 80 حرف>"}]}`
 
   try {

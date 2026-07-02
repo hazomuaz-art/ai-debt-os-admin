@@ -57,11 +57,17 @@ export default async function AdminDebtsPage({
       *,
       customer:customers(id, full_name, phone, whatsapp, ai_paused),
       assigned_collector:profiles!debts_assigned_to_fkey(id, full_name),
-      ai_scores(score, risk_classification),
+      ai_scores(score, risk_classification, created_at),
       portfolio:portfolios(id, name, name_ar)
     `, { count: 'exact' })
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
+    // Real sync bug this fixes: without ordering the embedded ai_scores
+    // relation, debt.ai_scores?.[0] below could be an old score rather than
+    // the latest one (a debt gets rescored repeatedly over its lifetime) —
+    // the detail page already sorts client-side by created_at, this page
+    // never did, so the two could show different scores for the same debt.
+    .order('created_at', { ascending: false, foreignTable: 'ai_scores' })
     .range(offset, offset + limit - 1)
 
   if (searchParams.status) query = query.eq('status', searchParams.status)
@@ -151,7 +157,21 @@ export default async function AdminDebtsPage({
                       <div className="text-sm font-bold text-rose-400">{formatCurrency(debt.current_balance, debt.currency)}</div>
                       <div className="text-[#5f6b7e] text-xs mt-0.5">{p.from_amount.replace('{amount}', formatCurrency(debt.original_amount, debt.currency))}</div>
                     </td>
-                    <td className="px-6 py-4 text-center"><span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(debt.status)}`}>{statusLabels[debt.status] ?? debt.status}</span></td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(debt.status)}`}>{statusLabels[debt.status] ?? debt.status}</span>
+                      {/* Real sync complaint this fixes: this column used to show
+                          only the coarse status (active/legal/disputed/settled...) —
+                          most of the company's specific outcome categories (the
+                          detail page's "original_sub_status") map to the SAME
+                          generic status, so nearly every debt looked identically
+                          "active" here while the real, specific picture only
+                          appeared once you opened it. Surfacing it here too. */}
+                      {debt.original_sub_status && (
+                        <div className="text-[#8b95a7] text-[11px] mt-1 max-w-[160px] mx-auto truncate" title={debt.original_sub_status}>
+                          {debt.original_sub_status}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-center">
                       {latestScore ? (
                         <div className="flex items-center justify-center gap-1.5">

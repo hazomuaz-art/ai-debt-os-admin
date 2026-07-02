@@ -99,6 +99,7 @@ interface Debt {
   priority:        string
   product_type:    string | null
   reference_number: string
+  case_note:       string | null
 }
 
 interface Customer {
@@ -178,7 +179,7 @@ async function loadCtx(debtId: string, companyId: string): Promise<Ctx | null> {
     const sb = createServiceClient()
     const [dr, pr] = await Promise.all([
       sb.from('debts')
-        .select('id,company_id,customer_id,status,current_balance,original_amount,currency,due_date,notes,last_contact_result,priority,product_type,reference_number,customer:customers(id,full_name,phone,whatsapp,national_id,monthly_income,employer)')
+        .select('id,company_id,customer_id,status,current_balance,original_amount,currency,due_date,notes,last_contact_result,priority,product_type,reference_number,metadata,customer:customers(id,full_name,phone,whatsapp,national_id,monthly_income,employer)')
         .eq('id', debtId).eq('company_id', companyId).single(),
       sb.from('payments')
         .select('amount,payment_date,status')
@@ -204,6 +205,7 @@ async function loadCtx(debtId: string, companyId: string): Promise<Ctx | null> {
         priority:        String(d.priority ?? 'medium'),
         product_type:    (d.product_type as string | null) ?? null,
         reference_number: String(d.reference_number ?? ''),
+        case_note:       ((d.metadata as Record<string, unknown> | null)?.case_note as string | undefined) ?? null,
       },
       customer: {
         id:             String(c?.id ?? ''),
@@ -334,12 +336,29 @@ async function stepMemory(_ctx: Ctx): Promise<number> {
 
 async function stepScore(ctx: Ctx): Promise<ScoreResult> {
   const daysOverdue = ctx.debt.due_date ? calculateDaysOverdue(ctx.debt.due_date) : 0
+
+  // Real complaint this fixes: the AI score/strategy shown on the debt page
+  // used to be blind to the actual conversation — grounding it in the same
+  // real signals a human would look at (current case status, recent
+  // activity, an open promise or dispute) before falling back to numbers
+  // alone.
+  const sbCtx = createServiceClient()
+  const [{ data: recentTimeline }, { data: openPromiseRow }, { data: openDisputeRow }] = await Promise.all([
+    sbCtx.from('timeline_events').select('summary').eq('debt_id', ctx.debt.id).order('occurred_at', { ascending: false }).limit(5),
+    sbCtx.from('promises').select('promised_amount, promised_date').eq('debt_id', ctx.debt.id).eq('status', 'pending').order('promised_date', { ascending: false }).limit(1).maybeSingle(),
+    sbCtx.from('disputes').select('id').eq('debt_id', ctx.debt.id).in('status', ['open', 'under_review']).limit(1).maybeSingle(),
+  ])
+
   const scoreInput = {
     debt:                ctx.debt as unknown as Parameters<typeof scoreDebt>[0]['debt'],
     customer:            ctx.customer as unknown as Parameters<typeof scoreDebt>[0]['customer'],
     payment_history:     ctx.payments.map(p => ({ amount: p.amount, date: p.date, status: p.status })),
     days_overdue:        daysOverdue,
     total_payments_made: ctx.payments.length,
+    case_note:           ctx.debt.case_note,
+    recent_events:       (recentTimeline ?? []).map((e: { summary: string }) => e.summary).filter(Boolean),
+    open_promise:        openPromiseRow ? { amount: Number(openPromiseRow.promised_amount), date: String(openPromiseRow.promised_date) } : null,
+    has_open_dispute:    Boolean(openDisputeRow),
   }
 
   let result: ScoreResult

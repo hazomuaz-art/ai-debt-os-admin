@@ -48,15 +48,16 @@ function extractJson(raw: string): any | null {
  * exchange (including a turn the agent chose to stay silent on — see the
  * caller in the WAHA webhook route).
  *
- * Real gap this fixes: this used to feed the model ONLY the previous note
- * (already a compressed summary) plus the single latest exchange, asking it
- * to "merge" the new bit in — a chain of summaries-of-summaries. Over a
- * longer conversation this reliably lost or garbled earlier details, which
- * is exactly the "not complete/accurate" symptom reported in production.
- * Now regenerates from the REAL recent transcript every time (same
- * generously-sized window the main collector agent itself uses), so the
- * note is always grounded in what actually happened, not in how well the
- * previous summary held up across several regenerations.
+ * Real complaint this fixes: the note used to summarize the ENTIRE
+ * conversation from the beginning every time, reading almost like a
+ * transcript rewrite — but the full conversation is already shown in its
+ * own section on the debt page (debt.messages), so repeating it here just
+ * made the note long and hard to scan. A collector opening the case needs
+ * "what's the situation RIGHT NOW" at a glance; the full history is one
+ * scroll away if they need it. The note is still generated from the real
+ * recent transcript (not a chain of summaries-of-summaries, which is what
+ * caused the earlier "lost/garbled details" problem), but the OUTPUT is now
+ * the current state only, not a chronicle of everything that happened.
  *
  * Never blocks or breaks the reply pipeline — any failure here just leaves
  * the previous note in place and logs the error.
@@ -126,14 +127,15 @@ export async function updateCaseNote(args: {
         {
           role: 'system',
           content:
-            'أنت تكتب "إفادة حالة" مختصرة وكاملة لملف تحصيل دين، تُقرأ من قبل محصّل بشري لاحقاً بدل ما يقرأ كل المحادثة. ' +
+            'أنت تكتب "إفادة حالة" مختصرة لملف تحصيل دين، تُقرأ من قبل محصّل بشري قبل ما يتواصل مع العميل. ' +
+            'المحادثة الكاملة نفسها معروضة بشكل منفصل وبالتفصيل في نفس الصفحة — دورك هنا مختلف: تعطي المحصّل "الوضع الحالي" بلمحة سريعة، مو تعيد سرد كل المحادثة من البداية. ' +
             'اكتب وقائع فقط من المحادثة الحقيقية والمعطيات أدناه — ممنوع منعاً باتاً اختراع أي تفصيل غير موجود فيها. ' +
-            'اقرأ المحادثة الكاملة أدناه (لا آخر رسالة فقط) وأنتج إفادة تلخّص كل ما حصل من البداية: من هو العميل وموقفه، وش اتفق عليه أو اختلف عليه، وأي نقطة معلّقة أو تحتاج متابعة — ملخّص كامل وحقيقي وليس فقط آخر تبادل. ' +
-            'أرجع JSON فقط بالشكل: {"note": "3-5 جمل، ملخّص كامل للحالة من بداية المحادثة حتى الآن، وما اتُّفق عليه وأي نقطة خلاف أو طلب معلَّق", "recommended_approach": "جملة واحدة، خطوة عملية محددة للمتابعة"}.',
+            'اقرأ المحادثة كاملة أدناه لتفهم السياق، لكن اكتب فقط عن آخر تطور/نقطة وصلت لها الحالة الآن — مثل: آخر شي قاله العميل أو اتفق عليه، وأي نقطة معلّقة تحتاج متابعة فورية. لا تسرد تاريخ المحادثة كامل ولا كل ما قيل من البداية. ' +
+            'أرجع JSON فقط بالشكل: {"note": "1-2 جملة فقط، آخر تطور/الوضع الحالي تحديداً — مو ملخص كامل للمحادثة", "recommended_approach": "جملة واحدة، خطوة عملية محددة للمتابعة"}.',
         },
         {
           role: 'user',
-          content: `${facts}\n\n═══ المحادثة الكاملة (الأقدم أولاً) ═══\n${transcript || 'لا توجد رسائل سابقة'}`,
+          content: `${facts}\n\n═══ المحادثة (للسياق فقط — لا تلخّصها كاملة) ═══\n${transcript || 'لا توجد رسائل سابقة'}`,
         },
       ],
       response_format: { type: 'json_object' },
