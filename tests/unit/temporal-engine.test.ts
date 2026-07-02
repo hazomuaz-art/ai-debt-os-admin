@@ -154,6 +154,24 @@ describe('Explicit Dates (Gregorian)', () => {
     const r = await runTemporalEngine('25 July', ctx(), testKB())
     expect(r.resolved_date).toBe('2026-07-25')
   })
+
+  // Real production gap: "يوم N" (bare day-of-month, no month/slash stated
+  // at all) previously matched NO resolver and fell through to
+  // 'unrecognized' — a very common way Arabic-speaking customers state a
+  // day-of-month promise ("قلت لك يوم ٣٠").
+  it('"يوم ٣٠" (Arabic-Indic digits) resolves to this month when the day has not passed yet (today is the 24th)', async () => {
+    const r = await runTemporalEngine('قلت لك يوم ٣٠ الشهر', ctx(), testKB())
+    expect(r.resolved_date).toBe('2026-06-30')
+    expect(r.resolved).toBe(true)
+  })
+  it('"يوم 10" rolls to next month when that day has already passed (today is the 24th)', async () => {
+    const r = await runTemporalEngine('بسدد يوم 10', ctx(), testKB())
+    expect(r.resolved_date).toBe('2026-07-10')
+  })
+  it('does not false-match "يوم" as a substring inside "اليوم" (today) — "اليوم 30" still resolves to TODAY, not day-30', async () => {
+    const r = await runTemporalEngine('اليوم 30 ريال بس مو للسداد', ctx(), testKB())
+    expect(r.resolved_date).toBe('2026-06-24')
+  })
 })
 
 describe('Explicit Dates (Hijri) — flagged medium confidence + requires_calendar', () => {

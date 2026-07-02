@@ -238,7 +238,16 @@ describe('collector agent — deterministic anti-redundancy guards', () => {
       shouldReply: true, action: 'record_promise', reason: 'customer_gave_date',
       message: 'تمام، مسجّل يوم 30. أرسل لي الإيصال بعدها.', promised_date: '2026-06-30',
     })
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'قلت لك يوم ٣٠ الشهر' })
+    // Real bug this fixes: this test used to omit messageTimestamp, so
+    // "today" defaulted to the REAL current date — the moment the calendar
+    // rolled past June, day-30 was no longer resolvable within June and the
+    // hardcoded '2026-06-30' expectation broke every month. A fixed
+    // reference date (matching temporal-engine.test.ts's FIXED_NOW) makes
+    // this deterministic regardless of when the suite actually runs.
+    const d = await runCollectorAgent({
+      company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'قلت لك يوم ٣٠ الشهر',
+      messageTimestamp: '2026-06-24T10:00:00Z',
+    })
 
     expect(d.action).toBe('record_promise')
     expect(d.promised_date).toBe('2026-06-30')

@@ -1349,8 +1349,19 @@ ${installmentRule}
     content: m.content,
   }))
 
-  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-  const todayWeekday = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' }).format(new Date())
+  // Real bug this fixes: the Temporal Engine call above already resolves
+  // dates relative to args.messageTimestamp when provided (e.g. a replay/
+  // backfill processing an old message, or a test fixing "today" for
+  // determinism) — but todayStr/todayWeekday ignored it and used the REAL
+  // wall-clock instead. That mismatch meant a date the engine correctly
+  // resolved relative to the message's own time could then get rejected as
+  // "in the past" by isSaneDate() below, which compares against this
+  // todayStr — silently discarding a perfectly valid customer-stated date
+  // and replacing it with a generic +3-day fallback. messageTimestamp is
+  // the single source of truth for "today" throughout this function now.
+  const referenceNow = args.messageTimestamp ? new Date(args.messageTimestamp) : new Date()
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(referenceNow)
+  const todayWeekday = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', weekday: 'long' }).format(referenceNow)
 
   const systemPrompt = `أنت "خالد"، محصّل ديون سعودي محترف عمره 45 سنة ولديه خبرة تتجاوز 20 سنة في تحصيل ديون كل القطاعات (اتصالات، تأمين، مرافق، تمويل، استقدام، زراعي). تتحدث بلهجة سعودية بيضاء طبيعية جداً عبر الواتساب، كأنك إنسان حقيقي يجلس أمام العميل.
 ${signals.isNonArabicMessage ? `🔴🔴🔴 رسالة العميل الحالية ليست بالعربية إطلاقاً — هذا عميل لا يقرأ عربي (شائع عند عمالة وافدة بمختلف الجنسيات). تجاهل تماماً قاعدة "اللهجة السعودية فقط" أدناه لهذا الرد بالكامل، واكتب ردك **كاملاً بنفس لغة رسالته بالضبط** (لا عربي، لا حتى كلمة واحدة) — إن كتب إنجليزي رد بإنجليزي واضح وبسيط ومهني، إن كتب أردو/هندي/تجالوج/أي لغة أخرى رد بنفس تلك اللغة. حافظ على كل القواعد الأخرى بمعناها (لا تقترح تقسيطاً، اطلب تاريخاً محدداً للوعد، إلخ) لكن بلغة العميل لا بنصها العربي حرفياً.` : `🔴 ممنوع منعاً باتاً استخدام أي لهجة غير سعودية (مصرية، سودانية، شامية، عراقية، أو أي لهجة خليجية أخرى) أو الفصحى الرسمية الثقيلة في أي رد — السعودية البيضاء فقط دائماً، بدون استثناء.

@@ -66,6 +66,39 @@ export const explicitDateResolver: TemporalResolver = {
       }
     }
 
+    // "يوم ٣٠" / "يوم 30 الشهر" — bare day-of-month, no month/slash given at
+    // all. Real gap this fixes: this pattern (very common in Arabic —
+    // customers naturally say "يوم فلان" for "the Nth of the month") matched
+    // NO resolver anywhere in the engine, so it silently fell through to
+    // 'unrecognized' and the caller (ai-collector-agent.ts) discarded the
+    // customer's actual stated day, defaulting to a generic "+3 days"
+    // follow-up instead — a promise date completely disconnected from what
+    // the customer said. Resolves to the nearest occurrence of that day
+    // (this month if not yet passed, else next month), same "roll forward"
+    // rule already used by the DD/MM resolver above; a day beyond the
+    // target month's length (e.g. "31" in a 30-day month) clamps to the
+    // month's last day.
+    // Leading (?:^|[^ء-ي]) requires "يوم" to be a standalone word,
+    // not matched as a substring inside "اليوم" (today) — "ال" + "يوم" would
+    // otherwise false-match "اليوم 30" (today, the 30th... or worse, an
+    // unrelated number right after "اليوم") as a day-of-month reference.
+    m = tAscii.match(/(?:^|[^ء-ي])يوم\s*(\d{1,2})\b(?!\s*[\/\-])/)
+    if (m) {
+      const day = parseInt(m[1], 10)
+      if (day >= 1 && day <= 31) {
+        const [y, mo] = todayStr.split('-').map(Number)
+        const clampedThisMonth = Math.min(day, daysInMonth(y, mo))
+        let resolved = `${y}-${String(mo).padStart(2, '0')}-${String(clampedThisMonth).padStart(2, '0')}`
+        if (resolved < todayStr) {
+          const nextMonth = mo === 12 ? 1 : mo + 1
+          const nextYear = mo === 12 ? y + 1 : y
+          const clampedNextMonth = Math.min(day, daysInMonth(nextYear, nextMonth))
+          resolved = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(clampedNextMonth).padStart(2, '0')}`
+        }
+        return build(resolved, 'gregorian', 'تاريخ صريح "يوم N" بدون تحديد شهر — افتُرض أقرب حدوث قادم لهذا اليوم')
+      }
+    }
+
     // "١٥ محرم" / "١ رمضان" — Hijri day + month name, no year stated.
     for (const [name, monthNum] of Object.entries(hijriMonthNamesEntries())) {
       const re = new RegExp(`\\b(\\d{1,2})\\s*${name}(?=\\s|$)`)
@@ -102,6 +135,10 @@ export const explicitDateResolver: TemporalResolver = {
       }
     }
   },
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
 }
 
 function hijriMonthNamesEntries(): Record<string, number> {
