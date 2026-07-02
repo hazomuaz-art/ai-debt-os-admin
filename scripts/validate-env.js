@@ -19,9 +19,15 @@ const REQUIRED = [
     key:      'SUPABASE_SERVICE_ROLE_KEY',
     validate: v => v.length > 20 ? null : 'Appears too short',
   },
+  // Real gap found during a full-system audit: this checked OPENAI_API_KEY,
+  // a variable the app hasn't actually used since migrating every AI call to
+  // OpenRouter (see src/lib/env.ts, the one actually enforced at runtime,
+  // which already checks the right variable) — this standalone script was
+  // never updated to match, so it always reported the real key as "missing"
+  // while never validating the one that actually matters.
   {
-    key:      'OPENAI_API_KEY',
-    validate: v => v.startsWith('sk-') ? null : 'Must start with sk-',
+    key:      'OPENROUTER_API_KEY',
+    validate: v => v.startsWith('sk-or-') ? null : 'OpenRouter key must start with sk-or-',
   },
   {
     key:      'APP_SECRET',
