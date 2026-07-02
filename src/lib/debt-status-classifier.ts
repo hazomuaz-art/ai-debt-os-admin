@@ -114,7 +114,18 @@ export async function classifyDebtOutcome(args: {
   // shown to the classifier itself. Now every category is listed WITH its
   // meaning, giving the model actual grounding to match against instead of
   // guessing from a bare label.
-  const list = profile.outcomeCategories
+  // Real gap found during a deep follow-up audit (2026-07-02), fixed with
+  // the account owner's explicit sign-off per category: some categories in
+  // the closed list require verification the AI has no way to perform (an
+  // external kafeel/exit-re-entry lookup, or a staff-only manual flag like
+  // "missing attachments") — these are filtered out of what the model is
+  // even offered to choose from, not just left to its judgment. They still
+  // exist in profile.outcomeCategories for the manual dropdown a human
+  // collector uses (UpdateDebtStatusSelect.tsx).
+  const aiCategories = profile.outcomeCategories.filter(c => !profile.outcomeMeta[c]?.aiExcluded)
+  if (aiCategories.length === 0) return null
+
+  const list = aiCategories
     .map((c, i) => `${i + 1}. "${c}" — ${profile.outcomeMeta[c]?.meaning ?? c}`)
     .join('\n')
 
@@ -130,6 +141,13 @@ export async function classifyDebtOutcome(args: {
             'أنت مصنّف حالات تحصيل ديون. مهمتك مطابقة رسالة العميل بأدق تصنيف من القائمة المغلقة أدناه (كل تصنيف مذكور مع معناه الحقيقي)، أو إرجاع null إن لم ينطبق أي تصنيف بوضوح على الرسالة الحالية. ' +
             'اقرأ معنى كل تصنيف فعلياً قبل الاختيار — لا تكتفِ بالتصنيفات "الواضحة" مثل الاعتراض أو وعد السداد فقط؛ القائمة تشمل حالات تشغيلية أخرى (مشكلة رقم تواصل، طلب تقسيط/مهلة، مماطلة سابقة، حالة خاصة كوفاة/سجن/إفلاس، إلخ) وكل واحدة منها لها معنى محدد يجب اختياره متى ما انطبق فعلياً على كلام العميل. ' +
             'اقرأ سياق المحادثة إن وُجد لتفهم معنى الرسالة الحالية فعلياً قبل التصنيف — رسالة قصيرة أو غامضة بمعزل عن السياق قد تُفهم خطأ. ' +
+            '\n\n══ قاعدة الوضوح الإلزامية — اقرأها قبل أي تصنيف ══\n' +
+            'لا تختر أي تصنيف إلا إذا كان كلام العميل صريحاً وقاطعاً بشكل لا يحتمل تأويلاً آخر. الشك يُرجَّح دائماً لصالح null. طابِق كلام العميل مقابل ملخص المحادثة كاملة (إن وُجد)، واستخرج تصنيفاً واحداً واضحاً فقط يطابق ما وصل إليه الطرفان فعلياً — لا تخمّن، ولا تصنّف بناءً على انطباع عام.\n' +
+            'أمثلة على "الوضوح المطلوب" مقابل "الغموض المرفوض":\n' +
+            '- ✅ وعد بالسداد: تاريخ أو موعد محدد فعلياً ("بسدد يوم الخميس"). ❌ ليس وعداً: "ان شاء الله بسدد" بدون توقيت، أو "خلينا نشوف".\n' +
+            '- ✅ رفض صريح: "ماراح اسدد"، "مو راضي ادفع شي". ❌ ليس رفضاً: سؤال افتراضي ("لو ماسددت وش بصير؟") أو صمت.\n' +
+            '- ✅ رقم خاطئ: "هذا مو رقمي"، "غلط عليكم الرقم". ❌ ليس كذلك: عدم الرد على استفسار عن الرقم.\n' +
+            '- ✅ إنكار المديونية: "ما اعرف هذا الدين"، "ماعندي مديونية عندكم اصلاً". ❌ ليس إنكاراً: سؤال عن تفاصيل الدين، أو تردد بلا نفي صريح.\n' +
             'أرجع null إلزامياً في هذه الحالات، ولا تصنّف شيئاً غامضاً كموقف نهائي: ' +
             '(أ) ردّ قصير غامض (مثل "لا"، "طيب"، "أوك") لا يتعلق وضوحاً بالسداد أو الدين — تحقق من السياق قبل افتراض أنه عن الدين. ' +
             '(ب) سؤال افتراضي/شرطي عن العواقب (مثل "لو ما سددت وش بصير؟") — هذا استفسار وليس رفضاً فعلياً للسداد. ' +
@@ -152,9 +170,11 @@ export async function classifyDebtOutcome(args: {
     const category = parsed?.category?.trim() ?? null
     if (!category) return null
 
-    // Closed-set enforcement — reject anything not literally in the list,
-    // even if the model returned non-null (defends against hallucination).
-    if (!profile.outcomeCategories.includes(category)) {
+    // Closed-set enforcement — reject anything not literally in the
+    // AI-eligible list, even if the model returned non-null (defends
+    // against hallucination AND against ever assigning a staff-only/
+    // externally-verified category the model was never even offered).
+    if (!aiCategories.includes(category)) {
       log.warn('classifier returned category outside closed list — discarded', { category, portfolio: args.portfolio_name })
       return null
     }

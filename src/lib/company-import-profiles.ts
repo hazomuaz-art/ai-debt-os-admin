@@ -41,6 +41,13 @@ export type OutcomeMeta = {
   isTerminal: boolean            // true = stop auto-replies, route to human review (never auto-decided by AI)
   meaning:    string             // short Arabic context line injected into the agent's prompt
   behavior:   string             // short Arabic behavior instruction for the agent's next reply
+  // true = this category requires verification the AI has no way to perform
+  // (e.g. an external kafeel/exit-re-entry lookup, or a staff-only manual
+  // flag like "missing attachments") — excluded from the closed list shown
+  // to the classifier entirely, never auto-assigned from chat text. Still
+  // stays in outcomeCategories for the manual dropdown a human collector
+  // uses (see UpdateDebtStatusSelect.tsx).
+  aiExcluded?: boolean
 }
 
 export type CompanyImportProfile = {
@@ -85,7 +92,7 @@ const OUTCOME_RULES: Array<{ test: (label: string) => boolean; meta: Omit<Outcom
       behaviorTpl: 'اطلب منه صورة الإيصال لتأكيد السداد قبل إغلاق الملف. لا تغيّر حالة الدين بناءً على كلامه فقط.' },
   },
   {
-    test: l => l.includes('سداد جزئ'),
+    test: l => l.includes('سداد جزئ') || l.includes('سدد جزء'),
     meta: { status: null, isTerminal: true,
       meaningTpl: 'العميل يدّعي أنه سدد جزءاً من المديونية ("${label}") — لم يُستلم إيصال/إثبات فعلي بعد.',
       behaviorTpl: 'اطلب منه صورة إيصال التحويل لتأكيد المبلغ المسدد فعلاً قبل أي تحديث لحالة الملف. لا تغيّر حالة الدين بناءً على كلامه فقط.' },
@@ -115,10 +122,166 @@ const OUTCOME_RULES: Array<{ test: (label: string) => boolean; meta: Omit<Outcom
       behaviorTpl: 'لا علاقة لهذا بمنطق السداد، يحتاج فقط تحديث بيانات الاتصال من الإدارة.' },
   },
   {
-    test: l => l.includes('طلب أقساط') || l.includes('طلب اقساط') || l.includes('طلب مهلة') || l.includes('طلب تسوية') || l.includes('تفاوض'),
+    test: l => l.includes('طلب أقساط') || l.includes('طلب اقساط') || l.includes('طلب مهلة') || l.includes('مهلة للسداد') || l.includes('طلب تسوية') || l.includes('تفاوض'),
     meta: { status: null, isTerminal: false,
       meaningTpl: 'العميل طلب تقسيطاً أو تسوية أو مهلة ("${label}") — يحتاج موافقة إدارة.',
       behaviorTpl: 'أفهمه أن طلبه رُفع للمراجعة، لا توافق على أي تقسيط أو تسوية من عندك مباشرة.' },
+  },
+  // ─────────────────────────────────────────────────────────────────────
+  // Real gap found during a deep audit (2026-07-02), fixed with explicit
+  // sign-off from the account owner on every category's real meaning and
+  // AI-usability below — over half of every large portfolio's categories
+  // (Saudi Energy 17/30, National Water 10/19, insurance 10/18) previously
+  // fell through to the generic "حالة عامة محدَّثة على الملف" fallback with
+  // zero differentiation between them. Order matters: MORE SPECIFIC rules
+  // must come before more generic ones that would otherwise shadow them
+  // (e.g. "قريب/صديق" contact before the generic "تم التواصل مع" pattern).
+  // ─────────────────────────────────────────────────────────────────────
+  {
+    // AI-EXCLUDED: confirmed by the account owner — determined via an
+    // external kafeel/exit-re-entry lookup the AI has no access to, not
+    // from anything the customer says in chat. Same reasoning applied to
+    // every portfolio using this exact label (all telecom/utility).
+    test: l => l.includes('خروج نهائى') || l.includes('خروج نهائي'),
+    meta: { status: null, isTerminal: false, aiExcluded: true,
+      meaningTpl: 'العميل خرج نهائياً من السعودية (يُحدَّد عبر منصة استعلام كفيل/موظف وافد خارجياً، وليس من كلام العميل) ("${label}").',
+      behaviorTpl: 'لا يُستخدم هذا التصنيف من قِبل الذكاء الاصطناعي إطلاقاً — يدوي فقط بعد تحقق إداري خارجي.' },
+  },
+  {
+    // AI-EXCLUDED: confirmed by the account owner — set by the human
+    // collector when required attachments/documents are missing on the
+    // insurer's own side, never inferred from the customer's words.
+    test: l => l.includes('نواقص مستندات'),
+    meta: { status: null, isTerminal: false, aiExcluded: true,
+      meaningTpl: 'نقص في مستندات مطلوبة لاستكمال الملف — يحدده المحصّل يدوياً ("${label}").',
+      behaviorTpl: 'لا يُستخدم هذا التصنيف من قِبل الذكاء الاصطناعي إطلاقاً — يدوي فقط.' },
+  },
+  {
+    // AI-EXCLUDED: structurally impossible to trigger from a customer
+    // message — classification only ever runs when an inbound message
+    // exists, so "no response at all" can never itself be the input. Left
+    // for manual/future time-based use, not the conversational classifier.
+    test: l => l.includes('لم يتم الرد') || l.includes('لم يتم التواصل'),
+    meta: { status: null, isTerminal: false, aiExcluded: true,
+      meaningTpl: 'تم إرسال عدة رسائل أو محاولات اتصال للعميل بدون أي رد منه ("${label}").',
+      behaviorTpl: 'لا يُستخدم هذا التصنيف من قِبل الذكاء الاصطناعي إطلاقاً — لا يمكن تقنياً استنتاجه من رسالة واردة (لا توجد رسالة أصلاً في هذه الحالة).' },
+  },
+  {
+    test: l => l.includes('قريب او صديق') || l.includes('قريب أو صديق'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'الرد الفعلي وصل من قريب أو صديق للعميل، وليس من العميل نفسه ("${label}").',
+      behaviorTpl: 'اطلب رقم تواصل مباشر مع العميل نفسه إن أمكن، ولا تفترض أن الشخص المتحدث هو العميل صاحب الدين.' },
+  },
+  {
+    test: l => l.includes('مرفوعه قانونيا') || l.includes('مرفوعة قانونيا') || l.includes('مرفوعة قانونياً'),
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'العميل صرّح بوجود إجراء قانوني مرفوع فعلياً من الجهة الدائنة ضده، أو هدّد رسمياً بذلك ("${label}").',
+      behaviorTpl: 'لا تتفاوض ولا تعد بأي تنازل، وجّه الملف فوراً لمراجعة بشرية/قانونية قبل أي رد إضافي بخصوص السداد.' },
+  },
+  {
+    // Financial/legal claim from the customer (e.g. "عندي رخصة سارية"،
+    // "التأمين كان ساري وقت الحادث") — same safety pattern as payment
+    // claims: never auto-trusted from chat text alone, isTerminal routes
+    // to human review so a person verifies against the real documents
+    // before the recourse amount actually changes.
+    test: l => l.includes('حذف مسترد'),
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'العميل قدّم معلومة تدعم إسقاط أو تعديل مبلغ الرجوع (رخصة سارية/تأمين ساري/تصحيح بالتقرير) — لم يُتحقق منها بعد ("${label}").',
+      behaviorTpl: 'لا تسقط أو تعدّل أي مبلغ بناءً على كلامه فقط — اطلب المستند الداعم ووجّه الملف لمراجعة بشرية قبل أي تحديث فعلي.' },
+  },
+  {
+    test: l => l.includes('خدمة مفصولة'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل صرّح أن الخدمة مقطوعة/موقوفة فعلياً على حسابه ("${label}").',
+      behaviorTpl: 'وضّح أن قطع الخدمة لا يُسقط المديونية المستحقة قبل القطع، وتابع بخصوص السداد بشكل طبيعي.' },
+  },
+  {
+    test: l => l.includes('تم ابلاغ العميل') || l.includes('تم إبلاغ العميل'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'تم إبلاغ العميل فعلياً بتفاصيل المديونية المستحقة عليه لأول مرة في هذه المحادثة ("${label}").',
+      behaviorTpl: 'هذا تسجيل لحدث حصل فعلاً (الإبلاغ)، لا يتطلب رداً إضافياً بحد ذاته — تابع المحادثة بشكل طبيعي.' },
+  },
+  {
+    test: l => l.includes('تم نقل المديونية'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل صرّح بوضوح أن المديونية نُقلت أو حُوّلت لجهة/شخص آخر ("${label}").',
+      behaviorTpl: 'وثّق التفاصيل التي ذكرها العميل عن جهة النقل، ووجّه الملف للمراجعة الإدارية لتأكيد النقل رسمياً.' },
+  },
+  {
+    // Broad "an administrative note was recorded based on this real
+    // exchange" bucket — covers update/error-acknowledgment/contact-method
+    // categories that don't change debt status, but ARE grounded in
+    // something that actually happened in the conversation (not the old
+    // generic catch-all, which applied even with zero real signal).
+    test: l => l === 'تحديث' || l.includes('تم التحديث') || l.includes('تم التعريف بالخطأ')
+      || l.includes('تم التواصل مع المشترك') || l.includes('تم التواصل عن طريق'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'تحديث إداري على الملف بناءً على معلومة فعلية ذكرها العميل في هذه المحادثة ("${label}").',
+      behaviorTpl: 'سجّل المعلومة الجديدة التي ذكرها العميل بدقة، ولا تغيّر حالة الدين بناءً على هذا وحده.' },
+  },
+  {
+    test: l => l === 'متابعه' || l === 'متابعة',
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'حالة متابعة عامة — لا يوجد تطور جديد في هذه المحادثة يستدعي تصنيفاً أدق ("${label}").',
+      behaviorTpl: 'تابع المحادثة بشكل طبيعي، لا تغيير مطلوب في الأسلوب.' },
+  },
+  {
+    // Real gap the account owner flagged as the single most important
+    // fix: explicit refusal — one of the most common and important real
+    // outcomes — had NO differentiated meaning in 9 of 12 portfolios,
+    // falling to the generic fallback like everything else.
+    test: l => l.includes('رافض السداد') || l === 'رفض السداد',
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل رفض السداد بشكل صريح وقاطع، بدون أي التزام أو نية للتفاوض ("${label}").',
+      behaviorTpl: 'لا تكرر نفس الطلب بنفس الأسلوب — إما تصعيد لهجة الجدية بحدود المهنية، أو استكشاف سبب الرفض إن لم يُذكر.' },
+  },
+  {
+    test: l => l.includes('سدد جزء من المبلغ') || l.includes('طلب تفاصيل الاستهلاك') || l.includes('طلب تفاصيل الاشتراك'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل طلب تفاصيل استهلاكه أو اشتراكه بشكل صريح ("${label}").',
+      behaviorTpl: 'وضّح أن التفاصيل الدقيقة تُطلب من الجهة الدائنة مباشرة أو عبر كشف حساب، وتابع بخصوص السداد.' },
+  },
+  {
+    test: l => l.includes('يرغب بالتواصل مع الشركة'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل طلب صراحةً التواصل المباشر مع الجهة الدائنة نفسها بدلاً من المحصّل ("${label}").',
+      behaviorTpl: 'زوّده بقنوات التواصل الرسمية للجهة إن توفرت، ووثّق الطلب للمتابعة الإدارية.' },
+  },
+  {
+    test: l => l.includes('سوف يرفع شكوى'),
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'العميل هدّد صراحةً أو أعلن نيته برفع شكوى رسمية ("${label}").',
+      behaviorTpl: 'حافظ على أسلوب مهني هادئ، لا تصعّد الموقف، ووجّه الملف لمراجعة بشرية فورية.' },
+  },
+  {
+    test: l => l.includes('باع العقار و المديونية مازالت باسمه') || l.includes('مديونية الحساب على المالك الجديد') || l.includes('مديونية الحساب على المستأجر'),
+    meta: { status: 'disputed', isTerminal: false,
+      meaningTpl: 'العميل صرّح بوضوح بنقل ملكية العقار/السكن، مع بقاء أو انتقال المديونية بحسب كلامه ("${label}").',
+      behaviorTpl: 'وثّق تفاصيل النقل التي ذكرها (تاريخ البيع/الإخلاء، المالك أو المستأجر الجديد إن ذكره)، ووجّه الملف للمراجعة الإدارية للتحقق قبل أي تعديل فعلي.' },
+  },
+  {
+    test: l => l.includes('المديونية لجهة حكومية'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل صرّح بوضوح أن الحساب/العقار تابع لجهة حكومية ("${label}").',
+      behaviorTpl: 'وثّق التفاصيل ووجّه الملف للمراجعة الإدارية، فالتعامل مع جهة حكومية يختلف عن العميل الفردي.' },
+  },
+  {
+    test: l => l.includes('مطور عقاري بحاجة لتفاصيل الموقع'),
+    meta: { status: null, isTerminal: true,
+      meaningTpl: 'المتصل صرّح بأنه مطور عقاري يبحث عن المستفيد الفعلي بخصوص موقع معيّن — ليس المدين نفسه بالضرورة ("${label}").',
+      behaviorTpl: 'حالة نادرة ومحددة — لا تكمل محادثة تحصيل عادية، وجّه فوراً لمراجعة بشرية للتحقق من هوية المتصل وغرضه.' },
+  },
+  {
+    test: l => l.includes('يتهرب من الاتصال'),
+    meta: { status: 'in_negotiation', isTerminal: false,
+      meaningTpl: 'العميل أظهر نمطاً متكرراً وموثّقاً من تجنّب الرد/التواصل عبر عدة محاولات سابقة ("${label}") — وليس مجرد رد متأخر مرة واحدة.',
+      behaviorTpl: 'كن مباشراً وواضحاً في طلب رد فعلي، ولا تفترض هذا التصنيف من مجرد بطء رد واحد.' },
+  },
+  {
+    test: l => l.includes('يراجع الفرع'),
+    meta: { status: null, isTerminal: false,
+      meaningTpl: 'العميل صرّح بأنه سيراجع أو راجع فرع الشركة شخصياً بخصوص هذا الملف ("${label}").',
+      behaviorTpl: 'أفهمه أن الموضوع مسجّل، ولا تكرر المطالبة بنفس الطريقة حتى تُعرف نتيجة مراجعته للفرع.' },
   },
 ]
 
@@ -136,6 +299,7 @@ function buildOutcomeMeta(categories: string[]): Record<string, OutcomeMeta> {
       ? {
           status: rule.meta.status,
           isTerminal: rule.meta.isTerminal,
+          aiExcluded: rule.meta.aiExcluded,
           meaning: rule.meta.meaningTpl.replace('${label}', label),
           behavior: rule.meta.behaviorTpl,
         }
