@@ -64,6 +64,7 @@ export function Sidebar({ profile, isPlatformOwner }: { profile: any; isPlatform
       items: [
         { href: `/dashboard/${role}/automation`,   label: t.nav.automation, icon: Settings, roles: ['admin'] },
         { href: `/dashboard/${role}/integrations`, label: t.nav.integrations, icon: LinkIcon, roles: ['admin'] },
+        { href: `/dashboard/${role}/whatsapp-numbers`, label: isRTL ? 'أرقام واتساب المحافظ' : 'Portfolio WhatsApp Numbers', icon: MessageCircle, roles: ['admin'] },
         { href: `/dashboard/${role}/alerts`,       label: t.nav.alerts, icon: Bell, roles: ['admin'] },
         { href: `/dashboard/${role}/health`,       label: isRTL ? 'صحة النظام' : 'System Health', icon: HeartPulse, roles: ['admin'] },
       ],
