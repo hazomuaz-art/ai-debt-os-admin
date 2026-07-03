@@ -1,6 +1,6 @@
 ﻿'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateReferenceNumber } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -58,7 +58,7 @@ async function requireAuth() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('company_id, role, is_active')
+    .select('company_id, role, is_active, full_name')
     .eq('id', user.id)
     .single()
 
@@ -268,7 +268,15 @@ export async function deleteCustomerFullyAction(customerId: string) {
       .eq('id', customerId).eq('company_id', profile.company_id).maybeSingle()
     if (!customer) return { error: 'العميل غير موجود' }
 
-    const { error } = await supabase.rpc('delete_customer_fully', { p_customer_id: customerId })
+    // Real security-audit finding (2026-07-03): delete_customer_fully is a
+    // SECURITY DEFINER function with ZERO internal caller checks — while it
+    // was executable by the `authenticated` role, ANY signed-in user (any
+    // role, any company) could call it directly via /rest/v1/rpc/ and wipe
+    // any customer in any company. EXECUTE is now revoked from anon/
+    // authenticated (migration 046); the only sanctioned path is THIS
+    // action, which enforces admin/manager + same-company above and then
+    // invokes it via the service client.
+    const { error } = await createServiceClient().rpc('delete_customer_fully', { p_customer_id: customerId })
     if (error) return { error: error.message }
 
     revalidatePath('/dashboard/admin/debts')
@@ -334,7 +342,7 @@ export async function updateDebtStatusAction(debtId: string, status: DebtStatus)
     // Verify debt belongs to company (RLS also enforces)
     const { data: existing } = await supabase
       .from('debts')
-      .select('id, status, company_id')
+      .select('id, status, company_id, customer_id')
       .eq('id', debtId)
       .eq('company_id', profile.company_id)
       .single()
@@ -354,6 +362,39 @@ export async function updateDebtStatusAction(debtId: string, status: DebtStatus)
       .single()
 
     if (error) return { error: error.message }
+
+    // Real audit finding (2026-07-03): this manual path wrote NO
+    // collection_status_history and NO timeline event — a human changing a
+    // debt's status left zero audit trail anywhere, unlike every automated
+    // path. Beyond auditability, the reconciliation cron
+    // (reclassify-outcomes) uses history recency as its "is this label
+    // newer than the customer's last message" gate — a manual change with
+    // no history row looked permanently stale and could be silently
+    // overwritten by the cron.
+    const { error: histErr } = await supabase.from('collection_status_history').insert({
+      company_id: profile.company_id,
+      customer_id: existing.customer_id,
+      debt_id: debtId,
+      source_system: 'manual_dashboard',
+      old_status: existing.status,
+      new_status: status,
+      normalized_status: status,
+      changed_by_name: profile.full_name || user.email || 'Dashboard user',
+      changed_at: new Date().toISOString(),
+    })
+    if (histErr) console.error('[updateDebtStatusAction] status history insert failed:', histErr.message)
+
+    const { insertTimelineEvent } = await import('@/lib/timeline')
+    await insertTimelineEvent({
+      company_id: profile.company_id,
+      customer_id: existing.customer_id,
+      debt_id: debtId,
+      event_type: 'status_change',
+      channel: 'manual',
+      actor_type: 'collector',
+      actor_name: profile.full_name || user.email || null,
+      summary: `تغيير حالة الدين يدوياً: ${existing.status} ← ${status}`,
+    })
 
     revalidatePath('/dashboard/admin/debts')
     revalidatePath('/dashboard/collector/debts')
@@ -376,7 +417,7 @@ export async function updateDebtCompanyCategoryAction(debtId: string, category: 
 
     const { data: existing } = await supabase
       .from('debts')
-      .select('id, customer_id, company_id')
+      .select('id, customer_id, company_id, status, original_sub_status')
       .eq('id', debtId)
       .eq('company_id', profile.company_id)
       .single()
@@ -389,6 +430,24 @@ export async function updateDebtCompanyCategoryAction(debtId: string, category: 
       .eq('id', debtId)
 
     if (error) return { error: error.message }
+
+    // Real audit finding (2026-07-03): a manually-set category wrote no
+    // collection_status_history row — no audit trail of WHO set it (a real
+    // production case was found with a category and zero history), and the
+    // reclassify-outcomes cron's staleness gate (based on history recency)
+    // would see the manual label as stale and could overwrite the human's
+    // explicit decision on the next customer message.
+    const { error: histErr } = await supabase.from('collection_status_history').insert({
+      company_id: profile.company_id,
+      customer_id: existing.customer_id,
+      debt_id: debtId,
+      source_system: 'manual_dashboard',
+      old_status: existing.original_sub_status ?? existing.status,
+      new_status: category,
+      changed_by_name: profile.full_name || user.email || 'Dashboard user',
+      changed_at: new Date().toISOString(),
+    })
+    if (histErr) console.error('[updateDebtCompanyCategoryAction] status history insert failed:', histErr.message)
 
     const { insertTimelineEvent } = await import('@/lib/timeline')
     await insertTimelineEvent({

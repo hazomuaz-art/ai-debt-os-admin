@@ -81,8 +81,16 @@ export async function POST(
 
     switch (action) {
       case 'promise_to_pay': {
+        // Real audit finding (2026-07-03): promises.customer_id is NOT NULL
+        // but was omitted here — every manually-recorded promise from the
+        // debt page's quick actions failed at the DB level (logged but not
+        // surfaced), while the debt status below still flipped to
+        // 'promised': a promised-status debt with no promise record, so
+        // follow-promises had nothing to follow up on. Same silent-failure
+        // class as the timeline customer_id fix above.
         const { error: pErr } = await supabase.from('promises').insert({
           company_id: profile.company_id,
+          customer_id: customerId,
           debt_id: debtId,
           promised_amount: amount,
           promised_date: date,
