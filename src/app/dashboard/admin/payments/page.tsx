@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Wallet, CheckCircle, Clock, User, Hash, Download, FileSpreadsheet } from 'lucide-react'
 
@@ -18,7 +19,7 @@ export default async function PaymentsPage() {
 
   const { data: payments } = await supabase
     .from('payments')
-    .select('*, customer:customers(full_name, phone, whatsapp), debt:debts(reference_number, currency)')
+    .select('*, customer:customers(full_name, phone, whatsapp), debt:debts(id, reference_number, currency)')
     .eq('company_id', profile.company_id)
     .order('payment_date', { ascending: false })
     .limit(300)
@@ -93,13 +94,23 @@ export default async function PaymentsPage() {
                 return (
                   <tr key={p.id} className="hover:bg-[#1a212c] transition-colors">
                     <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#222a36] text-[#8b95a7] flex items-center justify-center"><User size={14} /></div>
-                        <div>
-                          <p className="font-bold text-white">{p.customer?.full_name ?? '—'}</p>
-                          <p className="text-xs text-[#5f6b7e] font-mono mt-0.5">{p.customer?.whatsapp || p.customer?.phone}</p>
+                      {p.debt?.id ? (
+                        <Link href={`/dashboard/admin/debts/${p.debt.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                          <div className="w-8 h-8 rounded-full bg-[#222a36] text-[#8b95a7] flex items-center justify-center"><User size={14} /></div>
+                          <div>
+                            <p className="font-bold text-white underline decoration-dotted">{p.customer?.full_name ?? '—'}</p>
+                            <p className="text-xs text-[#5f6b7e] font-mono mt-0.5">{p.customer?.whatsapp || p.customer?.phone}</p>
+                          </div>
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#222a36] text-[#8b95a7] flex items-center justify-center"><User size={14} /></div>
+                          <div>
+                            <p className="font-bold text-white">{p.customer?.full_name ?? '—'}</p>
+                            <p className="text-xs text-[#5f6b7e] font-mono mt-0.5">{p.customer?.whatsapp || p.customer?.phone}</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </td>
                     <td className="py-4 px-6 font-mono text-xs font-bold text-[#8b95a7] bg-[#222a36]/50">{p.debt?.reference_number ?? '—'}</td>
                     <td className="py-4 px-6 font-bold font-mono text-emerald-400">{formatCurrency(p.amount, p.debt?.currency ?? p.currency ?? 'SAR')}</td>

@@ -1,8 +1,24 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import NextLink from 'next/link'
 import type { Campaign } from '@/types'
-import { Megaphone, MessageSquare, PlayCircle, Smartphone, Activity, Link as LinkIcon, Plus, QrCode, Target } from 'lucide-react'
+import { Megaphone, MessageSquare, PlayCircle, Smartphone, Activity, Link as LinkIcon, Plus, QrCode, Target, ChevronDown, ChevronUp } from 'lucide-react'
+
+type CampaignTarget = {
+  id: string
+  status: string
+  channel: string
+  processed_at: string | null
+  error: string | null
+  customer: { id: string; full_name: string; phone: string; whatsapp: string | null } | null
+  debt: { id: string; reference_number: string | null; current_balance: number; currency: string } | null
+}
+
+const TARGET_STATUS_ARABIC: Record<string, string> = {
+  pending: 'قيد الانتظار', processing: 'جارٍ الإرسال', sent: 'أُرسلت',
+  failed: 'فشلت', cancelled: 'أُلغيت', skipped: 'تخطّي',
+}
 
 type Portfolio = {
   id: string
@@ -73,6 +89,23 @@ export default function CampaignsPage() {
     portfolio_id: '',
   })
   const [runningCampaignId, setRunningCampaignId] = useState<string | null>(null)
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null)
+  const [campaignTargets, setCampaignTargets] = useState<Record<string, CampaignTarget[]>>({})
+  const [targetsLoading, setTargetsLoading] = useState(false)
+
+  const toggleCampaignTargets = useCallback(async (campaignId: string) => {
+    if (expandedCampaignId === campaignId) { setExpandedCampaignId(null); return }
+    setExpandedCampaignId(campaignId)
+    if (campaignTargets[campaignId]) return // already fetched
+    setTargetsLoading(true)
+    try {
+      const res = await fetch(`/api/modules/campaigns/${campaignId}/targets`)
+      const json = await res.json() as { data?: CampaignTarget[] }
+      setCampaignTargets(prev => ({ ...prev, [campaignId]: json.data ?? [] }))
+    } finally {
+      setTargetsLoading(false)
+    }
+  }, [expandedCampaignId, campaignTargets])
 
   const [numberForm, setNumberForm] = useState({
     portfolio_id: '',
@@ -606,16 +639,56 @@ export default function CampaignsPage() {
                     </div>
                   </div>
 
-                  {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => handleRunCampaign(campaign)}
-                      disabled={runningCampaignId === campaign.id}
-                      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 shrink-0">
-                      <PlayCircle size={14} />
-                      {runningCampaignId === campaign.id ? 'جارٍ التشغيل…' : 'تشغيل الحملة'}
+                      onClick={() => toggleCampaignTargets(campaign.id)}
+                      className="bg-[#151a23] border border-[#222a36] hover:bg-[#1a212c] text-[#8b95a7] font-bold text-xs px-4 py-2.5 rounded-xl transition-colors flex items-center gap-1.5">
+                      {expandedCampaignId === campaign.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      عرض الأهداف
                     </button>
-                  )}
+                    {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                      <button
+                        onClick={() => handleRunCampaign(campaign)}
+                        disabled={runningCampaignId === campaign.id}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5">
+                        <PlayCircle size={14} />
+                        {runningCampaignId === campaign.id ? 'جارٍ التشغيل…' : 'تشغيل الحملة'}
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Targets drill-down — closes the previous isolation gap
+                    where a campaign had no visible link to the actual
+                    debts/customers it targeted. */}
+                {expandedCampaignId === campaign.id && (
+                  <div className="mt-4 pt-4 border-t border-[#222a36]">
+                    {targetsLoading && !campaignTargets[campaign.id] ? (
+                      <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0e7a54]" /></div>
+                    ) : (campaignTargets[campaign.id]?.length ?? 0) === 0 ? (
+                      <div className="text-center py-6 text-[#5f6b7e] text-xs font-bold">لا يوجد أهداف مسجّلة لهذه الحملة بعد.</div>
+                    ) : (
+                      <div className="space-y-2 max-h-72 overflow-y-auto">
+                        {campaignTargets[campaign.id].map(t => (
+                          <div key={t.id} className="flex items-center justify-between gap-3 bg-[#151a23] border border-[#222a36] rounded-xl px-4 py-2.5 text-xs">
+                            <div className="min-w-0">
+                              <div className="font-bold text-white truncate">{t.customer?.full_name ?? '—'}</div>
+                              <div className="text-[#5f6b7e] font-mono">{t.customer?.whatsapp || t.customer?.phone || '—'}</div>
+                            </div>
+                            <span className="text-[#8b95a7] bg-[#0b0e14] px-2 py-1 rounded-md shrink-0">{TARGET_STATUS_ARABIC[t.status] ?? t.status}</span>
+                            {t.debt?.id ? (
+                              <NextLink href={`/dashboard/admin/debts/${t.debt.id}`} className="text-emerald-400 hover:text-emerald-300 font-bold shrink-0">
+                                فتح الملف ←
+                              </NextLink>
+                            ) : (
+                              <span className="text-[#5f6b7e] shrink-0">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

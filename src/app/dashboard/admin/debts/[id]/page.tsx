@@ -38,6 +38,25 @@ function factorAr(name: string): string {
   return name
 }
 
+const DISPUTE_TYPE_LABELS: Record<string, string> = {
+  amount_wrong:  'اعتراض على المبلغ',
+  already_paid:  'يدّعي السداد المسبق',
+  not_my_debt:   'ينكر الدين',
+  service_issue: 'مشكلة بالخدمة',
+  other:         'أخرى',
+}
+
+const LEGAL_ESCALATION_LABELS: Record<string, string> = {
+  legal_threat:        'تهديد/إجراء قانوني',
+  lawyer_mention:      'ذكر محامٍ',
+  complaint:           'شكوى رسمية',
+  fault_dispute:       'اعتراض نسبة خطأ',
+  recourse_dispute:    'اعتراض حق رجوع',
+  third_party_dispute: 'نزاع طرف ثالث',
+  recovered_deduction: 'مراجعة حذف مسترد',
+  playbook_mandated:   'تصعيد إلزامي بالسياسة',
+}
+
 function riskAr(r: string): string {
   switch (String(r ?? '').toLowerCase()) {
     case 'low': return 'خطورة منخفضة'
@@ -123,6 +142,29 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .eq('entity_id', debt.id)
     .order('created_at', { ascending: false })
     .limit(5)
+
+  // Disputes and legal escalations were previously tracked in separate
+  // tables/pages with zero visibility on the debt detail page itself — an
+  // admin could open a debt with an active dispute or an open legal
+  // escalation and have no idea, since the negotiation-lock/dispute state
+  // lives entirely outside what this page queried. Surfaced here so every
+  // piece of information about this debt is visible in one place.
+  const { data: debtDisputes } = await supabase
+    .from('disputes')
+    .select('id, dispute_type, description, status, priority, resolution, created_at')
+    .eq('debt_id', debt.id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const { data: debtLegalEscalations } = await supabase
+    .from('legal_escalations')
+    .select('id, escalation_type, reason, status, opened_at, closed_at, admin_notes')
+    .eq('debt_id', debt.id)
+    .order('opened_at', { ascending: false })
+    .limit(5)
+
+  const openDispute = (debtDisputes ?? []).find(d => d.status === 'open' || d.status === 'under_review')
+  const openEscalation = (debtLegalEscalations ?? []).find(e => e.status === 'open')
 
   const { data: memoryEntries } = await supabase
     .from('ai_memory')
@@ -257,10 +299,32 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
         </div>
       </div>
 
+      {/* Open dispute / legal escalation — highest-priority state for this
+          debt, shown before anything else so it can never be missed. */}
+      {(openDispute || openEscalation) && (
+        <div className="bg-rose-500/10 rounded-2xl p-5 shadow-sm border border-rose-500/30 flex items-start gap-3">
+          <ShieldAlert className="text-rose-400 shrink-0 mt-0.5" size={22} />
+          <div className="space-y-2">
+            {openEscalation && (
+              <p className="text-rose-300 font-bold text-sm">
+                تصعيد قانوني مفتوح ({LEGAL_ESCALATION_LABELS[openEscalation.escalation_type] ?? openEscalation.escalation_type}) — الوكيل الآلي متوقف عن التفاوض على هذه المديونية حتى يتم إغلاق التصعيد من صفحة "التصعيدات القانونية".
+                {openEscalation.reason && <span className="block text-rose-400/80 font-normal mt-1">{openEscalation.reason}</span>}
+              </p>
+            )}
+            {openDispute && (
+              <p className="text-rose-300 font-bold text-sm">
+                نزاع مفتوح ({DISPUTE_TYPE_LABELS[openDispute.dispute_type] ?? openDispute.dispute_type})
+                {openDispute.description && <span className="block text-rose-400/80 font-normal mt-1">{openDispute.description}</span>}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info (Right Column in RTL) */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* Quick Actions Panel */}
           <QuickActionsPanel debtId={debt.id} currentStatus={debt.status} />
 
@@ -447,6 +511,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
                       <p>{msg.content}</p>
                       <p className={`text-[10px] mt-2 font-bold ${msg.direction === 'outbound' ? 'text-[#5f6b7e]' : 'text-[#5f6b7e]'}`}>
                         {formatDate(msg.sent_at || msg.created_at)} • {msg.channel}
+                        {msg.metadata?.action_type === 'campaign' && (
+                          <span className="ms-2 bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">📢 حملة</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -718,6 +785,43 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
               <p className="text-[#5f6b7e] text-xs font-bold text-center py-4">لا توجد موافقات مسجلة.</p>
             )}
           </div>
+
+          {/* Customer 360: Disputes & Legal Escalations */}
+          {((debtDisputes && debtDisputes.length > 0) || (debtLegalEscalations && debtLegalEscalations.length > 0)) && (
+            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
+              <div className="flex items-center gap-2 border-b border-[#222a36] pb-3 mb-4">
+                <ShieldAlert className="text-rose-500" size={18} />
+                <h2 className="text-base font-bold text-white">النزاعات والتصعيدات القانونية</h2>
+              </div>
+              <div className="space-y-3">
+                {(debtLegalEscalations ?? []).map((e: any) => (
+                  <div key={e.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-sm font-bold text-white">{LEGAL_ESCALATION_LABELS[e.escalation_type] ?? e.escalation_type}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${e.status === 'open' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>
+                        {e.status === 'open' ? 'مفتوح' : 'مغلق'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#8b95a7] leading-relaxed">{e.reason}</p>
+                    <p className="text-[10px] text-[#5f6b7e] font-bold mt-1">{formatDate(e.opened_at)}</p>
+                  </div>
+                ))}
+                {(debtDisputes ?? []).map((d: any) => (
+                  <div key={d.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-sm font-bold text-white">{DISPUTE_TYPE_LABELS[d.dispute_type] ?? d.dispute_type}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${d.status === 'open' || d.status === 'under_review' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>
+                        {d.status === 'open' ? 'مفتوح' : d.status === 'under_review' ? 'قيد المراجعة' : d.status === 'resolved' ? 'محلول' : d.status === 'rejected' ? 'مرفوض' : d.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#8b95a7] leading-relaxed">{d.description}</p>
+                    {d.resolution && <p className="text-xs text-emerald-400 leading-relaxed mt-1">الحل: {d.resolution}</p>}
+                    <p className="text-[10px] text-[#5f6b7e] font-bold mt-1">{formatDate(d.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Active Alerts */}
           {debtAlerts?.length > 0 && (

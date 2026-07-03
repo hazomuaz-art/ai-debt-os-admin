@@ -55,7 +55,7 @@ export default async function AnalyticsPage() {
     { data: aiScores },
     { data: allDebts },
     { data: allMessages },
-    { data: allPayments },
+    { data: allPaymentAmounts },
   ] = await Promise.all([
     supabase
       .from('ai_scores')
@@ -71,20 +71,39 @@ export default async function AnalyticsPage() {
       .from('messages')
       .select('channel, direction, created_at')
       .eq('company_id', profile.company_id),
+    // Full (unlimited) payments sum — the single source of truth for "total
+    // collected" everywhere in this app. Previously this page computed
+    // "collected" two different ways from two different sources (this exact
+    // payments sum for the monthly trend chart, vs. original-minus-outstanding
+    // balance delta for the summary KPI/collection-rate), which silently
+    // diverge whenever a balance changes without a matching payment row (a
+    // manual write-off/adjustment) or vice versa. Only 'amount' is selected —
+    // cheap even at full table scope.
     supabase
       .from('payments')
-      .select('amount, payment_date, currency')
-      .eq('company_id', profile.company_id)
-      .order('payment_date', { ascending: false })
-      .limit(500),
+      .select('amount')
+      .eq('company_id', profile.company_id),
   ])
 
   // Compute summary stats
   const totalDebts = allDebts?.length ?? 0
   const totalOriginal = allDebts?.reduce((s, d) => s + Number(d.original_amount), 0) ?? 0
   const totalOutstanding = allDebts?.reduce((s, d) => s + Number(d.current_balance), 0) ?? 0
-  const totalCollectedAll = totalOriginal - totalOutstanding
+  // Authoritative "collected" figure — sum of actual recorded payments,
+  // the same source the monthly trend chart already uses. This must be the
+  // ONLY number this app calls "total collected" anywhere.
+  const totalCollectedAll = allPaymentAmounts?.reduce((s, p) => s + Number(p.amount), 0) ?? 0
   const collectionRate = totalOriginal > 0 ? (totalCollectedAll / totalOriginal) * 100 : 0
+  // Balance-delta figure kept ONLY to detect drift between recorded payments
+  // and actual outstanding-balance movement (e.g. a manual balance
+  // adjustment/write-off with no matching payment row, or a payment write
+  // that silently failed to update the balance). A real, visible divergence
+  // here is a data-integrity signal, not just a display inconsistency to
+  // paper over — surfaced below instead of hidden.
+  const balanceDelta = totalOriginal - totalOutstanding
+  const reconciliationGap = balanceDelta - totalCollectedAll
+  const reconciliationGapPct = totalOriginal > 0 ? (Math.abs(reconciliationGap) / totalOriginal) * 100 : 0
+  const hasReconciliationGap = Math.abs(reconciliationGap) > 1 && reconciliationGapPct > 1
   const avgScore = aiScores?.length
     ? Math.round(aiScores.reduce((s, a) => s + a.score, 0) / aiScores.length)
     : 0
@@ -174,6 +193,15 @@ export default async function AnalyticsPage() {
         </div>
 
       </div>
+
+      {/* Data-integrity signal: recorded payments vs. actual balance movement
+          disagree by more than a trivial amount — surfaced immediately
+          instead of silently showing an inconsistent number elsewhere. */}
+      {hasReconciliationGap && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-sm text-amber-300 font-bold">
+          تنبيه مطابقة بيانات: الفرق بين إجمالي المدفوعات المسجَّلة وإجمالي انخفاض الأرصدة يبلغ {formatCurrency(Math.abs(reconciliationGap), 'SAR')} ({reconciliationGapPct.toFixed(1)}%) — قد يكون سببه تسوية رصيد يدوية بدون سداد مقابل، أو سداد مسجَّل لم يُحدَّث معه رصيد المديونية.
+        </div>
+      )}
 
       {/* Charts — client component with Recharts */}
       <AnalyticsCharts

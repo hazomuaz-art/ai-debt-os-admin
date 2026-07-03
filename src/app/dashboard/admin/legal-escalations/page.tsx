@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Scale, AlertTriangle, CheckCircle2, X } from 'lucide-react'
 
 type Escalation = {
@@ -138,6 +139,11 @@ export default function LegalEscalationsPage() {
                   <div className="text-white font-bold">{e.customer?.full_name ?? '—'} <span className="text-[#5f6b7e] font-mono text-xs">({e.customer?.phone})</span></div>
                   <div className="text-[#8b95a7] text-xs">
                     المحفظة: {e.debt?.portfolio?.name_ar ?? e.debt?.portfolio?.name ?? '—'} · المرجع: {e.debt?.reference_number ?? '—'} · الرصيد: {e.debt?.current_balance} {e.debt?.currency}
+                    {e.debt?.id && (
+                      <Link href={`/dashboard/admin/debts/${e.debt.id}`} className="text-emerald-400 hover:text-emerald-300 font-bold ms-2">
+                        فتح ملف المديونية ←
+                      </Link>
+                    )}
                   </div>
                   <div className="text-slate-300 text-sm">{e.reason}</div>
                   <div className="text-[#5f6b7e] text-xs">فُتح: {new Date(e.opened_at).toLocaleString('ar-SA')}</div>
