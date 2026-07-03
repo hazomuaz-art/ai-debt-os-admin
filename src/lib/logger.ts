@@ -93,6 +93,28 @@ function writeLog(level: LogLevel, message: string, context?: LogContext, error?
   }
 }
 
+// Root-cause fix for a recurring bug class (2026-07-03): callers keep
+// passing raw Supabase `{error}` objects (PostgrestError — a plain object,
+// not an Error instance) as the 2nd param. The old `new Error(String(x))`
+// coercion turned every one of them into the useless "[object Object]" —
+// found live in production twice, across 20+ call sites, even after a
+// 28-site sweep fixed the known ones. Coercing properly HERE makes the
+// entire class impossible regardless of what any future call site passes.
+function coerceError(error: unknown): Error | undefined {
+  if (error === undefined || error === null) return undefined
+  if (error instanceof Error) return error
+  if (typeof error === 'object') {
+    const o = error as Record<string, unknown>
+    const msg = typeof o.message === 'string' && o.message
+      ? o.message
+      : (() => { try { return JSON.stringify(error) } catch { return String(error) } })()
+    const e = new Error(msg)
+    if (typeof o.code === 'string') (e as Error & { code?: string }).code = o.code
+    return e
+  }
+  return new Error(String(error))
+}
+
 // ── Logger factory ─────────────────────────────────────────────────────────
 
 export function createLogger(module: string) {
@@ -107,8 +129,7 @@ export function createLogger(module: string) {
       writeLog('warn', `[${module}] ${message}`, context),
 
     error: (message: string, error?: Error | unknown, context?: LogContext) => {
-      const err = error instanceof Error ? error : error ? new Error(String(error)) : undefined
-      writeLog('error', `[${module}] ${message}`, context, err)
+      writeLog('error', `[${module}] ${message}`, context, coerceError(error))
     },
 
     // For timing async operations
@@ -126,7 +147,7 @@ export function createLogger(module: string) {
           writeLog('error', `[${module}] ${label} failed`, {
             ...context,
             duration_ms: Date.now() - start,
-          }, err instanceof Error ? err : new Error(String(err)))
+          }, coerceError(err))
           throw err
         }
       )
@@ -182,7 +203,7 @@ export function captureError(
   category: ErrorCategory,
   context?: LogContext
 ): MonitoredError {
-  const err     = error instanceof Error ? error : new Error(String(error))
+  const err     = coerceError(error) ?? new Error('unknown error')
   const entry: MonitoredError = {
     category,
     message:   err.message,

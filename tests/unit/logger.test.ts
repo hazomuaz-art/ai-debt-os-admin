@@ -29,6 +29,27 @@ describe('createLogger', () => {
     expect(consoleSpy.error).toHaveBeenCalled()
   })
 
+  // Regression for a bug class found live in production TWICE: raw Supabase
+  // {error} objects (PostgrestError — plain objects, not Error instances)
+  // passed as the 2nd param got coerced via String(obj) → the useless
+  // "[object Object]". The logger must extract the real message no matter
+  // what shape the caller passes.
+  it('never logs "[object Object]" for a plain Supabase-style error object', () => {
+    const log = createLogger('test')
+    log.error('insert failed', { message: 'duplicate key violates unique constraint', code: '23505', details: '...' })
+    const out = consoleSpy.error.mock.calls.map((c: unknown[]) => String(c[0])).join('\n')
+    expect(out).toContain('duplicate key violates unique constraint')
+    expect(out).not.toContain('[object Object]')
+  })
+
+  it('serializes a message-less plain object as JSON, not "[object Object]"', () => {
+    const log = createLogger('test')
+    log.error('weird failure', { status: 500, hint: 'no message field here' })
+    const out = consoleSpy.error.mock.calls.map((c: unknown[]) => String(c[0])).join('\n')
+    expect(out).toContain('no message field here')
+    expect(out).not.toContain('[object Object]')
+  })
+
   it('logs warnings to console.warn', () => {
     const log = createLogger('test')
     log.warn('warning message')

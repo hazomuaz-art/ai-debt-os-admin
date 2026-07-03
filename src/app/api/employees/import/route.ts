@@ -115,9 +115,10 @@ export async function POST(req: NextRequest) {
             }).select('id').single()
             if (createErr || !created) { results.errors.push(`${row.email}: ${createErr?.message ?? 'insert failed'}`); continue }
 
-            await svc.from('employee_history').insert({
+            const { error: histCreatedErr } = await svc.from('employee_history').insert({
               employee_id: created.id, change_type: 'created', new_value: row.full_name,
             })
+            if (histCreatedErr) log.error('employee_history insert failed (created)', new Error(histCreatedErr.message), { email: row.email })
             results.created++
 
             if (row.job_title && COLLECTOR_TITLE_RE.test(row.job_title)) {
@@ -163,11 +164,12 @@ export async function POST(req: NextRequest) {
               if (updErr) { results.errors.push(`${row.email}: ${updErr.message}`); continue }
 
               for (const f of changedFields) {
-                await svc.from('employee_history').insert({
+                const { error: histUpdErr } = await svc.from('employee_history').insert({
                   employee_id: existing.id,
                   change_type: wasInactive && f === changedFields[0] ? 'reactivated' : 'updated',
                   field_changed: f, old_value: String((existing as any)[f] ?? ''), new_value: String((row as any)[f] ?? portfolio_id ?? ''),
                 })
+                if (histUpdErr) log.error('employee_history insert failed (updated)', new Error(histUpdErr.message), { email: row.email, field: f })
               }
               if (wasInactive) results.reactivated++
               else results.updated++
@@ -184,7 +186,8 @@ export async function POST(req: NextRequest) {
             status: 'inactive', last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           }).eq('id', existing.id)
           if (deactErr) { results.errors.push(`${existing.email}: deactivation failed — ${deactErr.message}`); continue }
-          await svc.from('employee_history').insert({ employee_id: existing.id, change_type: 'deactivated' })
+          const { error: histDeactErr } = await svc.from('employee_history').insert({ employee_id: existing.id, change_type: 'deactivated' })
+          if (histDeactErr) log.error('employee_history insert failed (deactivated)', new Error(histDeactErr.message), { email: existing.email })
           if (existing.profile_id) {
             await svc.from('profiles').update({ is_active: false }).eq('id', existing.profile_id)
           }
