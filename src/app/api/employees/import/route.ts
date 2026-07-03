@@ -136,7 +136,8 @@ export async function POST(req: NextRequest) {
                 if (profErr) {
                   log.error('profile setup failed after auto-provisioning collector account', new Error(profErr.message), { email: row.email })
                 } else {
-                  await svc.from('employees').update({ profile_id: authUser.user.id }).eq('id', created.id)
+                  const { error: linkErr } = await svc.from('employees').update({ profile_id: authUser.user.id }).eq('id', created.id)
+                  if (linkErr) log.error('employees.profile_id link update failed', new Error(linkErr.message), { email: row.email })
                   results.accounts_created.push({ name: row.full_name, email: row.email, password: sharedPassword, portfolio: row.portfolio_name })
                 }
               }
@@ -189,7 +190,8 @@ export async function POST(req: NextRequest) {
           const { error: histDeactErr } = await svc.from('employee_history').insert({ employee_id: existing.id, change_type: 'deactivated' })
           if (histDeactErr) log.error('employee_history insert failed (deactivated)', new Error(histDeactErr.message), { email: existing.email })
           if (existing.profile_id) {
-            await svc.from('profiles').update({ is_active: false }).eq('id', existing.profile_id)
+            const { error: deactProfileErr } = await svc.from('profiles').update({ is_active: false }).eq('id', existing.profile_id)
+            if (deactProfileErr) log.error('profile deactivation failed for removed employee', new Error(deactProfileErr.message), { email: existing.email })
           }
           results.deactivated++
         }

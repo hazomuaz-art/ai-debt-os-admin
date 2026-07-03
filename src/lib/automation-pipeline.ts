@@ -395,7 +395,8 @@ async function stepScore(ctx: Ctx): Promise<ScoreResult> {
     result.score < 75 ? 'medium' : 'low'
   if (newPriority !== ctx.debt.priority) {
     try {
-      await sb.from('debts').update({ priority: newPriority }).eq('id', ctx.debt.id)
+      const { error: priorityUpdErr } = await sb.from('debts').update({ priority: newPriority }).eq('id', ctx.debt.id)
+      if (priorityUpdErr) log.warn(`stepScore(${ctx.debt.id}) priority update failed: ${priorityUpdErr.message}`)
     } catch { /* non-critical */ }
   }
 
@@ -465,7 +466,12 @@ async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<
         : `Hi ${name}, quick reminder about your ${cur} ${bal} balance. Happy to arrange a payment option that works for you.`
 
   try {
-    await createServiceClient().from('ai_actions').insert({
+    // Real gap found during a full-system audit: the try/catch here only
+    // ever catches a THROWN exception — Supabase returns {error} instead of
+    // throwing, so a rejected insert still fell through to `return true`,
+    // meaning the caller's ai_actions_count kept incrementing for actions
+    // that were never actually created.
+    const { error: actionInsertErr } = await createServiceClient().from('ai_actions').insert({
       company_id:           ctx.debt.company_id,
       debt_id:              ctx.debt.id,
       customer_id:          ctx.debt.customer_id,
@@ -480,6 +486,7 @@ async function stepAction(ctx: Ctx, score: ScoreResult, today: string): Promise<
       scheduled_date:       today,
       status:               'pending',
     })
+    if (actionInsertErr) { log.warn(`stepAction insert(${ctx.debt.id}): ${actionInsertErr.message}`); return false }
     return true
   } catch (err) {
     log.warn(`stepAction insert(${ctx.debt.id}): ` + (err instanceof Error ? err.message : String(err)))
@@ -532,12 +539,13 @@ async function stepRules(ctx: Ctx, score: ScoreResult): Promise<string[]> {
       if (hit) {
         matched.push(String(rule.action))
         try {
-          await sb.from('collection_rules').update({
+          const { error: ruleUpdErr } = await sb.from('collection_rules').update({
             trigger_count: Number(rule.trigger_count ?? 0) + 1,
             last_triggered_at: new Date().toISOString(),
           }).eq('id', rule.id)
+          if (ruleUpdErr) log.warn(`stepRules(${ctx.debt.id}) trigger_count update failed: ${ruleUpdErr.message}`)
           // Timeline entry for rule trigger
-          await sb.from('timeline_events').insert({
+          const { error: ruleTlErr } = await sb.from('timeline_events').insert({
             company_id:  ctx.debt.company_id,
             customer_id: ctx.debt.customer_id,
             debt_id:     ctx.debt.id,
@@ -547,6 +555,7 @@ async function stepRules(ctx: Ctx, score: ScoreResult): Promise<string[]> {
             actor_type:  'system',
             occurred_at: new Date().toISOString(),
           })
+          if (ruleTlErr) log.warn(`stepRules(${ctx.debt.id}) timeline insert failed: ${ruleTlErr.message}`)
         } catch { /* non-critical */ }
       }
     }

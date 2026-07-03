@@ -1,5 +1,8 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/platform/users/status')
 
 export async function PATCH(
   request: NextRequest,
@@ -42,7 +45,7 @@ export async function PATCH(
         return errors.internal('Failed to update user status')
       }
 
-      await ctx.serviceClient.from('logs').insert({
+      const { error: statusLogErr } = await ctx.serviceClient.from('logs').insert({
         company_id: ctx.profile.company_id,
         user_id: ctx.user.id,
         entity_type: 'user',
@@ -53,6 +56,7 @@ export async function PATCH(
           is_active: body.is_active,
         },
       })
+      if (statusLogErr) log.error('user status-change audit log insert failed', statusLogErr, { target_user_id: userId })
 
       return NextResponse.json({
         data: {

@@ -69,7 +69,8 @@ export async function createCompanyAction(args: {
     user_metadata: { full_name: fullName, role: 'admin' },
   })
   if (createUserErr || !authData.user) {
-    await serviceClient.from('companies').delete().eq('id', company.id)
+    const { error: cleanupErr1 } = await serviceClient.from('companies').delete().eq('id', company.id)
+    if (cleanupErr1) log.error('cleanup after admin-user creation failure: company delete failed', cleanupErr1, { company_id: company.id })
     log.error('Admin user creation failed', createUserErr)
     return { error: createUserErr?.message ?? 'Failed to create the admin account' }
   }
@@ -81,7 +82,8 @@ export async function createCompanyAction(args: {
   if (profileError) {
     log.error('Profile update failed', profileError)
     await serviceClient.auth.admin.deleteUser(authData.user.id).catch(() => {})
-    await serviceClient.from('companies').delete().eq('id', company.id).catch(() => {})
+    const { error: cleanupErr2 } = await serviceClient.from('companies').delete().eq('id', company.id)
+    if (cleanupErr2) log.error('cleanup after profile-update failure: company delete failed', cleanupErr2, { company_id: company.id })
     return { error: 'Account setup failed. Please try again.' }
   }
 

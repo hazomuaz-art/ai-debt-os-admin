@@ -119,7 +119,7 @@ export async function logCost(opts: LogCostOptions): Promise<void> {
     }
 
     const supabase = createServiceClient()
-    await supabase.from('ai_cost_log').insert({
+    const { error: costLogErr } = await supabase.from('ai_cost_log').insert({
       company_id:         opts.company_id,
       provider:           opts.provider,
       model:              opts.model ?? null,
@@ -140,6 +140,7 @@ export async function logCost(opts: LogCostOptions): Promise<void> {
       error_message:      opts.error_message  ?? null,
       metadata:           opts.metadata       ?? {},
     })
+    if (costLogErr) log.warn('Failed to log cost entry', { error: costLogErr.message })
   } catch (err) {
     // Non-fatal — never let cost tracking break the main flow
     log.warn('Failed to log cost entry', { error: String(err) })

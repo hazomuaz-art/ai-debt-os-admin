@@ -32,28 +32,31 @@ export async function DELETE(
         return errors.forbidden()
       }
 
-      // Cleanup dependencies before deleting the Auth user
-      // 1. Clear logs where this user is the entity or the actor
-      await ctx.serviceClient.from('logs').delete().eq('entity_id', targetUserId)
-      await ctx.serviceClient.from('logs').delete().eq('user_id', targetUserId)
-      
-      // 2. Clear debts assignments and creation
-      await ctx.serviceClient.from('debts').update({ assigned_to: null }).eq('assigned_to', targetUserId)
-      await ctx.serviceClient.from('debts').update({ created_by: null }).eq('created_by', targetUserId)
-      
-      // 3. Clear customer creation
-      await ctx.serviceClient.from('customers').update({ created_by: null }).eq('created_by', targetUserId)
-      
-      // 4. Clear recorded payments
-      await ctx.serviceClient.from('payments').update({ recorded_by: null }).eq('recorded_by', targetUserId)
-      
-      // 5. Clear assigned AI actions
-      await ctx.serviceClient.from('ai_actions').update({ assigned_to: null }).eq('assigned_to', targetUserId)
-      // Some migrations added created_by to ai_actions, let's try to clear it (if it doesn't exist, it just returns an error we ignore)
-      await ctx.serviceClient.from('ai_actions').update({ created_by: null }).eq('created_by', targetUserId)
-      
-      // 6. Clear messages
-      await ctx.serviceClient.from('messages').update({ sent_by: null }).eq('sent_by', targetUserId)
+      // Cleanup dependencies before deleting the Auth user.
+      // Real gap found during a full-system audit: every single one of
+      // these 9 writes was unchecked — if one silently failed (e.g. a
+      // stale FK still pointing at this user), the account still got
+      // deleted, potentially leaving dangling references in logs/debts/
+      // customers/payments/ai_actions/messages with no trace anywhere.
+      const cleanupSteps: [string, Promise<{ error: { message: string } | null }>][] = [
+        ['logs.entity_id', ctx.serviceClient.from('logs').delete().eq('entity_id', targetUserId)],
+        ['logs.user_id', ctx.serviceClient.from('logs').delete().eq('user_id', targetUserId)],
+        ['debts.assigned_to', ctx.serviceClient.from('debts').update({ assigned_to: null }).eq('assigned_to', targetUserId)],
+        ['debts.created_by', ctx.serviceClient.from('debts').update({ created_by: null }).eq('created_by', targetUserId)],
+        ['customers.created_by', ctx.serviceClient.from('customers').update({ created_by: null }).eq('created_by', targetUserId)],
+        ['payments.recorded_by', ctx.serviceClient.from('payments').update({ recorded_by: null }).eq('recorded_by', targetUserId)],
+        ['ai_actions.assigned_to', ctx.serviceClient.from('ai_actions').update({ assigned_to: null }).eq('assigned_to', targetUserId)],
+        // Some migrations added created_by to ai_actions — if the column
+        // doesn't exist on a given deployment this legitimately errors;
+        // still logged (at warn, not error) so a genuine failure elsewhere
+        // isn't confused with this expected case.
+        ['ai_actions.created_by', ctx.serviceClient.from('ai_actions').update({ created_by: null }).eq('created_by', targetUserId)],
+        ['messages.sent_by', ctx.serviceClient.from('messages').update({ sent_by: null }).eq('sent_by', targetUserId)],
+      ]
+      for (const [stepName, stepPromise] of cleanupSteps) {
+        const { error: cleanupErr } = await stepPromise
+        if (cleanupErr) log.warn(`user-delete cleanup step failed: ${stepName}: ${cleanupErr.message}`, { target_user_id: targetUserId })
+      }
 
       // Delete the Auth user (this will CASCADE delete the profile)
       const { error: deleteErr } = await ctx.serviceClient.auth.admin.deleteUser(targetUserId)
@@ -63,7 +66,7 @@ export async function DELETE(
         return errors.internal('Failed to delete user account: ' + deleteErr.message)
       }
 
-      await ctx.supabase.from('logs').insert({
+      const { error: deleteLogErr } = await ctx.supabase.from('logs').insert({
         company_id:  ctx.profile.company_id,
         user_id:     ctx.user.id,
         entity_type: 'user',
@@ -71,6 +74,7 @@ export async function DELETE(
         action:      'deleted',
         new_values:  { status: 'deleted' },
       })
+      if (deleteLogErr) log.error('user-delete audit log insert failed', deleteLogErr, { target_user_id: targetUserId })
 
       return NextResponse.json({ success: true }, { status: 200 })
     },

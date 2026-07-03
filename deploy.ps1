@@ -38,6 +38,19 @@ function Step($m){ Write-Host "`n==> $m" -ForegroundColor Cyan }
 
 Set-Location $D
 
+# 0) Guard against the single most recurring bug class found across every
+# audit of this codebase: a Supabase write (insert/update/upsert/delete)
+# whose `error` result is never checked, so a failure is completely
+# invisible while the caller proceeds as if it succeeded. This has been
+# found and hand-fixed dozens of times in dozens of different files across
+# multiple sessions - this makes it impossible to reintroduce, permanently,
+# by scanning the entire src/ tree on every single deploy. A real failure
+# here MUST block the deploy (unlike the git steps below, which are
+# best-effort) - this is a hard gate, not a warning.
+Step "Guard: no unchecked Supabase writes"
+& node scripts/check-unchecked-writes.js
+if ($LASTEXITCODE -ne 0) { throw "unchecked Supabase write(s) found - see above. Fix before deploying (or add a documented, justified exclusion in scripts/check-unchecked-writes.js if truly out of scope)." }
+
 # 1) Commit + push to GitHub (history/backup; best-effort — never blocks deploy)
 Step "Commit & push to GitHub (origin) [best-effort]"
 git add -A | Out-Null

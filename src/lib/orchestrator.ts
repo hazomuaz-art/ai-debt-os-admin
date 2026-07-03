@@ -131,7 +131,7 @@ async function persistRunLog(
 ): Promise<string | undefined> {
   try {
     const sb = createServiceClient()
-    const { data } = await sb.from('orchestrator_runs').insert({
+    const { data, error: runLogErr } = await sb.from('orchestrator_runs').insert({
       company_id:      event.company_id,
       event_source:    event.source,
       debt_id:         result.debt_id         ?? null,
@@ -150,6 +150,7 @@ async function persistRunLog(
       duration_ms:     result.duration_ms,
       triggered_by:    event.actor_id ?? null,
     }).select('id').single()
+    if (runLogErr) log.warn('persistRunLog insert failed: ' + runLogErr.message)
     return (data as { id: string } | null)?.id
   } catch (err) {
     log.warn('persistRunLog failed: ' + (err instanceof Error ? err.message : String(err)))
@@ -296,7 +297,7 @@ export async function orchestrateBatch(
 
   try {
     const sb = createServiceClient()
-    await sb.from('orchestrator_runs').insert({
+    const { error: batchLogErr } = await sb.from('orchestrator_runs').insert({
       company_id:       opts.company_id,
       event_source:     opts.source + '_batch',
       mode:             'batch',
@@ -310,6 +311,7 @@ export async function orchestrateBatch(
       duration_ms:      summaryResult.duration_ms,
       triggered_by:     opts.actor_id ?? null,
     })
+    if (batchLogErr) log.warn('orchestrator batch run log insert failed: ' + batchLogErr.message)
   } catch { /* non-critical */ }
 
   return {

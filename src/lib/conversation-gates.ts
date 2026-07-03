@@ -201,7 +201,8 @@ export async function pickUnusedVariant(customer_id: string, scope: string, pool
   try {
     const { data: row } = await supabase.from('customers').select('used_reply_variants').eq('id', customer_id).maybeSingle()
     const current = (row as any)?.used_reply_variants ?? {}
-    await supabase.from('customers').update({ used_reply_variants: { ...current, [scope]: newUsed } }).eq('id', customer_id)
+    const { error: variantUpdErr } = await supabase.from('customers').update({ used_reply_variants: { ...current, [scope]: newUsed } }).eq('id', customer_id)
+    if (variantUpdErr) log.warn('failed to persist used reply variant', { error: variantUpdErr.message })
   } catch (err) {
     log.warn('failed to persist used reply variant', { error: String((err as any)?.message ?? err) })
   }

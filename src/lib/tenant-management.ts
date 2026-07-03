@@ -64,7 +64,7 @@ export async function logTenantEvent(opts: {
 }): Promise<void> {
   try {
     const sb = createServiceClient()
-    await sb.from('tenant_events').insert({
+    const { error } = await sb.from('tenant_events').insert({
       company_id: opts.company_id,
       event_type: opts.event_type,
       actor_id:   opts.actor_id   ?? null,
@@ -72,6 +72,7 @@ export async function logTenantEvent(opts: {
       new_value:  opts.new_value  ?? {},
       note:       opts.note       ?? null,
     })
+    if (error) log.warn('tenant_events insert failed: ' + error.message)
   } catch (err) {
     log.warn('logTenantEvent failed: ' + (err instanceof Error ? err.message : String(err)))
   }

@@ -4,6 +4,9 @@ import { withAuth, errors } from '@/lib/api'
 import { resolveResponse, storeCache } from '@/lib/smart-response'
 import { generateNegotiationResponse } from '@/lib/negotiation-response'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/ai/reply-preview')
 
 export async function POST(req: NextRequest) {
   return withAuth(async (ctx) => {
@@ -255,7 +258,7 @@ Important:
     if (body.customer_id) {
       const now = new Date().toISOString()
 
-      await ctx.supabase.from('messages').insert([
+      const { error: previewMsgErr } = await ctx.supabase.from('messages').insert([
         {
           company_id: companyId,
           customer_id: body.customer_id,
@@ -279,8 +282,9 @@ Important:
           sent_at: now,
         },
       ])
+      if (previewMsgErr) log.error('reply-preview messages insert failed', previewMsgErr, { customer_id: body.customer_id })
 
-      await ctx.supabase.from('timeline_events').insert([
+      const { error: previewTlErr } = await ctx.supabase.from('timeline_events').insert([
         {
           company_id: companyId,
           customer_id: body.customer_id,
@@ -306,6 +310,7 @@ Important:
           occurred_at: now,
         },
       ])
+      if (previewTlErr) log.error('reply-preview timeline insert failed', previewTlErr, { customer_id: body.customer_id })
     }
 
     return NextResponse.json({

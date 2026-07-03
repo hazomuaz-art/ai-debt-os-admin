@@ -291,13 +291,14 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
 
   // Update summary record
   const finalStatus = failed === 0 ? 'completed' : processed === 0 ? 'failed' : 'partial'
-  await supabase.from('debit_collect_sync').update({
+  const { error: syncSummaryErr } = await supabase.from('debit_collect_sync').update({
     status:            finalStatus,
     records_processed: processed,
     records_failed:    failed,
     error_log:         errorLog,
     completed_at:      new Date().toISOString(),
   }).eq('id', syncRecord.id)
+  if (syncSummaryErr) log.error('debit_collect_sync summary update failed', new Error(syncSummaryErr.message), { sync_id: syncRecord.id })
 
   return {
     ...syncRecord,

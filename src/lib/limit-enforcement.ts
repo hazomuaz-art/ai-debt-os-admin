@@ -162,7 +162,7 @@ async function logEnforcement(
 ): Promise<void> {
   try {
     const sb = createServiceClient()
-    await sb.from('limit_enforcement_log').insert({
+    const { error: enforcementLogErr } = await sb.from('limit_enforcement_log').insert({
       company_id: companyId,
       limit_type: limitType,
       action_type: action,
@@ -170,5 +170,6 @@ async function logEnforcement(
       limit_val:   limitVal,
       fallback:    fallback ?? null,
     })
+    if (enforcementLogErr) log.warn('limit_enforcement_log insert failed: ' + enforcementLogErr.message)
   } catch { /* non-critical */ }
 }

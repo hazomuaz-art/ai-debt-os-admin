@@ -76,12 +76,13 @@ export async function POST(req: NextRequest) {
     'data.content'
   ])
 
-  await supabase.from('webhook_events').insert({
+  const { error: webhookLogErr } = await supabase.from('webhook_events').insert({
     provider: 'rasf',
     event_id: String(eventId),
     event_type: 'message',
     payload
-  }).then(() => null)
+  })
+  if (webhookLogErr) log.error('rasf webhook_events insert failed', webhookLogErr, { event_id: eventId })
 
   if (!phoneRaw || !text) {
     log.warn('Rasf webhook missing phone or text', { eventId })

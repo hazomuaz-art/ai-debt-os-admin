@@ -159,7 +159,7 @@ export async function updateCaseNote(args: {
       return
     }
 
-    await svc.from('debts').update({
+    const { error: caseNoteUpdErr } = await svc.from('debts').update({
       metadata: {
         ...(debt.metadata as Record<string, unknown> ?? {}),
         case_note: note,
@@ -167,6 +167,7 @@ export async function updateCaseNote(args: {
         case_note_updated_at: new Date().toISOString(),
       },
     }).eq('id', args.debt_id)
+    if (caseNoteUpdErr) { log.error('case note update failed', new Error(caseNoteUpdErr.message), { debt_id: args.debt_id }); return }
     log.info('case note updated', { debt_id: args.debt_id })
   } catch (err) {
     log.error('updateCaseNote failed — previous note left untouched', err as Error)

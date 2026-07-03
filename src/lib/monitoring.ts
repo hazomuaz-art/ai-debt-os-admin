@@ -115,7 +115,7 @@ export async function runHealthChecks(companyId?: string): Promise<HealthResult[
 async function persistHealthChecks(results: HealthResult[], companyId?: string): Promise<void> {
   try {
     const sb = createServiceClient()
-    await sb.from('health_checks').insert(
+    const { error: healthInsertErr } = await sb.from('health_checks').insert(
       results.map(r => ({
         company_id: companyId ?? null,
         check_type: r.check_type,
@@ -124,6 +124,7 @@ async function persistHealthChecks(results: HealthResult[], companyId?: string):
         message:    r.message    ?? null,
       }))
     )
+    if (healthInsertErr) log.warn('health_checks insert failed: ' + healthInsertErr.message)
   } catch { /* non-critical */ }
 }
 
@@ -170,7 +171,7 @@ export async function writeAuditLog(opts: {
 }): Promise<void> {
   try {
     const sb = createServiceClient()
-    await sb.from('audit_log').insert({
+    const { error: auditInsertErr } = await sb.from('audit_log').insert({
       company_id:  opts.company_id  ?? null,
       actor_id:    opts.actor_id    ?? null,
       actor_email: opts.actor_email ?? null,
@@ -182,6 +183,7 @@ export async function writeAuditLog(opts: {
       ip_address:  opts.ip_address  ?? null,
       user_agent:  opts.user_agent  ?? null,
     })
+    if (auditInsertErr) log.warn('audit_log insert failed: ' + auditInsertErr.message)
   } catch (err) {
     log.warn('writeAuditLog failed: ' + (err instanceof Error ? err.message : String(err)))
   }

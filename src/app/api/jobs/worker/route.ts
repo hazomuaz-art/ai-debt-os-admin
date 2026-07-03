@@ -219,7 +219,7 @@ async function processJob(supabase: ReturnType<typeof createServiceClient>, job:
         total_payments_made: payments?.length ?? 0,
       })
 
-      await supabase.from('ai_scores').insert({
+      const { error: jobScoreInsertErr } = await supabase.from('ai_scores').insert({
         company_id:             debt.company_id,
         debt_id,
         customer_id:            debt.customer_id,
@@ -229,16 +229,18 @@ async function processJob(supabase: ReturnType<typeof createServiceClient>, job:
         recommended_strategy:   result.recommended_strategy,
         factors:                result.factors,
       })
+      if (jobScoreInsertErr) log.error('score_debt job: ai_scores insert failed', new Error(jobScoreInsertErr.message), { debt_id })
 
       const newPriority =
         result.score < 25 ? 'critical' :
         result.score < 50 ? 'high'     :
         result.score < 75 ? 'medium'   : 'low'
 
-      await supabase
+      const { error: jobPriorityErr } = await supabase
         .from('debts')
         .update({ priority: newPriority })
         .eq('id', debt_id)
+      if (jobPriorityErr) log.error('score_debt job: debt priority update failed', new Error(jobPriorityErr.message), { debt_id })
 
       break
     }
@@ -268,7 +270,7 @@ async function processJob(supabase: ReturnType<typeof createServiceClient>, job:
 
       const result = await sendWhatsAppMessage({ to: phone, message, company_id })
 
-      await supabase.from('messages').insert({
+      const { error: jobMsgLogErr } = await supabase.from('messages').insert({
         company_id,
         customer_id: customer_id ?? null,
         debt_id:     debt_id ?? null,
@@ -280,6 +282,7 @@ async function processJob(supabase: ReturnType<typeof createServiceClient>, job:
         sent_at:     new Date().toISOString(),
         metadata:    { phone, via: 'job_queue', error: result.error ?? null },
       })
+      if (jobMsgLogErr) log.error('send_whatsapp job: message log failed', new Error(jobMsgLogErr.message), { company_id })
 
       if (result.status === 'failed') {
         throw new Error(result.error ?? 'WhatsApp send failed')

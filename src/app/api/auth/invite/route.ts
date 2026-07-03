@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         return errors.internal('Failed to set up user profile')
       }
 
-      await ctx.supabase.from('logs').insert({
+      const { error: logErr } = await ctx.supabase.from('logs').insert({
         company_id:  ctx.profile.company_id,
         user_id:     ctx.user.id,
         entity_type: 'user',
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
         action:      'invited',
         new_values:  { email: body.email, role: body.role, invited_by: ctx.user.id },
       })
+      if (logErr) log.error('invite audit log insert failed', logErr, { invited_user_id: newUser.user.id })
 
       return NextResponse.json(
         { data: { id: newUser.user.id, email: body.email, role: body.role } },

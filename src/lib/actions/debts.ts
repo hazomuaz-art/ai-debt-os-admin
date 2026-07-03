@@ -196,7 +196,8 @@ export async function createDebtAction(formData: FormData) {
     if (data && !parsed.data.portfolio_id && parsed.data.creditor_name) {
       const portfolioId = await ensurePortfolioForCreditor(supabase, profile.company_id, parsed.data.creditor_name)
       if (portfolioId) {
-        await supabase.from('debts').update({ portfolio_id: portfolioId }).eq('id', data.id)
+        const { error: autoPortfolioErr } = await supabase.from('debts').update({ portfolio_id: portfolioId }).eq('id', data.id)
+        if (autoPortfolioErr) log.error('auto-assign portfolio_id update failed', autoPortfolioErr, { debt_id: data.id })
       }
     }
 

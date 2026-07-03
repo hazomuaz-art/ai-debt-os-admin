@@ -152,9 +152,11 @@ export async function registerAction(formData: FormData) {
 
   if (profileError) {
     log.error('Profile update failed during register', profileError)
-    // Best-effort cleanup
+    // Best-effort cleanup — logged (not silenced) so an orphaned company row
+    // left behind by a failed cleanup is at least visible in the logs.
     await serviceClient.auth.admin.deleteUser(authData.user.id).catch(() => {})
-    await serviceClient.from('companies').delete().eq('id', company.id).catch(() => {})
+    const { error: cleanupErr } = await serviceClient.from('companies').delete().eq('id', company.id)
+    if (cleanupErr) log.error('registration cleanup: company delete failed', cleanupErr, { company_id: company.id })
     return { error: 'Account setup failed. Please try again.' }
   }
 

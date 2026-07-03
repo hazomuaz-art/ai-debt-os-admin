@@ -71,9 +71,10 @@ async function ensureCompanyPortfolio(
     const id = (existing as { id: string }).id
     const meta = (existing as { metadata?: Record<string, unknown> }).metadata ?? {}
     if (!meta.outcome_categories) {
-      await supabase.from('portfolios').update({
+      const { error: metaUpdErr } = await supabase.from('portfolios').update({
         metadata: { ...meta, outcome_categories: profile.outcomeCategories, company_key: profile.key },
       }).eq('id', id)
+      if (metaUpdErr) logger.error('portfolio outcome_categories metadata update failed', metaUpdErr, { portfolio_id: id })
     }
     return id
   }
@@ -257,17 +258,19 @@ export async function POST(request: NextRequest) {
       if (cr.needsMapping || Object.keys(cr.headerFieldMap).length === 0) continue
       const existingId = templateIdByHash[cr.signatureHash]
       if (existingId) {
-        await supabase.from('import_mapping_templates').update({
+        const { error: tmplUpdErr } = await supabase.from('import_mapping_templates').update({
           field_map: cr.headerFieldMap, use_count: (templateRows?.find((t: any) => t.id === existingId)?.use_count ?? 0) + 1,
           last_used_at: new Date().toISOString(),
         }).eq('id', existingId)
+        if (tmplUpdErr) logger.error('import_mapping_templates update failed', tmplUpdErr, { template_id: existingId })
       } else {
-        await supabase.from('import_mapping_templates').insert({
+        const { error: tmplInsErr } = await supabase.from('import_mapping_templates').insert({
           company_id: profile.company_id, signature_hash: cr.signatureHash,
           signature_headers: headers.filter(h => clusters.find(c => c.signatureHash === cr.signatureHash)?.signature.includes(h)),
           field_map: cr.headerFieldMap, confirmed_by: overrides[cr.signatureHash] ? user.id : null,
           use_count: 1, last_used_at: new Date().toISOString(),
         })
+        if (tmplInsErr) logger.error('import_mapping_templates insert failed', tmplInsErr, { signature_hash: cr.signatureHash })
       }
     }
 
@@ -358,7 +361,7 @@ export async function POST(request: NextRequest) {
 
         if (existing) {
           customerId = (existing as { id: string }).id
-          await supabase.from('customers').update({
+          const { error: custUpdErr } = await supabase.from('customers').update({
             full_name:      f.full_name,
             ...(f.phone         && { phone:          f.phone.replace(/[^\d+]/g, '') }),
             ...(resolvedWhatsapp && { whatsapp:       resolvedWhatsapp }),
@@ -367,6 +370,7 @@ export async function POST(request: NextRequest) {
             ...(f.email         && { email:           f.email }),
             ...(f.monthly_income && { monthly_income: parseFloat(f.monthly_income.replace(/[,، ]/g, '')) }),
           }).eq('id', customerId)
+          if (custUpdErr) logger.error('customer re-sync update failed on re-import', custUpdErr, { customer_id: customerId })
         } else {
           const { data: newCust, error: custErr } = await supabase.from('customers').insert({
             company_id:     profile.company_id,
@@ -398,13 +402,14 @@ export async function POST(request: NextRequest) {
         // constraint on customer_id+phone silently no-ops on a repeat).
         const allPhoneNumbers = extractPhoneNumbers(f.phone)
         if (allPhoneNumbers.length > 0) {
-          await supabase.from('customer_contacts').upsert(
+          const { error: contactsUpsertErr } = await supabase.from('customer_contacts').upsert(
             allPhoneNumbers.map((phone, i) => ({
               company_id: profile.company_id, customer_id: customerId, phone,
               is_primary: i === 0, source: 'import' as const,
             })),
             { onConflict: 'customer_id,phone', ignoreDuplicates: true },
           )
+          if (contactsUpsertErr) logger.error('customer_contacts upsert failed', contactsUpsertErr, { customer_id: customerId })
         }
 
         if (rowProfile) {

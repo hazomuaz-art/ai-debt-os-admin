@@ -65,10 +65,11 @@ async function healExpiredCache(): Promise<HealingResult> {
       return { trigger, action: 'cleanup_cache', status: 'applied', detail: 'Cache cleanup RPC called' }
     } catch {
       // Fallback to direct delete
-      const { count } = await sb.from('response_cache')
+      const { count, error } = await sb.from('response_cache')
         .delete()
         .lt('expires_at', new Date().toISOString())
         .select('id', { count: 'exact' })
+      if (error) return { trigger, action: 'cleanup_cache', status: 'failed', detail: error.message }
       return { trigger, action: 'cleanup_cache', status: 'applied', detail: `Removed ${count ?? 0} expired entries` }
     }
   } catch (err) {
@@ -108,13 +109,14 @@ async function healOverduePromises(companyId?: string): Promise<HealingResult> {
 async function logHealing(result: HealingResult, companyId?: string): Promise<void> {
   try {
     const sb = createServiceClient()
-    await sb.from('self_healing_log').insert({
+    const { error } = await sb.from('self_healing_log').insert({
       company_id:    companyId ?? null,
       trigger_event: result.trigger,
       healing_action: result.action,
       status:        result.status,
       after_state:   { detail: result.detail },
     })
+    if (error) log.warn('self_healing_log insert failed: ' + error.message)
   } catch { /* non-critical */ }
 }
 

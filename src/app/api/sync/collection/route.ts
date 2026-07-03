@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
       if (error) throw error
       customerId = data.id
     } else {
-      await sb.from('customers')
+      const { error: custSyncUpdErr } = await sb.from('customers')
         .update({
           external_customer_id: externalCustomerId || undefined,
           full_name: payload.customer?.full_name || undefined,
@@ -270,6 +270,7 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', customerId)
         .eq('company_id', companyId)
+      if (custSyncUpdErr) log.error('sync/collection customer update failed', new Error(custSyncUpdErr.message), { customer_id: customerId })
     }
 
     let debtId: string | null = null
@@ -408,7 +409,7 @@ export async function POST(req: NextRequest) {
 
     if (payload.followups?.length) {
       for (const item of payload.followups) {
-        await sb.from('collection_followups').upsert({
+        const { error: followupUpsertErr } = await sb.from('collection_followups').upsert({
           company_id: companyId,
           customer_id: customerId,
           debt_id: debtId,
@@ -433,12 +434,13 @@ export async function POST(req: NextRequest) {
         }, {
           onConflict: 'company_id,source_system,external_followup_id',
         })
+        if (followupUpsertErr) log.error('sync/collection followup upsert failed', new Error(followupUpsertErr.message), { debt_id: debtId })
       }
     }
 
     if (payload.status_history?.length) {
       for (const item of payload.status_history) {
-        await sb.from('collection_status_history').upsert({
+        const { error: statusHistUpsertErr } = await sb.from('collection_status_history').upsert({
           company_id: companyId,
           customer_id: customerId,
           debt_id: debtId,
@@ -458,12 +460,13 @@ export async function POST(req: NextRequest) {
         }, {
           onConflict: 'company_id,source_system,external_status_id',
         })
+        if (statusHistUpsertErr) log.error('sync/collection status_history upsert failed', new Error(statusHistUpsertErr.message), { debt_id: debtId })
       }
     }
 
     if (payload.assignments?.length) {
       for (const item of payload.assignments) {
-        await sb.from('collection_assignments').upsert({
+        const { error: assignmentUpsertErr } = await sb.from('collection_assignments').upsert({
           company_id: companyId,
           customer_id: customerId,
           debt_id: debtId,
@@ -482,12 +485,13 @@ export async function POST(req: NextRequest) {
         }, {
           onConflict: 'company_id,source_system,external_assignment_id',
         })
+        if (assignmentUpsertErr) log.error('sync/collection assignment upsert failed', new Error(assignmentUpsertErr.message), { debt_id: debtId })
       }
     }
 
     if (payload.attachments?.length) {
       for (const item of payload.attachments) {
-        await sb.from('collection_attachments').upsert({
+        const { error: attachmentUpsertErr } = await sb.from('collection_attachments').upsert({
           company_id: companyId,
           customer_id: customerId,
           debt_id: debtId,
@@ -506,10 +510,11 @@ export async function POST(req: NextRequest) {
         }, {
           onConflict: 'company_id,source_system,external_attachment_id',
         })
+        if (attachmentUpsertErr) log.error('sync/collection attachment upsert failed', new Error(attachmentUpsertErr.message), { debt_id: debtId })
       }
     }
 
-    await sb.from('collection_external_snapshots').upsert({
+    const { error: snapshotUpsertErr } = await sb.from('collection_external_snapshots').upsert({
       company_id: companyId,
       customer_id: customerId,
       debt_id: debtId,
@@ -525,6 +530,7 @@ export async function POST(req: NextRequest) {
     }, {
       onConflict: 'company_id,source_system,external_case_id,snapshot_type,payload_hash',
     })
+    if (snapshotUpsertErr) log.error('sync/collection external_snapshot upsert failed', new Error(snapshotUpsertErr.message), { debt_id: debtId })
 
     if (payload.remark || payload.event_type) {
       // Both 'collection_sync' AND 'collection_system' were invalid values

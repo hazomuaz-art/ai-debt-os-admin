@@ -218,12 +218,18 @@ export async function runAudit(companyId: string, safeFix = false): Promise<Audi
         status = 'broken'
         detail = 'No system_config row for this company'
         if (safeFix) {
-          try {
-            await sb.from('system_config').insert({ company_id: companyId, automation_mode: 'off' })
+          // Real gap found during a full-system audit: this self-auditing
+          // tool's OWN fix was unchecked — a genuinely failed insert (not
+          // just "row already exists", which never throws here anyway)
+          // would still report status:'working'/"Created..." despite
+          // nothing being created, exactly the false-positive this tool
+          // exists to prevent elsewhere.
+          const { error: cfgInsertErr } = await sb.from('system_config').insert({ company_id: companyId, automation_mode: 'off' })
+          if (!cfgInsertErr) {
             safeFixes.push('Created missing system_config row')
             status = 'working'
             detail = 'Created default system_config row (mode=off)'
-          } catch { /* already exists */ }
+          }
         }
       } else {
         const d = cfg as Record<string,unknown>

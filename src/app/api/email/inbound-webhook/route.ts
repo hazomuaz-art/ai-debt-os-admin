@@ -69,12 +69,13 @@ export async function POST(req: NextRequest) {
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
   const debt_id = (latestDebt as { id: string } | null)?.id ?? null
 
-  await supabase.from('messages').insert({
+  const { error: inboundEmailErr } = await supabase.from('messages').insert({
     company_id: c.company_id, customer_id: c.id, debt_id,
     channel: 'email', direction: 'inbound', content: text,
     status: 'delivered', metadata: { subject, from },
     sent_at: new Date().toISOString(),
   })
+  if (inboundEmailErr) log.error('inbound email message insert failed', inboundEmailErr, { customer_id: c.id })
 
   if (c.ai_paused) { log.info('AI paused — skipping email reply', { customer_id: c.id }); return NextResponse.json({ status: 'ok' }) }
 
@@ -88,13 +89,14 @@ export async function POST(req: NextRequest) {
     const sendResult = await sendEmail({
       to: from, subject: subject ? `Re: ${subject}` : 'بخصوص ملفك', body: aiDecision.message, company_id: c.company_id,
     })
-    await supabase.from('messages').insert({
+    const { error: outboundEmailErr } = await supabase.from('messages').insert({
       company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
       channel: 'email', direction: 'outbound', content: aiDecision.message,
       status: sendResult.status === 'sent' ? 'sent' : 'failed',
       metadata: { sender: 'ai', action_type: aiDecision.action, error: sendResult.error ?? null },
       sent_at: new Date().toISOString(),
     })
+    if (outboundEmailErr) log.error('outbound email message log failed', outboundEmailErr, { customer_id: c.id })
   }
 
   return NextResponse.json({ status: 'ok' })

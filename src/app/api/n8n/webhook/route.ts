@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
         if (!customer) {
           // Log unknown number
-          await supabase.from('system_alerts').insert({
+          const { error: unknownAlertErr } = await supabase.from('system_alerts').insert({
             company_id,
             alert_type: 'unknown_number',
             severity: 'info',
@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
             message: `رقم ${phone_number}: ${message_content.substring(0, 100)}`,
             metadata: { phone_number, instance_name },
           })
-          
+          if (unknownAlertErr) console.error('[n8n-webhook] unknown_number alert insert failed:', unknownAlertErr.message)
+
           result = { action: 'unknown_number', phone_number }
           break
         }
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create alert
-        await supabase.from('system_alerts').insert({
+        const { error: paymentAlertErr } = await supabase.from('system_alerts').insert({
           company_id,
           alert_type: 'payment_received',
           severity: 'info',
@@ -152,6 +153,7 @@ export async function POST(request: NextRequest) {
           message: `تم استلام سداد بمبلغ ${amount} ر.س`,
           metadata: { customer_id, debt_id, amount },
         })
+        if (paymentAlertErr) console.error('[n8n-webhook] payment_received alert insert failed:', paymentAlertErr.message)
 
         result = { action: 'payment_saved', payment_id: payment?.id }
         break
@@ -258,7 +260,7 @@ export async function POST(request: NextRequest) {
         console.log('[ai_reply_generated] WAHA send result:', JSON.stringify(waResult))
 
         // Save outbound AI message
-        await supabase.from('messages').insert({
+        const { error: aiReplyMsgErr } = await supabase.from('messages').insert({
           company_id,
           customer_id,
           debt_id: active_debt_id || null,
@@ -270,6 +272,7 @@ export async function POST(request: NextRequest) {
           metadata: { sender: 'ai', action_type, instance_name, error: waResult.error },
           sent_at: new Date().toISOString(),
         })
+        if (aiReplyMsgErr) console.error('[ai_reply_generated] outbound message log failed:', aiReplyMsgErr.message)
 
         // Check if AI requested installment approval
         if (message_content.includes('موافقة') || message_content.includes('مراجعة') || message_content.includes('رفع طلب')) {
@@ -300,7 +303,7 @@ export async function POST(request: NextRequest) {
             if (approvalErr) console.error('[ai_reply_generated] Failed to create approval:', approvalErr)
             
             // 2. Insert System Alert
-            await supabase.from('system_alerts').insert({
+            const { error: installmentAlertErr } = await supabase.from('system_alerts').insert({
               company_id,
               alert_type: 'installment_request',
               severity: 'warning',
@@ -308,14 +311,15 @@ export async function POST(request: NextRequest) {
               message: `العميل يطلب تقسيط المديونية والموضوع بانتظار قرار الإدارة.`,
               metadata: { customer_id, debt_id: active_debt_id },
             })
-            
+            if (installmentAlertErr) console.error('[ai_reply_generated] installment_request alert insert failed:', installmentAlertErr.message)
+
             // 3. Update Debt status
             if (active_debt_id) {
               const { error: debtStatusErr } = await supabase.from('debts').update({ status: 'in_negotiation' }).eq('id', active_debt_id)
               if (debtStatusErr) console.error('[ai_reply_generated] debt status update failed:', debtStatusErr.message)
 
               // Add status history
-              await supabase.from('collection_status_history').insert({
+              const { error: statusHistErr } = await supabase.from('collection_status_history').insert({
                 company_id,
                 customer_id,
                 debt_id: active_debt_id,
@@ -326,6 +330,7 @@ export async function POST(request: NextRequest) {
                 changed_at: new Date().toISOString(),
                 source_system: 'whatsapp_ai',
               })
+              if (statusHistErr) console.error('[ai_reply_generated] collection_status_history insert failed:', statusHistErr.message)
             }
           } else {
             console.log('[ai_reply_generated] Pending approval already exists for this debt, skipping duplicate creation.')
@@ -351,7 +356,7 @@ export async function POST(request: NextRequest) {
         const { sync_type, records_processed, errors_count } = data as Record<string, string | number>
         const company_id = metadata?.company_id
 
-        await supabase.from('system_alerts').insert({
+        const { error: syncAlertErr } = await supabase.from('system_alerts').insert({
           company_id,
           alert_type: 'sync_completed',
           severity: Number(errors_count) > 0 ? 'warning' : 'info',
@@ -359,6 +364,7 @@ export async function POST(request: NextRequest) {
           message: `نوع: ${sync_type} — تمت معالجة ${records_processed} سجل — أخطاء: ${errors_count}`,
           metadata: data,
         })
+        if (syncAlertErr) console.error('[n8n-webhook] sync_completed alert insert failed:', syncAlertErr.message)
 
         result = { action: 'sync_logged' }
         break
@@ -370,13 +376,14 @@ export async function POST(request: NextRequest) {
         const company_id = metadata?.company_id
 
         if (campaign_id && company_id) {
-          await supabase.from('campaigns')
+          const { error: campaignProgressErr } = await supabase.from('campaigns')
             .update({
               sent_count: Number(sent_count) || 0,
               delivered_count: Number(delivered_count) || 0,
             })
             .eq('id', campaign_id)
             .eq('company_id', company_id)
+          if (campaignProgressErr) console.error('[n8n-webhook] campaign_progress update failed:', campaignProgressErr.message)
         }
 
         result = { action: 'campaign_updated', campaign_id }
