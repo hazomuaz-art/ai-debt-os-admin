@@ -397,6 +397,18 @@ export async function updateDebtStatusAction(debtId: string, status: DebtStatus)
       summary: `تغيير حالة الدين يدوياً: ${existing.status} ← ${status}`,
     })
 
+    // Real gap found in a live audit (2026-07-04): a manual status correction
+    // (e.g. an admin fixing an AI misclassification) updated the debt's real
+    // status but left the existing AI-written case note describing the OLD,
+    // now-wrong classification untouched — a collector opening the file would
+    // read a summary that directly contradicts the debt's actual current
+    // status. updateCaseNote() reads the debt's status fresh from the DB, so
+    // calling it after this write regenerates the note against the corrected
+    // reality. Never blocks/fails this action — it swallows its own errors
+    // and logs them, same contract as every other caller.
+    const { updateCaseNote } = await import('@/lib/case-note')
+    await updateCaseNote({ company_id: profile.company_id, debt_id: debtId })
+
     revalidatePath('/dashboard/admin/debts')
     revalidatePath('/dashboard/collector/debts')
     return { data }
@@ -461,6 +473,12 @@ export async function updateDebtCompanyCategoryAction(debtId: string, category: 
       actor_name: user.email ?? null,
       summary: `تصنيف الحالة: ${category}`,
     })
+
+    // Same staleness gap fixed in updateDebtStatusAction above — a manually
+    // set category must also refresh the case note, or it keeps describing
+    // whatever classification existed before this correction.
+    const { updateCaseNote } = await import('@/lib/case-note')
+    await updateCaseNote({ company_id: profile.company_id, debt_id: debtId })
 
     revalidatePath('/dashboard/admin/debts')
     revalidatePath('/dashboard/manager/debts')
