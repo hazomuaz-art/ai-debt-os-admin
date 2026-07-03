@@ -102,12 +102,13 @@ export async function recordPromise(args: {
   // Reflect the promise on the customer timeline immediately so the profile,
   // history and follow-ups all stay in sync (not stuck in one part of the app).
   try {
-    await supabase.from('timeline_events').insert({
+    const { error: teErr } = await supabase.from('timeline_events').insert({
       company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
       event_type: 'promise_to_pay', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
       summary: `وعد سداد${args.promise_text ? ` (${args.promise_text})` : ''} بتاريخ ${args.promised_date}`,
       detail: notes, occurred_at: new Date().toISOString(),
     })
+    if (teErr) log.error('promise timeline insert failed', new Error(teErr.message), { debt_id: args.debt_id })
   } catch (e) {
     log.error('promise timeline insert failed', e as Error)
   }
@@ -138,16 +139,22 @@ export async function markOpenPromiseBroken(args: {
   if (!existing) return
 
   const row = existing as { id: string; company_id: string; customer_id: string }
-  await supabase.from('promises').update({ status: 'broken' }).eq('id', row.id)
+  // Real gap found during a full-system audit: unchecked — this literally
+  // reintroduces the exact bug this function exists to fix (a promise
+  // permanently stuck showing pending forever). A rejected update left the
+  // promise silently unbroken while the log line still claimed success.
+  const { error: brokenErr } = await supabase.from('promises').update({ status: 'broken' }).eq('id', row.id)
+  if (brokenErr) { log.error('failed to mark promise broken', new Error(brokenErr.message), { debt_id: args.debt_id, promise_id: row.id }); return }
   log.info('promise marked broken — customer explicitly retracted/refused', { debt_id: args.debt_id, promise_id: row.id })
 
   try {
-    await supabase.from('timeline_events').insert({
+    const { error: teErr } = await supabase.from('timeline_events').insert({
       company_id: row.company_id, customer_id: row.customer_id, debt_id: args.debt_id,
       event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
       summary: 'العميل تراجع عن وعده/رفض السداد', detail: `كلام العميل: "${args.customer_message}"`,
       occurred_at: new Date().toISOString(),
     })
+    if (teErr) log.error('promise-broken timeline insert failed', new Error(teErr.message), { debt_id: args.debt_id })
   } catch (e) {
     log.error('promise-broken timeline insert failed', e as Error)
   }

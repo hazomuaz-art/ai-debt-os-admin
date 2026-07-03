@@ -83,11 +83,17 @@ export async function activateCompany(companyId: string, actorId?: string): Prom
     const sb = createServiceClient()
     const before = await getTenantStatus(companyId)
 
-    await sb.from('companies').update({ is_active: true }).eq('id', companyId)
-    await sb.from('company_subscriptions')
+    // Real gap found during a full-system audit: both unchecked — a
+    // rejected update would leave the tenant suspended/cancelled while this
+    // function still logs "activated" and returns true. Security/billing-
+    // relevant state change.
+    const { error: companyActivateErr } = await sb.from('companies').update({ is_active: true }).eq('id', companyId)
+    if (companyActivateErr) { log.warn('activateCompany: companies update failed: ' + companyActivateErr.message, { company_id: companyId }); return false }
+    const { error: subActivateErr } = await sb.from('company_subscriptions')
       .update({ status: 'active' })
       .eq('company_id', companyId)
       .in('status', ['suspended', 'cancelled'])
+    if (subActivateErr) { log.warn('activateCompany: company_subscriptions update failed: ' + subActivateErr.message, { company_id: companyId }); return false }
 
     await logTenantEvent({
       company_id: companyId,
@@ -115,10 +121,16 @@ export async function suspendCompany(
     const sb = createServiceClient()
     const before = await getTenantStatus(companyId)
 
-    await sb.from('companies').update({ is_active: false }).eq('id', companyId)
-    await sb.from('company_subscriptions')
+    // Real gap found during a full-system audit: both unchecked — a
+    // rejected update would leave a supposedly-suspended tenant's access
+    // fully active while this function still logs "suspended" and returns
+    // true. Security/billing-relevant state change.
+    const { error: companySuspendErr } = await sb.from('companies').update({ is_active: false }).eq('id', companyId)
+    if (companySuspendErr) { log.warn('suspendCompany: companies update failed: ' + companySuspendErr.message, { company_id: companyId }); return false }
+    const { error: subSuspendErr } = await sb.from('company_subscriptions')
       .update({ status: 'suspended' })
       .eq('company_id', companyId)
+    if (subSuspendErr) { log.warn('suspendCompany: company_subscriptions update failed: ' + subSuspendErr.message, { company_id: companyId }); return false }
 
     await logTenantEvent({
       company_id: companyId,

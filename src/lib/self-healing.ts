@@ -37,7 +37,11 @@ async function healStaleJobs(companyId?: string): Promise<HealingResult> {
       .eq('status', 'processing')
       .lt('started_at', tenMinsAgo)
     if (companyId) q.eq('company_id', companyId)
-    const { count } = await q.select('id', { count: 'exact' })
+    // Real gap found during a full-system audit: discarded `error` entirely
+    // (only destructured `count`) — a failed update was misreported as
+    // status:'applied', detail:'Reset 0 jobs' instead of a real failure.
+    const { count, error } = await q.select('id', { count: 'exact' })
+    if (error) return { trigger, action: 'reset_stale_jobs', status: 'failed', detail: error.message }
 
     const result: HealingResult = {
       trigger, action: 'reset_stale_jobs',
@@ -84,7 +88,10 @@ async function healOverduePromises(companyId?: string): Promise<HealingResult> {
       .eq('status', 'pending')
       .lt('promised_date', yesterday)
     if (companyId) q.eq('company_id', companyId)
-    const { count } = await q.select('id', { count: 'exact' })
+    // Real gap found during a full-system audit: discarded `error` entirely
+    // — same class as healStaleJobs above.
+    const { count, error } = await q.select('id', { count: 'exact' })
+    if (error) return { trigger, action: 'mark_broken_promises', status: 'failed', detail: error.message }
 
     const result: HealingResult = {
       trigger, action: 'mark_broken_promises',

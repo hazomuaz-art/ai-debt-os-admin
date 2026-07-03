@@ -177,7 +177,11 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
 
       if (!customerId) {
         // Create new customer
-        const { data: newCustomer } = await supabase
+        // Real gap found during a full-system audit: unchecked — a
+        // rejected insert left customerId null, but the loop still counted
+        // the record as processed and logged the sync row as 'completed',
+        // silently dropping the record while reporting success.
+        const { data: newCustomer, error: custInsertErr } = await supabase
           .from('customers')
           .insert({
             company_id:  opts.company_id,
@@ -187,6 +191,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
           })
           .select('id')
           .single()
+        if (custInsertErr) throw new Error(`customer insert failed: ${custInsertErr.message}`)
 
         customerId = (newCustomer as { id: string } | null)?.id ?? null
       }
@@ -205,7 +210,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
         if (existingDebt) {
           debtId = (existingDebt as { id: string }).id
           // Update with latest sync data
-          await supabase
+          const { error: debtUpdErr } = await supabase
             .from('debts')
             .update({
               current_balance:       rec.remaining_amount,
@@ -217,9 +222,10 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
                 : null,
             })
             .eq('id', debtId)
+          if (debtUpdErr) throw new Error(`debt update failed: ${debtUpdErr.message}`)
         } else if (customerId) {
           // Create new debt
-          const { data: newDebt } = await supabase
+          const { data: newDebt, error: debtInsertErr } = await supabase
             .from('debts')
             .insert({
               company_id:          opts.company_id,
@@ -238,13 +244,14 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
             })
             .select('id')
             .single()
+          if (debtInsertErr) throw new Error(`debt insert failed: ${debtInsertErr.message}`)
 
           debtId = (newDebt as { id: string } | null)?.id ?? null
         }
       }
 
       // Log this individual sync record
-      await supabase.from('debit_collect_sync').insert({
+      const { error: syncLogErr } = await supabase.from('debit_collect_sync').insert({
         company_id:             opts.company_id,
         source_system:          opts.source,
         sync_type:              'single',
@@ -271,6 +278,7 @@ export async function processRecords(opts: ProcessOptions): Promise<SyncResult> 
         started_at:             new Date().toISOString(),
         completed_at:           new Date().toISOString(),
       })
+      if (syncLogErr) log.error('debit_collect_sync log insert failed', new Error(syncLogErr.message), { external_id: rec.external_debt_id })
 
       processed++
     } catch (err) {

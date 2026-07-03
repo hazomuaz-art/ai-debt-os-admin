@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { getPlaybookForPortfolio, type PortfolioCategory } from '@/lib/company-playbook'
 import { z } from 'zod'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/portfolios/playbook')
 
 const playbookSchema = z.object({
   discounts: z.object({
@@ -84,10 +87,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       // Deactivate the previous active row, insert the new version active —
       // this is the audit trail / versioning the JSON-on-portfolio approach
       // could not give us.
-      await ctx.supabase.from('company_playbooks')
+      // Real gap found during a full-system audit: unchecked — a rejected
+      // deactivation could leave TWO rows with is_active=true for the same
+      // portfolio, making "the active playbook" ambiguous for every caller
+      // that reads it.
+      const { error: deactivateErr } = await ctx.supabase.from('company_playbooks')
         .update({ is_active: false })
         .eq('portfolio_id', params.id)
         .eq('is_active', true)
+      if (deactivateErr) log.error('failed to deactivate previous playbook version', new Error(deactivateErr.message), { portfolio_id: params.id })
 
       const { data, error } = await ctx.supabase
         .from('company_playbooks')

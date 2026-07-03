@@ -61,11 +61,15 @@ export async function POST(_request: NextRequest) {
       }
 
       // Delete today's pending actions before re-inserting
-      await ctx.supabase
+      // Real gap found during a full-system audit: unchecked — a rejected
+      // delete followed by the (checked) insert below produces duplicate
+      // pending actions for the same day instead of a clean replace.
+      const { error: deleteOldActionsErr } = await ctx.supabase
         .from('ai_actions').delete()
         .eq('company_id', ctx.profile.company_id)
         .eq('scheduled_for', today)
         .eq('status', 'pending')
+      if (deleteOldActionsErr) log.error('failed to clear prior pending ai_actions before re-generating', new Error(deleteOldActionsErr.message), { company_id: ctx.profile.company_id })
 
       // Build insert rows — only columns guaranteed to exist in schema
       const priorityScore: Record<string, number> = { critical: 100, high: 75, medium: 50, low: 25 }

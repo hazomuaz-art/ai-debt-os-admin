@@ -90,10 +90,15 @@ export async function POST(request: NextRequest) {
       scoreResult.score < 50 ? 'high'     :
       scoreResult.score < 75 ? 'medium'   : 'low'
 
-    await ctx.supabase
+    // Real gap found during a full-system audit: unchecked, unlike the
+    // ai_scores insert right above it — a rejected update leaves the debt's
+    // priority stale after a rescoring, silently mismatching the score just
+    // saved.
+    const { error: priorityUpdErr } = await ctx.supabase
       .from('debts')
       .update({ priority: newPriority })
       .eq('id', body.debt_id)
+    if (priorityUpdErr) log.error('debt priority update failed after scoring', priorityUpdErr, { debt_id: body.debt_id })
 
     // Track usage (non-blocking)
     trackEvent({ company_id: ctx.profile.company_id, event_type: 'ai_action', user_id: ctx.user.id, debt_id: body.debt_id }).catch(() => {})

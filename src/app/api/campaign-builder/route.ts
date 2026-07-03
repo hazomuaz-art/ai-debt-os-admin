@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { z } from 'zod'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/campaign-builder')
 
 const buildSchema = z.object({
   campaign_id: z.string().uuid(),
@@ -119,7 +122,11 @@ export async function POST(req: NextRequest) {
 
       if (queueError) return errors.internal(queueError.message)
 
-      await ctx.supabase
+      // Real gap found during a full-system audit: unchecked, unlike its
+      // sibling recipients/queue writes above — a rejected update leaves the
+      // campaign stuck at 'draft' even though its recipients were already
+      // queued, breaking any status-gated dashboard/automation downstream.
+      const { error: campaignUpdErr } = await ctx.supabase
         .from('campaigns')
         .update({
           target_count: (campaign.target_count ?? 0) + rows.length,
@@ -127,6 +134,7 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', campaign_id)
         .eq('company_id', ctx.profile.company_id)
+      if (campaignUpdErr) log.error('campaign status/target_count update failed', new Error(campaignUpdErr.message), { campaign_id })
 
       return NextResponse.json({
         data: {

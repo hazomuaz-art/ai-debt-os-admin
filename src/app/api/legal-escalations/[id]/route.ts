@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { z } from 'zod'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/legal-escalations')
 
 const closeSchema = z.object({
   admin_notes: z.string().max(2000).optional().nullable(),
@@ -44,7 +47,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // legal_escalations.status — closing it here is what actually lifts
       // the lock. Revert debts.status out of 'legal' too so other screens
       // (debt list/filters) reflect reality instead of staying stuck.
-      await ctx.supabase.from('debts').update({ status: 'active' }).eq('id', existing.debt_id).eq('status', 'legal')
+      // Real gap found during a full-system audit: unchecked — a rejected
+      // update would leave the debt permanently stuck at status='legal'
+      // (and thus permanently locked out of AI negotiation) even though the
+      // escalation record itself shows closed.
+      const { error: unlockErr } = await ctx.supabase.from('debts').update({ status: 'active' }).eq('id', existing.debt_id).eq('status', 'legal')
+      if (unlockErr) log.error('failed to revert debt status after closing legal escalation', new Error(unlockErr.message), { debt_id: existing.debt_id })
 
       return NextResponse.json({ data })
     },

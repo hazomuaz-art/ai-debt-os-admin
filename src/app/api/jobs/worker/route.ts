@@ -78,7 +78,13 @@ async function runWorker(): Promise<NextResponse> {
       results.processed++
 
       // Mark job as processing
-      await supabase
+      // Real gap found during a full-system audit: none of this route's
+      // job_queue writes were checked — a rejected 'processing'/'completed'
+      // update left the job stuck at its previous status, which
+      // recover_stale_jobs would later sweep back to pending/retrying and
+      // reprocess, risking duplicate WhatsApp sends or duplicate AI scoring
+      // for the same job.
+      const { error: processingErr } = await supabase
         .from('job_queue')
         .update({
           status:     'processing',
@@ -86,17 +92,19 @@ async function runWorker(): Promise<NextResponse> {
           attempts:   job.attempts + 1,
         })
         .eq('id', job.id)
+      if (processingErr) log.error('job_queue processing update failed', new Error(processingErr.message), { job_id: job.id })
 
       try {
         await processJob(supabase, job)
 
-        await supabase
+        const { error: completedErr } = await supabase
           .from('job_queue')
           .update({
             status:       'completed',
             completed_at: new Date().toISOString(),
           })
           .eq('id', job.id)
+        if (completedErr) log.error('job_queue completed update failed', new Error(completedErr.message), { job_id: job.id })
 
         results.succeeded++
       } catch (err) {
@@ -106,7 +114,7 @@ async function runWorker(): Promise<NextResponse> {
         results.failed++
 
         const willRetry = job.attempts + 1 < job.max_attempts
-        await supabase
+        const { error: retryErr } = await supabase
           .from('job_queue')
           .update({
             status:     willRetry ? 'retrying' : 'failed',
@@ -117,6 +125,7 @@ async function runWorker(): Promise<NextResponse> {
               : undefined,
           })
           .eq('id', job.id)
+        if (retryErr) log.error('job_queue retry/failed update failed', new Error(retryErr.message), { job_id: job.id })
       }
     }
 

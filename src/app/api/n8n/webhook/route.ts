@@ -173,7 +173,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Save to status history (dynamic status mapping)
-        await supabase.from('collection_status_history').insert({
+        // Real gap found during a full-system audit: this is the ONLY write
+        // in this branch and it was unchecked — a rejected insert means the
+        // external status-change event vanishes with zero record anywhere,
+        // while n8n still receives HTTP 200 and treats it as delivered.
+        const { error: statusHistErr } = await supabase.from('collection_status_history').insert({
           company_id,
           customer_id,
           debt_id,
@@ -184,6 +188,7 @@ export async function POST(request: NextRequest) {
           changed_at: new Date().toISOString(),
           source_system: source_system || 'collection_system',
         })
+        if (statusHistErr) return NextResponse.json({ error: `status history insert failed: ${statusHistErr.message}` }, { status: 500 })
 
         result = { action: 'status_saved', debt_id, new_status }
         break

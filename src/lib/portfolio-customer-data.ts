@@ -1,4 +1,7 @@
 import { getPortfolioTableConfig, type PortfolioField } from '@/lib/portfolio-data-fields'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('portfolio-customer-data')
 
 function coerce(field: PortfolioField, raw: string): string | number | boolean | null {
   const v = raw.trim()
@@ -60,18 +63,23 @@ export async function upsertPortfolioCustomerData(
     .eq('customer_id', args.customerId)
     .maybeSingle()
 
+  // Real gap found during a full-system audit: both unchecked — the
+  // portfolio-specific custom fields (e.g. account number, product details)
+  // could silently fail to persist with no trace anywhere.
   if (existing) {
-    await supabase.from(config.table).update({
+    const { error: updErr } = await supabase.from(config.table).update({
       ...args.payload,
       ...(args.portfolioId && { portfolio_id: args.portfolioId }),
       updated_at: new Date().toISOString(),
     }).eq('id', existing.id)
+    if (updErr) log.error('portfolio customer-data update failed', new Error(updErr.message), { table: config.table, customer_id: args.customerId })
   } else {
-    await supabase.from(config.table).insert({
+    const { error: insErr } = await supabase.from(config.table).insert({
       company_id:  args.companyId,
       customer_id: args.customerId,
       portfolio_id: args.portfolioId,
       ...args.payload,
     })
+    if (insErr) log.error('portfolio customer-data insert failed', new Error(insErr.message), { table: config.table, customer_id: args.customerId })
   }
 }

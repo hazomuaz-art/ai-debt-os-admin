@@ -285,12 +285,13 @@ async function addTimeline(
   event_type: string, summary: string, ocr: ReceiptData,
 ): Promise<void> {
   try {
-    await svc.from('timeline_events').insert({
+    const { error: teErr } = await svc.from('timeline_events').insert({
       company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
       event_type, channel: 'whatsapp', actor_type: 'ai', ai_used: true,
       summary: summary.slice(0, 200), detail: JSON.stringify(ocr).slice(0, 1000),
       occurred_at: new Date().toISOString(),
     })
+    if (teErr) log.error('receipt timeline insert failed', teErr, { debt_id: args.debt_id })
   } catch (e) {
     log.error('receipt timeline insert failed', e as Error)
   }

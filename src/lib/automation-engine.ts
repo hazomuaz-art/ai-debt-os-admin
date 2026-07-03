@@ -76,7 +76,10 @@ export async function startAutomationRun(opts: RunOptions): Promise<RunResult> {
     const planned = debtCount ?? 0
 
     // Create run record
-    const { data: runRow } = await sb
+    // Real gap found during a full-system audit: unchecked — a rejected
+    // insert left runId null, silently skipping the live-mode job enqueue
+    // below with no error surfaced anywhere.
+    const { data: runRow, error: runInsertErr } = await sb
       .from('automation_runs')
       .insert({
         company_id:      opts.company_id,
@@ -90,6 +93,7 @@ export async function startAutomationRun(opts: RunOptions): Promise<RunResult> {
       })
       .select('id')
       .single()
+    if (runInsertErr) log.error('automation_runs insert failed', new Error(runInsertErr.message), { company_id: opts.company_id })
 
     const runId = (runRow as { id: string } | null)?.id ?? null
 

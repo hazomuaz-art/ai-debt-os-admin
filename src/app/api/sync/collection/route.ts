@@ -336,7 +336,11 @@ export async function POST(req: NextRequest) {
       if (error) throw error
       debtId = data.id
     } else if (payload.debt && debtId) {
-      await sb.from('debts')
+      // Real gap found during a full-system audit: unchecked — a rejected
+      // update leaves the debt permanently stale (balance/status never
+      // reflect the external system) while the endpoint still returns
+      // success to the caller.
+      const { error: debtSyncUpdErr } = await sb.from('debts')
         .update({
           external_ref: externalDebtId || undefined,
           external_customer_id: externalCustomerId || undefined,
@@ -358,10 +362,11 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', debtId)
         .eq('company_id', companyId)
+      if (debtSyncUpdErr) log.error('sync/collection debt update failed', new Error(debtSyncUpdErr.message), { debt_id: debtId })
     }
 
     if (payload.status_mapping?.original_status) {
-      await sb.from('collection_status_mappings').upsert({
+      const { error: statusMapErr } = await sb.from('collection_status_mappings').upsert({
         company_id: companyId,
         source_system: sourceSystem,
         original_status: payload.status_mapping.original_status,
@@ -378,10 +383,15 @@ export async function POST(req: NextRequest) {
       }, {
         onConflict: 'company_id,portfolio_id,source_system,original_status,original_sub_status,original_status_code',
       })
+      if (statusMapErr) log.error('sync/collection status_mapping upsert failed', new Error(statusMapErr.message), { company_id: companyId })
     }
 
     if (payload.payment && debtId) {
-      await sb.from('payments').insert({
+      // Real gap found during a full-system audit: unchecked — a payment
+      // reported by the external system could silently never be recorded,
+      // permanent financial data loss with no trace, while the endpoint
+      // still returns success.
+      const { error: paymentSyncErr } = await sb.from('payments').insert({
         company_id: companyId,
         customer_id: customerId,
         debt_id: debtId,
@@ -393,6 +403,7 @@ export async function POST(req: NextRequest) {
         notes: payload.payment.notes || null,
         receipt_url: payload.payment.receipt_url || null,
       })
+      if (paymentSyncErr) log.error('sync/collection payment insert failed', new Error(paymentSyncErr.message), { debt_id: debtId })
     }
 
     if (payload.followups?.length) {
