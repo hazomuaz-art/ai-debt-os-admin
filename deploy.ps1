@@ -80,8 +80,17 @@ if (Test-Path $tar) { Remove-Item $tar -Force }
 # `rm -rf src` on the server).
 $tracked   = git ls-files
 $untracked = git ls-files --others --exclude-standard
-($tracked + $untracked) | Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ } | Set-Content -Path $list -Encoding ascii
-if (-not (Test-Path $list) -or (Get-Item $list).Length -eq 0) { throw "git ls-files produced no file list" }
+$fileList  = ($tracked + $untracked) | Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ }
+if (-not $fileList -or $fileList.Count -eq 0) { throw "git ls-files produced no file list" }
+# Write with explicit LF-only line endings, no BOM. Set-Content on Windows
+# PowerShell 5.1 writes CRLF per line — harmless for most consumers, but GNU
+# tar's `-T` reads each line LITERALLY including the trailing `\r`, so every
+# single path became "path\r" and failed to stat, silently producing a tarball
+# missing the entire src/ tree (this shipped a broken build to the VPS once
+# before this fix — caught immediately via the remote build's own failure,
+# production traffic was unaffected since pm2 never restarted onto it).
+[System.IO.File]::WriteAllText($list, (($fileList -join "`n") + "`n"), [System.Text.Encoding]::ASCII)
+if (-not (Test-Path $list) -or (Get-Item $list).Length -eq 0) { throw "file list write produced an empty file" }
 # --force-local: GNU tar (resolved here via git-bash's /usr/bin/tar ahead of
 # Windows' own tar.exe on PATH) auto-detects "host:path" remote-archive
 # syntax whenever the -f argument contains a colon before the first slash —
@@ -91,6 +100,13 @@ if (-not (Test-Path $list) -or (Get-Item $list).Length -eq 0) { throw "git ls-fi
 # "Cannot connect to C: resolve failed" error that has nothing to do with
 # the real VPS connection later in this script.
 & tar --force-local -cf $tar -T $list
+# tar's own exit code must be checked, not just "did a file get produced" —
+# tar can exit non-zero after logging per-entry errors (e.g. the CRLF bug
+# above) while still writing a small, silently-incomplete archive that passes
+# a bare Test-Path check. This is the exact "unchecked write, treated as
+# success" bug class this codebase has hit dozens of times, just in a deploy
+# script instead of a Supabase call.
+if ($LASTEXITCODE -ne 0) { throw "tar exited with errors (code $LASTEXITCODE) - see output above" }
 if (-not (Test-Path $tar)) { throw "tar produced no tarball" }
 & scp -o BatchMode=yes $tar "${VPS}:/tmp/deploy.tar"
 if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
