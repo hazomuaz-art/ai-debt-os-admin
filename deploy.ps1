@@ -82,7 +82,15 @@ $tracked   = git ls-files
 $untracked = git ls-files --others --exclude-standard
 ($tracked + $untracked) | Select-Object -Unique | Where-Object { Test-Path -LiteralPath $_ } | Set-Content -Path $list -Encoding ascii
 if (-not (Test-Path $list) -or (Get-Item $list).Length -eq 0) { throw "git ls-files produced no file list" }
-& tar -cf $tar -T $list
+# --force-local: GNU tar (resolved here via git-bash's /usr/bin/tar ahead of
+# Windows' own tar.exe on PATH) auto-detects "host:path" remote-archive
+# syntax whenever the -f argument contains a colon before the first slash —
+# which every Windows temp path does (e.g. C:\Users\...). Without this flag
+# tar tried to open an SSH connection to a host literally named "C" instead
+# of writing the local file, failing the whole deploy with a confusing
+# "Cannot connect to C: resolve failed" error that has nothing to do with
+# the real VPS connection later in this script.
+& tar --force-local -cf $tar -T $list
 if (-not (Test-Path $tar)) { throw "tar produced no tarball" }
 & scp -o BatchMode=yes $tar "${VPS}:/tmp/deploy.tar"
 if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
