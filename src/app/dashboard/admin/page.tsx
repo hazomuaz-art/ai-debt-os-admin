@@ -5,7 +5,7 @@ import { getServerTranslation } from '@/lib/i18n/server'
 import Link from 'next/link'
 import {
   Wallet, BrainCircuit, CheckCircle, AlertTriangle,
-  TrendingUp, MessageCircle, ArrowUpRight, ArrowDownRight
+  TrendingUp, MessageCircle, ArrowUpRight, ArrowDownRight, BellRing
 } from 'lucide-react'
 
 // ── Stats fetch ──────────────────────────────────────────────────────────
@@ -28,6 +28,7 @@ async function getStats(companyId: string) {
     { data: recentActions },
     { data: statusBreakdown },
     { data: lastMonthData },
+    { data: criticalAlerts },
   ] = await Promise.all([
     supabase.from('debts').select('*', { count: 'exact', head: true }).eq('company_id', companyId),
     supabase.from('debts').select('current_balance').eq('company_id', companyId).neq('status', 'settled'),
@@ -43,6 +44,19 @@ async function getStats(companyId: string) {
       .limit(6),
     supabase.from('debts').select('status').eq('company_id', companyId),
     supabase.from('payments').select('amount').eq('company_id', companyId).gte('payment_date', lastMonthStart).lt('payment_date', monthStart),
+    // Real incident (2026-07-04): a critical WhatsApp-disconnected alert was
+    // correctly created by the health-check cron within 2 minutes of the
+    // outage, but sat unresolved for 2 full days because nothing outside the
+    // dedicated /alerts page ever surfaced it - nobody visits that page daily.
+    // Surfacing unresolved critical alerts directly on the page admins
+    // actually open every day closes that visibility gap at its root.
+    supabase.from('system_alerts')
+      .select('id, severity, alert_type, title, message, created_at')
+      .eq('company_id', companyId)
+      .eq('is_resolved', false)
+      .eq('severity', 'critical')
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
   const totalBalance   = balanceData?.reduce((s, d) => s + Number(d.current_balance ?? 0), 0) ?? 0
@@ -78,6 +92,7 @@ async function getStats(companyId: string) {
     statusCount,
     dailySeries,
     collectedMoM,
+    criticalAlerts: criticalAlerts ?? [],
   }
 }
 
@@ -156,6 +171,28 @@ export default async function AdminDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Critical unresolved alerts - surfaced here so they're seen within
+          minutes, not discovered days later on the dedicated alerts page. */}
+      {s.criticalAlerts.length > 0 && (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <BellRing className="text-rose-400" size={20} />
+            <h2 className="text-base font-bold text-rose-400">{dir === 'rtl' ? 'تنبيهات حرجة تحتاج إجراء فوري' : 'Critical alerts need action'}</h2>
+          </div>
+          <div className="space-y-2">
+            {s.criticalAlerts.map((al: any) => (
+              <Link key={al.id} href="/dashboard/admin/alerts" className="block bg-[#151a23] border border-rose-500/20 rounded-xl p-3 hover:border-rose-500/40 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-white">{al.title}</span>
+                  <span className="text-[10px] text-[#5f6b7e] font-bold shrink-0">{new Date(al.created_at).toLocaleString(dir === 'rtl' ? 'ar-SA' : 'en-US')}</span>
+                </div>
+                {al.message && <p className="text-xs text-[#8b95a7] mt-1 leading-relaxed">{al.message}</p>}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">

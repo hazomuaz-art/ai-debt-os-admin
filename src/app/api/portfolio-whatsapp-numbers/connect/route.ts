@@ -143,6 +143,29 @@ export async function DELETE(req: NextRequest) {
     const waha = await resolveWaha(ctx.profile.company_id, number.api_url)
     if (!waha) return errors.badRequest('WAHA credentials not configured')
 
+    // Real incident (2026-07-04): a portfolio number's instance_name was set
+    // to "default" - the SAME WAHA session name the company's primary,
+    // company-wide WhatsApp integration uses (integration_settings.config.
+    // session). Disconnecting this "portfolio" number from this UI silently
+    // logged out the shared primary session, taking down WhatsApp for the
+    // entire company for two days before anyone noticed. This is not a
+    // one-off data-entry mistake to just correct once - the UI itself must
+    // refuse to disconnect a session name that is currently the company's
+    // primary shared session, since any future number reusing that name
+    // would reproduce the exact same outage.
+    const { data: primaryIntegration } = await ctx.supabase
+      .from('integration_settings')
+      .select('config')
+      .eq('company_id', ctx.profile.company_id)
+      .eq('integration_name', 'waha')
+      .maybeSingle()
+    const primarySession = (primaryIntegration?.config as Record<string, string> | undefined)?.session
+    if (primarySession && number.instance_name === primarySession) {
+      return errors.badRequest(
+        `لا يمكن فصل هذا الرقم من هنا - جلسته ("${number.instance_name}") هي نفس جلسة الواتساب الرئيسية المشتركة لكامل الشركة. فصلها من هذه الصفحة يقطع الواتساب عن كل النظام، ليس فقط عن هذه المحفظة.`
+      )
+    }
+
     try {
       await fetch(`${waha.apiUrl}/api/sessions/${number.instance_name}/logout`, {
         method: 'POST',
