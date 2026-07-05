@@ -42,9 +42,34 @@ export async function recordDispute(args: {
     .eq('debt_id', args.debt_id)
     .in('status', ['open', 'under_review'])
     .limit(1).maybeSingle()
+
+  // Real production bug this fixes: a dispute created before request_subtype
+  // existed (or otherwise decided through some other path) had its approval
+  // resolved, but the disputes.status sync in the approvals PATCH handler
+  // only matches requested_data.request_subtype='dispute' — an approval
+  // shaped any other way never touches this row. The dispute stayed "open"
+  // forever, and THIS dedup check then silently swallowed every subsequent
+  // real dispute the customer raised for that debt, with nothing ever shown
+  // to an admin again (confirmed live: a customer's fresh, explicit dispute
+  // statement produced zero approval because of a week-old orphaned "open"
+  // dispute with no pending decision behind it). Only treat it as a genuine
+  // duplicate when there's an ACTUAL pending approval attached — an "open"
+  // dispute with no pending decision needs to be resurfaced, not silently
+  // re-swallowed forever.
   if (existing) {
-    log.info('dispute already open for this debt — skipping duplicate', { debt_id: args.debt_id })
-    return
+    const { data: pendingApproval } = await supabase
+      .from('approvals')
+      .select('id')
+      .eq('company_id', args.company_id)
+      .eq('entity_id', args.debt_id)
+      .eq('status', 'pending')
+      .contains('requested_data', { request_subtype: 'dispute' })
+      .limit(1).maybeSingle()
+    if (pendingApproval) {
+      log.info('dispute already open with a pending approval — skipping duplicate', { debt_id: args.debt_id })
+      return
+    }
+    log.warn('open dispute with no pending approval found (orphaned/stale) — resurfacing instead of silently skipping', { debt_id: args.debt_id, dispute_id: existing.id })
   }
 
   // Last few turns for context, so an admin reviewing the dispute doesn't
@@ -67,17 +92,24 @@ export async function recordDispute(args: {
     args.agent_reason ? `تقييم الوكيل: ${args.agent_reason}` : null,
   ].filter(Boolean).join('\n')
 
-  const { data: disp, error } = await supabase.from('disputes').insert({
-    company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
-    dispute_type, description, status: 'open', priority: 'high', source: 'ai',
+  // Reuse the orphaned row instead of inserting a second disputes record for
+  // the same debt when one was found above with no pending approval behind it.
+  const disputeFields = {
+    dispute_type, description, priority: 'high' as const,
     metadata: {
       customer_message: args.customer_message,
       agent_reason: args.agent_reason ?? null,
       conversation_excerpt: excerpt,
     },
-  }).select('id').single()
+  }
+  const { data: disp, error } = existing
+    ? await supabase.from('disputes').update(disputeFields).eq('id', existing.id).select('id').single()
+    : await supabase.from('disputes').insert({
+        company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+        status: 'open', source: 'ai', ...disputeFields,
+      }).select('id').single()
 
-  if (error) { log.error('failed to insert dispute', error); return }
+  if (error) { log.error('failed to insert/update dispute', error); return }
 
   // Routed through insertApproval() (src/lib/approvals.ts) — approval_type
   // is typed against the real CHECK constraint, so 'dispute' (the invalid
