@@ -14,6 +14,7 @@ import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
 import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
+import { ExportCustomerDataButton } from '@/components/debt/ExportCustomerDataButton'
 import { AiToggleButton } from '@/components/debt/AiToggleButton'
 import { StartConversationButton } from '@/components/debt/StartConversationButton'
 import UnifiedTimeline from '@/components/debt/UnifiedTimeline'
@@ -292,6 +293,9 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
           />
           {debt.customer?.id && (
             <AiToggleButton customerId={debt.customer.id} paused={!!debt.customer.ai_paused} />
+          )}
+          {debt.customer?.id && (
+            <ExportCustomerDataButton customerId={debt.customer.id} customerName={debt.customer.full_name ?? ''} />
           )}
           {debt.customer?.id && (
             <DeleteCustomerButton customerId={debt.customer.id} customerName={debt.customer.full_name ?? ''} />

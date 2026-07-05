@@ -288,6 +288,73 @@ export async function deleteCustomerFullyAction(customerId: string) {
   }
 }
 
+// PDPL data-subject right: export everything the system holds about a
+// customer, on request. Complements delete_customer_fully (the erasure
+// right) with the access/portability right - both are required, neither
+// substitutes for the other. Logged as a security event since exporting a
+// full record of someone's financial data and conversation history is
+// itself a sensitive action worth its own audit trail entry.
+export async function exportCustomerDataAction(customerId: string) {
+  try {
+    const { supabase, user, profile } = await requireAuth()
+    if (!['admin', 'manager'].includes(profile.role)) return { error: 'صلاحيات غير كافية' }
+
+    const { data: customer } = await supabase
+      .from('customers').select('*')
+      .eq('id', customerId).eq('company_id', profile.company_id).maybeSingle()
+    if (!customer) return { error: 'العميل غير موجود' }
+
+    const svc = createServiceClient()
+    const [
+      { data: debts },
+      { data: payments },
+      { data: messages },
+      { data: promises },
+      { data: disputes },
+      { data: legalEscalations },
+      { data: timelineEvents },
+      { data: customerDocuments },
+      { data: aiScores },
+    ] = await Promise.all([
+      svc.from('debts').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      svc.from('payments').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      svc.from('messages').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id).order('created_at', { ascending: true }),
+      svc.from('promises').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      svc.from('disputes').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      svc.from('legal_escalations').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      svc.from('timeline_events').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      // Metadata only (doc_type, ai_summary, dates) - not the raw file bytes.
+      svc.from('customer_documents').select('id, doc_type, ai_summary, source, created_at, needs_admin_review').eq('customer_id', customerId).eq('company_id', profile.company_id),
+      svc.from('ai_scores').select('*').eq('customer_id', customerId).eq('company_id', profile.company_id),
+    ])
+
+    const { logSecurityEvent } = await import('@/lib/security-audit')
+    await logSecurityEvent({
+      company_id: profile.company_id, actor_user_id: user.id, actor_email: user.email,
+      event_type: 'data_export',
+      metadata: { customer_id: customerId, customer_name: customer.full_name },
+    })
+
+    return {
+      data: {
+        exported_at: new Date().toISOString(),
+        customer,
+        debts: debts ?? [],
+        payments: payments ?? [],
+        messages: messages ?? [],
+        promises: promises ?? [],
+        disputes: disputes ?? [],
+        legal_escalations: legalEscalations ?? [],
+        timeline_events: timelineEvents ?? [],
+        customer_documents: customerDocuments ?? [],
+        ai_scores: aiScores ?? [],
+      },
+    }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 // Ensures a portfolio exists for a creditor (per company) and returns its id.
 export async function ensurePortfolioForCreditor(supabase: any, companyId: string, creditor: string): Promise<string | null> {
   const name = creditor.trim()

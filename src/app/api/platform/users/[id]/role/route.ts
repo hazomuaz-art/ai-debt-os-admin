@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
+import { logSecurityEvent, extractRequestMeta } from '@/lib/security-audit'
 
 export async function PATCH(
   request: NextRequest,
@@ -39,6 +40,13 @@ export async function PATCH(
       if (updateErr) {
         return errors.internal('Failed to update role')
       }
+
+      const { ip, userAgent } = extractRequestMeta(request)
+      await logSecurityEvent({
+        company_id: ctx.profile.company_id, actor_user_id: ctx.user.id, actor_email: ctx.user.email,
+        event_type: 'role_changed', ip_address: ip, user_agent: userAgent,
+        metadata: { target_user_id: userId, target_email: targetUser.email, old_role: targetUser.role, new_role: body.role },
+      })
 
       return NextResponse.json({
         data: {

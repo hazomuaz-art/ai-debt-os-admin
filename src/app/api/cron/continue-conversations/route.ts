@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
         messageTimestamp: last.sent_at ?? undefined,
       })
       if (decision.shouldReply && decision.message) {
-        const r = await sendWhatsAppMessage({ to: phone, message: decision.message, company_id: last.company_id })
+        const r = await sendWhatsAppMessage({ to: phone, message: decision.message, company_id: last.company_id, customer_id: customerId })
         await recordOutbound(supabase, last.company_id, customerId, debt.id, decision.message, r, 'continue_unanswered', decision.action)
         if (r.status === 'sent') results.continued++; else results.failed++
       } else {

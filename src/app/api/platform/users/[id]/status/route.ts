@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { createLogger } from '@/lib/logger'
+import { logSecurityEvent, extractRequestMeta } from '@/lib/security-audit'
 
 const log = createLogger('api/platform/users/status')
 
@@ -57,6 +58,14 @@ export async function PATCH(
         },
       })
       if (statusLogErr) log.error('user status-change audit log insert failed', statusLogErr, { target_user_id: userId })
+
+      const { ip, userAgent } = extractRequestMeta(request)
+      await logSecurityEvent({
+        company_id: ctx.profile.company_id, actor_user_id: ctx.user.id, actor_email: ctx.user.email,
+        event_type: body.is_active ? 'user_activated' : 'user_deactivated',
+        ip_address: ip, user_agent: userAgent,
+        metadata: { target_user_id: userId, target_email: targetUser.email },
+      })
 
       return NextResponse.json({
         data: {

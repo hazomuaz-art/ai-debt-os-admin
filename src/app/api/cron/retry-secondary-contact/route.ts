@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       if (primaryNoReplyErr) log.error('failed to mark primary contact no_reply', new Error(primaryNoReplyErr.message), { customer_id: customerId })
 
       const message = await generateOpeningMessage({ company_id: secondary.company_id, customer_id: customerId, debt_id: debt.id })
-      const sendResult = await sendWhatsAppMessage({ to: secondary.phone, message, company_id: secondary.company_id })
+      const sendResult = await sendWhatsAppMessage({ to: secondary.phone, message, company_id: secondary.company_id, customer_id: customerId })
 
       const { error: secondaryInsertErr } = await supabase.from('messages').insert({
         company_id: secondary.company_id, customer_id: customerId, debt_id: debt.id,

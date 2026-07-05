@@ -146,7 +146,7 @@ export async function PATCH(req: NextRequest) {
                // We need to import sendWhatsAppMessage
                // Since we can't easily import it here if it's not already imported, we'll import it dynamically or at the top
                const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
-               const waResult = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
+               const waResult = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id, customer_id: debtInfo.customers.id })
                
                // Save message to history
                const { error: approvalMsgErr } = await ctx.supabase.from('messages').insert({
@@ -199,7 +199,7 @@ export async function PATCH(req: NextRequest) {
                   ? `مرحباً ${di.customers.full_name}، تمت دراسة اعتراضك وقبوله مبدئياً. تم تعليق المطالبة الآلية وسيتواصل معك موظف مختص لاستكمال المراجعة.`
                   : `مرحباً ${di.customers.full_name}، راجعنا اعتراضك ولم يثبت ما يلغي المديونية. يرجى سداد الرصيد المستحق (${di.current_balance} ${di.currency}) أو التواصل لترتيب حل.`
                 const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
-                const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
+                const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id, customer_id: di.customers.id })
                 const { error: disputeMsgErr } = await ctx.supabase.from('messages').insert({
                   company_id: ctx.profile.company_id, customer_id: di.customers.id, debt_id: debtId,
                   channel: 'whatsapp', direction: 'outbound', content: message,
@@ -234,7 +234,7 @@ export async function PATCH(req: NextRequest) {
                   ? `مرحباً ${pc.customers.full_name}، تم استلام إفادتك بالسداد وجارٍ التحقق منها. تم إيقاف المتابعة الآلية مؤقتاً لحين المطابقة.`
                   : `مرحباً ${pc.customers.full_name}، راجعنا حسابك ولم نجد سداداً مطابقاً حتى الآن. يرجى إرسال إثبات التحويل أو سداد الرصيد المستحق (${pc.current_balance} ${pc.currency}).`
                 const { sendWhatsAppMessage } = await import('@/lib/whatsapp')
-                const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id })
+                const wr = await sendWhatsAppMessage({ to: phone, message, company_id: ctx.profile.company_id, customer_id: pc.customers.id })
                 const { error: claimMsgErr } = await ctx.supabase.from('messages').insert({
                   company_id: ctx.profile.company_id, customer_id: pc.customers.id, debt_id: debtId,
                   channel: 'whatsapp', direction: 'outbound', content: message,

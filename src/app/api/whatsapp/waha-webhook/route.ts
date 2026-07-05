@@ -411,7 +411,7 @@ export async function POST(request: NextRequest) {
           const ackMessage = classification.needs_admin_review
             ? 'شكراً لك، تم استلام المستند وتحليله، وسيتم رفعه للإدارة المختصة للمراجعة، وسنقوم بإبلاغك بالنتيجة بمجرد الانتهاء.'
             : 'استلمت المرفق، شكراً لك.'
-          const wr = await sendWhatsAppMessage({ to: phone, message: ackMessage, company_id: c.company_id })
+          const wr = await sendWhatsAppMessage({ to: phone, message: ackMessage, company_id: c.company_id, customer_id: c.id })
           const { error: ackInsertErr } = await supabase.from('messages').insert({
             company_id: c.company_id, customer_id: c.id, debt_id,
             channel: 'whatsapp', direction: 'outbound', content: ackMessage,
@@ -457,7 +457,7 @@ export async function POST(request: NextRequest) {
       const effectiveDebtId = aiDecision.resolvedDebtId ?? debt_id
 
       if (aiDecision.shouldReply && aiDecision.message) {
-        const waResult = await sendWhatsAppMessage({ to: phone, message: aiDecision.message, company_id: c.company_id })
+        const waResult = await sendWhatsAppMessage({ to: phone, message: aiDecision.message, company_id: c.company_id, customer_id: c.id })
         const { error: replyInsertErr } = await supabase.from('messages').insert({
           company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
           channel: 'whatsapp', direction: 'outbound', content: aiDecision.message,

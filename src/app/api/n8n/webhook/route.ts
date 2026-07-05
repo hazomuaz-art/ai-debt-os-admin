@@ -256,6 +256,7 @@ export async function POST(request: NextRequest) {
           to: phone,
           message: message_content,
           company_id,
+          customer_id,
         })
         console.log('[ai_reply_generated] WAHA send result:', JSON.stringify(waResult))
 

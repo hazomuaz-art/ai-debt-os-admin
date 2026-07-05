@@ -1,6 +1,30 @@
 import { describe, it, expect } from 'vitest'
-import { parseWebhookPayload } from '@/lib/whatsapp'
+import { parseWebhookPayload, isWithinAllowedContactHours } from '@/lib/whatsapp'
 import { createHash } from 'crypto'
+
+// ── isWithinAllowedContactHours (CST/SAMA contact-hours gate) ───────────────
+// Saudi time = UTC+3. Blocked window: 22:00-09:00 Saudi time.
+
+describe('isWithinAllowedContactHours', () => {
+  it('allows a send at noon Saudi time (09:00 UTC)', () => {
+    expect(isWithinAllowedContactHours(new Date('2026-07-05T09:00:00Z'))).toBe(true)
+  })
+  it('allows a send right at the 9am Saudi opening (06:00 UTC)', () => {
+    expect(isWithinAllowedContactHours(new Date('2026-07-05T06:00:00Z'))).toBe(true)
+  })
+  it('blocks a send at 8:59am Saudi time (05:59 UTC)', () => {
+    expect(isWithinAllowedContactHours(new Date('2026-07-05T05:59:00Z'))).toBe(false)
+  })
+  it('blocks a send right at the 10pm Saudi close (19:00 UTC)', () => {
+    expect(isWithinAllowedContactHours(new Date('2026-07-05T19:00:00Z'))).toBe(false)
+  })
+  it('blocks a send at midnight Saudi time (21:00 UTC, wraps to next day)', () => {
+    expect(isWithinAllowedContactHours(new Date('2026-07-05T21:00:00Z'))).toBe(false)
+  })
+  it('allows a send at 9:01am Saudi time (06:01 UTC)', () => {
+    expect(isWithinAllowedContactHours(new Date('2026-07-05T06:01:00Z'))).toBe(true)
+  })
+})
 
 // ── parseWebhookPayload ───────────────────────────────────────────────────
 

@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
     const sendResult = await sendWhatsAppMessage({
       to: phone, message: messageText, company_id: r.company_id,
       waha_session: num.instance_name, waha_api_url: num.api_url,
+      customer_id: r.customer_id,
     })
 
     const { error: campaignMsgErr } = await supabase.from('messages').insert({

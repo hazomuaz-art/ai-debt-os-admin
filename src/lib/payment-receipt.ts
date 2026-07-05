@@ -302,7 +302,7 @@ async function replyAndLog(
   args: { company_id: string; customer_id: string; debt_id: string | null; phone: string },
   reply: string,
 ): Promise<void> {
-  const wr = await sendWhatsAppMessage({ to: args.phone, message: reply, company_id: args.company_id })
+  const wr = await sendWhatsAppMessage({ to: args.phone, message: reply, company_id: args.company_id, customer_id: args.customer_id })
   const { error: logErr } = await svc.from('messages').insert({
     company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
     channel: 'whatsapp', direction: 'outbound', content: reply,

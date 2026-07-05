@@ -117,6 +117,7 @@ export async function GET(req: NextRequest) {
           to: phone,
           message: reminderMsg,
           company_id: promise.company_id,
+          customer_id: customer.id,
         })
 
         // Always record the outbound message in the conversation (so it shows in the dashboard),

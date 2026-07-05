@@ -2,10 +2,55 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { createLogger } from '@/lib/logger'
+import { logSecurityEvent } from '@/lib/security-audit'
 
 const log = createLogger('auth')
+
+function requestMeta(): { ip: string | null; userAgent: string | null } {
+  try {
+    const h = headers()
+    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || null
+    return { ip, userAgent: h.get('user-agent') }
+  } catch {
+    return { ip: null, userAgent: null }
+  }
+}
+
+// Brute-force protection (NCA ECC hardening, 2026-07-05): a real gap found
+// during a live audit - nothing anywhere in this codebase rate-limited login
+// attempts, meaning any email address could be password-guessed indefinitely
+// with zero friction. middleware.ts's API_RATE_LIMITS never covered this
+// Server Action (it only matches specific /api/* paths). In-memory per-
+// instance state, same pattern already used in middleware.ts - this app runs
+// as a single pm2 process, so this is a real, effective gate, not a no-op.
+const FAILED_LOGIN_MAX     = 8
+const FAILED_LOGIN_WINDOW_MS = 15 * 60_000 // 15 minutes
+const failedLoginStore = new Map<string, { count: number; resetAt: number }>()
+
+function isLoginLockedOut(email: string): boolean {
+  const key = email.trim().toLowerCase()
+  const entry = failedLoginStore.get(key)
+  if (!entry || entry.resetAt <= Date.now()) return false
+  return entry.count >= FAILED_LOGIN_MAX
+}
+
+function recordFailedLogin(email: string): void {
+  const key = email.trim().toLowerCase()
+  const now = Date.now()
+  const entry = failedLoginStore.get(key)
+  if (!entry || entry.resetAt <= now) {
+    failedLoginStore.set(key, { count: 1, resetAt: now + FAILED_LOGIN_WINDOW_MS })
+  } else {
+    entry.count++
+  }
+}
+
+function clearFailedLogins(email: string): void {
+  failedLoginStore.delete(email.trim().toLowerCase())
+}
 
 const loginSchema = z.object({
   email:    z.string().email('Invalid email address'),
@@ -38,15 +83,25 @@ export async function loginAction(formData: FormData) {
     return { error: parsed.error.errors[0].message }
   }
 
+  if (isLoginLockedOut(parsed.data.email)) {
+    log.warn('Login blocked - too many failed attempts', { email: parsed.data.email })
+    return { error: 'محاولات كثيرة فاشلة. حاول مرة أخرى بعد 15 دقيقة.' }
+  }
+
   const { data: authData, error } = await supabase.auth.signInWithPassword(parsed.data)
+  const { ip, userAgent } = requestMeta()
 
   if (error) {
     // Generic message to prevent email enumeration
     log.warn('Login failed', { email: parsed.data.email, error: error.message })
+    recordFailedLogin(parsed.data.email)
+    await logSecurityEvent({ actor_email: parsed.data.email, event_type: 'login_failed', ip_address: ip, user_agent: userAgent })
     return { error: 'Invalid email or password' }
   }
 
   if (!authData.user) return { error: 'Authentication failed' }
+
+  clearFailedLogins(parsed.data.email)
 
   // Check account is active
   const { data: profile } = await supabase
@@ -65,6 +120,11 @@ export async function loginAction(formData: FormData) {
   }
 
   const role = profile.role ?? 'collector'
+
+  await logSecurityEvent({
+    company_id: profile.company_id, actor_user_id: authData.user.id, actor_email: parsed.data.email,
+    event_type: 'login_success', ip_address: ip, user_agent: userAgent,
+  })
 
   // MFA enforcement (NCA/compliance hardening, 2026-07-05): before this,
   // a password alone was sufficient for full access to every role,
@@ -126,6 +186,12 @@ export async function verifyMfaEnrollmentAction(factorId: string, code: string) 
   })
   if (verifyError) return { error: 'رمز غير صحيح، تأكد من الوقت الصحيح بجهازك وحاول مرة أخرى' }
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: p } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+    await logSecurityEvent({ company_id: p?.company_id, actor_user_id: user.id, actor_email: user.email, event_type: 'mfa_enrolled' })
+  }
+
   await redirectToOwnDashboard(supabase)
 }
 
@@ -143,7 +209,18 @@ export async function verifyMfaChallengeAction(code: string) {
   const { error: verifyError } = await supabase.auth.mfa.verify({
     factorId: factor.id, challengeId: challenge.id, code,
   })
-  if (verifyError) return { error: 'رمز غير صحيح، حاول مرة أخرى' }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: p } = user
+    ? await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+    : { data: null }
+
+  if (verifyError) {
+    if (user) await logSecurityEvent({ company_id: p?.company_id, actor_user_id: user.id, actor_email: user.email, event_type: 'mfa_challenge_failed' })
+    return { error: 'رمز غير صحيح، حاول مرة أخرى' }
+  }
+
+  if (user) await logSecurityEvent({ company_id: p?.company_id, actor_user_id: user.id, actor_email: user.email, event_type: 'mfa_challenge_success' })
 
   await redirectToOwnDashboard(supabase)
 }
@@ -253,6 +330,11 @@ export async function logoutAction() {
   }
 
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: p } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+    await logSecurityEvent({ company_id: p?.company_id, actor_user_id: user.id, actor_email: user.email, event_type: 'logout' })
+  }
   await supabase.auth.signOut()
   redirect('/login')
 }

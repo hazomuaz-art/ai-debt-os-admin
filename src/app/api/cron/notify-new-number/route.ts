@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     const firstName = t.name.split(' ')[0] || ''
     const msg = `مرحباً ${firstName}، معك خالد من قسم التحصيل. هذا رقمنا الجديد للتواصل بخصوص ملفك. تقدر ترد علينا هنا مباشرة وبنكمل معك.`
     try {
-      const r = await sendWhatsAppMessage({ to: t.phone, message: msg, company_id: t.company_id })
+      const r = await sendWhatsAppMessage({ to: t.phone, message: msg, company_id: t.company_id, customer_id: t.id })
       const { error: notifyInsertErr } = await supabase.from('messages').insert({
         company_id: t.company_id, customer_id: t.id,
         channel: 'whatsapp', direction: 'outbound', content: msg,

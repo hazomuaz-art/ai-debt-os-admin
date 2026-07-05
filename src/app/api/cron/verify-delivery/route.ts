@@ -110,6 +110,7 @@ export async function GET(req: NextRequest) {
         const r = await sendWhatsAppMessage({
           to: phone, message: String((newest as { content: string }).content),
           company_id: (newest as { company_id: string }).company_id,
+          customer_id: customerId,
         })
         if (r.status === 'sent') {
           const { error: firstRetryInsertErr } = await supabase.from('messages').insert({
@@ -191,6 +192,7 @@ export async function GET(req: NextRequest) {
     const r = await sendWhatsAppMessage({
       to: phone, message: String((latest as { content: string }).content),
       company_id: (latest as { company_id: string }).company_id,
+      customer_id: customerId,
     })
 
     const { error: preRetryFailErr } = await supabase.from('messages').update({

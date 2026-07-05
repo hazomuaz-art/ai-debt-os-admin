@@ -18,6 +18,15 @@ export interface SendMessageOptions {
   // existing portfolio_whatsapp_numbers connect/QR flow's own resolution.
   waha_session?:   string | null
   waha_api_url?:   string | null
+  // When provided, this call is checked against the customer's opt-out flag
+  // before sending anything. CST anti-spam rules require ALL messaging to
+  // stop within 24h of a stop request - previously this was only enforced
+  // in the live AI-reply path (ai-collector-agent.ts), not in any of the
+  // cron jobs (campaigns, follow-ups, retries) that also message customers,
+  // so an opted-out customer could still receive a campaign blast or a
+  // promise-followup reminder. Omit only for sends that are not "messaging
+  // a customer" (e.g. an internal admin alert to a fixed ops phone number).
+  customer_id?:    string | null
 }
 
 export interface SendResult {
@@ -69,7 +78,54 @@ function truncateMessage(message: string): string {
 
 import { createServiceClient } from '@/lib/supabase/server'
 
+// CST (Communications, Space & Technology Commission) anti-spam regulations
+// prohibit promotional/commercial messages 10pm-9am Saudi time daily; SAMA's
+// debt-collection conduct rules impose a similar "reasonable hours" duty on
+// creditors. Enforced here — the single choke point every outbound WhatsApp
+// send in this codebase routes through — rather than at each call site,
+// since a rule enforced in N places is a rule that will eventually be
+// missed in the N+1th. Ramadan has a separate, narrower allowed window
+// under CST rules (1am-noon) that requires Hijri-calendar date resolution
+// this codebase does not currently have a library for; NOT implemented
+// here — flagged as a known gap requiring either a Hijri calendar
+// dependency or manual seasonal configuration, not silently approximated.
+const CONTACT_HOURS_BLOCKED_START = 22 // 10pm Saudi time
+const CONTACT_HOURS_BLOCKED_END   = 9  // 9am Saudi time
+const SAUDI_UTC_OFFSET_HOURS = 3
+
+export function isWithinAllowedContactHours(now: Date = new Date()): boolean {
+  const saudiHour = (now.getUTCHours() + SAUDI_UTC_OFFSET_HOURS) % 24
+  // Blocked window wraps midnight (22:00 -> 09:00), so "blocked" is true
+  // when the hour is >= start OR < end, not a simple range check.
+  const blocked = saudiHour >= CONTACT_HOURS_BLOCKED_START || saudiHour < CONTACT_HOURS_BLOCKED_END
+  return !blocked
+}
+
 export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<SendResult> {
+  // Compliance gate: this deliberately does NOT distinguish "we contacted
+  // them first" from "replying to a message they just sent us" - a lawyer
+  // should confirm whether responsive replies to customer-initiated inbound
+  // messages are exempt from this window before narrowing this check; the
+  // conservative default (block all outbound in the window) is applied
+  // until that is confirmed, since under-blocking is the worse mistake here.
+  if (!isWithinAllowedContactHours()) {
+    log.warn('WhatsApp send blocked - outside allowed contact hours (CST/SAMA)', { to: options.to })
+    return { message_id: null, status: 'failed', error: 'blocked_contact_hours' }
+  }
+
+  if (options.customer_id) {
+    const svc = createServiceClient()
+    const { data: customer } = await svc
+      .from('customers')
+      .select('contact_opt_out')
+      .eq('id', options.customer_id)
+      .maybeSingle()
+    if (customer?.contact_opt_out) {
+      log.warn('WhatsApp send blocked - customer opted out of contact', { customer_id: options.customer_id })
+      return { message_id: null, status: 'failed', error: 'blocked_contact_opt_out' }
+    }
+  }
+
   // WAHA config — env defaults, optionally overridden per-company via
   // integration_settings (integration_name = 'waha').
   let wahaUrl     = process.env.WAHA_API_URL

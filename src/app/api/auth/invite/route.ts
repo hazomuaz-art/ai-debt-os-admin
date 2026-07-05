@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, parseBody, errors, inviteUserSchema } from '@/lib/api'
 import { createLogger } from '@/lib/logger'
+import { logSecurityEvent, extractRequestMeta } from '@/lib/security-audit'
 
 const log = createLogger('api/auth/invite')
 
@@ -64,6 +65,13 @@ export async function POST(request: NextRequest) {
         new_values:  { email: body.email, role: body.role, invited_by: ctx.user.id },
       })
       if (logErr) log.error('invite audit log insert failed', logErr, { invited_user_id: newUser.user.id })
+
+      const { ip, userAgent } = extractRequestMeta(request)
+      await logSecurityEvent({
+        company_id: ctx.profile.company_id, actor_user_id: ctx.user.id, actor_email: ctx.user.email,
+        event_type: 'user_invited', ip_address: ip, user_agent: userAgent,
+        metadata: { invited_email: body.email, invited_role: body.role },
+      })
 
       return NextResponse.json(
         { data: { id: newUser.user.id, email: body.email, role: body.role } },
