@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { resolveCompanyProfile } from '@/lib/company-import-profiles'
 import { createLogger } from '@/lib/logger'
-import * as XLSX from 'xlsx'
+import { parseXLSX } from '@/lib/excel-parser'
 import crypto from 'crypto'
 
 const log = createLogger('api/employees/import')
@@ -25,12 +25,20 @@ type ParsedRow = {
   pbx_connection_key: string | null
 }
 
-function parseSheet(buf: ArrayBuffer): ParsedRow[] {
-  const wb = XLSX.read(buf, { type: 'array' })
-  const sheet = wb.Sheets[wb.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 })
+// Security hardening (2026-07-05): swapped the `xlsx` (SheetJS) npm package
+// for this codebase's own dependency-free parser (excel-parser.ts, already
+// proven in production for the main debt-import feature). `xlsx` has two
+// HIGH-severity vulnerabilities (Prototype Pollution, ReDoS) with NO fix
+// available from the maintainer - this was the only place in the app that
+// fed genuinely untrusted, user-uploaded file content into it (the other
+// usage, in EmployeeImportPanel.tsx, only WRITES a template file from
+// trusted internal data, which is a materially different risk profile and
+// left unchanged here).
+// Exported for testing only.
+export function parseSheet(buf: ArrayBuffer): ParsedRow[] {
+  const { rows } = parseXLSX(buf)
   const out: ParsedRow[] = []
-  for (const r of rows.slice(1)) {
+  for (const r of rows) {
     if (!r || !r.length) continue
     const email = String(r[COL.email] ?? '').trim().toLowerCase()
     const full_name = String(r[COL.fullName] ?? '').trim()
