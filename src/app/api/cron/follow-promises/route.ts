@@ -79,36 +79,47 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+      // Real production incident this fixes: generateProactiveReminder is a
+      // separate, simpler generator with NO memory of what was already sent
+      // — it reliably regenerated near-identical wording to previous
+      // reminders (same greeting shape, same info order, same closing
+      // question) since it ran on the exact same debt/customer summary every
+      // day a promise stayed overdue. isRepeated()'s literal-similarity check
+      // catches near-exact text but not this kind of paraphrased repetition,
+      // so a retry-only-after-the-fact approach wasn't reliable. Fetching the
+      // debt's recent outbound history UPFRONT and handing it to the model as
+      // concrete "don't repeat this" context (not just a blind post-hoc
+      // retry) is far more effective at actually varying the wording.
+      const { data: priorOutbound } = await supabase
+        .from('messages').select('content').eq('debt_id', debt.id).eq('direction', 'outbound')
+        .order('sent_at', { ascending: false }).limit(5)
+      const priorTexts = (priorOutbound ?? []).map((m: { content: string | null }) => m.content ?? '').filter(Boolean)
+
       let reminderMsg = await generateProactiveReminder({
         company_id: promise.company_id,
         customer_id: customer.id,
         debt_id: debt.id,
         reason: `Customer promised to pay ${promise.promised_amount} on ${promise.promised_date} but payment has not been marked as received. Reach out to follow up.`,
+        avoid_texts: priorTexts,
       })
 
-      // Real production incident this fixes: this cron is exactly what fires
-      // when a customer goes silent (promise date passed, no reply at all)
-      // — but generateProactiveReminder is a separate, simpler generator
-      // with NO memory of what was already sent and NO anti-repetition
-      // check, unlike the main runCollectorAgent pipeline. It could (and
-      // did) generate near-identical wording to a message already sent
-      // earlier in this same debt's conversation. Checked against the
-      // debt's FULL outbound history (not just promise-followups), same
-      // guard the live conversation path uses.
+      // Full-history guard as a final backstop against literal/near-literal
+      // repeats the avoid_texts context (last 5 only) doesn't cover.
       if (reminderMsg) {
-        const { data: priorOutbound } = await supabase
+        const { data: fullPriorOutbound } = await supabase
           .from('messages').select('content').eq('debt_id', debt.id).eq('direction', 'outbound')
           .order('sent_at', { ascending: true }).limit(500)
-        const priorTexts = (priorOutbound ?? []).map((m: { content: string | null }) => m.content ?? '')
-        if (isRepeated(reminderMsg, priorTexts)) {
+        const fullPriorTexts = (fullPriorOutbound ?? []).map((m: { content: string | null }) => m.content ?? '')
+        if (isRepeated(reminderMsg, fullPriorTexts)) {
           log.warn('proactive reminder repeated a prior message — regenerating once', { promise_id: promise.id, debt_id: debt.id })
           const retry = await generateProactiveReminder({
             company_id: promise.company_id,
             customer_id: customer.id,
             debt_id: debt.id,
             reason: `Customer promised to pay ${promise.promised_amount} on ${promise.promised_date} but payment has not been marked as received. IMPORTANT: your first attempt repeated a message already sent to this customer — this time, phrase the reminder differently. Reach out to follow up.`,
+            avoid_texts: priorTexts,
           })
-          reminderMsg = isRepeated(retry, priorTexts) ? '' : retry
+          reminderMsg = isRepeated(retry, fullPriorTexts) ? '' : retry
         }
       }
 

@@ -86,6 +86,62 @@ const pendingBursts = new Map<string, { texts: string[]; timer: ReturnType<typeo
 // of the same thought.
 const BURST_DEBOUNCE_MS = 9000
 
+// Real production bug this fixes: the debounce timer above only MERGES
+// messages that arrive within the same 9s window — it never stopped a
+// SECOND independent run() from starting for the same customer if the
+// FIRST run() (a full classify + LLM-reply + record pipeline; easily
+// several seconds, sometimes more under load) was still in flight when a
+// later message's own 9s timer fired. Two concurrent runCollectorAgent
+// calls for the same customer each fetch conversation history fresh — the
+// second call cannot see the first call's not-yet-committed outbound
+// reply, so it has no idea a reply is already being sent, and independently
+// generates and sends its own. This is the confirmed cause of a customer
+// getting a duplicate reply (and, since one of the two concurrent LLM
+// calls can end up working from a slightly different context snapshot,
+// occasionally an inconsistent/formal-register reply alongside the normal
+// Saudi-dialect one). Never processes two turns for the same customer
+// concurrently, regardless of how long a turn takes.
+const processingCustomers = new Set<string>()
+const LOCK_RECHECK_MS = 1500
+
+// Test-only: this Set is module-level (correct for the real single-process
+// server, where it must outlive any one request), but that means it isn't
+// naturally reset between test cases the way pendingBursts is (that one
+// self-clears synchronously inside the timer callback, before run() even
+// starts) — exported so test setup can clear it between cases.
+export function __resetWahaWebhookStateForTests(): void {
+  processingCustomers.clear()
+  pendingBursts.clear()
+}
+
+function fireWhenFree(customerId: string, run: (mergedText: string, latestTimestamp: string) => Promise<void>): void {
+  const entry = pendingBursts.get(customerId)
+  if (!entry) return // nothing pending (shouldn't happen, but nothing to run)
+
+  if (processingCustomers.has(customerId)) {
+    // A previous turn for this customer outlasted the debounce window —
+    // wait and recheck instead of racing it with a second concurrent run.
+    entry.timer = setTimeout(() => fireWhenFree(customerId, run), LOCK_RECHECK_MS)
+    return
+  }
+
+  pendingBursts.delete(customerId)
+  processingCustomers.add(customerId)
+  // Real bug found in production: this used to be `.catch(() => {})` —
+  // any exception ANYWHERE inside `run` (classification, promise/dispute
+  // recording, the case-note update at the very end...) silently killed
+  // everything after the point of failure for that turn, with zero log
+  // trace. This is exactly why a real customer's case note froze at one
+  // point in a long conversation and never updated again afterward, even
+  // though replies kept sending fine (the send happens before the failure
+  // point) — there was no way to even know it had stopped. Always log now.
+  run(entry.texts.join('\n'), entry.latestTimestamp)
+    .catch(err => {
+      log.error('burst-processed run() failed — see which step inside it threw', err as Error, { customerId })
+    })
+    .finally(() => processingCustomers.delete(customerId))
+}
+
 function scheduleBurstProcessing(
   customerId: string,
   text: string,
@@ -104,20 +160,7 @@ function scheduleBurstProcessing(
   // `entry` is the same mutable object stored in the map — the closure below
   // always sees the LATEST texts/timestamp by the time it actually fires,
   // since every new message in the burst mutates this same object in place.
-  entry.timer = setTimeout(() => {
-    pendingBursts.delete(customerId)
-    // Real bug found in production: this used to be `.catch(() => {})` —
-    // any exception ANYWHERE inside `run` (classification, promise/dispute
-    // recording, the case-note update at the very end...) silently killed
-    // everything after the point of failure for that turn, with zero log
-    // trace. This is exactly why a real customer's case note froze at one
-    // point in a long conversation and never updated again afterward, even
-    // though replies kept sending fine (the send happens before the failure
-    // point) — there was no way to even know it had stopped. Always log now.
-    run(entry!.texts.join('\n'), entry!.latestTimestamp).catch(err => {
-      log.error('burst-processed run() failed — see which step inside it threw', err as Error, { customerId })
-    })
-  }, BURST_DEBOUNCE_MS)
+  entry.timer = setTimeout(() => fireWhenFree(customerId, run), BURST_DEBOUNCE_MS)
 }
 
 export async function POST(request: NextRequest) {

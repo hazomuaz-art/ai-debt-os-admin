@@ -14,6 +14,20 @@ let mockContentDupRow: any = null
 let mockLatestDebt: any = { id: 'd1', current_balance: 1000 }
 let runCollectorAgentCalls: any[] = []
 let mockAiDecision: any = { shouldReply: true, action: 'reply', reason: 'x', message: 'تمام.' }
+// Lets a test simulate a slow turn (classification + LLM call genuinely can
+// take several seconds) that outlasts the 9s debounce window, to prove a
+// second message's own timer firing mid-flight never starts a concurrent run.
+// Manually-controlled gate (not a setTimeout-based delay — chaining a raw
+// timer delay inside an async mock under vi.advanceTimersByTimeAsync hits an
+// unrelated fake-timer/microtask-budget limitation that stalls the rest of
+// the mocked call chain indefinitely, reproducible even with zero lock
+// contention). A manually-resolved promise needs no timer at all, so it
+// sidesteps that entirely while still proving the same thing: a turn that
+// hasn't finished yet when a second message's debounce fires.
+let releaseRunCollectorAgentGate: (() => void) | null = null
+let gateRunCollectorAgent = false
+let activeRunCollectorAgentCalls = 0
+let maxConcurrentRunCollectorAgentCalls = 0
 
 // A chainable query-builder mock: any sequence of .eq()/.not()/.order() calls
 // is supported (each just returns the same chain object), terminated by
@@ -74,6 +88,12 @@ vi.mock('@/lib/promise', () => ({
 vi.mock('@/lib/ai-collector-agent', () => ({
   runCollectorAgent: vi.fn().mockImplementation(async (args: any) => {
     runCollectorAgentCalls.push(args)
+    activeRunCollectorAgentCalls++
+    maxConcurrentRunCollectorAgentCalls = Math.max(maxConcurrentRunCollectorAgentCalls, activeRunCollectorAgentCalls)
+    if (gateRunCollectorAgent) {
+      await new Promise<void>(resolve => { releaseRunCollectorAgentGate = resolve })
+    }
+    activeRunCollectorAgentCalls--
     return mockAiDecision
   }),
   detectSignals: vi.fn().mockReturnValue({ deniesPromise: false, refusesToPay: false }),
@@ -87,7 +107,7 @@ vi.mock('@/lib/ai-collector-agent', () => ({
 // before ever reaching it.
 process.env.WAHA_WEBHOOK_SECRET = 'test-secret'
 
-import { POST } from '@/app/api/whatsapp/waha-webhook/route'
+import { POST, __resetWahaWebhookStateForTests } from '@/app/api/whatsapp/waha-webhook/route'
 
 function makeRequest(body: any): any {
   return {
@@ -114,6 +134,11 @@ beforeEach(() => {
   runCollectorAgentCalls = []
   mockDupRow = null
   mockAiDecision = { shouldReply: true, action: 'reply', reason: 'x', message: 'تمام.' }
+  gateRunCollectorAgent = false
+  releaseRunCollectorAgentGate = null
+  activeRunCollectorAgentCalls = 0
+  maxConcurrentRunCollectorAgentCalls = 0
+  __resetWahaWebhookStateForTests()
 })
 
 afterEach(() => {
@@ -160,5 +185,25 @@ describe('Rapid-fire message burst merging', () => {
 
     expect(runCollectorAgentCalls.length).toBe(2)
     expect(runCollectorAgentCalls.map(c => c.customer_id).sort()).toEqual(['cust-1', 'cust-2'])
+  })
+
+  // Real production bug: a slow turn (classification + LLM call) that
+  // outlasts the 9s debounce window used to let a LATER message's own timer
+  // fire while the first turn was still in flight, starting a second
+  // concurrent runCollectorAgent call for the same customer — the confirmed
+  // cause of a customer getting a duplicate/inconsistent reply. Proves the
+  // per-customer lock (processingCustomers) serializes these instead.
+  it('a message arriving while a previous turn is still running never starts a concurrent second call', async () => {
+    gateRunCollectorAgent = true // holds the first turn open until manually released below
+    await POST(makeRequest(inboundPayload('وش صار في طلبي', 'm9', 5000)))
+    await vi.advanceTimersByTimeAsync(9000) // first turn's timer fires, run() starts and is now held open
+
+    await POST(makeRequest(inboundPayload('رد سريع ثاني', 'm10', 5010)))
+    await vi.advanceTimersByTimeAsync(9000) // second message's own debounce fires WHILE the first turn is still open — must defer, not run concurrently
+
+    expect(runCollectorAgentCalls.length).toBe(1)
+    expect(maxConcurrentRunCollectorAgentCalls).toBe(1)
+
+    releaseRunCollectorAgentGate?.() // release so the held-open turn doesn't leak into later test runs
   })
 })

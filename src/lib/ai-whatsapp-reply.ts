@@ -541,6 +541,19 @@ export async function generateProactiveReminder(args: {
   debt_id?: string | null
   promise_details?: any
   reason?: string
+  // Real production bug this fixes: this generator ran with the SAME
+  // debt/customer summary every single day a promise stayed overdue, at a
+  // low temperature, with zero awareness of what it already sent — so it
+  // reliably regenerated near-identical reminders day after day (same
+  // greeting shape, same information order, same closing question, just
+  // reworded). isRepeated()'s literal-similarity check catches EXACT/near-
+  // exact text but not this kind of paraphrased repetition, so it slipped
+  // through undetected (confirmed live: two reminders for the same overdue
+  // promise, one day apart, near-identical structure/emojis, worded
+  // differently enough to dodge the check). Passing the actual prior
+  // reminder text(s) gives the model something concrete to differentiate
+  // against instead of a blind "be different" instruction.
+  avoid_texts?: string[]
 }): Promise<string> {
   const debtContext = await buildCustomerDebtContext({
     company_id: args.company_id,
@@ -557,11 +570,18 @@ export async function generateProactiveReminder(args: {
   })
 
   const context = args.promise_details ?? args.reason ?? ''
+  const avoidBlock = args.avoid_texts?.length
+    ? `\n🔴 رسائل سبق إرسالها لهذا العميل بنفس الغرض — اكتب رسالة مختلفة تماماً عنها (تحية مختلفة، ترتيب أفكار مختلف، سؤال ختامي مختلف الصياغة)، لا تعيد نفس الشكل بكلمات مرادفة فقط:\n${args.avoid_texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+    : ''
 
   try {
     const res = await ai.chat.completions.create({
       model: 'anthropic/claude-sonnet-4.6',
-      temperature: 0.4,
+      // Raised from 0.4 — this is a low-stakes reminder (no numbers/dates
+      // being negotiated, just a factual follow-up), so more lexical variety
+      // carries little real risk, while low temperature was a direct
+      // contributor to near-identical day-to-day phrasing.
+      temperature: 0.7,
       max_tokens: 160,
       messages: [
         {
@@ -571,7 +591,7 @@ export async function generateProactiveReminder(args: {
 السياق: ${typeof context === 'string' ? context : JSON.stringify(context)}
 - كن مهذباً وغير عدواني، حيّه بتحية مناسبة.
 - اذكر الموعد/المبلغ إن توفّر واسأله إن كان قد حوّل المبلغ.
-- جملة أو جملتين فقط. لا تذكر أي أرقام مرجعية داخلية.
+- جملة أو جملتين فقط. لا تذكر أي أرقام مرجعية داخلية.${avoidBlock}
 أعد نص الرسالة فقط.`,
         },
         {
