@@ -466,13 +466,18 @@ export default function CampaignsPage() {
       )}
 
       {showCampaignForm && (
-        <form onSubmit={handleAddCampaign} className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 space-y-5 animate-in fade-in slide-in-from-top-2">
+        <form onSubmit={handleAddCampaign} className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6 space-y-4 animate-in fade-in slide-in-from-top-2">
           <div className="font-bold text-lg text-white border-b border-[#222a36] pb-3 flex items-center gap-2">
             <Megaphone size={18} className="text-blue-500" />
-            صياغة مسودة حملة جديدة
+            حملة جديدة
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          {/* Single-column stack instead of a 2-column grid — in RTL the grid
+              put "نوع الحملة" visually first (right-to-left reading order
+              didn't match the field order), which read as confusing/messy.
+              A straight top-to-bottom list is unambiguous regardless of
+              language direction. */}
+          <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-[#8b95a7] ps-2">اسم الحملة *</label>
               <input required className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
@@ -481,46 +486,51 @@ export default function CampaignsPage() {
                 placeholder="حملة العيد، حملة الرواتب..." />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-[#8b95a7] ps-2">نوع الحملة</label>
-              <select className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
-                value={campaignForm.campaign_type}
-                onChange={e => setCampaignForm(p => ({ ...p, campaign_type: e.target.value }))}>
-                {Object.entries(TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#8b95a7] ps-2">نوع الحملة</label>
+                <select className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
+                  value={campaignForm.campaign_type}
+                  onChange={e => setCampaignForm(p => ({ ...p, campaign_type: e.target.value }))}>
+                  {Object.entries(TYPE_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-[#8b95a7] ps-2">المحفظة المستهدَفة *</label>
-              <select required className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
-                value={campaignForm.portfolio_id}
-                onChange={e => setCampaignForm(p => ({ ...p, portfolio_id: e.target.value }))}>
-                <option value="">اختر المحفظة...</option>
-                {portfolios.map(p => (
-                  <option key={p.id} value={p.id}>{p.code ? `${p.code} - ` : ''}{p.name_ar || p.name}</option>
-                ))}
-              </select>
-              <div className="text-[#5f6b7e] text-xs">يجب أن يكون لهذي المحفظة رقم واتساب مربوط (أعلى الصفحة) قبل تشغيل الحملة.</div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#8b95a7] ps-2">المحفظة المستهدَفة *</label>
+                <select required className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
+                  value={campaignForm.portfolio_id}
+                  onChange={e => setCampaignForm(p => ({ ...p, portfolio_id: e.target.value }))}>
+                  <option value="">اختر المحفظة...</option>
+                  {portfolios.map(p => (
+                    <option key={p.id} value={p.id}>{p.code ? `${p.code} - ` : ''}{p.name_ar || p.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+            <div className="text-[#5f6b7e] text-xs -mt-2">يجب أن يكون للمحفظة رقم واتساب مربوط قبل تشغيل الحملة.</div>
 
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-bold text-[#8b95a7] ps-2">قالب الرسالة الافتتاحية</label>
-              <textarea rows={3} className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54] resize-none"
-                placeholder="اكتب رسالة الواتساب الأولى التي سيبدأ بها الذكاء الاصطناعي محادثته..."
+            {/* Was a required-looking 3-row textarea labeled "قالب الرسالة
+                الافتتاحية" — misleading now that every customer gets an
+                AI-generated message built from their own balance/score/case
+                note (campaign-message.ts), not this literal text. Shrunk to
+                one line and relabeled as an optional style hint so it can't
+                be mistaken for "the message that gets sent". */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-[#8b95a7] ps-2">توجيه اختياري لأسلوب الرسالة</label>
+              <input className="w-full bg-[#0b0e14] border-none text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0e7a54]"
+                placeholder="مثال: تذكير ودّي قبل الراتب"
                 value={campaignForm.message_template}
                 onChange={e => setCampaignForm(p => ({ ...p, message_template: e.target.value }))} />
+              <div className="text-[#5f6b7e] text-xs">🤖 الذكاء الاصطناعي يكتب رسالة مختلفة لكل عميل تلقائياً حسب رصيده وحالته — هذا الحقل اختياري فقط لتوجيه الأسلوب العام.</div>
             </div>
           </div>
 
-          <div className="bg-amber-50 text-amber-600 px-4 py-3 rounded-xl text-xs font-bold border border-amber-100 flex items-center gap-2">
-            ستُحفظ الحملة في حالة (مسودة). يمكنك لاحقاً تفعيلها وتشغيل منظم طوابير الإرسال (Queue Worker).
-          </div>
-
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1">
             <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50">
-              {saving ? 'جارٍ الحفظ…' : 'إنشاء الحملة (مسودة)'}
+              {saving ? 'جارٍ الحفظ…' : 'إنشاء الحملة'}
             </button>
           </div>
         </form>
