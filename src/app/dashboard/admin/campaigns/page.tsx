@@ -376,26 +376,24 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Trimmed from 5 stat cards to 3 — "إجمالي الحملات" duplicated info
+          already visible in the log below, and daily capacity/sent-today
+          are more useful read together as one fraction than as two separate
+          numbers. Real complaint this fixes: too many competing numbers up
+          top made the page feel dense before the user even reached the
+          actual campaign list. */}
+      <div className="grid grid-cols-3 gap-4">
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5">
-          <div className="text-[#8b95a7] text-sm font-bold mb-1">إجمالي الحملات</div>
-          <div className="text-3xl font-bold text-white">{campaigns.length}</div>
-        </div>
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5">
-          <div className="text-[#8b95a7] text-sm font-bold mb-1">حملات نشطة (جارية)</div>
+          <div className="text-[#8b95a7] text-sm font-bold mb-1">حملات نشطة الآن</div>
           <div className="text-3xl font-bold text-emerald-500">{runningCampaigns}</div>
         </div>
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5">
-          <div className="text-[#8b95a7] text-sm font-bold mb-1">أرقام واتساب الفعالة</div>
+          <div className="text-[#8b95a7] text-sm font-bold mb-1">أرقام واتساب متصلة</div>
           <div className="text-3xl font-bold text-blue-500">{activeNumbers}</div>
         </div>
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5">
-          <div className="text-[#8b95a7] text-sm font-bold mb-1">القدرة الاستيعابية اليومية</div>
-          <div className="text-3xl font-bold text-purple-500">{String(dailyCapacity)}</div>
-        </div>
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-5">
-          <div className="text-[#8b95a7] text-sm font-bold mb-1">تم إرساله اليوم</div>
-          <div className="text-3xl font-bold text-orange-500">{String(sentToday)}</div>
+          <div className="text-[#8b95a7] text-sm font-bold mb-1">أُرسل اليوم من السعة</div>
+          <div className="text-3xl font-bold text-orange-500">{String(sentToday)} <span className="text-lg text-[#5f6b7e] font-normal">/ {String(dailyCapacity)}</span></div>
         </div>
       </div>
 
@@ -528,7 +526,12 @@ export default function CampaignsPage() {
         </form>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      {/* Was a 2-column grid with a second card ("بنية الطوابير والقواعد")
+          that was purely explanatory static text (throttling/isolation
+          rules) with zero live data or actions — real clutter contributing
+          nothing a user could act on. Removed; the numbers card now takes
+          the full width on its own. */}
+      <div>
         <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
           <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
             <Smartphone className="text-white" size={20} />
@@ -606,40 +609,6 @@ export default function CampaignsPage() {
               ))}
             </div>
           )}
-        </div>
-
-        <div className="bg-[#151a23] rounded-2xl border border-[#222a36] shadow-sm p-6">
-          <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
-            <Activity className="text-white" size={20} />
-            <div>
-              <h2 className="text-lg font-bold text-white">بنية الطوابير والقواعد (Queue Foundation)</h2>
-              <div className="text-[#8b95a7] text-xs mt-0.5">ضمان التوزيع العادل وحماية النظام من الحظر.</div>
-            </div>
-          </div>
-
-          <div className="space-y-4 text-sm mt-6">
-            <div className="rounded-2xl border border-[#222a36] bg-[#0d1117] p-5 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">🛑</div>
-              <div>
-                <div className="font-bold text-white">قواعد الإيقاف التلقائي</div>
-                <div className="text-[#8b95a7] text-xs mt-1 leading-relaxed">يتوقف الواتساب فوراً عن إرسال الرسائل التلقائية إذا قام العميل بالرد، ادعاء الدفع، تقديم اعتراض، أو الدخول في وعد سداد.</div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[#222a36] bg-[#0d1117] p-5 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">⏳</div>
-              <div>
-                <div className="font-bold text-white">التدفق الآمن (Throttling)</div>
-                <div className="text-[#8b95a7] text-xs mt-1 leading-relaxed">جدولة الرسائل بفاصل زمني ديناميكي يمنع حظر الواتساب ويتوافق مع سياسات شركة Meta للرسائل التسويقية.</div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[#222a36] bg-[#0d1117] p-5 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shrink-0">🗂️</div>
-              <div>
-                <div className="font-bold text-white">العزل الذكي للمحافظ</div>
-                <div className="text-[#8b95a7] text-xs mt-1 leading-relaxed">لا تتداخل بيانات الحملات الخاصة بالاتصالات مع البنوك، كل محفظة تعمل باستقلال تام برقم واتساب مخصص لها.</div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -757,19 +726,12 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm border-t border-[#222a36] pt-6">
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center">
-            <div className="text-emerald-600/80 font-bold text-xs mb-1">إجمالي المبالغ المحصلة (من الحملات)</div>
-            <div className="font-bold text-emerald-600 text-xl font-mono">{String(totalCollected)} SAR</div>
-          </div>
-          <div className="rounded-xl border border-[#222a36] bg-[#0d1117] p-4 text-center">
-            <div className="text-[#8b95a7] font-bold text-xs mb-1">حالة المعالجة في الخلفية</div>
-            <div className="font-bold text-white">جاهز لإدارة الطوابير</div>
-          </div>
-          <div className="rounded-xl border border-[#222a36] bg-[#0d1117] p-4 text-center">
-            <div className="text-[#8b95a7] font-bold text-xs mb-1">استقرار خوادم الإرسال</div>
-            <div className="font-bold text-white flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> مستقر 100%</div>
-          </div>
+        {/* Was a 3-card row — two of the three ("حالة المعالجة"، "استقرار
+            الخوادم") were hardcoded strings, not real data, pure visual
+            filler. Kept only the one real number. */}
+        <div className="mt-6 pt-6 border-t border-[#222a36] flex items-center justify-between">
+          <span className="text-[#8b95a7] text-sm font-bold">إجمالي المبالغ المحصلة من الحملات</span>
+          <span className="text-emerald-500 text-xl font-bold font-mono">{String(totalCollected)} SAR</span>
         </div>
       </div>
 
