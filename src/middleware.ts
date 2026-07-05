@@ -166,6 +166,34 @@ export async function middleware(request: NextRequest) {
       } catch (e) {
         // Fallback
       }
+
+      // MFA enforcement, checked on every dashboard request (not just at
+      // login) - real gap this closes: a login-time-only redirect to
+      // /mfa-challenge or /mfa-setup is trivially bypassed by navigating
+      // directly to a /dashboard/* URL, since nothing else re-checks the
+      // session's actual authenticator assurance level afterward.
+      try {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+          // a verified TOTP factor exists but this session hasn't completed
+          // the challenge yet
+          const dest = request.nextUrl.clone()
+          dest.pathname = '/mfa-challenge'
+          return applySecurityHeaders(NextResponse.redirect(dest))
+        }
+        if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal1') {
+          // no factor enrolled at all - mandatory for privileged roles
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          if (profile && ['admin', 'manager'].includes(profile.role)) {
+            const dest = request.nextUrl.clone()
+            dest.pathname = '/mfa-setup'
+            dest.searchParams.set('required', 'true')
+            return applySecurityHeaders(NextResponse.redirect(dest))
+          }
+        }
+      } catch (e) {
+        // Fallback - never block dashboard access due to an MFA-check error
+      }
     }
   }
 

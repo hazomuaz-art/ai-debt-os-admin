@@ -65,7 +65,87 @@ export async function loginAction(formData: FormData) {
   }
 
   const role = profile.role ?? 'collector'
+
+  // MFA enforcement (NCA/compliance hardening, 2026-07-05): before this,
+  // a password alone was sufficient for full access to every role,
+  // including 'admin' which can delete customers and view all financial
+  // data platform-wide. Required for privileged roles (admin, manager);
+  // optional for collector. The middleware re-checks this on every
+  // /dashboard/* request too, so this redirect can't be bypassed by
+  // navigating straight to a dashboard URL after password login.
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+    redirect('/mfa-challenge')
+  }
+  if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal1' && ['admin', 'manager'].includes(role)) {
+    redirect('/mfa-setup?required=true')
+  }
+
   redirect(`/dashboard/${role}`)
+}
+
+// ============================================================
+// MFA (TOTP) - enrollment and challenge
+// ============================================================
+
+export async function enrollMfaAction(): Promise<
+  { factorId: string; qrCode: string; secret: string } | { error: string }
+> {
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
+  if (error) {
+    log.error('MFA enroll failed', error)
+    return { error: error.message }
+  }
+  return { factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret }
+}
+
+// Cancels an in-progress (unverified) enrollment - lets a user re-scan a
+// fresh QR code if the first attempt's code doesn't match, without leaving
+// an abandoned "unverified" factor behind.
+export async function cancelMfaEnrollmentAction(factorId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.auth.mfa.unenroll({ factorId }).catch(() => {})
+}
+
+async function redirectToOwnDashboard(supabase: ReturnType<typeof createClient>): Promise<never> {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('role').eq('id', user.id).single()
+    : { data: null }
+  redirect(`/dashboard/${profile?.role ?? 'collector'}`)
+}
+
+export async function verifyMfaEnrollmentAction(factorId: string, code: string) {
+  const supabase = createClient()
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+  if (challengeError) return { error: challengeError.message }
+
+  const { error: verifyError } = await supabase.auth.mfa.verify({
+    factorId, challengeId: challenge.id, code,
+  })
+  if (verifyError) return { error: 'رمز غير صحيح، تأكد من الوقت الصحيح بجهازك وحاول مرة أخرى' }
+
+  await redirectToOwnDashboard(supabase)
+}
+
+export async function verifyMfaChallengeAction(code: string) {
+  const supabase = createClient()
+  const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors()
+  if (factorsError) return { error: factorsError.message }
+
+  const factor = factors.totp.find(f => f.status === 'verified')
+  if (!factor) return { error: 'لا يوجد عامل مصادقة ثنائية مفعّل على هذا الحساب' }
+
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+  if (challengeError) return { error: challengeError.message }
+
+  const { error: verifyError } = await supabase.auth.mfa.verify({
+    factorId: factor.id, challengeId: challenge.id, code,
+  })
+  if (verifyError) return { error: 'رمز غير صحيح، حاول مرة أخرى' }
+
+  await redirectToOwnDashboard(supabase)
 }
 
 export async function registerAction(formData: FormData) {
