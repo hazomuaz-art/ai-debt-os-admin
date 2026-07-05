@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { generateCampaignMessage } from '@/lib/campaign-message'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/send-campaign-queue')
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     .from('campaign_send_queue')
     .select(`
       id, company_id, campaign_id, customer_id, debt_id, message_text, attempts, max_attempts,
-      campaign:campaigns(id, message_template, sent_count, send_window_start, send_window_end),
+      campaign:campaigns(id, campaign_type, message_template, sent_count, send_window_start, send_window_end),
       customer:customers(phone, whatsapp),
       whatsapp_number:portfolio_whatsapp_numbers(id, instance_name, api_url, daily_limit, sent_today, last_sent_at, is_active)
     `)
@@ -96,7 +97,14 @@ export async function GET(req: NextRequest) {
     }
 
     const phone = r.customer?.whatsapp || r.customer?.phone
-    const messageText = r.message_text || campaign?.message_template || null
+    // Personalized per-customer message generated fresh at send time (real
+    // balance, AI score, latest case note) — only falls back to the campaign's
+    // generic template if generation is unavailable/fails, or a message_text
+    // was already explicitly set on this row.
+    const messageText = r.message_text || (campaign ? await generateCampaignMessage({
+      company_id: r.company_id, customer_id: r.customer_id, debt_id: r.debt_id,
+      campaign_type: campaign.campaign_type, message_template: campaign.message_template,
+    }) : null)
     if (!phone || !messageText) {
       results.failed++
       const { error: noPhoneErr } = await supabase.from('campaign_send_queue').update({ status: 'failed', error: !phone ? 'no_phone' : 'no_message_text', processed_at: new Date().toISOString() }).eq('id', r.id)

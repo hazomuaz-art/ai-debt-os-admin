@@ -66,6 +66,11 @@ export interface WhatsAppWebhookEntry {
 export function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '')
   if (digits.startsWith('0') && digits.length === 10) return '966' + digits.slice(1)
+  // Bare Saudi mobile with no leading 0 or country code (e.g. "5XXXXXXXX",
+  // typed directly into a phone/whatsapp field) - previously passed through
+  // unchanged and silently failed to send since WAHA requires the country
+  // code, with no visible error pointing back to the missing "966".
+  if (digits.startsWith('5') && digits.length === 9) return '966' + digits
   return digits
 }
 

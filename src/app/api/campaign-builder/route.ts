@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { z } from 'zod'
-import { createLogger } from '@/lib/logger'
-
-const log = createLogger('api/campaign-builder')
+import { buildCampaignQueueRows } from '@/lib/campaign-queue-builder'
 
 const buildSchema = z.object({
   campaign_id: z.string().uuid(),
@@ -60,26 +58,7 @@ export async function POST(req: NextRequest) {
 
       if (debtsError) return errors.internal(debtsError.message)
 
-      const rows = (debts ?? [])
-        .filter((debt: any) => debt.customer_id)
-        .map((debt: any) => ({
-          company_id: ctx.profile.company_id,
-          campaign_id,
-          portfolio_id: targetPortfolioId,
-          customer_id: debt.customer_id,
-          debt_id: debt.id,
-          whatsapp_number_id: whatsappNumber.id,
-          status: 'queued',
-          priority: debt.priority === 'high' ? 90 : debt.priority === 'urgent' ? 100 : 50,
-          scheduled_at: new Date().toISOString(),
-          metadata: {
-            source: 'campaign_builder',
-            debt_status: debt.status,
-            current_balance: debt.current_balance,
-          },
-        }))
-
-      if (rows.length === 0) {
+      if (!debts || debts.length === 0) {
         return NextResponse.json({
           data: {
             campaign_id,
@@ -91,58 +70,29 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      const { data: recipients, error: recipientsError } = await ctx.supabase
-        .from('campaign_recipients')
-        .upsert(rows, { onConflict: 'campaign_id,customer_id,debt_id' })
-        .select('*')
-
-      if (recipientsError) return errors.internal(recipientsError.message)
-
-      const queueRows = (recipients ?? []).map((recipient: any, index: number) => ({
-        company_id: ctx.profile.company_id,
-        campaign_id,
-        recipient_id: recipient.id,
-        portfolio_id: targetPortfolioId,
-        whatsapp_number_id: whatsappNumber.id,
-        customer_id: recipient.customer_id,
-        debt_id: recipient.debt_id,
-        channel: 'whatsapp',
-        status: 'pending',
-        message_text: campaign.message_template ?? null,
-        scheduled_at: new Date(Date.now() + index * 60000).toISOString(),
-        metadata: {
-          source: 'campaign_builder',
+      let result: { recipients_created: number; queue_created: number }
+      try {
+        result = await buildCampaignQueueRows({
+          supabase: ctx.supabase,
+          company_id: ctx.profile.company_id,
+          campaign_id,
           portfolio_id: targetPortfolioId,
-        },
-      }))
-
-      const { error: queueError } = await ctx.supabase
-        .from('campaign_send_queue')
-        .insert(queueRows)
-
-      if (queueError) return errors.internal(queueError.message)
-
-      // Real gap found during a full-system audit: unchecked, unlike its
-      // sibling recipients/queue writes above — a rejected update leaves the
-      // campaign stuck at 'draft' even though its recipients were already
-      // queued, breaking any status-gated dashboard/automation downstream.
-      const { error: campaignUpdErr } = await ctx.supabase
-        .from('campaigns')
-        .update({
-          target_count: (campaign.target_count ?? 0) + rows.length,
-          status: campaign.status === 'draft' ? 'scheduled' : campaign.status,
+          whatsapp_number_id: whatsappNumber.id,
+          debts: debts as any,
+          source: 'campaign_builder',
+          campaign_target_count: campaign.target_count ?? 0,
+          campaign_status: campaign.status,
         })
-        .eq('id', campaign_id)
-        .eq('company_id', ctx.profile.company_id)
-      if (campaignUpdErr) log.error('campaign status/target_count update failed', new Error(campaignUpdErr.message), { campaign_id })
+      } catch (err) {
+        return errors.internal(err instanceof Error ? err.message : String(err))
+      }
 
       return NextResponse.json({
         data: {
           campaign_id,
           portfolio_id: targetPortfolioId,
           whatsapp_number_id: whatsappNumber.id,
-          recipients_created: recipients?.length ?? 0,
-          queue_created: queueRows.length,
+          ...result,
         },
       })
     },

@@ -8,6 +8,8 @@ export function CreateCustomerModal() {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [whatsapp, setWhatsapp] = useState('')
+  const [whatsappTouched, setWhatsappTouched] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -22,6 +24,8 @@ export function CreateCustomerModal() {
     } else {
       setOpen(false)
       formRef.current?.reset()
+      setWhatsapp('')
+      setWhatsappTouched(false)
       setLoading(false)
     }
   }
@@ -48,11 +52,24 @@ export function CreateCustomerModal() {
             </div>
             <div>
               <label className="label">Phone</label>
-              <input name="phone" type="tel" className="input" placeholder="+966 5X XXX XXXX" />
+              <input
+                name="phone"
+                type="tel"
+                className="input"
+                placeholder="+966 5X XXX XXXX"
+                onChange={(e) => { if (!whatsappTouched) setWhatsapp(e.target.value) }}
+              />
             </div>
             <div>
-              <label className="label">WhatsApp</label>
-              <input name="whatsapp" type="tel" className="input" placeholder="+966 5X XXX XXXX" />
+              <label className="label">WhatsApp <span className="text-[#8b95a7] font-normal">(same as phone by default)</span></label>
+              <input
+                name="whatsapp"
+                type="tel"
+                className="input"
+                placeholder="+966 5X XXX XXXX"
+                value={whatsapp}
+                onChange={(e) => { setWhatsappTouched(true); setWhatsapp(e.target.value) }}
+              />
             </div>
             <div>
               <label className="label">Email</label>

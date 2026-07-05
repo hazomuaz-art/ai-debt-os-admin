@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import NextLink from 'next/link'
 import type { Campaign } from '@/types'
-import { Megaphone, MessageSquare, PlayCircle, Smartphone, Activity, Link as LinkIcon, Plus, QrCode, Target, ChevronDown, ChevronUp } from 'lucide-react'
+import { Megaphone, MessageSquare, PlayCircle, Smartphone, Activity, Link as LinkIcon, Plus, QrCode, Target, ChevronDown, ChevronUp, Upload } from 'lucide-react'
 
 type CampaignTarget = {
   id: string
@@ -89,6 +89,9 @@ export default function CampaignsPage() {
     portfolio_id: '',
   })
   const [runningCampaignId, setRunningCampaignId] = useState<string | null>(null)
+  const [uploadingCampaignId, setUploadingCampaignId] = useState<string | null>(null)
+  const uploadTargetCampaignRef = useRef<Campaign | null>(null)
+  const uploadFileInputRef = useRef<HTMLInputElement>(null)
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null)
   const [campaignTargets, setCampaignTargets] = useState<Record<string, CampaignTarget[]>>({})
   const [targetsLoading, setTargetsLoading] = useState(false)
@@ -274,6 +277,47 @@ export default function CampaignsPage() {
       alert(e instanceof Error ? e.message : 'فشل تشغيل الحملة')
     } finally {
       setRunningCampaignId(null)
+    }
+  }
+
+  function handleUploadTargetsClick(campaign: Campaign) {
+    if (!(campaign as any).portfolio_id) { alert('هذي الحملة بلا محفظة محدّدة — افتح حملة جديدة واختر المحفظة.'); return }
+    uploadTargetCampaignRef.current = campaign
+    uploadFileInputRef.current?.click()
+  }
+
+  async function handleUploadTargetsFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const campaign = uploadTargetCampaignRef.current
+    e.target.value = ''
+    if (!file || !campaign) return
+
+    setUploadingCampaignId(campaign.id)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('campaign_id', campaign.id)
+      formData.append('portfolio_id', (campaign as any).portfolio_id)
+
+      const res = await fetch('/api/campaign-builder/upload-targets', { method: 'POST', body: formData })
+      const json = await res.json() as {
+        data?: { rows_in_file: number; matched_customers: number; queue_created: number; unmatched: unknown[]; message?: string }
+        error?: string
+      }
+      if (!res.ok) throw new Error(json.error ?? 'فشل رفع الملف')
+
+      const d = json.data
+      alert(
+        d?.message ??
+        `تمت المعالجة: ${d?.rows_in_file ?? 0} صف بالملف، ${d?.matched_customers ?? 0} عميل تمت مطابقته، ${d?.queue_created ?? 0} رسالة جدولت للإرسال` +
+        ((d?.unmatched?.length ?? 0) > 0 ? `\n(${d!.unmatched.length} صف لم تتم مطابقته)` : '')
+      )
+      await load()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'فشل رفع الملف')
+    } finally {
+      setUploadingCampaignId(null)
+      uploadTargetCampaignRef.current = null
     }
   }
 
@@ -648,6 +692,16 @@ export default function CampaignsPage() {
                     </button>
                     {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
                       <button
+                        onClick={() => handleUploadTargetsClick(campaign)}
+                        disabled={uploadingCampaignId === campaign.id}
+                        title="استهداف عملاء محددين برفع ملف Excel يحتوي رقم الهوية أو الجوال"
+                        className="bg-[#151a23] border border-[#222a36] hover:bg-[#1a212c] disabled:opacity-50 text-[#8b95a7] font-bold text-xs px-4 py-2.5 rounded-xl transition-colors flex items-center gap-1.5">
+                        <Upload size={14} />
+                        {uploadingCampaignId === campaign.id ? 'جارٍ الرفع…' : 'استهداف عملاء (Excel)'}
+                      </button>
+                    )}
+                    {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                      <button
                         onClick={() => handleRunCampaign(campaign)}
                         disabled={runningCampaignId === campaign.id}
                         className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5">
@@ -709,6 +763,14 @@ export default function CampaignsPage() {
           </div>
         </div>
       </div>
+
+      <input
+        ref={uploadFileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleUploadTargetsFileChange}
+      />
 
       {/* QR Code Modal for linking */}
       {activeQr && (
