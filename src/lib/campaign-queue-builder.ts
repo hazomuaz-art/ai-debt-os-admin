@@ -75,7 +75,18 @@ export async function buildCampaignQueueRows(args: {
     metadata: { source, portfolio_id },
   }))
 
-  const { error: queueError } = await supabase.from('campaign_send_queue').insert(queueRows)
+  // Real production bug this fixes: a plain insert() let re-running the
+  // builder (a re-click, or "تشغيل الحملة" then "استهداف عملاء (Excel)" on
+  // the same person) create a SECOND queue row for the same recipient —
+  // each one gets sent independently by send-campaign-queue, so the
+  // customer receives the same campaign message more than once. Confirmed
+  // live: one customer received 3 near-simultaneous sends from one run
+  // before the recipient_id unique constraint (migration 052) + this
+  // upsert. ignoreDuplicates means an already-queued/already-sent recipient
+  // is left untouched, not reset back to 'pending'.
+  const { error: queueError } = await supabase
+    .from('campaign_send_queue')
+    .upsert(queueRows, { onConflict: 'recipient_id', ignoreDuplicates: true })
   if (queueError) throw new Error(queueError.message)
 
   const { error: campaignUpdErr } = await supabase
