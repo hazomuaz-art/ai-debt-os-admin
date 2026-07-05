@@ -145,13 +145,23 @@ export function detectCustomerIntent(message: string): CustomerIntent {
     return "information_request"
   }
 
+  // Real production bug this fixes: "يوم"/"تاريخ" are bare substrings that
+  // also match extremely common, unrelated words ("اليوم" = today, "بتاريخ"
+  // in an unrelated sentence, any mention of a day of the week) with no
+  // requirement that the customer is actually committing to pay — the SAME
+  // unguarded-lexicon bug class already root-caused and fixed in
+  // ai-collector-agent.ts's hasTemporalRef() (which requires an actual
+  // payment verb alongside "اليوم"/"الحين" for exactly this reason). This
+  // classifier drives real writes downstream (automation-pipeline.ts's
+  // stepLiveReactor: debts.update() priority escalation, promise_detected
+  // timeline events) — "اوعدك"/"بوعدك" are unambiguous promise declarations
+  // and stay unconditional; the vaguer day/date words now require an actual
+  // payment verb in the same message.
+  const hasPaymentVerbForPromise = /سدد|اسدد|أسدد|بسدد|ادفع|أدفع|بدفع|احول|أحول|بحول|حول|دفعت|سددت|حولت/.test(text)
   if (
     text.includes("اوعدك") ||
     text.includes("بوعدك") ||
-    text.includes("يوم") ||
-    text.includes("تاريخ") ||
-    text.includes("بكرة") ||
-    text.includes("بكره")
+    ((text.includes("يوم") || text.includes("تاريخ") || text.includes("بكرة") || text.includes("بكره")) && hasPaymentVerbForPromise)
   ) {
     return "promise"
   }

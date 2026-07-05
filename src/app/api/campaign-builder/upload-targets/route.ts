@@ -8,6 +8,15 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('api/campaign-builder/upload-targets')
 
+// Real DoS gap this fixes: no bound existed on the uploaded file's size or
+// row count, and every row triggered its own sequential DB round-trip — an
+// authenticated admin/manager (this SaaS has many customer-org admins, not
+// all equally trusted) could upload a huge file and tie up a server worker
+// and the shared Supabase connection pool for minutes. 5MB / 2,000 rows is
+// generously above any realistic hand-picked target list for this feature.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+const MAX_UPLOAD_ROWS = 2000
+
 type UnmatchedRow = { row: number; national_id: string | null; phone: string | null; reason: string }
 
 // Lets an admin scope a campaign to a SPECIFIC, hand-picked customer list
@@ -28,6 +37,7 @@ export async function POST(req: NextRequest) {
       const campaign_id = form?.get('campaign_id')
       const portfolio_id_raw = form?.get('portfolio_id')
       if (!file || !(file instanceof File)) return errors.badRequest('file is required')
+      if (file.size > MAX_UPLOAD_BYTES) return errors.badRequest(`حجم الملف كبير جداً — الحد الأقصى ${MAX_UPLOAD_BYTES / (1024 * 1024)} ميجابايت`)
       if (typeof campaign_id !== 'string' || !campaign_id) return errors.badRequest('campaign_id is required')
       const portfolio_id = typeof portfolio_id_raw === 'string' && portfolio_id_raw ? portfolio_id_raw : null
 
@@ -63,6 +73,7 @@ export async function POST(req: NextRequest) {
         return errors.badRequest('Failed to parse Excel file: ' + (err instanceof Error ? err.message : String(err)))
       }
       if (!parsed.rows.length) return errors.badRequest('No data rows found in file')
+      if (parsed.rows.length > MAX_UPLOAD_ROWS) return errors.badRequest(`عدد كبير جداً من الصفوف (${parsed.rows.length}) — الحد الأقصى ${MAX_UPLOAD_ROWS} صف لكل ملف`)
 
       const { clusters } = analyzeImportFile(parsed.headers, parsed.rows)
 
@@ -90,18 +101,25 @@ export async function POST(req: NextRequest) {
       const unmatched: UnmatchedRow[] = []
       const matchedCustomerIds = new Set<string>()
 
-      for (const id of identifiers) {
-        let customerId: string | null = null
-
-        if (id.national_id) {
-          const { data } = await ctx.supabase
-            .from('customers')
-            .select('id')
-            .eq('company_id', ctx.profile.company_id)
-            .eq('national_id', id.national_id)
-            .maybeSingle()
-          customerId = data?.id ?? null
+      // Batched instead of one query per row — with up to MAX_UPLOAD_ROWS
+      // identifiers, a per-row national_id lookup was the bulk of the
+      // sequential-query DoS surface fixed above. A single `.in()` covers
+      // every distinct national_id in the file in one round-trip.
+      const distinctNationalIds = Array.from(new Set(identifiers.map(id => id.national_id).filter((v): v is string => !!v)))
+      const nationalIdToCustomerId = new Map<string, string>()
+      if (distinctNationalIds.length > 0) {
+        const { data: byNationalId } = await ctx.supabase
+          .from('customers')
+          .select('id, national_id')
+          .eq('company_id', ctx.profile.company_id)
+          .in('national_id', distinctNationalIds)
+        for (const c of byNationalId ?? []) {
+          if (c.national_id) nationalIdToCustomerId.set(c.national_id, c.id)
         }
+      }
+
+      for (const id of identifiers) {
+        let customerId: string | null = id.national_id ? (nationalIdToCustomerId.get(id.national_id) ?? null) : null
 
         if (!customerId && id.phone) {
           const normalized = normalizePhone(id.phone)

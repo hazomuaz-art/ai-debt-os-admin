@@ -1638,8 +1638,22 @@ ${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعل�
   // Gated on a cheap pre-check (lexicon hit OR a commitment verb present) so
   // the engine is never called on every single message. Fails closed to
   // null on any error — never blocks or breaks the reply.
+  // Real production bug this fixes: hasTemporalRef() already excludes
+  // hardship/insufficiency phrasing ("راتبي ما يكفي") from ITS OWN salary
+  // branch, but COMMITMENT_VERBS below is a bare substring check with no such
+  // guard — "راتبي ما يكفي اني اسدد" contains "اسدد" purely inside a negation
+  // ("not enough for me TO PAY"), which still passed this gate, consulted the
+  // Temporal Engine, and let engineResolution?.resolved alone satisfy
+  // isRealPromise further below — completely bypassing the hasTemporalRef fix.
+  // Confirmed live: exact case fabricated a "2026-07-27" promise from this
+  // customer's refusal+dispute message. A customer explicitly disputing the
+  // debt or flatly refusing to pay in THIS message is never making a genuine
+  // commitment, regardless of what verb/date-like text also appears in it —
+  // this single guard is applied everywhere a promise could be inferred below
+  // (the engine gate, the force-record guard, and isRealPromise itself).
+  const notAGenuineCommitment = hasExplicitDisputeDeclaration(text) || signals.refusesToPay
   let engineResolution: { resolved: boolean; resolved_date: string | null; confidence: string | null; reference_type: string; needs_clarification: boolean } | null = null
-  if (hasTemporalRef(text) || hasAny(text, COMMITMENT_VERBS)) {
+  if ((hasTemporalRef(text) || hasAny(text, COMMITMENT_VERBS)) && !notAGenuineCommitment) {
     try {
       const { resolveTemporalExpression } = await import('@/lib/temporal-engine')
       engineResolution = await resolveTemporalExpression(text, {
@@ -1661,7 +1675,7 @@ ${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعل�
   // never force-record a promise over an active objection, same reasoning
   // as the existing deniesDebt/deniesPromise guards below.
   let promiseForcedFromTemporalRef = false
-  if ((hasTemporalRef(text) || !!engineResolution?.resolved) && !negatesImmediateTiming && parsed.action !== 'record_promise' && !signals.deniesDebt && !signals.deniesPromise && !hasExplicitDisputeDeclaration(text)) {
+  if ((hasTemporalRef(text) || !!engineResolution?.resolved) && !negatesImmediateTiming && parsed.action !== 'record_promise' && !signals.deniesDebt && !signals.deniesPromise && !notAGenuineCommitment) {
     log.warn('forcing record_promise — customer message has an explicit temporal reference the model did not classify as a promise', { original_action: parsed.action, text_preview: text.slice(0, 80) })
     parsed.action = 'record_promise'
     parsed.reason = 'promise_forced_from_temporal_ref'

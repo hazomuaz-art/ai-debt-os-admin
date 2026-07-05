@@ -28,6 +28,13 @@ export async function generateCampaignMessage(args: {
   debt_id: string | null
   campaign_type: string
   message_template: string | null
+  // Same repetition-risk class as generateProactiveReminder() in
+  // ai-whatsapp-reply.ts: a customer enrolled in more than one campaign (or
+  // a re-run of the same campaign) could get near-identical AI-personalized
+  // text each time, since this function otherwise has zero awareness of
+  // what was already sent. Prior campaign message texts for this customer,
+  // most recent first.
+  avoid_texts?: string[]
 }): Promise<string | null> {
   const fallback = args.message_template ?? null
   if (!process.env.OPENROUTER_API_KEY || !args.debt_id) return fallback
@@ -45,9 +52,14 @@ export async function generateCampaignMessage(args: {
     const caseNote = (ctx.debt as any)?.metadata?.case_note ?? null
     const negotiation = ctx.negotiation_profile as any
 
+    // company_id scoping added defensively — debt_id here always comes from
+    // an already tenant-scoped campaign_send_queue row, so this wasn't
+    // directly exploitable, but every other query in this file is scoped and
+    // this one shouldn't be the exception.
     const { data: latestScore } = await svc
       .from('ai_scores')
       .select('score, risk_classification, recommended_strategy')
+      .eq('company_id', args.company_id)
       .eq('debt_id', args.debt_id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -70,6 +82,9 @@ export async function generateCampaignMessage(args: {
     ].filter(Boolean).join('\n')
 
     const strictRules = Array.isArray(ctx.strict_rules) ? ctx.strict_rules.join('\n') : ''
+    const avoidBlock = args.avoid_texts?.length
+      ? `\n🔴 رسائل حملات سبق إرسالها لهذا العميل — اكتب رسالة مختلفة تماماً عنها (تحية/فتحة مختلفة، ترتيب أفكار مختلف)، لا تعيد نفس الشكل بكلمات مرادفة فقط:\n${args.avoid_texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+      : ''
 
     const client = new OpenAI({
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -86,7 +101,7 @@ ${facts || 'لا توجد بيانات كافية عن هذا العميل'}
 
 ═══ الغرض من هذه الحملة ═══
 ${CAMPAIGN_PURPOSE[args.campaign_type] ?? 'رسالة حملة'}
-${args.message_template ? `النص المرجعي للحملة (استخدمه كدليل على الأسلوب والغرض العام فقط، ثم خصصه فعلياً لهذا العميل ببياناته أعلاه):\n${args.message_template}` : ''}
+${args.message_template ? `النص المرجعي للحملة (استخدمه كدليل على الأسلوب والغرض العام فقط، ثم خصصه فعلياً لهذا العميل ببياناته أعلاه):\n${args.message_template}` : ''}${avoidBlock}
 
 ═══ المهمة ═══
 اكتب رسالة واتساب واحدة قصيرة (سطر إلى سطرين كحد أقصى) موجّهة لهذا العميل بالذات، مبنية على بياناته الحقيقية أعلاه (اسمه، رصيده، آخر تطور في حالته إن وُجد) بدل رسالة عامة تصلح لأي عميل آخر.
@@ -95,7 +110,9 @@ ${args.message_template ? `النص المرجعي للحملة (استخدمه 
 
     const ai = await client.chat.completions.create({
       model: 'anthropic/claude-sonnet-4.6',
-      temperature: 0.4,
+      // Raised from 0.4 for more lexical variety across recipients/campaigns
+      // — same reasoning as generateProactiveReminder's temperature bump.
+      temperature: 0.6,
       max_tokens: 220,
       messages: [
         { role: 'system', content: systemPrompt },

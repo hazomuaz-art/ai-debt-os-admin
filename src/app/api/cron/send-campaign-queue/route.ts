@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   const { data: queueRows, error } = await supabase
     .from('campaign_send_queue')
     .select(`
-      id, company_id, campaign_id, customer_id, debt_id, message_text, attempts, max_attempts,
+      id, company_id, campaign_id, recipient_id, customer_id, debt_id, message_text, attempts, max_attempts,
       campaign:campaigns(id, campaign_type, message_template, sent_count, send_window_start, send_window_end),
       customer:customers(phone, whatsapp),
       whatsapp_number:portfolio_whatsapp_numbers(id, instance_name, api_url, daily_limit, sent_today, last_sent_at, is_active)
@@ -101,10 +101,23 @@ export async function GET(req: NextRequest) {
     // balance, AI score, latest case note) — only falls back to the campaign's
     // generic template if generation is unavailable/fails, or a message_text
     // was already explicitly set on this row.
-    const messageText = r.message_text || (campaign ? await generateCampaignMessage({
-      company_id: r.company_id, customer_id: r.customer_id, debt_id: r.debt_id,
-      campaign_type: campaign.campaign_type, message_template: campaign.message_template,
-    }) : null)
+    let messageText = r.message_text || null
+    if (!messageText && campaign) {
+      // Same repetition risk as the proactive-reminder fix — a customer
+      // enrolled in more than one campaign could otherwise get near-identical
+      // AI text each time. Prior campaign messages give the model something
+      // concrete to differentiate against.
+      const { data: priorCampaignMsgs } = await supabase
+        .from('messages').select('content')
+        .eq('customer_id', r.customer_id).eq('direction', 'outbound')
+        .eq('metadata->>action_type', 'campaign')
+        .order('sent_at', { ascending: false }).limit(5)
+      messageText = await generateCampaignMessage({
+        company_id: r.company_id, customer_id: r.customer_id, debt_id: r.debt_id,
+        campaign_type: campaign.campaign_type, message_template: campaign.message_template,
+        avoid_texts: (priorCampaignMsgs ?? []).map((m: { content: string | null }) => m.content ?? '').filter(Boolean),
+      })
+    }
     if (!phone || !messageText) {
       results.failed++
       const { error: noPhoneErr } = await supabase.from('campaign_send_queue').update({ status: 'failed', error: !phone ? 'no_phone' : 'no_message_text', processed_at: new Date().toISOString() }).eq('id', r.id)
@@ -137,6 +150,17 @@ export async function GET(req: NextRequest) {
       // messages), since nothing else here marks it done.
       const { error: sentStatusErr } = await supabase.from('campaign_send_queue').update({ status: 'sent', processed_at: new Date().toISOString() }).eq('id', r.id)
       if (sentStatusErr) log.error('failed to mark queue row sent — will be re-sent next run', new Error(sentStatusErr.message), { queue_id: r.id })
+      // Real gap found during a full-system audit: this never synced back to
+      // campaign_recipients — the campaigns dashboard's target drill-down
+      // kept showing "queued" for a recipient whose message had actually
+      // already sent, since campaign_send_queue is what actually gates
+      // delivery but campaign_recipients.status is the display source.
+      if (r.recipient_id) {
+        const { error: recipientStatusErr } = await supabase.from('campaign_recipients').update({
+          status: 'sent', sent_at: new Date().toISOString(),
+        }).eq('id', r.recipient_id)
+        if (recipientStatusErr) log.error('failed to sync campaign_recipients status to sent', new Error(recipientStatusErr.message), { recipient_id: r.recipient_id })
+      }
       const { error: numberCountErr } = await supabase.from('portfolio_whatsapp_numbers').update({
         sent_today: runningSentToday[num.id], last_sent_at: new Date().toISOString(),
       }).eq('id', num.id)
