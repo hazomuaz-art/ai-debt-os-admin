@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Search, Send, Bot, User, Phone, MessageSquare } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
@@ -23,6 +24,7 @@ interface ChatMessage {
     ai_paused?: boolean
   }
   debt?: {
+    id?: string
     reference_number?: string
     current_balance?: number
     currency?: string
@@ -202,8 +204,18 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
                   <h3 className="font-bold text-white">{selectedChat.customer.full_name}</h3>
                   <div className="text-xs text-[#8b95a7] flex items-center gap-2">
                     <span>{selectedChat.customer.whatsapp || selectedChat.customer.phone}</span>
-                    <span>•</span>
-                    <span className="font-mono text-blue-400 font-semibold">{selectedChat.debt?.reference_number}</span>
+                    {selectedChat.debt?.reference_number && (
+                      <>
+                        <span>•</span>
+                        {selectedChat.debt?.id ? (
+                          <Link href={`/dashboard/admin/debts/${selectedChat.debt.id}`} className="font-mono text-blue-400 font-semibold underline decoration-dotted hover:text-blue-300">
+                            {selectedChat.debt.reference_number}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-blue-400 font-semibold">{selectedChat.debt.reference_number}</span>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

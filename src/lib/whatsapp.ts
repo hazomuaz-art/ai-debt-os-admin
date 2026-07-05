@@ -74,6 +74,20 @@ export function normalizePhone(raw: string): string {
   return digits
 }
 
+// Real inconsistency found during a full-system audit: customer creation
+// (createCustomerAction) stored phone/whatsapp as "+966XXXXXXXXX", while the
+// customers list's inline WhatsApp-edit PATCH route stored the SAME kind of
+// value via normalizePhone() alone — digit-only, no "+". Both formats now
+// coexist across real customer rows (confirmed live), so the same phone
+// prints inconsistently depending on which write path last touched it. This
+// shared helper is the single source of truth both call sites should use —
+// normalizePhone() itself stays digit-only since every WhatsApp-send call
+// site depends on that exact shape.
+export function toSaudiIntlPhone(raw: string): string | undefined {
+  const normalized = normalizePhone(raw)
+  return normalized ? `+${normalized}` : undefined
+}
+
 function truncateMessage(message: string): string {
   if (Buffer.byteLength(message, 'utf8') <= MAX_MESSAGE_BYTES) return message
   let t = message

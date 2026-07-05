@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, parseQuery, errors } from '@/lib/api'
-import { normalizePhone } from '@/lib/whatsapp'
+import { normalizePhone, toSaudiIntlPhone } from '@/lib/whatsapp'
 import { z } from 'zod'
 
 const customersQuerySchema = z.object({
@@ -65,13 +65,19 @@ export async function PATCH(request: NextRequest) {
       return errors.badRequest('رقم واتساب غير صحيح')
     }
 
+    // Real inconsistency found during a full-system audit: this stored
+    // digit-only (e.g. "966501234567") while customer creation stores
+    // "+966501234567" — both formats coexist across real rows today,
+    // printing inconsistently depending on which path last touched a given
+    // customer. toSaudiIntlPhone() is the shared, single format going forward.
+    const stored = toSaudiIntlPhone(whatsapp) ?? normalized
     const { error } = await ctx.supabase
       .from('customers')
-      .update({ whatsapp: normalized })
+      .update({ whatsapp: stored })
       .eq('id', id)
       .eq('company_id', ctx.profile.company_id)
 
     if (error) return errors.internal()
-    return NextResponse.json({ success: true, whatsapp: normalized })
+    return NextResponse.json({ success: true, whatsapp: stored })
   })
 }

@@ -25,9 +25,22 @@ export default async function PaymentsPage() {
     .limit(300)
 
   const all = payments ?? []
-  const totalAmount = all.reduce((sum, p: any) => sum + Number(p.amount ?? 0), 0)
-  const verified = all.filter((p: any) => p.verification_status === 'verified')
-  const pendingReview = all.filter((p: any) => p.verification_status !== 'verified')
+
+  // Real gap found during a full-system audit: totalAmount/verified/
+  // pendingReview were computed off this same 300-row-capped display array —
+  // once a company passes 300 total payments, these silently undercount
+  // (same bug class already fixed once in analytics.tsx's dual "collected"
+  // computation). A separate, unlimited fetch of just the two columns
+  // needed for these aggregates keeps them accurate regardless of the
+  // display list's cap.
+  const { data: allPaymentTotals } = await supabase
+    .from('payments')
+    .select('amount, verification_status')
+    .eq('company_id', profile.company_id)
+  const totalsSource = allPaymentTotals ?? all
+  const totalAmount = totalsSource.reduce((sum, p: any) => sum + Number(p.amount ?? 0), 0)
+  const verified = totalsSource.filter((p: any) => p.verification_status === 'verified')
+  const pendingReview = totalsSource.filter((p: any) => p.verification_status !== 'verified')
 
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">

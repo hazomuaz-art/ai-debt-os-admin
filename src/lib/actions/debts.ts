@@ -11,17 +11,8 @@ import { processEvent } from '@/lib/automation-pipeline'
 import { recordAttribution } from '@/lib/revenue-attribution'
 import { upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
 import { getPortfolioTableConfig } from '@/lib/portfolio-data-fields'
-import { normalizePhone } from '@/lib/whatsapp'
+import { toSaudiIntlPhone } from '@/lib/whatsapp'
 const log = createLogger('actions/debts')
-
-// Saudi international display format ("+966 5X XXX XXXX" style storage),
-// matching this form's own placeholder text. normalizePhone() already
-// strips non-digits wherever it's consumed for sending, so the leading
-// "+" here is purely a storage/display convention and never breaks WAHA.
-function toSaudiIntlPhone(raw: string): string | undefined {
-  const normalized = normalizePhone(raw)
-  return normalized ? `+${normalized}` : undefined
-}
 
 // ============================================================
 // Schemas

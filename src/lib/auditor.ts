@@ -80,6 +80,12 @@ const EXPECTED_TABLES = [
   'system_alerts','system_config','promises','approvals','campaigns',
   'portfolios','job_queue','integration_settings',
   'orchestrator_runs','legal_escalations',
+  // Added during a full-system audit: the campaign engine overhaul added
+  // campaign_send_queue/campaign_recipients/disputes as real, load-bearing
+  // tables, but the health page had zero visibility into any of them —
+  // an operator watching صحة النظام had no way to notice a stuck send
+  // queue or an unreviewed dispute.
+  'campaign_send_queue','campaign_recipients','disputes',
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +155,8 @@ const MODULE_MAP = [
   { name: 'Campaigns',       writes: 'campaigns',       reads: 'campaigns',       pipeline_step: 'campaigns' },
   { name: 'WhatsApp Queue',  writes: 'job_queue',       reads: 'messages',        pipeline_step: 'whatsapp' },
   { name: 'Orchestrator Log',writes: 'orchestrator_runs',reads: 'orchestrator_runs',pipeline_step: 'batch' },
+  { name: 'Campaign Send Queue', writes: 'campaign_send_queue', reads: 'campaign_send_queue', pipeline_step: 'campaign_send' },
+  { name: 'Disputes',        writes: 'disputes',        reads: 'disputes',        pipeline_step: 'disputes' },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

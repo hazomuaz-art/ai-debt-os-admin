@@ -18,14 +18,24 @@ export default async function MessagesPage() {
     .select(`
       id, content, direction, channel, status, sent_at, created_at,
       customer:customers(id, full_name, phone, whatsapp, ai_paused),
-      debt:debts(reference_number, current_balance, currency)
+      debt:debts(id, reference_number, current_balance, currency)
     `)
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
     .limit(300)
 
-  const inbound = messages?.filter(m => m.direction === 'inbound').length ?? 0
-  const whatsapp = messages?.filter(m => m.channel === 'whatsapp').length ?? 0
+  // Real gap found during a full-system audit: these used to be computed off
+  // the same 300-row-capped `messages` array shown in the chat list — once a
+  // company passes 300 total messages, both counters silently undercount
+  // (same bug class already fixed once in analytics.tsx's dual "collected"
+  // computation). Exact counts via a separate head-only query, independent
+  // of the display list's cap.
+  const [{ count: inbound }, { count: whatsapp }] = await Promise.all([
+    supabase.from('messages').select('*', { count: 'exact', head: true })
+      .eq('company_id', profile.company_id).eq('direction', 'inbound'),
+    supabase.from('messages').select('*', { count: 'exact', head: true })
+      .eq('company_id', profile.company_id).eq('channel', 'whatsapp'),
+  ])
   const { t, dir } = getServerTranslation()
   const m = t.pages.messages
 
@@ -40,11 +50,11 @@ export default async function MessagesPage() {
         </div>
         <div className="flex gap-4">
           <div className="bg-[#0d1117] px-4 py-2 rounded-xl border border-[#222a36] text-center">
-            <div className="text-2xl font-bold text-white">{whatsapp}</div>
+            <div className="text-2xl font-bold text-white">{whatsapp ?? 0}</div>
             <div className="text-[10px] text-[#8b95a7] font-bold">{m.whatsapp_msgs}</div>
           </div>
           <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 text-center">
-            <div className="text-2xl font-bold text-emerald-400">{inbound}</div>
+            <div className="text-2xl font-bold text-emerald-400">{inbound ?? 0}</div>
             <div className="text-[10px] text-[#8b95a7] font-bold">{m.inbound_from_customers}</div>
           </div>
         </div>
