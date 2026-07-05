@@ -690,7 +690,16 @@ export default function CampaignsPage() {
                       {expandedCampaignId === campaign.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       عرض الأهداف
                     </button>
-                    {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                    {/* 'running' is included alongside draft/scheduled — a
+                        campaign flips to 'running' the moment its FIRST
+                        message sends (see send-campaign-queue/route.ts), so
+                        excluding it here would permanently hide both
+                        targeting actions after just one send, even though
+                        adding another batch of targets to an already-active
+                        campaign is a completely normal thing to want. Only
+                        genuinely finished/stopped states (paused, completed,
+                        cancelled) are excluded. */}
+                    {(campaign.status === 'draft' || campaign.status === 'scheduled' || campaign.status === 'running') && (
                       <button
                         onClick={() => handleUploadTargetsClick(campaign)}
                         disabled={uploadingCampaignId === campaign.id}
@@ -700,7 +709,7 @@ export default function CampaignsPage() {
                         {uploadingCampaignId === campaign.id ? 'جارٍ الرفع…' : 'استهداف عملاء (Excel)'}
                       </button>
                     )}
-                    {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                    {(campaign.status === 'draft' || campaign.status === 'scheduled' || campaign.status === 'running') && (
                       <button
                         onClick={() => handleRunCampaign(campaign)}
                         disabled={runningCampaignId === campaign.id}
