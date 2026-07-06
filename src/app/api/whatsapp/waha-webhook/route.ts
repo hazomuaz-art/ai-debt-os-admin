@@ -558,6 +558,26 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // human_review → the agent decided this needs a person, WITHOUT
+      // stopping collection. Main current source: an أبشر-verified customer
+      // who keeps insisting the confirmed number isn't theirs — the debt
+      // stays fully active (ai NOT paused) but a human should look. Surfaced
+      // as an alert so it appears on the التنبيهات page.
+      if (aiDecision.action === 'human_review') {
+        await insertSystemAlert({
+          company_id: c.company_id, severity: 'warning', alert_type: 'needs_human_review',
+          title: `يحتاج مراجعة بشرية: ${c.full_name ?? phone}`,
+          message: `العميل ${c.full_name ?? phone} يصرّ على أن الرقم ليس رقمه رغم أنه مؤكد من أبشر. المديونية باقية قائمة والتواصل مستمر — راجع الحالة يدوياً.`,
+          metadata: { customer_id: c.id, debt_id: effectiveDebtId, phone, customer_message: mergedText, reason: aiDecision.reason ?? null },
+        })
+        await insertTimelineEvent({
+          company_id: c.company_id, customer_id: c.id, debt_id: effectiveDebtId,
+          event_type: 'status_change', channel: 'whatsapp', actor_type: 'ai', ai_used: true,
+          summary: 'رُفعت الحالة لمراجعة بشرية (إصرار على رقم مؤكد من أبشر) — التحصيل مستمر',
+          detail: mergedText.slice(0, 500),
+        })
+      }
+
       // Dispute → open dispute + approval (dedup), with full context
       if (aiDecision.action === 'record_dispute' && effectiveDebtId) {
         const { recordDispute } = await import('@/lib/dispute')

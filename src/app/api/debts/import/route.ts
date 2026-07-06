@@ -340,35 +340,58 @@ export async function POST(request: NextRequest) {
       try {
         let customerId: string
 
-        let existing = null
+        // أبشر (Absher) — the government-verified, authoritative contact for
+        // this customer. When the file carries an Absher column, that number
+        // is treated as the CONFIRMED primary (phone + whatsapp) and the
+        // customer is flagged `absher_verified` so the collector agent knows
+        // the number is certain and never simply accepts a "this isn't my
+        // number" claim on it (see ai-collector-agent.ts wrong-number guard).
+        const absherKey = Object.keys(rawByHeader).find(k => /ابشر|absher/.test(k))
+        const absherNumber = absherKey ? normalizePhone(rawByHeader[absherKey]) : ''
+        const absherVerified = /^9665\d{8}$/.test(absherNumber)
+
+        // All valid numbers from the (often multi-number) contact cell.
+        // Real bug this also fixes: the primary phone/whatsapp used to be
+        // `f.phone` with only non-digits stripped — for a cell holding
+        // several numbers ("0599..., 0545...") that produced ONE mashed,
+        // invalid number. Use a genuinely-parsed number as the primary.
+        const contactNumbers = extractPhoneNumbers(f.phone)
+        const explicitWhatsapp = f.whatsapp ? normalizePhone(f.whatsapp) : ''
+        const primaryNumber =
+          (absherVerified ? absherNumber : '') ||
+          explicitWhatsapp ||
+          contactNumbers[0] ||
+          (f.phone ? normalizePhone(f.phone) : '') ||
+          null
+
+        type ExistingCustomer = { id: string; metadata?: Record<string, unknown> | null }
+        let existing: ExistingCustomer | null = null
         if (f.national_id) {
-          const { data } = await supabase.from('customers').select('id')
+          const { data } = await supabase.from('customers').select('id, metadata')
             .eq('company_id', profile.company_id).eq('national_id', f.national_id).maybeSingle()
-          existing = data
+          existing = (data as ExistingCustomer | null) ?? null
         }
-        if (!existing && f.phone) {
-          const cleanPhone = f.phone.replace(/[^\d+]/g, '')
-          const { data } = await supabase.from('customers').select('id')
-            .eq('company_id', profile.company_id).eq('phone', cleanPhone).maybeSingle()
-          existing = data
+        if (!existing && primaryNumber) {
+          const { data } = await supabase.from('customers').select('id, metadata')
+            .eq('company_id', profile.company_id).eq('phone', primaryNumber).maybeSingle()
+          existing = (data as ExistingCustomer | null) ?? null
         }
 
-        // Auto-derive WhatsApp from phone when no explicit whatsapp column:
-        // Saudi numbers starting with 05... → 966..., already-966 kept as-is.
-        const resolvedWhatsapp = f.whatsapp
-          ? f.whatsapp.replace(/[^\d+]/g, '')
-          : (f.phone ? normalizePhone(f.phone) : null)
+        const absherMeta = absherVerified ? { absher_verified: true, absher_number: absherNumber } : null
 
         if (existing) {
-          customerId = (existing as { id: string }).id
+          customerId = existing.id
+          // Merge (never overwrite) existing metadata so an Absher flag adds
+          // to whatever else is already stored on the customer.
+          const mergedMeta = absherMeta ? { ...(existing.metadata ?? {}), ...absherMeta } : null
           const { error: custUpdErr } = await supabase.from('customers').update({
             full_name:      f.full_name,
-            ...(f.phone         && { phone:          f.phone.replace(/[^\d+]/g, '') }),
-            ...(resolvedWhatsapp && { whatsapp:       resolvedWhatsapp }),
+            ...(primaryNumber   && { phone: primaryNumber, whatsapp: primaryNumber }),
             ...(f.city          && { city:            f.city }),
             ...(f.employer      && { employer:        f.employer }),
             ...(f.email         && { email:           f.email }),
             ...(f.monthly_income && { monthly_income: parseFloat(f.monthly_income.replace(/[,، ]/g, '')) }),
+            ...(mergedMeta      && { metadata: mergedMeta }),
           }).eq('id', customerId)
           if (custUpdErr) logger.error('customer re-sync update failed on re-import', custUpdErr, { customer_id: customerId })
         } else {
@@ -376,13 +399,14 @@ export async function POST(request: NextRequest) {
             company_id:     profile.company_id,
             created_by:     user.id,
             full_name:      f.full_name,
-            phone:          f.phone?.replace(/[^\d+]/g, '') || null,
-            whatsapp:       resolvedWhatsapp || null,
+            phone:          primaryNumber,
+            whatsapp:       primaryNumber,
             national_id:    f.national_id || null,
             city:           f.city || null,
             employer:       f.employer || null,
             email:          f.email || null,
             monthly_income: f.monthly_income ? parseFloat(f.monthly_income.replace(/[,، ]/g, '')) : null,
+            ...(absherMeta && { metadata: absherMeta }),
           }).select('id').single()
 
           if (custErr || !newCust)
@@ -400,7 +424,15 @@ export async function POST(request: NextRequest) {
         // tokens that match a real Saudi mobile shape. Re-imports of the
         // same customer only ever ADD a newly-seen number (UNIQUE
         // constraint on customer_id+phone silently no-ops on a repeat).
-        const allPhoneNumbers = extractPhoneNumbers(f.phone)
+        // Absher number (when present) leads as the primary contact, then
+        // every other valid number from the contact cell as secondaries a
+        // later cron can retry only if the primary never delivers/replies.
+        // De-duplicated so the Absher number isn't stored twice if it also
+        // appears in the contact cell.
+        const allPhoneNumbers = [
+          ...(absherVerified ? [absherNumber] : []),
+          ...extractPhoneNumbers(f.phone),
+        ].filter((v, i, arr) => v && arr.indexOf(v) === i)
         if (allPhoneNumbers.length > 0) {
           const { error: contactsUpsertErr } = await supabase.from('customer_contacts').upsert(
             allPhoneNumbers.map((phone, i) => ({
