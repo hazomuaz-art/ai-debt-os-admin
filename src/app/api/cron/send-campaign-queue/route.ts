@@ -34,6 +34,19 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString()
   const today = nowIso.slice(0, 10)
 
+  // Recover rows a prior run atomically claimed ('processing') but never
+  // completed — e.g. the process was killed mid-send. Without this they'd
+  // stay 'processing' and never retry. Only rows claimed more than 10
+  // minutes ago are reset (a real in-flight send finishes in seconds), so
+  // this never races an active run. processed_at doubles as the claim time.
+  const staleIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+  const { error: recoverErr } = await supabase
+    .from('campaign_send_queue')
+    .update({ status: 'pending' })
+    .eq('status', 'processing')
+    .lt('processed_at', staleIso)
+  if (recoverErr) log.error('failed to recover stale processing rows', new Error(recoverErr.message))
+
   const { data: queueRows, error } = await supabase
     .from('campaign_send_queue')
     .select(`
@@ -95,6 +108,26 @@ export async function GET(req: NextRequest) {
       results.skipped_limit++
       continue // leave pending — retried once the daily window resets
     }
+
+    // 🔴 ATOMIC CLAIM — the fix for a real production double-send: this cron
+    // did a plain SELECT of pending rows then sent them, with no claim. If a
+    // second run (e.g. the scheduled cron overlapping a manual trigger, or
+    // two overlapping scheduled runs) started before the first marked a row
+    // 'sent', BOTH selected the same pending row and BOTH sent it — the same
+    // customer received the identical campaign message twice, seconds apart.
+    // Confirmed live: two customers got duplicate messages with distinct
+    // whatsapp_message_ids. This UPDATE ... WHERE status='pending' is atomic
+    // at the row level in Postgres, so exactly one concurrent run flips
+    // pending→processing and proceeds; every other run gets 0 rows back and
+    // skips. Placed AFTER the cheap skip checks above (which legitimately
+    // leave a row 'pending' for a later run) and BEFORE any send/LLM work.
+    const { data: claimed, error: claimErr } = await supabase
+      .from('campaign_send_queue')
+      .update({ status: 'processing', processed_at: new Date().toISOString() })
+      .eq('id', r.id).eq('status', 'pending')
+      .select('id')
+    if (claimErr) { log.error('failed to claim queue row', new Error(claimErr.message), { queue_id: r.id }); continue }
+    if (!claimed || claimed.length === 0) continue // another concurrent run already claimed/sent this row
 
     const phone = r.customer?.whatsapp || r.customer?.phone
     // Personalized per-customer message generated fresh at send time (real
