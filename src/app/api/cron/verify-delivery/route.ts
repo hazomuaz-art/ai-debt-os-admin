@@ -48,12 +48,31 @@ export async function GET(req: NextRequest) {
     .order('sent_at', { ascending: true })
     .limit(MAX_PER_RUN)
 
-  const result = { checked: stuck?.length ?? 0, retried: 0, markedFailedNoResend: 0, brokenSessionsSkipped: 0, correctedToFailed: 0, skipped: 0 }
+  // 🔴 Campaign messages must NEVER be auto-retried by this cron. A campaign
+  // is a one-shot blast to many brand-NEW contacts at once — none of whom
+  // have any prior delivered message — so this cron's "no delivery ack yet →
+  // the first message was swallowed during e2e setup → resend it once" logic
+  // fires on EVERY campaign message and re-sends the whole campaign a second
+  // time (~4 min later). Confirmed live: a campaign to 132 fresh imports had
+  // ~20 customers receive the identical message twice, ~4 min apart (the
+  // original + this cron's "first-contact retry"). Delivery of a campaign
+  // message is best-effort: if its ack never arrives we leave it alone rather
+  // than risk spamming a customer who already received it. Conversational
+  // 1:1 first-contact messages (the real target of the retry logic) still
+  // retry normally.
+  const retriable = (stuck ?? []).filter(m => {
+    const meta = (m as { metadata?: Record<string, unknown> }).metadata ?? {}
+    return meta.action_type !== 'campaign'
+      && meta.source !== 'campaign_send_queue'
+      && meta.source !== 'campaign_builder_upload'
+  })
+
+  const result = { checked: retriable.length, retried: 0, markedFailedNoResend: 0, brokenSessionsSkipped: 0, correctedToFailed: 0, skipped: 0 }
 
   // Group by customer so we never act on more than one stuck message per
   // customer per run, and so we can check session health once per customer.
   const byCustomer = new Map<string, Array<NonNullable<typeof stuck>[number]>>()
-  for (const m of stuck ?? []) {
+  for (const m of retriable) {
     const cid = (m as { customer_id: string }).customer_id
     if (!byCustomer.has(cid)) byCustomer.set(cid, [])
     byCustomer.get(cid)!.push(m)
