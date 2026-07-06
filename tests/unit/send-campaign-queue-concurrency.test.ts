@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Direct regression proof for the real production double-send incident
 // (2026-07-06): the campaign queue used to do a plain SELECT of pending rows
@@ -98,6 +98,11 @@ function makeReq() {
 
 describe('send-campaign-queue — concurrent invocations never double-send the same row', () => {
   beforeEach(() => {
+    // The real route enforces a 10s pacing delay between sends (see
+    // MIN_DELAY_BETWEEN_SENDS_MS — the WhatsApp-ban burst-rate fix). That
+    // delay is a real production safety measure, not something these tests
+    // are exercising, so make it instant here to keep the suite fast.
+    vi.stubGlobal('setTimeout', (fn: () => void) => { fn(); return 0 as any })
     sentCalls = 0
     queueRow = {
       id: 'row-1', company_id: 'c1', campaign_id: 'camp-1', recipient_id: 'rec-1',
@@ -106,6 +111,13 @@ describe('send-campaign-queue — concurrent invocations never double-send the s
       scheduled_at: new Date(Date.now() - 1000).toISOString(),
     }
     vi.resetModules()
+  })
+
+  afterEach(() => {
+    // Restore the real global setTimeout — vi.stubGlobal otherwise leaks
+    // across other test files sharing this worker (broke @testing-library's
+    // waitFor, which relies on real timers, in unrelated component tests).
+    vi.unstubAllGlobals()
   })
 
   it('sends exactly once when the route is invoked twice concurrently for the same pending row', async () => {

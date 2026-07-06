@@ -14,7 +14,23 @@ const log = createLogger('cron/send-campaign-queue')
 // last_sent_at rolls to a new calendar day) and the campaign's own
 // send_window_start/end if set. One batch per run; the crontab interval
 // controls overall throughput.
-const BATCH_SIZE = 20
+//
+// 🔴 BURST-RATE FIX — root cause of a real WhatsApp ban risk (2026-07-06):
+// this number (only 6 days old) was silently blocked by WhatsApp TWICE —
+// 2026-06-30 (0% delivery on 11 messages) and again today (25% delivery on
+// 149 messages) — both times immediately after a campaign burst. The
+// per-recipient `scheduled_at` stagger set at build time (1/minute) never
+// actually throttled the real send rate: this cron drained up to BATCH_SIZE
+// due rows in a SINGLE invocation with no delay between them beyond WAHA's
+// own ~1.5s warm-up ping, so if the cron tick lagged even slightly behind
+// the 1/minute schedule, many rows became "due" at once and were blasted
+// back-to-back — a burst-of-many-first-contacts-to-a-brand-new-number
+// pattern that is exactly WhatsApp's own anti-spam fingerprint. Fixed by
+// (a) capping how many real sends one tick can ever attempt, and (b) an
+// explicit, enforced delay between consecutive real sends within a tick —
+// both independent of how the cron scheduler itself behaves.
+const BATCH_SIZE = 5
+const MIN_DELAY_BETWEEN_SENDS_MS = 10_000
 
 function withinSendWindow(start: string | null, end: string | null): boolean {
   if (!start || !end) return true
@@ -197,6 +213,13 @@ export async function GET(req: NextRequest) {
       waha_session: num.instance_name, waha_api_url: num.api_url,
       customer_id: r.customer_id,
     })
+
+    // Enforced pacing — see BURST-RATE FIX above. Applied right after every
+    // real send attempt (success or failure both still hit WhatsApp's own
+    // rate-limit tracking), so no code path through this loop can ever emit
+    // two real sends closer together than this floor, regardless of how
+    // many rows were due or how the cron scheduler itself behaves.
+    await new Promise(resolve => setTimeout(resolve, MIN_DELAY_BETWEEN_SENDS_MS))
 
     const { error: campaignMsgErr } = await supabase.from('messages').insert({
       company_id: r.company_id, customer_id: r.customer_id, debt_id: r.debt_id,

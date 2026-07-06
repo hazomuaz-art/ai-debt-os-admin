@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Proves the Decision Engine end-to-end using the REAL send-gate.ts (not
 // mocked) wired through the real route: a customer who received an
@@ -102,7 +102,20 @@ function freshQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
 }
 
 describe('send-campaign-queue — real Decision Engine blocks a repeat unprompted send', () => {
-  beforeEach(() => { sentCalls = 0; vi.resetModules() })
+  beforeEach(() => {
+    // Same rationale as send-campaign-queue-concurrency.test.ts: the real
+    // 10s inter-send pacing delay is a genuine production safety measure,
+    // not something these tests exercise — make it instant here.
+    vi.stubGlobal('setTimeout', (fn: () => void) => { fn(); return 0 as any })
+    sentCalls = 0
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    // Restore the real global setTimeout — see rationale in
+    // send-campaign-queue-concurrency.test.ts.
+    vi.unstubAllGlobals()
+  })
 
   it('sends the first message, then blocks a second queue row for the same customer minutes later with no reply', async () => {
     messages = []
