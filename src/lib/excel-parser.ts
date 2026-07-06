@@ -148,13 +148,25 @@ function parseSheet(xml: string, sharedStrings: string[]): string[][] {
   let maxRow = 0
   let maxCol = 0
 
-  // Parse each <c> element
-  const cellRe = /<c\s([^>]*)>([\s\S]*?)<\/c>/g
+  // Parse each <c> element. Real production data-loss bug this fixes: the
+  // old regex was `/<c\s([^>]*)>([\s\S]*?)<\/c>/g`, which only matched cells
+  // written as `<c ...>...</c>`. Excel writes EMPTY cells as self-closing
+  // `<c r="B2" s="3"/>` — the old regex's greedy `[^>]*` consumed the `/` and
+  // its `>`, then `([\s\S]*?)<\/c>` reached forward to the NEXT real cell's
+  // `</c>`, swallowing that cell entirely (and even pulling its `<v>` value
+  // up into the empty cell's slot). Net effect: any cell following an empty
+  // cell — very commonly the next row's first column — was lost or
+  // corrupted. Confirmed live on a real 134-row import file: 107 of 134
+  // customer names silently dropped, exactly the rows whose name column was
+  // preceded by an empty (self-closed) cell. The alternation below matches
+  // EITHER a self-closing cell (no inner value) OR a full cell, so an empty
+  // cell can never swallow the following one.
+  const cellRe = /<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g
   let cm: RegExpExecArray | null
 
   while ((cm = cellRe.exec(xml)) !== null) {
     const attrs   = cm[1]
-    const inner   = cm[2]
+    const inner   = cm[2] ?? '' // undefined for a self-closing (empty) cell
     const refAttr = getAttr(attrs, 'r')
     const type    = getAttr(attrs, 't')
 
