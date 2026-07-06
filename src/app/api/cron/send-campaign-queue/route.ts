@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { generateCampaignMessage } from '@/lib/campaign-message'
+import { canSendUnpromptedMessage, isWhatsAppSessionHealthy } from '@/lib/send-gate'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/send-campaign-queue')
@@ -28,6 +29,23 @@ export async function GET(req: NextRequest) {
     if (process.env.APP_SECRET || process.env.CRON_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+  }
+
+  // 🔴 CIRCUIT BREAKER — root-cause fix for a real production incident
+  // (2026-07-06): WhatsApp actually disconnected at 11:30, and the
+  // whatsapp-health cron correctly detected and alerted it (11:30 and again
+  // at 12:00, "رسائل البوت لا تصل للعملاء"), but nothing here ever consulted
+  // that signal — this cron kept attempting all 132 campaign targets every
+  // few minutes for over 90 minutes into a KNOWN-broken session, burning an
+  // LLM call per attempt and repeatedly writing "campaign message" rows into
+  // the conversation history even though delivery was failing every time.
+  // From an admin looking at the messages list, that is indistinguishable
+  // from "the agent keeps messaging a silent customer". Stop entirely,
+  // before spending a single LLM call or WAHA request, whenever the health
+  // check already knows the session is down.
+  if (!(await isWhatsAppSessionHealthy())) {
+    log.warn('WhatsApp session unhealthy — skipping this run entirely, no attempts spent')
+    return NextResponse.json({ message: 'Skipped — WhatsApp session unhealthy', results: { sent: 0, failed: 0, skipped_unhealthy_session: true } })
   }
 
   const supabase = createServiceClient()
@@ -65,7 +83,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch queue' }, { status: 500 })
   }
 
-  const results = { sent: 0, failed: 0, skipped_limit: 0, skipped_inactive: 0, skipped_window: 0 }
+  const results = { sent: 0, failed: 0, skipped_limit: 0, skipped_inactive: 0, skipped_window: 0, skipped_gate: 0 }
   const sentCountDelta: Record<string, number> = {}
   // Real bug this fixes: `num.sent_today` is read ONCE per row from the
   // initial batch select — if two queue rows in the same BATCH_SIZE=20
@@ -128,6 +146,22 @@ export async function GET(req: NextRequest) {
       .select('id')
     if (claimErr) { log.error('failed to claim queue row', new Error(claimErr.message), { queue_id: r.id }); continue }
     if (!claimed || claimed.length === 0) continue // another concurrent run already claimed/sent this row
+
+    // 🔴 DECISION ENGINE — the master rule, enforced independently of every
+    // other mechanism above: a customer who has not replied gets exactly one
+    // unprompted message, then silence, until they reply or 3 full days
+    // pass. This does not trust the queue's own attempt bookkeeping (which
+    // is exactly what broke in production) — it reads the real, authoritative
+    // messages table fresh, right before dispatch, every single time.
+    const gate = await canSendUnpromptedMessage(r.customer_id)
+    if (!gate.allowed) {
+      const { error: skipErr } = await supabase.from('campaign_send_queue').update({
+        status: 'skipped', error: gate.reason, processed_at: new Date().toISOString(),
+      }).eq('id', r.id)
+      if (skipErr) log.error('failed to mark queue row skipped (send-gate)', new Error(skipErr.message), { queue_id: r.id })
+      results.skipped_gate++
+      continue
+    }
 
     const phone = r.customer?.whatsapp || r.customer?.phone
     // Personalized per-customer message generated fresh at send time (real
@@ -201,13 +235,18 @@ export async function GET(req: NextRequest) {
       sentCountDelta[r.campaign_id] = (sentCountDelta[r.campaign_id] ?? 0) + 1
       results.sent++
     } else {
-      const attempts = (r.attempts ?? 0) + 1
-      const maxAttempts = r.max_attempts ?? 3
-      const { error: failStatusErr } = await supabase.from('campaign_send_queue').update({
-        status: attempts >= maxAttempts ? 'failed' : 'pending',
-        attempts, error: sendResult.error ?? 'send_failed', processed_at: new Date().toISOString(),
-      }).eq('id', r.id)
-      if (failStatusErr) log.error('failed to update queue row after failed send', new Error(failStatusErr.message), { queue_id: r.id })
+      // 🔴 ATOMIC ATTEMPTS INCREMENT — root-cause fix for a real production
+      // bug: `attempts = (r.attempts ?? 0) + 1` computed in application code
+      // is a read-modify-write race. Confirmed live: one customer had 5
+      // "campaign" message rows logged against a queue row whose FINAL
+      // attempts value was only 3 — meaning at least one increment was lost
+      // to a race while a real send (and a real WAHA request) still
+      // happened each time. A single Postgres statement can't lose an
+      // update no matter how many callers race on the same row.
+      const { data: incResult, error: incErr } = await supabase
+        .rpc('increment_campaign_queue_attempts', { p_id: r.id, p_error: sendResult.error ?? 'send_failed' })
+      if (incErr) log.error('failed to atomically increment queue row attempts', new Error(incErr.message), { queue_id: r.id })
+      void incResult
       results.failed++
     }
   }

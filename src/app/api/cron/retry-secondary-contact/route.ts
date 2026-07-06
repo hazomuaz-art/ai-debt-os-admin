@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateOpeningMessage } from '@/lib/opening-message'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { isWhatsAppSessionHealthy } from '@/lib/send-gate'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/retry-secondary-contact')
@@ -20,6 +21,14 @@ export async function GET(req: NextRequest) {
     if (process.env.APP_SECRET || process.env.CRON_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+  }
+
+  // Circuit breaker — same production incident as send-campaign-queue: don't
+  // spend an LLM call and a WAHA request per customer when the health check
+  // already knows the session is down.
+  if (!(await isWhatsAppSessionHealthy())) {
+    log.warn('WhatsApp session unhealthy — skipping this run entirely')
+    return NextResponse.json({ message: 'Skipped — WhatsApp session unhealthy' })
   }
 
   const supabase = createServiceClient()
