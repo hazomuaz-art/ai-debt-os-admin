@@ -234,7 +234,18 @@ export async function POST(request: NextRequest) {
       : new Date().toISOString()
     const mediaUrl: string = payload?.media?.url ?? ''
     const mimetype: string = String(payload?.media?.mimetype ?? '')
-    const hasReceiptMedia = !!mediaUrl && (mimetype.startsWith('image/') || mimetype === 'application/pdf')
+    // WhatsApp stickers are ALWAYS sent as image/webp — real photos/scans a
+    // customer sends are never webp. Without this exclusion, a sticker (a
+    // reaction emoji, nothing else) was treated exactly like a receipt photo:
+    // routed into the AI document-classifier (which hallucinates a doc_type
+    // for a cartoon image), and because stickers never carry caption text,
+    // the code below returns before ever invoking the conversational agent
+    // — so the agent goes silent, or sends a confusing "received your
+    // attachment" ack for what was just an emoji, and a fake "document
+    // received" event gets written into the conversation history that
+    // poisons the agent's understanding on every later turn.
+    const isSticker = mimetype === 'image/webp'
+    const hasReceiptMedia = !!mediaUrl && !isSticker && (mimetype.startsWith('image/') || mimetype === 'application/pdf')
     if (from.endsWith('@g.us')) { log.info('group message ignored', { from }); return NextResponse.json({ status: 'ok' }) }
     if (!from) return NextResponse.json({ status: 'ok' })
     // Accept the message if it has text OR a receipt-type attachment.
@@ -246,7 +257,9 @@ export async function POST(request: NextRequest) {
       // having happened at all. Still nothing to act on automatically (no
       // classifier for arbitrary file types), but now at least visible to
       // staff instead of silently dropped.
-      if (mediaUrl) {
+      // A sticker with no caption is a harmless reaction, not a real
+      // attachment staff need to review — skip it silently, no alert noise.
+      if (mediaUrl && !isSticker) {
         log.warn('unsupported inbound attachment type — not stored, no reply sent', { from, mimetype })
         await insertSystemAlert({
           company_id: null, severity: 'warning', alert_type: 'unsupported_attachment_type',
