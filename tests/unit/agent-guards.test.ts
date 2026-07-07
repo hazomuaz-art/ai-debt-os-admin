@@ -349,6 +349,31 @@ describe('collector agent — deterministic anti-redundancy guards', () => {
     expect(d.promise_text).toBeNull()
   })
 
+  it('(L2) refusing to pay AND disputing the amount in the same message is never recorded as a promise, even with a fabricated date — the exact real production incident (2026-07-05)', async () => {
+    // Real customer text, verbatim, from a live conversation: an explicit
+    // refusal ("راتبي ما يكفي اني اسدد") combined with an explicit dispute
+    // declaration ("معترض على مبلغ المديونية") in one message. The model, on
+    // its own, chose record_promise and hallucinated "2026-07-27" — a date
+    // that never appeared anywhere in this message, apparently pulled from
+    // an unrelated salary-day mention days earlier in the same long
+    // conversation. The customer was then told "تمام، مسجّل وعدك بالسداد
+    // بتاريخ 2026-07-27" and, understandably, replied confused ("سداد ايش؟").
+    mockContext.recent_promises = []
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_promise', reason: 'model_confused',
+      message: 'تمام، مسجّل وعدك بالسداد بتاريخ 2026-07-27. بانتظار سدادك، وأرسل لي صورة الإيصال بعد التحويل.',
+      promised_date: '2026-07-27', promise_text: 'وعد',
+    })
+    const d = await runCollectorAgent({
+      company_id: 'c', customer_id: 'u', debt_id: 'd',
+      message: 'راتبي ما يكفي اني اسدد وكمان انا معترض علي مبلغ المديونيه واحس انها ظلم',
+    })
+
+    expect(d.action).not.toBe('record_promise')
+    expect(d.promised_date).toBeNull()
+    expect(d.message).not.toContain('2026-07-27')
+  })
+
   it('(M) a customer denying a promise ever happened is never told it is confirmed — flags for review instead', async () => {
     mockContext.recent_promises = [{ status: 'pending', promised_amount: 1250.5, promised_date: '2026-06-25' }]
     mockModelContent = JSON.stringify({

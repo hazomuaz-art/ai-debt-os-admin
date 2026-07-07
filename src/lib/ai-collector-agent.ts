@@ -261,6 +261,18 @@ function hasSpecificDisputeReason(text: string): boolean {
     'ليس لي', 'مش بيتي', 'مو بيتي', 'رقم غلط', 'مش دين', 'مو دين',
     'انكر', 'أنكر', 'تامين عندي', 'كان عندي تامين', 'باعت العقار', 'بعت العقار',
     'مالك جديد', 'مستاجر', 'مستأجر', 'خطأ في المبلغ', 'مبلغ غلط', 'زيادة في المبلغ',
+    // Real production gap this fixes: a customer flatly denying they EVER had
+    // this specific service/account at all ("لا يوجد عندي شرائح أو تعامل مع
+    // موبايلي سابقاً" — literally "I've never had a SIM or dealt with Mobily
+    // at all") is one of the most specific dispute reasons there is, yet none
+    // of the phrases above cover it. Confirmed live: this exact sentence,
+    // plus an explicit "ارسلي العقد" request, got a generic "وضّح لي إيش
+    // بالضبط سبب اعتراضك" follow-up instead of being treated as an
+    // already-specific reason — the model was told (via the disputeReasonGiven
+    // prompt injection below) that no reason was given, when one plainly was.
+    'ما عندي شرائح', 'لا يوجد عندي شرائح', 'ماعندي شريحة', 'ما عندي شريحة',
+    'ما تعاملت', 'ما اتعاملت', 'ماتعاملت', 'ما اشتركت', 'ماشتركت',
+    'ما فتحت خط', 'ما عندي خط', 'ماعندي خط', 'ما اخذت خدمة', 'ماخذت خدمة',
   ])
 }
 

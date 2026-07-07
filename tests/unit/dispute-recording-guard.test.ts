@@ -144,4 +144,33 @@ describe('Real incident — dispute recorded from a vague message with no actual
 
     expect(d.action).toBe('record_dispute')
   })
+
+  // Real production incident (customer محمد علي المزنعي, Mobily debt,
+  // 2026-07-06): the customer said, verbatim, "لايوجد عندي شرائح أو تعامل مع
+  // موبايلي سابقا إذا في شي موضح عندك ممكن ترسلي العقد" — an unambiguous,
+  // specific dispute reason (never had ANY service with this company at
+  // all) plus a concrete request (send the contract). hasSpecificDisputeReason
+  // didn't recognize "لا شرائح/ما تعاملت" phrasing at all, so the model was
+  // told via prompt injection that no reason was given — it responded with a
+  // generic "وضّح لي إيش بالضبط سبب اعتراضك؟", completely ignoring what the
+  // customer had already stated clearly. Confirmed in the real transcript:
+  // the customer had to repeat the request a second time before getting an
+  // actual answer.
+  it('recognizes "never had this service at all" as a specific reason — the real customer text that previously got a generic clarifying question instead of an answer', async () => {
+    mockContext = baseContext([
+      { direction: 'outbound', content: 'الملف اللي عندي باسمك ورقم حسابك 100016384848056، والمبلغ المستحق 536.6 ريال.' },
+    ])
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_dispute', reason: 'specific reason — never had the service',
+      message: 'تمام، بسجّل اعتراضك. طلب العقد يرفع مباشرة عند موبايلي، تواصل معهم وطالبهم بنسخة العقد باسمك.',
+    })
+
+    const d = await runCollectorAgent({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      message: 'ونعم ياخالد لايوجد عندي شرائح أو تعامل مع موبايلي سابقا إذا في شي موضح عندك ممكن ترسلي العقد',
+    })
+
+    expect(d.action).toBe('record_dispute')
+    expect(d.reason).not.toBe('dispute_reason_guard_override')
+  })
 })
