@@ -47,6 +47,27 @@ export async function GET(req: NextRequest) {
     return true
   }
 
+  // 🔴 Real gap this fixes: this cron only ever RAISED alerts, never
+  // resolved them — confirmed live, a real WhatsApp disconnection/delivery-
+  // failure pair from 2026-07-06 sat unresolved in the dashboard for two
+  // days even after the session was manually reconnected and confirmed
+  // WORKING, permanently blocking the send-gate circuit breaker (which
+  // refuses to send while ANY of these alert types are unresolved) from
+  // ever letting campaigns resume without a human manually clearing the
+  // alert in the database. A delivery-failure alert is typically a symptom
+  // of a bad connection in the first place, so resolving both together on
+  // a confirmed-healthy reconnect is safe — any NEW real degradation is
+  // still caught immediately by send-gate's own finer-grained, real-time
+  // delivery-quality check (isDeliveryQualityHealthy), which runs fresh
+  // before every campaign batch regardless of this cron's 30-minute cadence.
+  const resolveOpen = async (alert_type: string, forCompanyId: string | null) => {
+    let q = supabase.from('system_alerts').update({ is_resolved: true, resolved_at: new Date().toISOString() })
+      .eq('alert_type', alert_type).eq('is_resolved', false)
+    q = forCompanyId ? q.eq('company_id', forCompanyId) : q.is('company_id', null)
+    const { error } = await q
+    if (error) log.error('failed to auto-resolve alert', new Error(error.message), { alert_type })
+  }
+
   // 1) connection state — WAHA session status (WORKING == connected).
   // Real gap this fixes: this only ever checked the ONE hardcoded default
   // WAHA_SESSION/WAHA_API_URL env pair — a company with multiple WhatsApp
@@ -89,6 +110,12 @@ export async function GET(req: NextRequest) {
         { state, session, whatsapp_number_id: num.id },
         num.company_id ?? company_id,
       )
+    } else {
+      // Confirmed reconnected — clear both alert types so the send-gate
+      // circuit breaker can resume sending (see the resolveOpen comment
+      // above for why delivery_failure is cleared alongside disconnected).
+      await resolveOpen('whatsapp_disconnected', num.company_id ?? company_id)
+      await resolveOpen('whatsapp_delivery_failure', num.company_id ?? company_id)
     }
   }
   result.connectionStates = connectionAlerts

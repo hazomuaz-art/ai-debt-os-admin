@@ -53,20 +53,30 @@ export async function canSendUnpromptedMessage(customerId: string): Promise<Send
 }
 
 /**
- * Circuit breaker: true only when there is no unresolved WhatsApp
+ * Circuit breaker: true only when there is no unresolved GLOBAL WhatsApp
  * connectivity/delivery alert. Root-cause fix for the same incident — the
  * health-check cron correctly detected and alerted a WAHA disconnection at
  * 11:30 and a total delivery failure at 12:00, but nothing consulted those
  * alerts before continuing to attempt sends. Any unprompted-send cron must
  * check this FIRST, before spending an LLM call or a WAHA request on a
  * session that is already known to be broken.
+ *
+ * 🔴 Scope bug this fixes (2026-07-08): 'whatsapp_session_broken' used to be
+ * included here too, but that alert is raised PER CUSTOMER (by
+ * verify-delivery.ts, when one specific customer's messages never confirm
+ * delivered even after a retry) — it says nothing about the connection
+ * overall. Confirmed live: 17 of these per-customer alerts from an earlier
+ * incident sat unresolved and would have silently blocked the ENTIRE
+ * campaign for every OTHER customer too, forever, until someone noticed and
+ * manually cleared 17 individual rows. Only alert types that describe the
+ * WHOLE session/connection belong in a GLOBAL gate.
  */
 export async function isWhatsAppSessionHealthy(): Promise<boolean> {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('system_alerts')
     .select('id')
-    .in('alert_type', ['whatsapp_disconnected', 'whatsapp_delivery_failure', 'whatsapp_session_broken'])
+    .in('alert_type', ['whatsapp_disconnected', 'whatsapp_delivery_failure'])
     .eq('is_resolved', false)
     .limit(1)
     .maybeSingle()
