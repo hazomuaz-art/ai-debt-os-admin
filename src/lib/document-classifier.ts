@@ -79,7 +79,7 @@ export async function classifyDocumentImage(imageBase64: string): Promise<Docume
   const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
   try {
     const res = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       max_tokens: 400,
       response_format: { type: 'json_object' },
       messages: [{
@@ -102,7 +102,7 @@ async function classifyDocumentText(text: string): Promise<DocumentClassificatio
   if (!client) return FALLBACK
   try {
     const res = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       max_tokens: 300,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: `${PROMPT}\n\nنص المستند:\n${text.slice(0, 4000)}` }],

@@ -145,7 +145,7 @@ export async function classifyDebtOutcome(args: {
 
   try {
     const completion = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       temperature: 0,
       max_tokens: 60,
       messages: [

@@ -1499,7 +1499,14 @@ ${intentPrompts[intent]}
   // model must be the one that reliably follows instructions. A post-hoc
   // dialect filter was tried and removed (it produced false positives on
   // normal Arabic words like "محصّل"/"رصيد"). Root fix = capable model.
-  const selectModel = (_i: AgentIntent): string => 'anthropic/claude-sonnet-4.6'
+  // Upgraded from claude-sonnet-4.6 (2026-07-07) — claude-sonnet-5 is
+  // Anthropic's newer flagship Sonnet (released 2026-06-30), same 1M context
+  // window, and actually cheaper per token. Real production evidence for the
+  // switch: a live conversation review found the prior model contradicting
+  // its own earlier statement about partial-payment eligibility within the
+  // same conversation, confusing the customer — exactly the grounding/
+  // consistency failure a stronger model is expected to reduce.
+  const selectModel = (_i: AgentIntent): string => 'anthropic/claude-sonnet-5'
   const modelId = selectModel(intent)
   log.info('model routing', { intent, modelId })
   let ai

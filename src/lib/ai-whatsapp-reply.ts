@@ -576,7 +576,7 @@ export async function generateProactiveReminder(args: {
 
   try {
     const res = await ai.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       // Raised from 0.4 — this is a low-stakes reminder (no numbers/dates
       // being negotiated, just a factual follow-up), so more lexical variety
       // carries little real risk, while low temperature was a direct

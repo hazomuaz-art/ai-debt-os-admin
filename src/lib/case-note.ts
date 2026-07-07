@@ -131,7 +131,7 @@ export async function updateCaseNote(args: {
     ].filter(Boolean).join('\n')
 
     const completion = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       temperature: 0,
       // Was 260 — root cause of the case note silently freezing forever on
       // any sufficiently long/active conversation: a 3-5 sentence Arabic

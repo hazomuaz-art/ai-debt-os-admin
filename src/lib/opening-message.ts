@@ -65,7 +65,7 @@ ${facts || 'لا توجد بيانات كافية'}
 
   try {
     const ai = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       temperature: 0.4,
       max_tokens: 180,
       messages: [

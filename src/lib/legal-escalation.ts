@@ -340,7 +340,7 @@ export async function generateLawyerPersonaReply(args: {
 ملف القضية: ${args.caseSummary}`
 
     const completion = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
       temperature: 0.5,
       max_tokens: 220,
       messages: [

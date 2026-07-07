@@ -342,7 +342,7 @@ describe('Root fix — all customer replies routed through Sonnet (not Haiku)', 
     // emitted "شنو"/"دلوقتي". Every customer-facing decision call must now
     // use Sonnet.
     expect(capturedModels.length).toBeGreaterThan(0)
-    expect(capturedModels.every(m => m === 'anthropic/claude-sonnet-4.6')).toBe(true)
+    expect(capturedModels.every(m => m === 'anthropic/claude-sonnet-5')).toBe(true)
     expect(capturedModels).not.toContain('anthropic/claude-haiku-4.5')
   })
 })
