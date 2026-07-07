@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateOpeningMessage } from '@/lib/opening-message'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
-import { isWhatsAppSessionHealthy } from '@/lib/send-gate'
+import { isWhatsAppSessionHealthy, canSendUnpromptedMessage, jitteredSendDelayMs } from '@/lib/send-gate'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/retry-secondary-contact')
@@ -75,6 +75,18 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (!debt) { results.skipped++; continue }
 
+    // Same Decision Engine gate as send-campaign-queue — found missing here
+    // during a full-system audit. This cron already checks "zero reply ever"
+    // via anyInbound above, but not whether the customer already got a
+    // DIFFERENT unprompted message (campaign/reminder) within the last 3
+    // days from another cron.
+    const gate = await canSendUnpromptedMessage(customerId)
+    if (!gate.allowed) {
+      log.info('skipping secondary-contact attempt — send-gate blocked', { customer_id: customerId, reason: gate.reason })
+      results.skipped++
+      continue
+    }
+
     try {
       // Mark every untried/primary contact that's gone silent this long as
       // no_reply, then move to the next untried secondary number.
@@ -84,6 +96,9 @@ export async function GET(req: NextRequest) {
 
       const message = await generateOpeningMessage({ company_id: secondary.company_id, customer_id: customerId, debt_id: debt.id })
       const sendResult = await sendWhatsAppMessage({ to: secondary.phone, message, company_id: secondary.company_id, customer_id: customerId })
+
+      // Same jittered anti-fingerprint pacing as send-campaign-queue.
+      await new Promise(resolve => setTimeout(resolve, jitteredSendDelayMs()))
 
       const { error: secondaryInsertErr } = await supabase.from('messages').insert({
         company_id: secondary.company_id, customer_id: customerId, debt_id: debt.id,

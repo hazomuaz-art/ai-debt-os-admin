@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { isWhatsAppSessionHealthy, isDeliveryQualityHealthy, canSendUnpromptedMessage, jitteredSendDelayMs } from '@/lib/send-gate'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/notify-new-number')
@@ -11,6 +12,21 @@ export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.APP_SECRET}` && auth !== `Bearer ${process.env.CRON_SECRET}`) {
     if (process.env.APP_SECRET || process.env.CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // This cron had ZERO send-gate protection (found during a full-system
+  // audit) despite being able to blast every open-debt customer with no
+  // pacing at all — exactly the burst pattern that already caused two real
+  // WhatsApp silent-blocks on this number. Same circuit breakers as
+  // send-campaign-queue, checked before spending any sends.
+  if (!(await isWhatsAppSessionHealthy())) {
+    log.warn('WhatsApp session unhealthy — skipping this run entirely')
+    return NextResponse.json({ message: 'Skipped — WhatsApp session unhealthy' })
+  }
+  const quality = await isDeliveryQualityHealthy()
+  if (!quality.healthy) {
+    log.warn('delivery quality degraded — skipping this run', quality)
+    return NextResponse.json({ message: 'Skipped — delivery quality degraded', quality })
   }
 
   const supabase = createServiceClient()
@@ -45,10 +61,16 @@ export async function GET(req: NextRequest) {
       .limit(1).maybeSingle()
     if (prev) { results.skipped++; continue }
 
+    const gate = await canSendUnpromptedMessage(t.id)
+    if (!gate.allowed) { results.skipped++; continue }
+
     const firstName = t.name.split(' ')[0] || ''
     const msg = `مرحباً ${firstName}، معك خالد من قسم التحصيل. هذا رقمنا الجديد للتواصل بخصوص ملفك. تقدر ترد علينا هنا مباشرة وبنكمل معك.`
     try {
       const r = await sendWhatsAppMessage({ to: t.phone, message: msg, company_id: t.company_id, customer_id: t.id })
+      // Same jittered anti-fingerprint pacing as send-campaign-queue — this
+      // loop could otherwise blast every candidate back-to-back.
+      await new Promise(resolve => setTimeout(resolve, jitteredSendDelayMs()))
       const { error: notifyInsertErr } = await supabase.from('messages').insert({
         company_id: t.company_id, customer_id: t.id,
         channel: 'whatsapp', direction: 'outbound', content: msg,

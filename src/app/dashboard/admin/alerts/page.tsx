@@ -49,11 +49,15 @@ export default function AlertsPage() {
   const [alerts,  setAlerts]  = useState<SystemAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [filter,  setFilter]  = useState<AlertSeverity | 'all'>('all')
+  // Real gap this fixes: resolved alerts had no history view at all — once
+  // cleared (auto or manual), they vanished permanently with no way to see
+  // what had already been fixed.
+  const [showResolved, setShowResolved] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (resolved: boolean) => {
     setLoading(true)
     try {
-      const r = await fetch('/api/modules/alerts')
+      const r = await fetch(`/api/modules/alerts${resolved ? '?resolved=1' : ''}`)
       const d = await r.json() as { data?: SystemAlert[] }
       setAlerts(d.data ?? [])
     } finally { setLoading(false) }
@@ -64,10 +68,11 @@ export default function AlertsPage() {
   // user manually clicked "تحديث". Poll every 20s so new alerts surface
   // without any action needed.
   useEffect(() => {
-    void load()
-    const interval = setInterval(() => void load(), 20_000)
+    void load(showResolved)
+    if (showResolved) return
+    const interval = setInterval(() => void load(showResolved), 20_000)
     return () => clearInterval(interval)
-  }, [load])
+  }, [load, showResolved])
 
   async function resolve(id: string) {
     setAlerts(prev => prev.filter(a => a.id !== id))
@@ -114,7 +119,13 @@ export default function AlertsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} className="bg-[#151a23] hover:bg-[#1a212c] border border-[#222a36] text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+          <button onClick={() => setShowResolved(v => !v)}
+            className={`font-bold text-sm px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2 border ${
+              showResolved ? 'bg-[#0e7a54] text-white border-transparent' : 'bg-[#151a23] hover:bg-[#1a212c] border-[#222a36] text-white'
+            }`}>
+            <Check size={16} /> {showResolved ? 'عرض النشطة' : 'التنبيهات المحلولة'}
+          </button>
+          <button onClick={() => void load(showResolved)} className="bg-[#151a23] hover:bg-[#1a212c] border border-[#222a36] text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> {loading ? 'جاري التحديث...' : 'تحديث'}
           </button>
           {alerts.length > 0 && (
@@ -190,25 +201,41 @@ export default function AlertsPage() {
                       <span className="bg-[#0b0e14] text-[#8b95a7] text-[10px] font-bold px-2 py-1 rounded-md">
                         {ALERT_TYPE_LABELS[alert.alert_type] ?? alert.alert_type}
                       </span>
+                      {/* Real gap this fixes: a global connection alert and a
+                          per-customer alert used to look identical — staff
+                          couldn't tell "the whole system is down" from "just
+                          this one customer" at a glance. */}
+                      {alert.metadata?.customer_id ? (
+                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold px-2 py-1 rounded-md">
+                          خاص بعميل محدد
+                        </span>
+                      ) : (
+                        <span className="bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-bold px-2 py-1 rounded-md">
+                          عام لكل النظام
+                        </span>
+                      )}
                     </div>
-                    
+
                     {alert.message && (
                       <p className="text-slate-300 text-sm font-medium leading-relaxed bg-[#0d1117] border border-[#222a36] p-3 rounded-xl mt-2 mb-3">
                         {alert.message}
                       </p>
                     )}
-                    
+
                     <p className="text-[#5f6b7e] text-xs font-mono font-bold mt-1" dir="ltr">
                       {new Date(alert.created_at).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                      {alert.resolved_at && ` → تم الحل: ${new Date(alert.resolved_at).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}`}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-row md:flex-col gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 pt-4 md:pt-0 border-t border-[#222a36] md:border-0">
-                  <button onClick={() => void resolve(alert.id)}
-                    className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-colors flex items-center justify-center gap-1.5">
-                    <Check size={14} /> تم الحل
-                  </button>
+                  {!alert.is_resolved && (
+                    <button onClick={() => void resolve(alert.id)}
+                      className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-colors flex items-center justify-center gap-1.5">
+                      <Check size={14} /> تم الحل
+                    </button>
+                  )}
                   <button onClick={() => void remove(alert.id)}
                     className="flex-1 md:flex-none text-xs font-bold px-4 py-2 rounded-xl bg-[#151a23] text-[#8b95a7] border border-[#222a36] hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition-colors flex items-center justify-center gap-1.5">
                     <Trash2 size={14} /> حذف

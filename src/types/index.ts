@@ -503,6 +503,8 @@ export interface SystemAlert {
   message?:    string
   is_read:     boolean
   is_resolved: boolean
+  resolved_at?: string | null
+  metadata?:   Record<string, unknown> | null
   created_at:  string
 }
 

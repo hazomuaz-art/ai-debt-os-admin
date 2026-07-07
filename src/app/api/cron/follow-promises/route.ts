@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { generateProactiveReminder } from '@/lib/ai-whatsapp-reply'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { isRepeated } from '@/lib/ai-collector-agent'
-import { isWhatsAppSessionHealthy } from '@/lib/send-gate'
+import { isWhatsAppSessionHealthy, canSendUnpromptedMessage, jitteredSendDelayMs } from '@/lib/send-gate'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/follow-promises')
@@ -87,6 +87,17 @@ export async function GET(req: NextRequest) {
       continue
     }
 
+    // Same Decision Engine gate as send-campaign-queue — this cron was found
+    // during a full-system audit to be checking only session health, not the
+    // per-customer rule (one unprompted message, then silence, until reply or
+    // 3 days). Without this, a customer could get a campaign message and a
+    // promise reminder back to back from two different crons.
+    const gate = await canSendUnpromptedMessage(customer.id)
+    if (!gate.allowed) {
+      log.info('skipping promise reminder — send-gate blocked', { promise_id: promise.id, reason: gate.reason })
+      continue
+    }
+
     try {
       // Real production incident this fixes: generateProactiveReminder is a
       // separate, simpler generator with NO memory of what was already sent
@@ -139,6 +150,10 @@ export async function GET(req: NextRequest) {
           company_id: promise.company_id,
           customer_id: customer.id,
         })
+
+        // Same jittered anti-fingerprint pacing as send-campaign-queue —
+        // this loop had zero delay between real sends.
+        await new Promise(resolve => setTimeout(resolve, jitteredSendDelayMs()))
 
         // Always record the outbound message in the conversation (so it shows in the dashboard),
         // even if delivery failed (status reflects that).

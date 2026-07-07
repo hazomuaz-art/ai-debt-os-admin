@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   return withAuth(async (ctx) => {
+    // Resolved alerts used to be permanently invisible once cleared (no
+    // history view at all) — found during a full-system audit. Default stays
+    // unresolved-only; ?resolved=1 lets the page show what already got fixed.
+    const showResolved = req.nextUrl.searchParams.get('resolved') === '1'
     const { data, error } = await ctx.supabase
       .from('system_alerts')
       .select('*')
       .or(`company_id.eq.${ctx.profile.company_id},company_id.is.null`)
-      .eq('is_resolved', false)
+      .eq('is_resolved', showResolved)
       .order('created_at', { ascending: false })
       .limit(50)
     if (error) return errors.internal(error.message)
