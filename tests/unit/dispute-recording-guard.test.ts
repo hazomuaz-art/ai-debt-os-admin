@@ -7,9 +7,11 @@
 // dispute/deniesDebt/angry/wrongNumber keywords), so intent stayed GENERAL
 // and the guard never engaged at all — letting record_dispute through
 // completely ungoverned. Fixed: the guard now applies regardless of intent,
-// and disputeReasonGiven also recognizes an EXPLICIT dispute declaration
-// (not just a specific reason), so a real "أنا معترض على هذا المبلغ" is
-// still allowed through.
+// and gates on the model's own semantic read of the message
+// (parsed.dispute_reason — the customer's actual reason in their own
+// words, or null for vague doubt with no real content) instead of a fixed
+// keyword list, so any genuine reason or explicit declaration ("أنا معترض
+// على هذا المبلغ") is recognized regardless of phrasing.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 let mockModelContent = ''
@@ -117,6 +119,7 @@ describe('Real incident — dispute recorded from a vague message with no actual
     mockModelContent = JSON.stringify({
       shouldReply: true, action: 'record_dispute', reason: 'explicit dispute',
       message: 'عندك اعتراض مسجّل عندنا قيد المراجعة الحين.',
+      dispute_reason: 'معترض على المبلغ من الأساس (بدون تفصيل إضافي)',
     })
 
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'انا معترض علي ذا المبلغ من الاساس' })
@@ -132,6 +135,7 @@ describe('Real incident — dispute recorded from a vague message with no actual
     mockModelContent = JSON.stringify({
       shouldReply: true, action: 'record_dispute', reason: 'specific reason',
       message: 'تمام، بسجّل اعتراضك بخصوص المبلغ.',
+      dispute_reason: 'يقول إن المبلغ غلط وليس المبلغ الصحيح المستحق عليه',
     })
 
     // Was "هذا رقم غلط مو رقمي" — that phrase is a genuine wrong-number claim
@@ -149,13 +153,15 @@ describe('Real incident — dispute recorded from a vague message with no actual
   // 2026-07-06): the customer said, verbatim, "لايوجد عندي شرائح أو تعامل مع
   // موبايلي سابقا إذا في شي موضح عندك ممكن ترسلي العقد" — an unambiguous,
   // specific dispute reason (never had ANY service with this company at
-  // all) plus a concrete request (send the contract). hasSpecificDisputeReason
-  // didn't recognize "لا شرائح/ما تعاملت" phrasing at all, so the model was
-  // told via prompt injection that no reason was given — it responded with a
+  // all) plus a concrete request (send the contract). This used to be
+  // judged by a fixed keyword list (hasSpecificDisputeReason) that didn't
+  // recognize "لا شرائح/ما تعاملت" phrasing at all, so the model was told
+  // via prompt injection that no reason was given — it responded with a
   // generic "وضّح لي إيش بالضبط سبب اعتراضك؟", completely ignoring what the
-  // customer had already stated clearly. Confirmed in the real transcript:
-  // the customer had to repeat the request a second time before getting an
-  // actual answer.
+  // customer had already stated clearly. The customer had to repeat the
+  // request a second time before getting an actual answer. Fixed by
+  // replacing the keyword guess with the model's own semantic read of the
+  // message (dispute_reason) — genuine understanding, not string matching.
   it('recognizes "never had this service at all" as a specific reason — the real customer text that previously got a generic clarifying question instead of an answer', async () => {
     mockContext = baseContext([
       { direction: 'outbound', content: 'الملف اللي عندي باسمك ورقم حسابك 100016384848056، والمبلغ المستحق 536.6 ريال.' },
@@ -163,6 +169,7 @@ describe('Real incident — dispute recorded from a vague message with no actual
     mockModelContent = JSON.stringify({
       shouldReply: true, action: 'record_dispute', reason: 'specific reason — never had the service',
       message: 'تمام، بسجّل اعتراضك. طلب العقد يرفع مباشرة عند موبايلي، تواصل معهم وطالبهم بنسخة العقد باسمك.',
+      dispute_reason: 'لا يوجد عنده شرائح أو تعامل مع موبايلي سابقاً',
     })
 
     const d = await runCollectorAgent({
