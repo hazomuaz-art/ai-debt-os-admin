@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 let mockModelContent = ''
 let debtRow: any = { status: 'active', original_sub_status: null, metadata: {} }
 let updateCalls: any[] = []
+let lastCompletionArgs: any = null
 
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
-    chat: { completions: { create: vi.fn().mockImplementation(async () => ({
-      choices: [{ message: { content: mockModelContent } }],
-    })) } },
+    chat: { completions: { create: vi.fn().mockImplementation(async (args: any) => {
+      lastCompletionArgs = args
+      return { choices: [{ message: { content: mockModelContent } }] }
+    }) } },
   })),
 }))
 
@@ -56,6 +58,7 @@ beforeEach(() => {
   debtRow = { status: 'active', original_sub_status: null, metadata: {} }
   updateCalls = []
   mockModelContent = ''
+  lastCompletionArgs = null
 })
 
 describe('updateCaseNote', () => {
@@ -98,5 +101,25 @@ describe('updateCaseNote', () => {
     mockModelContent = '{"recommended_approach": "تابع بعد 3 أيام'
     await updateCaseNote({ company_id: 'c', debt_id: 'd1' })
     expect(updateCalls.length).toBe(0)
+  })
+
+  // Regression for a real production bug (2026-07-06): the model was never
+  // told the customer's actual registered name, and the only name-shaped
+  // string in the transcript was the AGENT'S OWN fake persona alias (e.g.
+  // "معك خالد الدويحي من شركة..."). On a wrong-number conversation it
+  // conflated the two, producing a case note that said the number "لا يعود
+  // لخالد الدويحي" — attributing the disclaimer to the agent's invented
+  // name instead of the real customer on file. Fixed by feeding the real
+  // name as an explicit fact and warning the model about the alias.
+  it('includes the real customer name as an explicit fact, and warns the model the agent may use a fake alias', async () => {
+    debtRow = { status: 'active', original_sub_status: null, metadata: {}, customers: { full_name: 'خالد صالح الحربي' } }
+    mockModelContent = JSON.stringify({ note: 'تم تأكيد أن الرقم ليس رقم خالد صالح الحربي.', recommended_approach: 'تحقق من رقم بديل.' })
+    await updateCaseNote({ company_id: 'c', debt_id: 'd1' })
+
+    const userMsg = lastCompletionArgs.messages.find((m: any) => m.role === 'user').content as string
+    expect(userMsg).toContain('اسم العميل المسجَّل في الملف: خالد صالح الحربي')
+
+    const systemMsg = lastCompletionArgs.messages.find((m: any) => m.role === 'system').content as string
+    expect(systemMsg).toContain('اسم شخصي مستعار')
   })
 })

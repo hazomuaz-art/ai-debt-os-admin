@@ -392,7 +392,27 @@ export async function POST(request: NextRequest) {
     // the conversation history, even though the AI agent below still
     // processed and replied to it from the in-memory `text` — leaving a
     // reply on record with no visible message it was replying to.
-    if (inboundInsertErr) log.error('inbound message insert failed', { error: inboundInsertErr.message, customer_id: c.id })
+    //
+    // 🔴 REAL DUPLICATE-REPLY BUG (2026-07-06): the SELECT-based dedup check
+    // above is a TOCTOU race — if WAHA redelivers the same message event
+    // twice in quick succession (a known whatsapp-web.js/WAHA behavior),
+    // both requests can pass that SELECT before either commits this INSERT,
+    // so both go on to run the agent and both send a reply. Confirmed live:
+    // a customer got two different replies to one message, 24s apart, with
+    // only one inbound row on record. A partial unique index on
+    // (whatsapp_message_id) WHERE direction='inbound' now makes the SECOND
+    // insert for the same message fail atomically (Postgres 23505) — treat
+    // that specific failure as a hard stop, not just a logged-and-continued
+    // error, so the agent can never run twice for what WAHA considers one
+    // message. Any OTHER insert failure still just logs and continues, same
+    // as before, so a transient DB blip never silently drops a real message.
+    if (inboundInsertErr) {
+      if (inboundInsertErr.code === '23505') {
+        log.info('duplicate inbound message blocked by DB constraint — WAHA redelivered the same event', { customer_id: c.id, msgId })
+        return NextResponse.json({ status: 'ok' })
+      }
+      log.error('inbound message insert failed', { error: inboundInsertErr.message, customer_id: c.id })
+    }
 
     if (c.ai_paused) { log.info('AI paused — skipping reply', { customer_id: c.id }); return NextResponse.json({ status: 'ok' }) }
 

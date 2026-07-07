@@ -73,10 +73,11 @@ export async function updateCaseNote(args: {
   try {
     const { data: debt } = await svc
       .from('debts')
-      .select('status, original_sub_status, metadata, customer_id')
+      .select('status, original_sub_status, metadata, customer_id, customers(full_name)')
       .eq('id', args.debt_id)
       .maybeSingle()
     if (!debt) return
+    const customerName = (debt as { customers?: { full_name?: string | null } | null }).customers?.full_name ?? null
 
     const { data: lastPromise } = await svc
       .from('promises')
@@ -113,7 +114,17 @@ export async function updateCaseNote(args: {
       baseURL: 'https://openrouter.ai/api/v1',
     })
 
+    // 🔴 REAL BUG this fixes (2026-07-06): the model was never told the
+    // customer's actual registered name — its only source for "who is this
+    // about" was the transcript itself, where the AGENT introduces itself
+    // with a human-sounding alias (e.g. "معك خالد الدويحي من شركة..."). On a
+    // wrong-number conversation the model conflated the two, producing a
+    // case note that said the number "لا يعود لخالد الدويحي" — attributing
+    // the disclaimer to the AGENT'S OWN fake persona name instead of the
+    // actual customer on file. Giving the real name as an explicit fact
+    // removes the ambiguity the model was filling in incorrectly.
     const facts = [
+      customerName ? `اسم العميل المسجَّل في الملف: ${customerName}` : null,
       `حالة الدين الحالية: ${debt.status ?? 'غير محدد'}`,
       debt.original_sub_status ? `آخر تصنيف: ${debt.original_sub_status}` : null,
       lastPromise ? `آخر وعد مسجَّل: ${lastPromise.promised_date} (${lastPromise.status})` : 'لا يوجد وعد مسجَّل',
@@ -140,6 +151,7 @@ export async function updateCaseNote(args: {
             'المحادثة الكاملة نفسها معروضة بشكل منفصل وبالتفصيل في نفس الصفحة — دورك هنا مختلف: تعطي المحصّل "الوضع الحالي" بلمحة سريعة، مو تعيد سرد كل المحادثة من البداية. ' +
             'اكتب وقائع فقط من المحادثة الحقيقية والمعطيات أدناه — ممنوع منعاً باتاً اختراع أي تفصيل غير موجود فيها. ' +
             'اقرأ المحادثة كاملة أدناه لتفهم السياق، لكن اكتب فقط عن آخر تطور/نقطة وصلت لها الحالة الآن — مثل: آخر شي قاله العميل أو اتفق عليه، وأي نقطة معلّقة تحتاج متابعة فورية. لا تسرد تاريخ المحادثة كامل ولا كل ما قيل من البداية. ' +
+            'تنبيه مهم: "الوكيل" في المحادثة قد يقدّم نفسه للعميل باسم شخصي مستعار (مثلاً "معك خالد الدويحي من شركة..."). هذا اسم الوكيل نفسه فقط — وليس اسم العميل بأي حال. لا تخلط بينه وبين "اسم العميل المسجَّل" أعلاه، ولا تستخدمه أبداً للإشارة لهوية العميل أو لصياغة عبارات مثل "الرقم لا يعود لـ...". ' +
             'أرجع JSON فقط بالشكل: {"note": "1-2 جملة فقط، آخر تطور/الوضع الحالي تحديداً — مو ملخص كامل للمحادثة", "recommended_approach": "جملة واحدة، خطوة عملية محددة للمتابعة"}.',
         },
         {
