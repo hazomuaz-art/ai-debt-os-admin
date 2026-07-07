@@ -65,13 +65,25 @@ export interface WhatsAppWebhookEntry {
 
 export function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('0') && digits.length === 10) return '966' + digits.slice(1)
+  if (digits.startsWith('0') && digits.length === 10 && digits[1] === '5') return '966' + digits.slice(1)
   // Bare Saudi mobile with no leading 0 or country code (e.g. "5XXXXXXXX",
   // typed directly into a phone/whatsapp field) - previously passed through
   // unchanged and silently failed to send since WAHA requires the country
   // code, with no visible error pointing back to the missing "966".
   if (digits.startsWith('5') && digits.length === 9) return '966' + digits
-  return digits
+  if (digits.startsWith('966') && digits.length === 12 && digits[3] === '5') return digits
+  // Real production bug this fixes: any input that doesn't match one of the
+  // three known-valid Saudi mobile shapes above used to fall through here
+  // and return the raw digits UNCHANGED, as if they were a real number.
+  // Confirmed live: an Excel "contact numbers" cell containing "172228020"
+  // (9 digits, not even starting with 5 — not a valid Saudi mobile shape at
+  // all) was silently accepted and stored as a real customer's phone/
+  // whatsapp number during import. Every call site chains this function's
+  // result with `||` to fall back to null when no valid number exists
+  // (`extractPhoneNumbers(...)[0] || normalizePhone(...) || null`) — that
+  // fallback only works if an invalid input actually returns a falsy value
+  // here instead of masking garbage digits as a valid-looking phone number.
+  return ''
 }
 
 // Real inconsistency found during a full-system audit: customer creation
@@ -175,6 +187,10 @@ export async function sendWhatsAppMessage(options: SendMessageOptions): Promise<
   if (options.waha_session) wahaSession = options.waha_session
 
   const to = normalizePhone(options.to)
+  if (!to) {
+    log.warn('WhatsApp send blocked - not a valid Saudi mobile number', { raw: options.to })
+    return { message_id: null, status: 'failed', error: 'invalid_phone_number' }
+  }
   const message = truncateMessage(options.message)
 
   // 1. WAHA (browser-based gateway) — the primary channel.
