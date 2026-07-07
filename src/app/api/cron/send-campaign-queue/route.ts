@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { generateCampaignMessage } from '@/lib/campaign-message'
-import { canSendUnpromptedMessage, isWhatsAppSessionHealthy } from '@/lib/send-gate'
+import { canSendUnpromptedMessage, isWhatsAppSessionHealthy, isDeliveryQualityHealthy, getWarmupDailyLimit, jitteredSendDelayMs } from '@/lib/send-gate'
+import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/send-campaign-queue')
@@ -30,7 +31,6 @@ const log = createLogger('cron/send-campaign-queue')
 // explicit, enforced delay between consecutive real sends within a tick —
 // both independent of how the cron scheduler itself behaves.
 const BATCH_SIZE = 5
-const MIN_DELAY_BETWEEN_SENDS_MS = 10_000
 
 function withinSendWindow(start: string | null, end: string | null): boolean {
   if (!start || !end) return true
@@ -62,6 +62,33 @@ export async function GET(req: NextRequest) {
   if (!(await isWhatsAppSessionHealthy())) {
     log.warn('WhatsApp session unhealthy — skipping this run entirely, no attempts spent')
     return NextResponse.json({ message: 'Skipped — WhatsApp session unhealthy', results: { sent: 0, failed: 0, skipped_unhealthy_session: true } })
+  }
+
+  // 🔴 META-POLICY QUALITY GATE — this number was silently blocked by
+  // WhatsApp TWICE (2026-06-30 and 2026-07-06), both times because delivery
+  // quality had already degraded well before the slower external
+  // whatsapp-health cron (30-min cadence) caught it. Check the campaign's
+  // OWN recent delivery ratio inline, every single run, independent of that
+  // cron's timing. If it's already degrading, PAUSE every affected running
+  // campaign outright (not just skip a row) and stop this run completely —
+  // mirrors how a real WhatsApp Business quality-rating drop restricts
+  // sending until it recovers, rather than quietly limping along.
+  const quality = await isDeliveryQualityHealthy()
+  if (!quality.healthy) {
+    log.warn('delivery quality degraded — pausing running campaigns and skipping this run', quality)
+    const pauseSupabase = createServiceClient()
+    const { data: runningCampaigns } = await pauseSupabase.from('campaigns').select('id').eq('status', 'running')
+    for (const c of (runningCampaigns ?? []) as { id: string }[]) {
+      const { error: pauseErr } = await pauseSupabase.from('campaigns').update({ status: 'paused' }).eq('id', c.id)
+      if (pauseErr) log.error('failed to auto-pause campaign on quality degradation', new Error(pauseErr.message), { campaign_id: c.id })
+    }
+    await insertSystemAlert({
+      company_id: null, severity: 'critical', alert_type: 'campaign_auto_paused_quality',
+      title: 'إيقاف تلقائي للحملة — جودة تسليم متدهورة',
+      message: `من أصل ${quality.total} رسالة حملة في آخر ساعة، وصل ${quality.delivered} فقط (${Math.round(quality.ratio * 100)}%). تم إيقاف كل الحملات الجارية تلقائياً قبل أن يتفاقم الحظر الصامت. راجع حالة الرقم قبل الاستئناف يدوياً.`,
+      metadata: { total: quality.total, delivered: quality.delivered, ratio: quality.ratio },
+    })
+    return NextResponse.json({ message: 'Skipped — delivery quality degraded, running campaigns auto-paused', results: { sent: 0, failed: 0, quality } })
   }
 
   const supabase = createServiceClient()
@@ -137,7 +164,15 @@ export async function GET(req: NextRequest) {
     // looking identical to "working as intended, just idle". A configured
     // limit is still honored exactly; only a genuinely unset one falls back
     // to a conservative default instead of a de-facto permanent block.
-    const effectiveLimit = num.daily_limit ?? 200
+    //
+    // 🔴 META WARM-UP TIER — the configured daily_limit (250, coincidentally
+    // matching WhatsApp Business API's own real Tier-1 cap) is the CEILING,
+    // not the actual allowance for a number this fresh. This number has two
+    // silent-block incidents in its first 6 days — real Meta policy would
+    // have already downgraded its quality rating and restricted it further.
+    // Ramp up gradually instead of trusting the static config from day one.
+    const warmupLimit = await getWarmupDailyLimit(num.id, num.daily_limit ?? 200)
+    const effectiveLimit = Math.min(num.daily_limit ?? 200, warmupLimit)
     if (sentTodaySoFar >= effectiveLimit) {
       results.skipped_limit++
       continue // leave pending — retried once the daily window resets
@@ -218,8 +253,10 @@ export async function GET(req: NextRequest) {
     // real send attempt (success or failure both still hit WhatsApp's own
     // rate-limit tracking), so no code path through this loop can ever emit
     // two real sends closer together than this floor, regardless of how
-    // many rows were due or how the cron scheduler itself behaves.
-    await new Promise(resolve => setTimeout(resolve, MIN_DELAY_BETWEEN_SENDS_MS))
+    // many rows were due or how the cron scheduler itself behaves. Jittered
+    // (not a fixed interval) — a perfectly uniform gap is itself a bot
+    // fingerprint; real usage has natural variance.
+    await new Promise(resolve => setTimeout(resolve, jitteredSendDelayMs()))
 
     const { error: campaignMsgErr } = await supabase.from('messages').insert({
       company_id: r.company_id, customer_id: r.customer_id, debt_id: r.debt_id,

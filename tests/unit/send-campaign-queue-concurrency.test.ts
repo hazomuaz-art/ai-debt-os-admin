@@ -32,6 +32,9 @@ vi.mock('@/lib/campaign-message', () => ({ generateCampaignMessage: vi.fn().mock
 vi.mock('@/lib/send-gate', () => ({
   isWhatsAppSessionHealthy: vi.fn().mockResolvedValue(true),
   canSendUnpromptedMessage: vi.fn().mockResolvedValue({ allowed: true }),
+  isDeliveryQualityHealthy: vi.fn().mockResolvedValue({ healthy: true, total: 0, delivered: 0, ratio: 1 }),
+  getWarmupDailyLimit: vi.fn().mockImplementation(async (_id: string, configured: number) => configured),
+  jitteredSendDelayMs: vi.fn().mockReturnValue(0),
 }))
 
 // Generic chainable query-builder mock: every filter method (eq/lt/lte/order/

@@ -78,3 +78,89 @@ export async function isWhatsAppSessionHealthy(): Promise<boolean> {
   }
   return !data
 }
+
+export type QualityCheckResult = { healthy: boolean; total: number; delivered: number; ratio: number }
+
+/**
+ * Real-time delivery-quality circuit breaker — checked INLINE by the
+ * campaign sender itself, independent of the whatsapp-health cron's own
+ * schedule. Root cause this closes: this number was silently blocked by
+ * WhatsApp TWICE (2026-06-30: 0% delivered on 11 messages; 2026-07-06: 25%
+ * delivered on 149 messages before the disconnect alert even fired) — by
+ * the time the periodic health cron caught it, dozens of messages had
+ * already gone out into a degrading session. A campaign sender must check
+ * its OWN recent delivery ratio before every batch, not just trust that an
+ * external alert will arrive in time. Threshold is intentionally stricter
+ * (0.5, vs the health cron's 0.3) and the window shorter (60 min, vs 3h) —
+ * catch degradation early and stop, rather than confirm it's already bad.
+ */
+export async function isDeliveryQualityHealthy(windowMinutes = 60, minSample = 5, minRatio = 0.5): Promise<QualityCheckResult> {
+  const supabase = createServiceClient()
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString()
+  const cutoff = new Date(Date.now() - 10 * 60_000).toISOString() // give WAHA's ack webhook time to land
+  const { data } = await supabase
+    .from('messages')
+    .select('status')
+    .eq('direction', 'outbound').eq('channel', 'whatsapp')
+    .eq('metadata->>action_type', 'campaign')
+    .gte('sent_at', since).lte('sent_at', cutoff)
+    .limit(500)
+
+  const rows = (data ?? []) as { status: string }[]
+  const total = rows.length
+  const delivered = rows.filter(r => ['delivered', 'read'].includes(r.status)).length
+  const ratio = total ? delivered / total : 1
+  const healthy = total < minSample || ratio >= minRatio
+  return { healthy, total, delivered, ratio: Number(ratio.toFixed(2)) }
+}
+
+/**
+ * Meta-Business-Platform-inspired warm-up tiering: a brand-new or recently
+ * reconnected WhatsApp number does not get to send at its full configured
+ * daily_limit from day one — it ramps up over several days, exactly like
+ * WhatsApp Business API's own messaging tiers (new numbers start at a low
+ * tier and only scale up as quality/volume holds). This number's own
+ * history (two silent-block incidents in its first 6 days) is precisely
+ * the failure mode Meta's tiering exists to prevent, so the ramp here is
+ * intentionally conservative — capped well below the account's configured
+ * daily_limit for the first several days after any (re)connection.
+ */
+export async function getWarmupDailyLimit(numberId: string, configuredLimit: number): Promise<number> {
+  const supabase = createServiceClient()
+  const { data: lastReconnect } = await supabase
+    .from('system_alerts')
+    .select('resolved_at')
+    .eq('alert_type', 'whatsapp_disconnected')
+    .contains('metadata', { whatsapp_number_id: numberId })
+    .not('resolved_at', 'is', null)
+    .order('resolved_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data: number } = await supabase
+    .from('portfolio_whatsapp_numbers')
+    .select('created_at')
+    .eq('id', numberId)
+    .maybeSingle()
+
+  const anchor = (lastReconnect as { resolved_at: string } | null)?.resolved_at
+    ?? (number as { created_at: string } | null)?.created_at
+    ?? new Date().toISOString()
+
+  const daysSinceAnchor = (Date.now() - new Date(anchor).getTime()) / (24 * 3600_000)
+  if (daysSinceAnchor < 2) return Math.min(configuredLimit, 30)
+  if (daysSinceAnchor < 5) return Math.min(configuredLimit, 80)
+  if (daysSinceAnchor < 10) return Math.min(configuredLimit, 150)
+  return configuredLimit
+}
+
+/**
+ * Jittered pacing between real sends — a perfectly uniform interval (the
+ * previous fixed 10s delay) is itself a bot fingerprint; real human/business
+ * WhatsApp usage has natural variance. Widened and randomized specifically
+ * because this number already has two block incidents on record — err
+ * toward slower and less mechanical, not faster.
+ */
+export function jitteredSendDelayMs(minMs = 20_000, maxMs = 45_000): number {
+  return minMs + Math.floor(Math.random() * (maxMs - minMs))
+}
