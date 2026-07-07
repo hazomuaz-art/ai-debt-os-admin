@@ -91,15 +91,24 @@ if (-not $fileList -or $fileList.Count -eq 0) { throw "git ls-files produced no 
 # production traffic was unaffected since pm2 never restarted onto it).
 [System.IO.File]::WriteAllText($list, (($fileList -join "`n") + "`n"), [System.Text.Encoding]::ASCII)
 if (-not (Test-Path $list) -or (Get-Item $list).Length -eq 0) { throw "file list write produced an empty file" }
-# --force-local: GNU tar (resolved here via git-bash's /usr/bin/tar ahead of
-# Windows' own tar.exe on PATH) auto-detects "host:path" remote-archive
-# syntax whenever the -f argument contains a colon before the first slash —
-# which every Windows temp path does (e.g. C:\Users\...). Without this flag
-# tar tried to open an SSH connection to a host literally named "C" instead
-# of writing the local file, failing the whole deploy with a confusing
-# "Cannot connect to C: resolve failed" error that has nothing to do with
-# the real VPS connection later in this script.
-& tar --force-local -cf $tar -T $list
+# --force-local: GNU tar auto-detects "host:path" remote-archive syntax
+# whenever the -f argument contains a colon before the first slash — which
+# every Windows temp path does (e.g. C:\Users\...). Without this flag tar
+# tried to open an SSH connection to a host literally named "C" instead of
+# writing the local file, failing the whole deploy with a confusing "Cannot
+# connect to C: resolve failed" error that has nothing to do with the real
+# VPS connection later in this script.
+#
+# Must be GNU tar specifically (bundled with Git for Windows) — Windows'
+# own built-in tar.exe (System32, bsdtar/libarchive-based) doesn't have
+# --force-local at all and hard-fails on the flag. Bash resolves bare `tar`
+# to Git's copy first on PATH, but PowerShell's PATH does NOT include Git's
+# usr\bin, so a bare `tar` call here silently resolves to the wrong binary
+# depending on which shell invoked this script. Pin the exact GNU tar path
+# so this is no longer dependent on PATH ordering.
+$gnuTar = "C:\Program Files\Git\usr\bin\tar.exe"
+if (-not (Test-Path $gnuTar)) { throw "GNU tar not found at $gnuTar - required for --force-local (Git for Windows not installed at the expected path?)" }
+& $gnuTar --force-local -cf $tar -T $list
 # tar's own exit code must be checked, not just "did a file get produced" —
 # tar can exit non-zero after logging per-entry errors (e.g. the CRLF bug
 # above) while still writing a small, silently-incomplete archive that passes
