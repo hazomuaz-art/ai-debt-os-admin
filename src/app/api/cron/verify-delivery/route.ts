@@ -67,7 +67,27 @@ export async function GET(req: NextRequest) {
       && meta.source !== 'campaign_builder_upload'
   })
 
-  const result = { checked: retriable.length, retried: 0, markedFailedNoResend: 0, brokenSessionsSkipped: 0, correctedToFailed: 0, skipped: 0 }
+  const result = { checked: retriable.length, retried: 0, markedFailedNoResend: 0, brokenSessionsSkipped: 0, correctedToFailed: 0, skipped: 0, confirmedByReply: 0 }
+
+  // 🔴 REAL DUPLICATE-MESSAGE BUG (confirmed live, customer حذيفه, 2026-07-08):
+  // a message.ack webhook can simply never arrive or arrive late (exactly
+  // what happens during the WhatsApp connection instability this platform
+  // has hit repeatedly) even though WhatsApp genuinely delivered the message
+  // — the customer replied to it within seconds. This cron only trusted the
+  // ack status, never the conversation itself, so it re-sent the identical
+  // text ~5 minutes later to a customer who had already read and reacted to
+  // it, and had gone quiet since. The customer's own next inbound message is
+  // far stronger delivery proof than an ack webhook that can get lost — if
+  // they responded to (or simply kept messaging after) the "stuck" send, it
+  // unambiguously reached them, and resending it is a straight duplicate,
+  // not a recovery.
+  async function hasRepliedSince(customerId: string, sentAt: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('messages').select('id')
+      .eq('customer_id', customerId).eq('direction', 'inbound')
+      .gt('sent_at', sentAt).limit(1).maybeSingle()
+    return !!data
+  }
 
   // Group by customer so we never act on more than one stuck message per
   // customer per run, and so we can check session health once per customer.
@@ -113,6 +133,15 @@ export async function GET(req: NextRequest) {
       }
 
       if (!alreadyTried) {
+        if (await hasRepliedSince(customerId, (newest as { sent_at: string }).sent_at)) {
+          const { error: confirmedErr } = await supabase.from('messages').update({
+            status: 'delivered', metadata: { ...newestMeta, delivery_confirmed_by_reply: true },
+          }).eq('id', (newest as { id: string }).id)
+          if (confirmedErr) log.error('verify-delivery: failed to mark reply-confirmed message delivered', new Error(confirmedErr.message), { message_id: (newest as { id: string }).id })
+          result.confirmedByReply++
+          continue
+        }
+
         // First-contact retry: mark the swallowed original failed, resend once.
         const { error: newestFailErr } = await supabase.from('messages').update({
           status: 'failed', metadata: { ...newestMeta, delivery_unconfirmed: true, retry_attempted: true },
@@ -190,6 +219,16 @@ export async function GET(req: NextRequest) {
     }
 
     const meta = (latest as { metadata?: Record<string, unknown> }).metadata ?? {}
+
+    if (await hasRepliedSince(customerId, (latest as { sent_at: string }).sent_at)) {
+      const { error: confirmedErr } = await supabase.from('messages').update({
+        status: 'delivered', metadata: { ...meta, delivery_confirmed_by_reply: true },
+      }).eq('id', (latest as { id: string }).id)
+      if (confirmedErr) log.error('verify-delivery: failed to mark reply-confirmed message delivered (healthy session)', new Error(confirmedErr.message), { message_id: (latest as { id: string }).id })
+      result.confirmedByReply++
+      continue
+    }
+
     const alreadyRetried = !!meta.retry_of || !!meta.retry_attempted
     if (alreadyRetried) {
       const { error: alreadyRetriedErr } = await supabase.from('messages').update({
