@@ -140,6 +140,52 @@ describe('Mobily field/payment question → INFO_REQUEST, with knowledge block i
   })
 })
 
+describe('Real production gap: promise confirmation never included the payment number', () => {
+  beforeEach(() => {
+    mockContext = baseContext('موبايلي')
+    mock360 = {
+      debtGroups: [{ portfolio_id: 'p1', portfolio_name: 'موبايلي', portfolio_category: 'telecom', company_key: 'mobily', debts: [{ id: 'd1', status: 'overdue' }] }],
+      allDisputes: [],
+      customerDataByPortfolio: { p1: [{ service_status: 'Inactive', product_number: '0551112222', account_number: 'ACC-9' }] },
+    }
+  })
+
+  it('appends the correct Mobily payment number (service number, Inactive) when the model\'s own confirmation omits it', async () => {
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_promise', reason: 'ok',
+      message: 'تمام، مسجّل وعدك بالسداد. أول ما تسدد، أرسل لي صورة الإيصال بعد التحويل.',
+      promised_date: '2026-08-01', promise_text: 'بداية الشهر الجاي',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بداية الشهر الجاي بسدد' })
+
+    expect(d.action).toBe('record_promise')
+    expect(d.message).toContain('0551112222')
+  })
+
+  it('appends the account number instead when service status is Closed', async () => {
+    mock360.customerDataByPortfolio.p1 = [{ service_status: 'Closed', product_number: '0551112222', account_number: 'ACC-9' }]
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_promise', reason: 'ok',
+      message: 'تمام، مسجّل وعدك بالسداد. أول ما تسدد، أرسل لي صورة الإيصال بعد التحويل.',
+      promised_date: '2026-08-01', promise_text: 'بداية الشهر الجاي',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بداية الشهر الجاي بسدد' })
+
+    expect(d.message).toContain('ACC-9')
+  })
+
+  it('does not duplicate the number if the model already included it', async () => {
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_promise', reason: 'ok',
+      message: 'تمام، مسجّل وعدك. سدد على رقم الخدمة 0551112222 وأرسل لي الإيصال.',
+      promised_date: '2026-08-01', promise_text: 'بداية الشهر الجاي',
+    })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بداية الشهر الجاي بسدد' })
+
+    expect(d.message.match(/0551112222/g)?.length).toBe(1)
+  })
+})
+
 describe('STC is unaffected by the Mobily wiring', () => {
   it('an STC portfolio still gets the STC knowledge path, never the Mobily block', async () => {
     mockContext = baseContext('إس تي سي')
