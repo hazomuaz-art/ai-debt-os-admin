@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { openEscalation, getOpenEscalation } from '@/lib/legal-escalation'
+import { openEscalation, getOpenEscalation, REFUSAL_THRESHOLD } from '@/lib/legal-escalation'
 import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('cron/legal-escalation-check')
 
-// Owner-specified business rule (2026-06-28): a debt whose customer has
-// explicitly refused to pay (or stalled/evaded) 3+ times, with the FIRST
-// refusal at least 48 hours ago and no resolution since, gets automatically
-// escalated to the 'repeated_refusal' type — which switches the agent to a
-// dynamic, persuasive "lawyer persona" instead of normal negotiation (see
+// A debt whose customer has explicitly refused to pay (or stalled/evaded)
+// 3+ times (REFUSAL_THRESHOLD, shared with the live agent) gets escalated to
+// the 'repeated_refusal' type — which switches the agent to a dynamic,
+// persuasive "lawyer persona" instead of normal negotiation (see
 // generateLawyerPersonaReply in ai-collector-agent.ts). Never opened for
 // STC, Saudi Energy, or National Water portfolios.
-const REFUSAL_THRESHOLD = 3
+//
+// 🔴 This cron is now only a SLOW SAFETY NET: ai-collector-agent.ts reacts to
+// the same 3-refusal threshold LIVE, in the same conversation turn, opening
+// the escalation immediately instead of waiting on this cron. This still
+// exists to catch a debt whose live write somehow failed (e.g. a transient
+// DB error at the moment of the 3rd refusal) — the original 48h delay was
+// far too slow to be the PRIMARY mechanism (confirmed live: a customer
+// refused 5+ times within one hour with nothing escalating), but is fine
+// for a secondary catch-all that only needs to eventually notice.
 const DELAY_HOURS = 48
 
 const EXCLUDED_KEYS = ['stc', 'saudi_energy', 'national_water'] as const

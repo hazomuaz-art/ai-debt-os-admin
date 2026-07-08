@@ -265,13 +265,31 @@ export function renderLegalPersonaReply(escalationType: EscalationType): string 
   return `معك إدارة الشؤون القانونية. ملفك محوّل للمراجعة القانونية حالياً بخصوص: ${label}. سيتم التواصل معك من الجهة المختصة، ولا داعي لمتابعة الموضوع مع المحصّل.`
 }
 
-// ── Repeated-refusal tracking (feeds the legal-escalation-check cron) ──
-// Owner-specified rule: 3+ explicit refusals (signals.refusesToPay), 48h
-// after the FIRST one, with no resolution → cron opens a 'repeated_refusal'
-// escalation automatically. This function only counts; the cron decides
-// when the threshold+delay are actually met. Called on every turn where
-// the customer explicitly refuses to pay, for portfolios that allow it.
-export async function trackRefusalForLegalEscalation(args: { debt_id: string }): Promise<void> {
+// خالد's OWN last message the exact turn the repeated-refusal threshold is
+// crossed — announces the handoff to the customer directly, from the SAME
+// number, before the lawyer persona takes over on every turn after this one.
+export function renderRepeatedRefusalNotice(): string {
+  return 'واضح إنك رافض السداد بشكل قاطع. راح يتواصل معك القسم القانوني بالشركة خلال 24 ساعة من نفس هذا الرقم لمتابعة الموضوع رسمياً.'
+}
+
+// 3+ explicit refusals (signals.refusesToPay) in the SAME live conversation
+// is treated as decisive on its own — no separate waiting period. Exported
+// so both the live agent (immediate reaction) and the legal-escalation-check
+// cron (slow safety net, in case the inline path ever fails to write) use
+// the identical number.
+export const REFUSAL_THRESHOLD = 3
+
+// ── Repeated-refusal tracking ──
+// 🔴 Real gap found live (customer حذيفه, 2026-07-08): the customer refused
+// payment explicitly 5+ times within about one hour, in one continuous
+// conversation, and NOTHING escalated — this counter only ever fed a
+// cron that additionally required 48 HOURS to pass since the first refusal
+// before it would act, and the customer was never told anything was
+// happening in the meantime. Now returns the live count so the caller
+// (ai-collector-agent.ts) can react the SAME turn the threshold is crossed —
+// open the escalation immediately and tell the customer directly, instead of
+// silently waiting up to two days for a slow batch job to notice.
+export async function trackRefusalForLegalEscalation(args: { debt_id: string }): Promise<{ count: number; first_at: string } | null> {
   const supabase = createServiceClient()
   try {
     const { data: debt } = await supabase.from('debts').select('metadata').eq('id', args.debt_id).maybeSingle()
@@ -283,13 +301,15 @@ export async function trackRefusalForLegalEscalation(args: { debt_id: string }):
       metadata: { ...meta, refusal_tracking: { count, first_at } },
     }).eq('id', args.debt_id)
     // A silent failure here means the refusal count never actually
-    // increments — the repeated_refusal auto-escalation cron would never
+    // increments — the repeated_refusal auto-escalation would never
     // trigger for a genuinely repeat-refusing customer, with no trace at all
     // (the try/catch alone can't catch this — Supabase returns {error}
     // rather than throwing).
-    if (trackErr) log.warn('failed to persist refusal tracking: ' + trackErr.message, { debt_id: args.debt_id })
+    if (trackErr) { log.warn('failed to persist refusal tracking: ' + trackErr.message, { debt_id: args.debt_id }); return null }
+    return { count, first_at }
   } catch (err) {
     log.warn('trackRefusalForLegalEscalation failed: ' + (err instanceof Error ? err.message : String(err)), { debt_id: args.debt_id })
+    return null
   }
 }
 

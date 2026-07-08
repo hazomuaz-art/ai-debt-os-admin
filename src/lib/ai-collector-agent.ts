@@ -9,7 +9,7 @@ import {
 } from '@/lib/customer-context-engine'
 import { getPlaybookForPortfolio, renderPlaybookForPrompt } from '@/lib/company-playbook'
 import { classifyInsuranceCase, detectInsuranceObjectionSignals, renderInsuranceCaseFile } from '@/lib/insurance-engine'
-import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply, detectStcReviewSignal, recordStcReview, trackRefusalForLegalEscalation, generateLawyerPersonaReply } from '@/lib/legal-escalation'
+import { detectMandatoryEscalation, getOpenEscalation, openEscalation, renderLegalPersonaReply, renderRepeatedRefusalNotice, detectStcReviewSignal, recordStcReview, trackRefusalForLegalEscalation, generateLawyerPersonaReply, REFUSAL_THRESHOLD } from '@/lib/legal-escalation'
 import { COMPANY_IMPORT_PROFILES } from '@/lib/company-import-profiles'
 import { renderStcKnowledgeForCaseFile, detectStcFieldMeaningQuestion } from '@/lib/stc-knowledge'
 import { renderMobilyKnowledgeForCaseFile, detectMobilyFieldMeaningQuestion } from '@/lib/mobily-knowledge'
@@ -993,12 +993,33 @@ export async function runCollectorAgent(args: {
   const insuranceCase = insuranceRow ? classifyInsuranceCase(insuranceRow) : null
   const insuranceObjection = isInsurancePortfolio ? detectInsuranceObjectionSignals(text) : null
 
-  // ── Repeated-refusal tracking (feeds the legal-escalation-check cron,
-  // which opens a 'repeated_refusal' escalation after 3+ refusals + 48h).
-  // Excluded entirely for STC, Saudi Energy, and National Water per owner
-  // instruction. Fire-and-forget — never blocks or affects this reply.
+  // ── Repeated-refusal tracking → IMMEDIATE legal escalation, same turn.
+  // 🔴 Real gap found live (customer حذيفه, 2026-07-08): this used to only
+  // feed a separate cron requiring 48 HOURS since the first refusal before
+  // acting — the customer refused explicitly 5+ times within one hour in a
+  // single conversation and nothing happened; they were never told anything
+  // either. Now reacts the SAME turn the threshold is crossed: opens the
+  // escalation immediately and tells the customer directly (a live legal
+  // notice), instead of silently waiting on a slow batch job. The
+  // legal-escalation-check cron remains as a slower safety net only (in case
+  // this write path itself ever fails). Excluded entirely for STC, Saudi
+  // Energy, and National Water per owner instruction.
   if (forcedDebtId && signals.refusesToPay && !isStcPortfolio && !isSaudiEnergyPortfolio && !isNationalWaterPortfolio) {
-    void trackRefusalForLegalEscalation({ debt_id: forcedDebtId })
+    const tracking = await trackRefusalForLegalEscalation({ debt_id: forcedDebtId })
+    if (tracking && tracking.count >= REFUSAL_THRESHOLD) {
+      const opened = await openEscalation({
+        company_id: args.company_id, customer_id: args.customer_id, debt_id: forcedDebtId,
+        portfolio_id: resolvedPortfolioId, escalation_type: 'repeated_refusal',
+        reason: `رفض/مماطلة متكررة (${tracking.count} مرات)، أول رفض منذ ${tracking.first_at}`,
+      })
+      if (opened) {
+        return {
+          shouldReply: true, action: 'human_review',
+          reason: 'repeated_refusal_escalated_live', message: renderRepeatedRefusalNotice(),
+          resolvedDebtId: forcedDebtId,
+        }
+      }
+    }
   }
 
   // ── Mandatory legal escalation — checked deterministically BEFORE the
@@ -1467,6 +1488,7 @@ ${intentPrompts[intent]}
    - عبّئ حقلين معاً: (1) promise_text = توقيت العميل بكلماته/معناه كما قاله بالضبط (مثل "مع نزول الراتب"، "بداية الشهر الجاي"، "عند نزول حساب المواطن"، "بكرا"). (2) promised_date = أفضل تحويل دقيق إلى YYYY-MM-DD اعتماداً على تاريخ اليوم الحقيقي (${todayStr}) والمنطقة الزمنية والسياق. لو التعبير قابل للتحويل لتاريخ فعلي حوّله؛ لو نسبي/ظرفي لا يُحوَّل بدقة، ضع أقرب تاريخ متابعة منطقي في promised_date واحفظ المعنى الحقيقي في promise_text. لا تخمّن عشوائياً، استنتج بمنطق من اليوم.
    - لا تختر record_promise إلا إذا ذكر العميل توقيتاً فعلاً في رسالته. مجرد "بسدد" بلا أي إشارة زمنية = نية لا وعد → اسأله عن التوقيت مرة واحدة (action=negotiate). ومتى ما أعطى توقيتاً، لا تعد سؤاله عنه أبداً بعد تسجيله.
 13.1 🔴🔴 حادثة حقيقية: العميل كشف تناقضاً في كلامك (وعد مختلق، معلومة غلط)، فرد الوكيل "عذراً، غلطت... معك حق. وش تبغى نتكلم فيه الحين؟" — هذا استسلام كامل يسلّم دفة الحوار للعميل ويهدم ثقته فيك تماماً، ممنوع منعاً باتاً. لو اضطررت تصحّح معلومة قلتها غلط: صحّحها بجملة واحدة مباشرة بلا إطالة في الاعتذار (كلمة "آسف"/"عذراً" مرة واحدة كحد أقصى، بدون تكرارها)، ثم في **نفس الرد** ارجع فوراً لدفة التفاوض بسؤال محدد أو خطوة ملموسة (تاريخ سداد، سبب الرفض، التزام أصغر) — ممنوع أن ينتهي ردك بسؤال مفتوح يسلّم القرار للعميل مثل "وش تبغى تتكلم فيه؟" أو "وش رايك؟" بدون اقتراح محدد منك.
+13.2 🔴🔴 حادثة حقيقية: بدل رد حقيقي للعميل، كتب الوكيل "العميل رافض بشكل قاطع، ولا فيه معلومة جديدة تحتاج توضيح، بس ما يصير أسكت. هذا قرار يتجاوز صلاحيتي، فبرفعه للإدارة يقيّمون الموقف" — هذا كلام يصف العميل بصيغة الغائب ويشرح تفكيرك الداخلي الخاص، وليس كلاماً موجّهاً للعميل نفسه، ممنوع منعاً باتاً. حقل "message" هو **حرفياً الكلام اللي تقوله للعميل مباشرة بصيغة المخاطب ("انت"/"لك")** — ليس وصفاً لموقفه بصيغة الغائب ("العميل رافض...")، وليس شرحاً لقرارك الداخلي ("هذا يتجاوز صلاحيتي"، "برفعه للإدارة"، "بستشير المسؤول"). حتى لو قررت رفع الموقف لمراجعة إدارية (action=human_review)، لازم "message" يكون جملة طبيعية تقولها للعميل فعلاً (مثل "موقفك واضح، وبنحول ملفك لجهة مختصة تتابع معك" أو مثلها) — لا شرحاً لعملية اتخاذ القرار نفسها.
 
 ═══════════════ صيغة الإخراج ═══════════════
 أعد JSON فقط بهذا الشكل، بدون أي نص خارجه:
