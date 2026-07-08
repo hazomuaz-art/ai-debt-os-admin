@@ -218,10 +218,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ok' })
     }
 
-    // ── Inbound messages ──
     if (event !== 'message' && event !== 'message.any') return NextResponse.json({ status: 'ok' })
-    if (payload?.fromMe) return NextResponse.json({ status: 'ok' })
 
+    // 🔴 A message sent manually from the PHONE itself (the linked device),
+    // not through this system's dashboard/API, also arrives here as
+    // fromMe=true — this used to be unconditionally ignored, meaning the
+    // agent had ZERO knowledge such a message was ever sent, and could reply
+    // inconsistently with what the human already told the customer. Every
+    // OUR-OWN send (via sendWhatsAppMessage) is already logged with its real
+    // whatsapp_message_id — if a fromMe event's id ISN'T already in our
+    // messages table, it must be a genuine manual send from the phone that
+    // never went through our system, and gets recorded here so the agent's
+    // conversation-history context includes it on the next reply.
+    if (payload?.fromMe) {
+      const outMsgId = String(payload?.id?._serialized ?? payload?.id ?? '')
+      if (!outMsgId) return NextResponse.json({ status: 'ok' })
+      const outRef = outMsgId.split('_').pop() ?? outMsgId
+      const { data: alreadyLogged } = await supabase
+        .from('messages').select('id')
+        .or(`whatsapp_message_id.eq.${outMsgId},whatsapp_message_id.eq.${outRef}`)
+        .eq('direction', 'outbound').limit(1).maybeSingle()
+      if (alreadyLogged) return NextResponse.json({ status: 'ok' }) // our own send, already recorded
+
+      const manualText = String(payload?.body ?? '').trim()
+      // `to` identifies the chat/recipient for an outgoing (fromMe) event;
+      // logged alongside the raw payload once so the exact WAHA field shape
+      // can be confirmed against a real occurrence if this ever misses.
+      const toRaw = String(payload?.to ?? payload?.from ?? '')
+      const manualPhone = toRaw ? await resolvePhone(toRaw, session) : ''
+      if (!manualText || !manualPhone) {
+        log.warn('fromMe message not already logged, but missing text/recipient to record it — check payload shape', { hasText: !!manualText, toRaw, payloadKeys: Object.keys(payload ?? {}) })
+        return NextResponse.json({ status: 'ok' })
+      }
+
+      const { data: manualCustomer } = await supabase
+        .from('customers').select('id, company_id')
+        .or([`whatsapp.eq.${manualPhone}`, `phone.eq.${manualPhone}`].join(','))
+        .limit(1).maybeSingle()
+      if (manualCustomer) {
+        const mc = manualCustomer as { id: string; company_id: string }
+        const { data: manualDebt } = await supabase
+          .from('debts').select('id').eq('customer_id', mc.id)
+          .not('status', 'in', '("settled","written_off")')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        const { error: manualInsertErr } = await supabase.from('messages').insert({
+          company_id: mc.company_id, customer_id: mc.id, debt_id: (manualDebt as { id: string } | null)?.id ?? null,
+          channel: 'whatsapp', direction: 'outbound', content: manualText,
+          status: 'sent', whatsapp_message_id: outMsgId,
+          metadata: { sender: 'human', source: 'manual_phone_send' },
+          sent_at: new Date().toISOString(),
+        })
+        if (manualInsertErr) log.error('manual phone-sent message log failed', new Error(manualInsertErr.message), { customer_id: mc.id })
+        else log.info('manual phone-sent message recorded', { customer_id: mc.id })
+      } else {
+        log.warn('fromMe message from an unrecognized recipient number — not recorded', { manualPhone })
+      }
+      return NextResponse.json({ status: 'ok' })
+    }
+
+    // ── Inbound messages ──
     const from = String(payload?.from ?? '')
     let text = String(payload?.body ?? '')
     // WAHA sends the message's own send time as a unix-seconds timestamp —
