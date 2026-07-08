@@ -4,6 +4,7 @@ import { normalizePhone, sendWhatsAppMessage } from '@/lib/whatsapp'
 import { processInboundReceipt } from '@/lib/payment-receipt'
 import { insertSystemAlert } from '@/lib/system-alerts'
 import { insertTimelineEvent } from '@/lib/timeline'
+import { transcribeAudioMessage } from '@/lib/audio-transcription'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('webhook/waha')
@@ -222,7 +223,7 @@ export async function POST(request: NextRequest) {
     if (payload?.fromMe) return NextResponse.json({ status: 'ok' })
 
     const from = String(payload?.from ?? '')
-    const text = String(payload?.body ?? '')
+    let text = String(payload?.body ?? '')
     // WAHA sends the message's own send time as a unix-seconds timestamp —
     // used by the Temporal Intelligence Engine's Shadow Mode comparison
     // (relative expressions like "بكرة" must resolve from when the customer
@@ -248,7 +249,36 @@ export async function POST(request: NextRequest) {
     const hasReceiptMedia = !!mediaUrl && !isSticker && (mimetype.startsWith('image/') || mimetype === 'application/pdf')
     if (from.endsWith('@g.us')) { log.info('group message ignored', { from }); return NextResponse.json({ status: 'ok' }) }
     if (!from) return NextResponse.json({ status: 'ok' })
-    // Accept the message if it has text OR a receipt-type attachment.
+
+    // Voice notes — transcribe to text and feed the transcript through the
+    // EXACT SAME pipeline as a typed message, so the agent replies to what
+    // the customer actually said, not a generic "received your attachment"
+    // ack. Real gap this fixes: any non-image/pdf attachment (including
+    // voice notes) previously fell straight into "unsupported attachment
+    // type" below — logged for staff, but the agent never knew the customer
+    // said anything at all.
+    let isVoiceNote = false
+    if (!text && mediaUrl && mimetype.startsWith('audio/') && !isSticker) {
+      isVoiceNote = true
+      const b64 = await downloadMediaBase64(mediaUrl)
+      const transcript = b64 ? await transcribeAudioMessage(b64, mimetype) : null
+      if (transcript) {
+        text = transcript
+        log.info('voice note transcribed', { from, transcript_preview: transcript.slice(0, 80) })
+      } else {
+        log.warn('voice note transcription failed — no reply sent', { from, mimetype })
+        await insertSystemAlert({
+          company_id: null, severity: 'warning', alert_type: 'voice_transcription_failed',
+          title: 'تعذّر تحويل رسالة صوتية من عميل',
+          message: `أرسل الرقم ${from} رسالة صوتية لم يتمكن النظام من تحويلها لنص — راجعها يدوياً إذا لزم.`,
+          metadata: { from, mimetype },
+        })
+        return NextResponse.json({ status: 'ok' })
+      }
+    }
+
+    // Accept the message if it has text (including a transcribed voice
+    // note) OR a receipt-type attachment.
     if (!text && !hasReceiptMedia) {
       // Real gap found during a full-system audit: an attachment type we
       // don't classify (not image/pdf — e.g. a Word/Excel file, audio note)
@@ -381,10 +411,13 @@ export async function POST(request: NextRequest) {
     const { error: inboundInsertErr } = await supabase.from('messages').insert({
       company_id: c.company_id, customer_id: c.id, debt_id,
       channel: 'whatsapp', direction: 'inbound',
-      content: text || (mimetype === 'application/pdf' ? '📎 إيصال (PDF)' : '📎 إيصال (صورة)'),
+      // Voice notes are stored as their TRANSCRIPT (prefixed so staff can
+      // tell it originated as audio, not typed) — the agent's own
+      // conversation-history reads see the real words the customer said.
+      content: isVoiceNote ? `🎤 (رسالة صوتية): ${text}` : (text || (mimetype === 'application/pdf' ? '📎 إيصال (PDF)' : '📎 إيصال (صورة)')),
       status: 'delivered',
       whatsapp_message_id: msgId,
-      metadata: { provider: 'waha', from, ...(hasReceiptMedia && { media_url: mediaUrl, mimetype }) },
+      metadata: { provider: 'waha', from, ...(hasReceiptMedia && { media_url: mediaUrl, mimetype }), ...(isVoiceNote && { voice_note: true, mimetype }) },
       sent_at: new Date().toISOString(),
     })
     // Real gap found during a full-system audit: not checked — a rejected
