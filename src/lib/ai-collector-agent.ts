@@ -363,12 +363,23 @@ export function detectSignals(text: string) {
     // Saudi-dialect-only rule on them is actively useless. A message with
     // essentially no Arabic script in it is the signal to drop that rule
     // for this reply and mirror whatever language the customer actually
-    // used instead. A short "ok"/numbers-only reply has no script either
-    // way, so require a minimum of real letters before judging.
+    // used instead. A numbers/emoji-only reply has no script either way, so
+    // it's excluded (letters.length === 0).
+    //
+    // 🔴 Real bug found live (customer RAYMOND LASTRELLA BLANCAFLOR,
+    // 2026-07-08): opened the conversation with "Hi" (2 letters) and got a
+    // full Arabic reply — the OLD `letters.length < 3` floor treated any
+    // short message as "not enough signal", silently defaulting to Arabic
+    // even though "Hi" is unambiguously English with zero Arabic characters.
+    // Any letters at all with ZERO Arabic script present is already a
+    // certain non-Arabic verdict regardless of length ("Hi", "ok", "no" all
+    // qualify) — the ratio-based 30% threshold is only needed to judge a
+    // MIXED-script message, where a length floor still isn't the right tool.
     isNonArabicMessage: (() => {
       const letters = text.replace(/[^\p{L}]/gu, '')
-      if (letters.length < 3) return false
+      if (!letters.length) return false
       const arabicLetters = (text.match(/[؀-ۿݐ-ݿࢠ-ࣿ]/g) ?? []).length
+      if (arabicLetters === 0) return true
       return arabicLetters / letters.length < 0.3
     })(),
   }

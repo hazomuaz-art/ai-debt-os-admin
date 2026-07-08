@@ -27,4 +27,14 @@ describe('detectSignals — isNonArabicMessage', () => {
   it('does not misfire on a short Arabic acknowledgement', () => {
     expect(detectSignals('تمام').isNonArabicMessage).toBe(false)
   })
+
+  // Real production bug (customer RAYMOND LASTRELLA BLANCAFLOR, 2026-07-08):
+  // opened with "Hi" and got a full Arabic reply back — the old length-floor
+  // (letters.length < 3) treated any short message as unjudgeable, silently
+  // defaulting to Arabic even though "Hi" has zero Arabic characters at all.
+  it('detects a short English greeting with zero Arabic characters as non-Arabic (the real incident)', () => {
+    expect(detectSignals('Hi').isNonArabicMessage).toBe(true)
+    expect(detectSignals('ok').isNonArabicMessage).toBe(true)
+    expect(detectSignals('no').isNonArabicMessage).toBe(true)
+  })
 })
