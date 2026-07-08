@@ -669,16 +669,53 @@ describe('Insurance Engine (Phase 3)', () => {
     expect(OpenAIMock.mock.calls.length).toBe(0)
   })
 
-  it('(HH) lawyer mention ALWAYS escalates, on any portfolio, with zero LLM call', async () => {
-    const OpenAIMock = (await import('openai')).default as any
-    OpenAIMock.mockClear()
+  // 🔴 No longer a zero-LLM-call pre-model keyword scan — real production
+  // incident (customer RAYMOND LASTRELLA BLANCAFLOR, 2026-07-08): the old
+  // "محامي"/"محكمة" keyword check couldn't tell a genuine personal threat
+  // from a customer quoting text WE sent them. The model now reads the full
+  // message and reports legal_escalation_trigger itself (see rule §14); this
+  // costs one real LLM call, which is the correct trade-off for actually
+  // understanding intent instead of pattern-matching on scary words.
+  it('(HH) a genuine personal lawyer mention (per the model\'s own semantic verdict) opens the escalation and overrides the reply', async () => {
     mockContext.recent_promises = []
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'ok',
+      message: 'فهمتك، بس خلنا نحلها من دون ما توصل لهذي المرحلة.', promised_date: null,
+      legal_escalation_trigger: 'lawyer_mention',
+    })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'إذا ما حليتوها بترفع القضية مع محاميي' })
 
     expect(d.action).toBe('human_review')
-    expect(d.reason).toBe('legal_escalation_opened')
+    expect(d.reason).toBe('legal_escalation_opened_by_model')
+    expect(d.message).toContain('إدارة الشؤون القانونية')
     expect(mockOpenEscalationCall).toHaveBeenCalledWith(expect.objectContaining({ escalation_type: 'lawyer_mention' }))
-    expect(OpenAIMock.mock.calls.length).toBe(0)
+  })
+
+  // Real production incident (customer RAYMOND LASTRELLA BLANCAFLOR,
+  // 2026-07-08): the company ran a separate SMS reminder campaign whose own
+  // text mentions "المحامي"/legal wording. A customer who pasted/forwarded
+  // that exact SMS into WhatsApp got treated as if THEY PERSONALLY mentioned
+  // a lawyer — locking the conversation into legal-escalation mode for
+  // words that were never the customer's own. The model's own semantic
+  // verdict (legal_escalation_trigger: null here) correctly recognizes this
+  // and lets the conversation continue normally.
+  it('(HH2) quoting our OWN outbound SMS notice (containing "محامي") does NOT escalate — real incident', async () => {
+    const OpenAIMock = (await import('openai')).default as any
+    OpenAIMock.mockClear()
+    mockContext.recent_promises = []
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'ok',
+      message: 'إي هذا إشعار حقيقي من الشركة بخصوص ملفك، وش رايك تسدد الحين؟', promised_date: null,
+    })
+    const d = await runCollectorAgent({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      message: 'عزيزنا عميل موبايلي نفيدكم بأنه تم إشعاركم سابقًا بضرورة سداد مبلغ (852.42) ريال المستحق على هوية (XXXX9210) عبر حساب سداد (1000135507940555) ولم يتم السداد حتى تاريخه. وعليه، نؤكد أن عدم السداد سيترتب عليه إحالة ملفكم مباشرة للمحامي لاتخاذ الإجراءات القانونية دون أي إشعار إضافي، مع تحملكم كامل أتعاب المحامي والتكاليف القضائية المترتبة على ذلك. للتواصل عبر الواتساب: 0561153262',
+    })
+
+    expect(d.reason).not.toBe('legal_escalation_opened')
+    expect(d.reason).not.toBe('customer_invoked_legal_challenge')
+    expect(mockOpenEscalationCall).not.toHaveBeenCalled()
+    expect(OpenAIMock.mock.calls.length).toBeGreaterThan(0)
   })
 
   it('(II) once an escalation is OPEN for this debt, every subsequent message gets the fixed legal reply — zero LLM, zero negotiation', async () => {
@@ -764,16 +801,19 @@ describe('Playbook real policy fields (company_policy / ai_instructions / forbid
     expect(mockOpenEscalationCall).not.toHaveBeenCalled()
   })
 
-  it('(NN) escalation_rules never override the fixed lawyer/legal/complaint rules or the insurance-only gating', async () => {
-    // Even if a (misconfigured) custom rule tries to match "محامي", the
-    // FIXED lawyer_mention rule fires first — same escalation_type either
-    // way, but proves the hard-coded checks run before custom ones.
+  // 🔴 lawyer_mention/legal_threat/complaint no longer have a fixed PRE-model
+  // keyword check to compete with (see the redesign at rule §14 in
+  // ai-collector-agent.ts and the "(HH)"/"(HH2)" tests above) — that
+  // detection moved to the model's own post-reply semantic verdict. A
+  // playbook_mandated custom rule is now the only PRE-model, keyword-driven
+  // trigger left, so it correctly fires on its own configured keyword
+  // without competing against anything else at that stage.
+  it('(NN) a playbook escalation_rules entry still opens playbook_mandated correctly (pre-model, admin-configured)', async () => {
     mockPlaybook = { ...defaultPlaybook(), escalation_rules: [{ keywords: ['محامي'], reason: 'custom override attempt' }] }
     mockContext.recent_promises = []
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بكلم محاميي' })
 
-    expect(mockOpenEscalationCall).toHaveBeenCalledWith(expect.objectContaining({ escalation_type: 'lawyer_mention' }))
-    expect(mockOpenEscalationCall).not.toHaveBeenCalledWith(expect.objectContaining({ reason: 'custom override attempt' }))
+    expect(mockOpenEscalationCall).toHaveBeenCalledWith(expect.objectContaining({ escalation_type: 'playbook_mandated', reason: 'custom override attempt' }))
   })
 })
 

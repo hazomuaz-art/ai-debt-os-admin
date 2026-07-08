@@ -29,40 +29,41 @@ function hasAny(text: string, words: string[]) {
   return words.some(w => v.includes(w.toLowerCase()))
 }
 
-// 100% deterministic, keyword/data-driven — never an LLM judgment call.
-// Checked BEFORE any negotiation logic runs.
+// 🔴 lawyer_mention/legal_threat/complaint used to be detected here by raw
+// keyword matching on the customer's text — real production incident
+// (customer RAYMOND LASTRELLA BLANCAFLOR, 2026-07-08): the company ran a
+// separate SMS campaign whose OWN text mentions "المحامي"/legal wording. A
+// customer who pasted/forwarded that SMS into WhatsApp (asking about it) got
+// treated as if THEY PERSONALLY were threatening legal action — the keyword
+// check has no way to tell "the customer is quoting text we sent them" from
+// "the customer is genuinely threatening us", because it never actually
+// reads what the message MEANS. This is the same root mistake already fixed
+// once for dispute_reason (keyword lists always lag behind and misfire on
+// real phrasing) — the fix is identical: the model reads the customer's
+// actual message and reports its own semantic verdict
+// (parsed.legal_escalation_trigger, in ai-collector-agent.ts) instead of us
+// guessing from a fixed word list. Insurance-driven and playbook-driven
+// triggers below are untouched — those are data/config-driven, not
+// keyword-matched against free-form customer text, so they don't have this
+// failure mode.
 export function detectMandatoryEscalation(args: {
   text: string
   isInsurancePortfolio: boolean
   insuranceObjection?: InsuranceObjectionSignals | null
   insuranceCase?: InsuranceCaseFile | null
   // Admin-configured ADDITIONAL triggers from this portfolio's Playbook.
-  // Checked LAST, after every hard-coded rule below — a playbook can only
-  // ADD escalation triggers, never override, weaken, or replace the fixed
-  // ones (lawyer/legal/complaint, or the insurance-only types which stay
-  // gated on isInsurancePortfolio regardless of what a playbook says).
+  // Checked LAST — a playbook can only ADD escalation triggers, never
+  // override, weaken, or replace the insurance-only types (which stay gated
+  // on isInsurancePortfolio regardless of what a playbook says).
   customEscalationRules?: EscalationRule[] | null
   // Portfolios whose policy bans the legal/lockout path entirely (e.g. STC).
-  // When true, none of the hard-coded lawyer/legal/complaint triggers below
-  // fire, and a playbook_mandated trigger from customEscalationRules is
-  // also refused — this is a code-level guarantee, not just a DB policy,
-  // so a legal escalation can never be opened for this debt no matter what
-  // is configured in the playbook.
+  // When true, a playbook_mandated trigger from customEscalationRules is
+  // refused — this is a code-level guarantee, not just a DB policy, so a
+  // legal escalation can never be opened for this debt no matter what is
+  // configured in the playbook.
   suppressLegalTriggers?: boolean
 }): { escalation_type: EscalationType; reason: string } | null {
   const t = args.text
-
-  if (!args.suppressLegalTriggers) {
-    if (hasAny(t, ['محامي', 'المحامي', 'محاميي', 'lawyer', 'attorney'])) {
-      return { escalation_type: 'lawyer_mention', reason: `العميل ذكر محامياً: "${t}"` }
-    }
-    if (hasAny(t, ['قضية', 'دعوى', 'قضائي', 'المحكمة', 'محكمة', 'court', 'lawsuit', 'sue'])) {
-      return { escalation_type: 'legal_threat', reason: `العميل ذكر إجراءً قانونياً/قضائياً: "${t}"` }
-    }
-    if (hasAny(t, ['شكوى رسمية', 'برفع شكوى', 'بلاغ رسمي', 'هقدم شكوى', 'official complaint'])) {
-      return { escalation_type: 'complaint', reason: `العميل ذكر شكوى رسمية: "${t}"` }
-    }
-  }
 
   // Insurance-specific mandatory escalations — only ever for an actual
   // insurance portfolio, driven by the Phase 3 Insurance Engine's own

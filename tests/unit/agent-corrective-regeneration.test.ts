@@ -149,18 +149,43 @@ describe('Real incident — repeated "متى تقدر تسدد؟" after explicit
   })
 })
 
-describe('Customer invokes a lawyer/court themselves -> immediate lawyer persona, not the normal guard pipeline', () => {
-  it('"ارفعوها للمحكمه" switches to the lawyer persona immediately (not the STC/Energy/Water-excluded portfolios)', async () => {
+describe('Customer invokes a lawyer/court themselves -> legal escalation from the model\'s own semantic verdict', () => {
+  // Real production incident (2026-07-08): this used to be a pre-model
+  // keyword scan for "محكمة"/"محامي" — it couldn't tell a genuine personal
+  // threat from a customer quoting text WE sent them (a separate SMS
+  // campaign whose own wording mentions "المحامي"). Now the model itself
+  // reads the message and reports legal_escalation_trigger; the guard below
+  // acts on that semantic verdict, not on which words appear in the text.
+  it('"ارفعوها للمحكمه" (a genuine personal threat) opens a legal escalation and overrides the reply with the fixed legal-persona line', async () => {
     mockContext = baseContext([])
-    // generateLawyerPersonaReply doesn't JSON-parse — whatever the mocked
-    // client returns IS the reply text verbatim.
-    mockModelContent = 'الدين يبقى مستحقاً نظاماً، ونحتفظ بحق اتخاذ الإجراءات اللازمة إن لم تتم التسوية وديّاً. هل تفضّل ترتيب السداد الآن؟'
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'ok',
+      message: 'تمام، بس خلنا نحل الموضوع وديّاً أحسن لك.', promised_date: null,
+      legal_escalation_trigger: 'legal_threat',
+    })
 
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ارفعوها للمحكمه' })
 
-    expect(d.reason).toBe('customer_invoked_legal_challenge')
+    expect(d.reason).toBe('legal_escalation_opened_by_model')
     expect(d.action).toBe('human_review')
-    expect(d.message).toBe(mockModelContent)
+    expect(d.message).toContain('إدارة الشؤون القانونية')
+  })
+
+  it('does NOT escalate when the model correctly reads that the customer is only quoting our own SMS notice, not threatening us personally', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'ok',
+      message: 'إي هذا إشعار حقيقي من الشركة بخصوص ملفك، وش رايك تسدد الحين؟', promised_date: null,
+      legal_escalation_trigger: null,
+    })
+
+    const d = await runCollectorAgent({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      message: 'عزيزنا عميل موبايلي نفيدكم بأنه تم إشعاركم سابقًا بضرورة سداد مبلغ () ريال المستحق على هوية () عبر حساب سداد () ولم يتم السداد حتى تاريخه. وعليه، نؤكد أن عدم السداد سيترتب عليه إحالة ملفكم مباشرة للمحامي لاتخاذ الإجراءات القانونية دون أي إشعار إضافي، مع تحملكم كامل أتعاب المحامي والتكاليف القضائية المترتبة على ذلك.',
+    })
+
+    expect(d.reason).not.toBe('legal_escalation_opened_by_model')
+    expect(d.message).not.toContain('إدارة الشؤون القانونية')
   })
 })
 

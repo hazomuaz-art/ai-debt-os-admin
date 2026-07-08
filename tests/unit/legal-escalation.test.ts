@@ -1,22 +1,21 @@
 import { describe, it, expect } from 'vitest'
 import { detectMandatoryEscalation, renderLegalPersonaReply, detectStcReviewSignal } from '@/lib/legal-escalation'
 
-describe('detectMandatoryEscalation — deterministic, no guessing', () => {
-  it('detects a lawyer mention regardless of sector', () => {
-    const r = detectMandatoryEscalation({ text: 'بكلم محاميي', isInsurancePortfolio: false })
-    expect(r?.escalation_type).toBe('lawyer_mention')
-  })
-
-  it('detects a legal/court threat', () => {
-    const r = detectMandatoryEscalation({ text: 'برفع عليك دعوى قضائية', isInsurancePortfolio: false })
-    expect(r?.escalation_type).toBe('legal_threat')
-  })
-
-  it('detects an official complaint', () => {
-    const r = detectMandatoryEscalation({ text: 'برفع شكوى رسمية عليكم', isInsurancePortfolio: false })
-    expect(r?.escalation_type).toBe('complaint')
-  })
-
+// 🔴 lawyer_mention/legal_threat/complaint used to be detected here by raw
+// keyword matching on the customer's text ("محامي"/"محكمة"/"شكوى رسمية").
+// Real production incident (customer RAYMOND LASTRELLA BLANCAFLOR,
+// 2026-07-08): a customer pasted/forwarded an SMS notice WE sent (which
+// itself mentions "المحامي") and got treated as if they personally
+// threatened legal action — the keyword check has no way to tell "the
+// customer is quoting text we sent them" from "the customer genuinely means
+// this". That detection now lives in ai-collector-agent.ts as the model's
+// own semantic verdict (parsed.legal_escalation_trigger) — see
+// tests/unit/agent-guards.test.ts "(HH)"/"(HH2)" and
+// tests/unit/agent-corrective-regeneration.test.ts for coverage of that
+// behavior. detectMandatoryEscalation itself now only handles the
+// insurance-engine-driven and playbook-configured triggers below, which are
+// data/config-driven rather than keyword-matched against free-form text.
+describe('detectMandatoryEscalation — insurance + playbook triggers only (lawyer/legal/complaint moved to the model)', () => {
   it('does NOT escalate ordinary negotiation text', () => {
     const r = detectMandatoryEscalation({ text: 'تمام بسدد بكرة', isInsurancePortfolio: false })
     expect(r).toBeNull()
@@ -41,29 +40,17 @@ describe('detectMandatoryEscalation — deterministic, no guessing', () => {
     const r = detectMandatoryEscalation({ text: 'عندي رخصة سارية وبترسلها', isInsurancePortfolio: true, insuranceObjection: objection as any, insuranceCase: { claim_type: 'recourse' } as any })
     expect(r?.escalation_type).toBe('recovered_deduction')
   })
-
-  it('lawyer mention takes priority and is checked before insurance signals', () => {
-    const objection = { objectsToRecourseOrFault: true, contradictsClaimReason: false }
-    const r = detectMandatoryEscalation({ text: 'بكلم محاميي بخصوص نسبة الخطأ', isInsurancePortfolio: true, insuranceObjection: objection as any, insuranceCase: { claim_type: 'recourse' } as any })
-    expect(r?.escalation_type).toBe('lawyer_mention')
-  })
 })
 
 describe('custom escalation_rules from a portfolio Playbook — additive only', () => {
-  it('triggers playbook_mandated when a custom keyword matches, checked only after the hard-coded rules', () => {
+  it('triggers playbook_mandated when a custom keyword matches', () => {
     const rules = [{ keywords: ['وسيط', 'محامي الأسرة'], reason: 'وسيط قانوني غير معتاد' }]
     const r = detectMandatoryEscalation({ text: 'بكلم وسيط بخصوص الموضوع', isInsurancePortfolio: false, customEscalationRules: rules })
     expect(r?.escalation_type).toBe('playbook_mandated')
     expect(r?.reason).toBe('وسيط قانوني غير معتاد')
   })
 
-  it('hard-coded rules still win even if a custom rule would also match', () => {
-    const rules = [{ keywords: ['محامي'], reason: 'custom reason should NOT be used' }]
-    const r = detectMandatoryEscalation({ text: 'بكلم محاميي', isInsurancePortfolio: false, customEscalationRules: rules })
-    expect(r?.escalation_type).toBe('lawyer_mention') // the fixed rule, not the custom one
-  })
-
-  it('does not escalate when no custom rule and no hard-coded signal match', () => {
+  it('does not escalate when no custom rule and no insurance signal match', () => {
     const rules = [{ keywords: ['شيء غير موجود في الرسالة'], reason: 'x' }]
     const r = detectMandatoryEscalation({ text: 'تمام بسدد بكرة', isInsurancePortfolio: false, customEscalationRules: rules })
     expect(r).toBeNull()
@@ -76,30 +63,22 @@ describe('custom escalation_rules from a portfolio Playbook — additive only', 
 })
 
 describe('suppressLegalTriggers — STC policy bans the legal/lockout path entirely', () => {
-  it('"برفع عليك قضية" does NOT open a legal escalation when suppressed', () => {
-    const r = detectMandatoryEscalation({ text: 'برفع عليك قضية', isInsurancePortfolio: false, suppressLegalTriggers: true })
-    expect(r).toBeNull()
-  })
-
-  it('"سأكلم محامي" does NOT open a legal escalation when suppressed', () => {
-    const r = detectMandatoryEscalation({ text: 'سأكلم محامي', isInsurancePortfolio: false, suppressLegalTriggers: true })
-    expect(r).toBeNull()
-  })
-
-  it('an official-complaint phrase also does NOT open a legal escalation when suppressed', () => {
-    const r = detectMandatoryEscalation({ text: 'برفع شكوى رسمية عليكم', isInsurancePortfolio: false, suppressLegalTriggers: true })
-    expect(r).toBeNull()
-  })
-
-  it('a playbook-mandated custom rule is also refused when suppressed, even if configured', () => {
+  it('a playbook-mandated custom rule is refused when suppressed, even if configured', () => {
     const rules = [{ keywords: ['محامي'], reason: 'should never fire for STC' }]
     const r = detectMandatoryEscalation({ text: 'بكلم محاميي', isInsurancePortfolio: false, customEscalationRules: rules, suppressLegalTriggers: true })
     expect(r).toBeNull()
   })
 
-  it('other portfolios (e.g. insurance) are completely unaffected — suppression defaults to false', () => {
-    const r = detectMandatoryEscalation({ text: 'سأكلم محامي', isInsurancePortfolio: true })
-    expect(r?.escalation_type).toBe('lawyer_mention')
+  it('a playbook-mandated custom rule still fires normally when NOT suppressed', () => {
+    const rules = [{ keywords: ['محامي'], reason: 'real custom trigger' }]
+    const r = detectMandatoryEscalation({ text: 'بكلم محاميي', isInsurancePortfolio: false, customEscalationRules: rules, suppressLegalTriggers: false })
+    expect(r?.escalation_type).toBe('playbook_mandated')
+  })
+
+  it('insurance-driven triggers are unaffected by suppressLegalTriggers (STC has no insurance portfolios anyway, but the code path is independent)', () => {
+    const objection = { objectsToRecourseOrFault: true, contradictsClaimReason: false }
+    const r = detectMandatoryEscalation({ text: 'اعتراض', isInsurancePortfolio: true, insuranceObjection: objection as any, insuranceCase: { claim_type: 'recourse' } as any, suppressLegalTriggers: true })
+    expect(r?.escalation_type).toBe('recourse_dispute')
   })
 })
 
