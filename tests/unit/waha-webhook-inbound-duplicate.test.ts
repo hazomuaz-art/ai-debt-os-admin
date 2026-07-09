@@ -48,14 +48,26 @@ vi.mock('@/lib/supabase/server', () => ({
         })),
         eq: vi.fn().mockImplementation(() => makeEqChain()),
       })),
-      insert: vi.fn().mockImplementation(async (row: any) => {
-        if (table !== 'messages' || row.direction !== 'inbound') return { data: null, error: null }
-        const id = row.whatsapp_message_id
-        if (id && insertedInboundMessageIds.has(id)) {
-          return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "idx_messages_inbound_whatsapp_message_id_unique"' } }
+      // Same real-insert shape as waha-webhook-burst-merge.test.ts's mock:
+      // must support both a bare `await insert(...)` AND
+      // `insert(...).select('id').single()` — .select is attached directly
+      // to the returned Promise, not wrapped in an async function.
+      insert: vi.fn().mockImplementation((row: any) => {
+        let result: { data: any; error: any }
+        if (table !== 'messages' || row.direction !== 'inbound') {
+          result = { data: { id: 'msg-mock-id' }, error: null }
+        } else {
+          const id = row.whatsapp_message_id
+          if (id && insertedInboundMessageIds.has(id)) {
+            result = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "idx_messages_inbound_whatsapp_message_id_unique"' } }
+          } else {
+            if (id) insertedInboundMessageIds.add(id)
+            result = { data: { id: 'msg-mock-id' }, error: null }
+          }
         }
-        if (id) insertedInboundMessageIds.add(id)
-        return { data: null, error: null }
+        const p: any = Promise.resolve(result)
+        p.select = () => ({ single: () => Promise.resolve(result) })
+        return p
       }),
       update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
     })),

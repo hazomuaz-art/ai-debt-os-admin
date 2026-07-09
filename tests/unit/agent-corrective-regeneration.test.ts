@@ -215,6 +215,90 @@ describe('Real incident — agent itself used a non-Saudi word ("دلوقتي")'
   })
 })
 
+describe('Real incident — dispute misread as payment promise (customer 057da61b, 2026-07-09)', () => {
+  it('a customer describing the CREDITOR\'S response window while disputing the debt is NOT force-recorded as a promise', async () => {
+    // Exact production text: customer contacted the company, found no
+    // contract exists, filed a non-ownership dispute, and reported that the
+    // COMPANY will respond within 5 business days — "خلال 5 أيام عمل" is a
+    // real temporal reference (hasTemporalRef matches it), but it belongs to
+    // the creditor's own response window, not a payment commitment. The
+    // deterministic temporal-ref promise-forcing guard used to override any
+    // model action here and fabricate a payment date + number. The model's
+    // own semantic verdict (customer_commits_to_pay=false) must block that.
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'record_dispute', reason: 'ok',
+      message: 'تمام، فهمت. بانتظار رد الشركة خلال المدة اللي ذكرتها، وأنا بتابع معاك.',
+      dispute_reason: 'لا يوجد عقد، تم تقديم طلب عدم ملكية وينتظر رد الشركة',
+      customer_commits_to_pay: false,
+    })
+
+    const d = await runCollectorAgent({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      message: 'تم التواصل معهم واتضح عدم وجود عقد وتم تقديم طلب عدم ملكية وسيتم التواصل من قبلهم خلال 5 أيام عمل هذا ردهم',
+    })
+
+    expect(d.action).not.toBe('record_promise')
+    expect(d.promised_date).toBeFalsy()
+    expect(d.message).not.toContain('رقم السداد')
+  })
+
+  it('a genuine payment commitment with a temporal reference is still force-recorded (customer_commits_to_pay defaults true when unset)', async () => {
+    // Regression guard: the fix must not break the ORIGINAL case this
+    // deterministic guard exists for — a real promise the model itself
+    // failed to classify as record_promise.
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'negotiate', reason: 'x',
+      message: 'متى بالضبط بداية الشهر الجاي؟',
+    })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر الجاي' })
+
+    expect(d.action).toBe('record_promise')
+  })
+
+  it('an explicit customer_commits_to_pay=true with a temporal reference is force-recorded as a promise', async () => {
+    mockContext = baseContext([])
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'x',
+      message: 'تمام، خلاص.', customer_commits_to_pay: true,
+    })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر الجاي' })
+
+    expect(d.action).toBe('record_promise')
+  })
+})
+
+describe('Real incident — payment pressure tacked onto an INFO_REQUEST answer (customer 64eb6162, 2026-07-08)', () => {
+  it('an identity question ("ايش مين انت") never gets a payment-date question appended, even with novel phrasing the old regex never covered', async () => {
+    // Exact production text: customer asked "ايش مين انت" (a plain identity
+    // question, mid-conversation — not first contact) and got "... المبلغ
+    // 276.24 ريال، وش رايك نحدد له تاريخ سداد؟" appended — a direct
+    // violation of the INFO_REQUEST rule banning any payment pressure. The
+    // old PRESSURE_PATTERN regex never matched this exact phrasing (no
+    // fixed phrase list can enumerate every way to ask "وش رايك نحدد
+    // تاريخ؟") — the fix adds a general question-shape check (ends in "؟"
+    // + mentions payment/date vocabulary) that catches any phrasing.
+    mockContext = baseContext([
+      { direction: 'outbound', content: 'هلا، عندك مبلغ 276.24 ريال لموبايلي لسا ما اتسوّى. متى تقدر تسدّده؟' },
+      { direction: 'inbound', content: '🌹' },
+      { direction: 'outbound', content: 'رسالة الورد لطيفة، بس ما فيها رد على سؤالي. وش رايك، تحدد لي تاريخ تقدر تسدد فيه المبلغ؟' },
+    ])
+    mockModelContent = JSON.stringify({
+      shouldReply: true, action: 'reply', reason: 'x',
+      message: 'أنا خالد الدويحي من شركة مصدر الرؤية، متابع معك مطالبة إس تي سي المستحقة عليك. المبلغ 276.24 ريال، وش رايك نحدد له تاريخ سداد؟',
+    })
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'ايش مين انت' })
+
+    expect(d.message).not.toMatch(/[؟?]\s*$/)
+    expect(d.message).not.toContain('نحدد له تاريخ')
+    expect(d.message).toContain('خالد الدويحي')
+  })
+})
+
 describe('Real incident — customer question must never be buried by a promise confirmation', () => {
   it('customer asks "ايش المنتج؟" while an old promise is on file → answers the question, does NOT parrot the promise', async () => {
     // Exact production bug (Mobily, 2026-06-27): customer asked "المنتج ايش؟"

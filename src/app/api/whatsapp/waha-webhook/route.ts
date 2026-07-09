@@ -463,7 +463,7 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     const debt_id = (latestDebt as { id: string } | null)?.id ?? null
 
-    const { error: inboundInsertErr } = await supabase.from('messages').insert({
+    const { data: insertedInbound, error: inboundInsertErr } = await supabase.from('messages').insert({
       company_id: c.company_id, customer_id: c.id, debt_id,
       channel: 'whatsapp', direction: 'inbound',
       // Voice notes are stored as their TRANSCRIPT (prefixed so staff can
@@ -474,7 +474,7 @@ export async function POST(request: NextRequest) {
       whatsapp_message_id: msgId,
       metadata: { provider: 'waha', from, ...(hasReceiptMedia && { media_url: mediaUrl, mimetype }), ...(isVoiceNote && { voice_note: true, mimetype }) },
       sent_at: new Date().toISOString(),
-    })
+    }).select('id').single()
     // Real gap found during a full-system audit: not checked — a rejected
     // insert meant the customer's actual inbound message never existed in
     // the conversation history, even though the AI agent below still
@@ -545,6 +545,34 @@ export async function POST(request: NextRequest) {
           })
           if (docInsertErr) log.error('customer_documents insert failed', new Error(docInsertErr.message), { customer_id: c.id })
 
+          // 🔴 Real production bug this fixes (customer 057da61b, 2026-07-09):
+          // the classifier already analyzes the ACTUAL content of every
+          // attachment (classification.summary), but that analysis was only
+          // ever stored in customer_documents/admin alerts — never in the
+          // conversation history itself. The stored inbound message stayed a
+          // permanently opaque "📎 إيصال (صورة)" placeholder. Confirmed live:
+          // a customer sent a photo, then in their VERY NEXT message
+          // explained the outcome of a dispute they'd just filed related to
+          // it — but the agent's case-file/history read for that next turn
+          // had zero idea what the photo actually showed, because nothing
+          // ever wrote the real content anywhere the agent could see it.
+          // Enriching the message row itself (not just a side table) means
+          // every later turn's conversation-history read sees the real
+          // content, exactly like it would for typed text.
+          if (insertedInbound?.id && classification.summary) {
+            const docLabelAr: Record<string, string> = {
+              receipt: 'إيصال', account_statement: 'كشف حساب', letter: 'خطاب رسمي',
+              court_judgment: 'مستند قضائي', proof_of_payment: 'إثبات سداد',
+              debt_waiver: 'مستند إسقاط دين', id_document: 'هوية', other: 'مرفق',
+            }
+            const label = docLabelAr[classification.doc_type] ?? 'مرفق'
+            const enriched = text
+              ? `${text}\n📎 ${label}: ${classification.summary}`
+              : `📎 ${label}: ${classification.summary}`
+            const { error: enrichErr } = await supabase.from('messages').update({ content: enriched }).eq('id', insertedInbound.id)
+            if (enrichErr) log.error('inbound attachment content enrichment failed', new Error(enrichErr.message), { customer_id: c.id })
+          }
+
           // Confirmed receipt → hand off to the dedicated OCR/verification
           // pipeline, which does its own beneficiary-matching and reply.
           if (classification.doc_type === 'receipt') {
@@ -570,10 +598,22 @@ export async function POST(request: NextRequest) {
           // Every other classification still gets a reply — never silent.
           // Saudi-dialect phrasing the user specified for anything that might
           // require administrative review (statement/letter/judgment/proof of
-          // payment/debt waiver); a generic id/other document just gets a
-          // plain acknowledgment.
+          // payment/debt waiver).
+          //
+          // 🔴 Real production complaint this fixes: a non-receipt/non-review
+          // attachment (doc_type='other') always got the exact same blind
+          // "استلمت المرفق، شكراً لك." regardless of what the classifier's
+          // own vision analysis actually found in it — the analysis existed
+          // (classification.summary) but was never surfaced to the customer.
+          // When the model produced a real, non-empty summary, reference it
+          // directly instead of a generic line; the fixed line is only the
+          // fallback for when analysis genuinely found nothing to describe
+          // (empty summary — e.g. classification API failure or a truly
+          // unreadable image).
           const ackMessage = classification.needs_admin_review
             ? 'شكراً لك، تم استلام المستند وتحليله، وسيتم رفعه للإدارة المختصة للمراجعة، وسنقوم بإبلاغك بالنتيجة بمجرد الانتهاء.'
+            : classification.summary
+            ? `تم استلام مرفقك (${classification.summary}). إذا له علاقة بموضوع مديونيتك وضّح لي كيف أقدر أساعدك فيه.`
             : 'استلمت المرفق، شكراً لك.'
           const wr = await sendWhatsAppMessage({ to: phone, message: ackMessage, company_id: c.company_id, customer_id: c.id })
           const { error: ackInsertErr } = await supabase.from('messages').insert({

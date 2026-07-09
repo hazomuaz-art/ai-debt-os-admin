@@ -66,7 +66,17 @@ vi.mock('@/lib/supabase/server', () => ({
         })),
         eq: vi.fn().mockImplementation((col: string) => makeEqChain(table, col === 'direction')),
       })),
-      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+      // Real inbound insert now chains .select('id').single() to capture the
+      // new row's id (used to later enrich attachment turns with the
+      // classifier's content analysis) — the mock must support both a bare
+      // `await insert(...)` AND `insert(...).select('id').single()`, so
+      // .select is attached directly to the returned (already-resolved)
+      // Promise rather than making this an async function.
+      insert: vi.fn().mockImplementation(() => {
+        const p: any = Promise.resolve({ data: { id: 'msg-mock-id' }, error: null })
+        p.select = () => ({ single: () => Promise.resolve({ data: { id: 'msg-mock-id' }, error: null }) })
+        return p
+      }),
       update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
     })),
   })),

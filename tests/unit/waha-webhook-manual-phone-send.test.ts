@@ -46,9 +46,14 @@ vi.mock('@/lib/supabase/server', () => ({
         }),
         eq: vi.fn().mockImplementation(() => makeEqChain(table, false)),
       })),
-      insert: vi.fn().mockImplementation(async (row: any) => {
+      // Must support both a bare `await insert(...)` AND
+      // `insert(...).select('id').single()` — .select is attached directly
+      // to the returned Promise, not wrapped in an async function.
+      insert: vi.fn().mockImplementation((row: any) => {
         insertedMessages.push({ table, row })
-        return { data: null, error: null }
+        const p: any = Promise.resolve({ data: { id: 'msg-mock-id' }, error: null })
+        p.select = () => ({ single: () => Promise.resolve({ data: { id: 'msg-mock-id' }, error: null }) })
+        return p
       }),
     })),
   })),
