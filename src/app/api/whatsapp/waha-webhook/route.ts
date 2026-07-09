@@ -514,14 +514,61 @@ export async function POST(request: NextRequest) {
     // the content itself has actually been confirmed to be a receipt.
     if (hasReceiptMedia) {
       ;(async () => {
+        // Computed up front (not just deep inside the try block) so BOTH the
+        // real classification ack AND the failure-path notice below can use
+        // it — a download/classification failure must never fall back to a
+        // hardcoded Arabic line either.
+        const { data: recentForLang } = await supabase
+          .from('messages').select('content').eq('customer_id', c.id).eq('direction', 'inbound')
+          .order('sent_at', { ascending: false }).limit(10)
+        const { isNonArabicConversation } = await import('@/lib/detect-language')
+        const replyLang: 'ar' | 'en' = isNonArabicConversation((recentForLang ?? []).map((m: { content: string | null }) => m.content ?? '')) ? 'en' : 'ar'
+
+        // 🔴 Real production bug this fixes (customer RAYMOND LASTRELLA
+        // BLANCAFLOR / 4a47f571, 2026-07-09): the customer sent a genuine
+        // payment receipt (100 SAR) that vanished completely — no
+        // customer_documents row, no reply, no admin alert, nothing. Root
+        // cause: `if (!r.ok) { log.error(...); return }` on the WAHA media
+        // download silently swallowed the failure with a server-side log
+        // line only. From the customer's side they sent proof of payment
+        // and got total silence; from an admin's side there was no record a
+        // document was ever lost. This alerts admin AND tells the customer
+        // to resend, instead of a black hole.
+        const notifyDocumentFailure = async (reason: string) => {
+          log.error('document processing failed — notifying customer and admin instead of silent drop', new Error(reason), { customer_id: c.id })
+          const wr = await sendWhatsAppMessage({
+            to: phone,
+            message: replyLang === 'en'
+              ? "Sorry, I couldn't open the file you sent — can you resend it?"
+              : 'عذراً، ما قدرت أفتح المرفق اللي أرسلته — ممكن ترسله مرة ثانية؟',
+            company_id: c.company_id, customer_id: c.id,
+          })
+          const { error: failAckErr } = await supabase.from('messages').insert({
+            company_id: c.company_id, customer_id: c.id, debt_id,
+            channel: 'whatsapp', direction: 'outbound',
+            content: replyLang === 'en' ? "Sorry, I couldn't open the file you sent — can you resend it?" : 'عذراً، ما قدرت أفتح المرفق اللي أرسلته — ممكن ترسله مرة ثانية؟',
+            status: wr.status === 'sent' ? 'sent' : 'failed',
+            whatsapp_message_id: wr.message_id || null,
+            metadata: { sender: 'ai', action_type: 'document_ack', source: 'document_processing_failed', error: reason },
+            sent_at: new Date().toISOString(),
+          })
+          if (failAckErr) log.error('document-failure notice insert failed', new Error(failAckErr.message), { customer_id: c.id })
+          await insertSystemAlert({
+            company_id: c.company_id, severity: 'warning', alert_type: 'document_processing_failed',
+            title: `فشل معالجة مرفق: ${c.full_name ?? ''}`,
+            message: `العميل ${c.full_name ?? ''} أرسل مرفقاً فشلت معالجته (${reason}) — طُلب منه إعادة الإرسال، لكن يفضّل مراجعة المرفق يدوياً إذا لم يُعِد الإرسال.`,
+            metadata: { customer_id: c.id, debt_id, media_url: mediaUrl, reason },
+          })
+        }
+
         try {
           const r = await fetch(wahaMediaUrl(mediaUrl), { headers: { 'X-Api-Key': WAHA_KEY ?? '' } })
-          if (!r.ok) { log.error('document media download failed', undefined, { status: r.status }); return }
+          if (!r.ok) { await notifyDocumentFailure(`media download failed (status ${r.status})`); return }
           const b64 = Buffer.from(await r.arrayBuffer()).toString('base64')
           const isPdf = mimetype === 'application/pdf'
 
           const { classifyDocumentImage, classifyDocumentPdf } = await import('@/lib/document-classifier')
-          const classification = isPdf ? await classifyDocumentPdf(b64) : await classifyDocumentImage(b64)
+          const classification = isPdf ? await classifyDocumentPdf(b64, replyLang) : await classifyDocumentImage(b64, replyLang)
 
           // Persist the original file regardless of type — never OCR'd then
           // discarded. Non-critical: a storage failure never blocks the reply.
@@ -610,11 +657,27 @@ export async function POST(request: NextRequest) {
           // fallback for when analysis genuinely found nothing to describe
           // (empty summary — e.g. classification API failure or a truly
           // unreadable image).
+          // Real production bug this fixes (customer 4a47f571, 2026-07-09):
+          // wrapping the classifier's summary in "(...)." as a parenthetical
+          // aside produced a stilted, nested-punctuation sentence that read
+          // like an analytical report bolted onto a template, not something
+          // a human would type ("تم استلام مرفقك (صورة خارجية لمبنى ومحل خاص
+          // بشركة موبايلي (اتصالات)، لا تحتوي على مستند... ). إذا له علاقة
+          // ..."). The classifier prompt itself now asks for a summary
+          // already phrased as natural customer-facing prose (see
+          // document-classifier.ts) — so it just needs to flow directly into
+          // the sentence, not be parenthesized as a quoted analysis.
+          // Fallback lines (used when the classifier found nothing to
+          // describe, or an admin review is required) are the only
+          // remaining hardcoded-Arabic strings on this path — mirror
+          // replyLang here too, same real incident as above.
           const ackMessage = classification.needs_admin_review
-            ? 'شكراً لك، تم استلام المستند وتحليله، وسيتم رفعه للإدارة المختصة للمراجعة، وسنقوم بإبلاغك بالنتيجة بمجرد الانتهاء.'
+            ? (replyLang === 'en'
+              ? 'Thank you, we received your document and it has been sent to the relevant department for review — we will update you once it is done.'
+              : 'شكراً لك، تم استلام المستند وتحليله، وسيتم رفعه للإدارة المختصة للمراجعة، وسنقوم بإبلاغك بالنتيجة بمجرد الانتهاء.')
             : classification.summary
-            ? `تم استلام مرفقك (${classification.summary}). إذا له علاقة بموضوع مديونيتك وضّح لي كيف أقدر أساعدك فيه.`
-            : 'استلمت المرفق، شكراً لك.'
+            ? `${classification.summary}${replyLang === 'en' ? ' If this is related to your debt, let me know how I can help.' : ' إذا له علاقة بموضوع مديونيتك وضّح لي كيف أقدر أساعدك فيه.'}`
+            : (replyLang === 'en' ? 'Got your attachment, thank you.' : 'استلمت المرفق، شكراً لك.')
           const wr = await sendWhatsAppMessage({ to: phone, message: ackMessage, company_id: c.company_id, customer_id: c.id })
           const { error: ackInsertErr } = await supabase.from('messages').insert({
             company_id: c.company_id, customer_id: c.id, debt_id,
@@ -635,7 +698,7 @@ export async function POST(request: NextRequest) {
             })
           }
         } catch (err) {
-          log.error('WAHA document processing error', err as Error)
+          await notifyDocumentFailure(String((err as Error)?.message ?? err)).catch(() => {})
         }
       })().catch(() => {})
       // If the customer sent ONLY media with no caption text, there's nothing

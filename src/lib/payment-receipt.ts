@@ -33,6 +33,22 @@ export async function processInboundReceipt(args: {
 }): Promise<void> {
   const svc = createServiceClient()
 
+  // 🔴 Real production bug this fixes (customer RAYMOND LASTRELLA
+  // BLANCAFLOR / 4a47f571, 2026-07-09): this customer's entire conversation
+  // was in English, and the main collector agent already mirrors that
+  // correctly per-message — but this receipt-confirmation reply is a THIRD
+  // separate code path that never looked at conversation language at all,
+  // so a real 300 SAR payment got confirmed with an Arabic-only reply to a
+  // customer who never once wrote a word of Arabic. Same fix as
+  // document-classifier.ts / waha-webhook.ts's document ack path: look at
+  // the customer's actual recent messages, since a receipt attachment
+  // usually carries no caption text of its own to judge.
+  const { data: recentForLang } = await svc
+    .from('messages').select('content').eq('customer_id', args.customer_id).eq('direction', 'inbound')
+    .order('sent_at', { ascending: false }).limit(10)
+  const { isNonArabicConversation } = await import('@/lib/detect-language')
+  const replyLang: 'ar' | 'en' = isNonArabicConversation((recentForLang ?? []).map((m: { content: string | null }) => m.content ?? '')) ? 'en' : 'ar'
+
   const srcLabel = args.source === 'image' ? 'صورة' : args.source === 'pdf' ? 'PDF' : 'نص'
 
   let ocr: ReceiptData | null
@@ -141,7 +157,9 @@ export async function processInboundReceipt(args: {
       metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ocr, receipt_path: receiptPath },
     })
     await addTimeline(svc, args, 'payment', 'إيصال استُلم — يحتاج مراجعة يدوية (تعذّر قراءة المبلغ)', ocr)
-    await replyAndLog(svc, args, 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
+    await replyAndLog(svc, args, replyLang === 'en'
+      ? "Got your receipt, I'm verifying it now and will confirm shortly. Thank you."
+      : 'استلمت إيصالك ووصلني، جاري التحقق منه وأأكد لك قريباً. شكراً.')
     return
   }
 
@@ -224,9 +242,13 @@ export async function processInboundReceipt(args: {
     // REMAINDER (full amount, not a new multi-payment plan) — never an
     // installment/objection suggestion unless the customer raises that
     // idea themselves; this is just asking when the rest will be paid.
-    reply = newBal <= 0
-      ? `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. تم سداد المديونية بالكامل، شكراً لك.`
-      : `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. المتبقي ${newBal} ${currency} — متى تقدر تسدد باقي المبلغ؟`
+    reply = replyLang === 'en'
+      ? (newBal <= 0
+        ? `Receipt received and confirmed — ${amount} ${currency}. Your debt has been fully paid, thank you.`
+        : `Receipt received and confirmed — ${amount} ${currency}. Remaining balance: ${newBal} ${currency} — when can you pay the rest?`)
+      : (newBal <= 0
+        ? `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. تم سداد المديونية بالكامل، شكراً لك.`
+        : `تم استلام إيصالك وتأكيد مبلغ ${amount} ${currency}. المتبقي ${newBal} ${currency} — متى تقدر تسدد باقي المبلغ؟`)
   } else {
     // Match incomplete (beneficiary mismatch, unknown, or a typed-text
     // claim with no attachment to verify) → never auto-verified. Always
@@ -244,7 +266,9 @@ export async function processInboundReceipt(args: {
       metadata: { debt_id: args.debt_id, customer_id: args.customer_id, ...matchMeta, ocr },
     })
     await addTimeline(svc, args, 'payment', `إيصال بمبلغ ${amount} ${currency} — ${reason}`, ocr)
-    reply = 'وصلنا الإيصال، وبنراجع مطابقته على الحساب ونتأكد من البيانات.'
+    reply = replyLang === 'en'
+      ? "Got your receipt, we're reviewing it against the account to confirm the details."
+      : 'وصلنا الإيصال، وبنراجع مطابقته على الحساب ونتأكد من البيانات.'
   }
 
   await replyAndLog(svc, args, reply)

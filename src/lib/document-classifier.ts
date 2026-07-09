@@ -47,8 +47,27 @@ const PROMPT = `أنت مصنّف مستندات لنظام تحصيل ديون.
 - id_document: هوية وطنية/إقامة/جواز سفر
 - other: أي شيء آخر لا ينطبق عليه ما سبق (صورة عشوائية، سكرين شات غير متعلق، إلخ)
 
+هذا الحقل "summary" يُرسَل للعميل مباشرة كجزء من رد واتساب — لازم يكون جملة واحدة طبيعية بصيغة محادثة بشرية عادية، وليس تقريراً تحليلياً. لا تكتبه بصيغة "الصورة تُظهر..." أو "لا تحتوي على..." أو أي أسلوب وصفي/تحليلي بارد — اكتبه كأنك تخبر العميل مباشرة بمحتوى ما أرسله بجملة قصيرة طبيعية (مثال: "استلمت إيصال تحويل بنكي بمبلغ 500 ريال" أو "استلمت صورة لمحل تجاري، ما فيها أي مستند متعلق بالدين"). إذا المرفق غير متعلق بالمديونية إطلاقاً، وضّح هذا بجملة بسيطة مباشرة بدل أسلوب تقرير.
+
 أعد JSON فقط بالشكل التالي بدون أي نص إضافي:
-{"doc_type": "أحد القيم أعلاه بالضبط", "summary": "وصف من جملة أو جملتين لمحتوى المستند الفعلي بالعربية", "confidence": <0-100>}`
+{"doc_type": "أحد القيم أعلاه بالضبط", "summary": "جملة واحدة طبيعية جاهزة للإرسال المباشر للعميل، بالعربية", "confidence": <0-100>}`
+
+// 🔴 Real production bug this fixes (customer RAYMOND LASTRELLA BLANCAFLOR /
+// 4a47f571, 2026-07-09): this customer's entire conversation was in
+// English — the main collector agent (ai-collector-agent.ts) already
+// mirrors the customer's language correctly — but this classifier's summary
+// was ALWAYS generated in Arabic regardless, because nothing here ever knew
+// what language the conversation was actually in. The customer got an
+// otherwise-improved, natural-sounding summary that was still in the wrong
+// language entirely. `lang` lets the caller (which reads the real recent
+// conversation history) tell this classifier to write the summary in
+// English instead, mirroring the same per-conversation language decision
+// the main agent already makes.
+const ENGLISH_SUMMARY_INSTRUCTION = '\n\n🔴 هذا العميل يتواصل بالإنجليزية في محادثته الحالية بالكامل — اكتب حقل "summary" بالإنجليزية فقط، بنفس الأسلوب الطبيعي المباشر أعلاه، لا بالعربية.'
+
+function buildPrompt(lang: 'ar' | 'en'): string {
+  return lang === 'en' ? PROMPT + ENGLISH_SUMMARY_INSTRUCTION : PROMPT
+}
 
 function parse(raw: string): { doc_type: string; summary: string; confidence: number } | null {
   try {
@@ -73,7 +92,7 @@ function toResult(parsed: { doc_type: string; summary: string; confidence: numbe
 
 // Classifies an inbound image attachment. Never assumes what it is —
 // analyzes the actual visual content first via a vision-capable model.
-export async function classifyDocumentImage(imageBase64: string): Promise<DocumentClassification> {
+export async function classifyDocumentImage(imageBase64: string, lang: 'ar' | 'en' = 'ar'): Promise<DocumentClassification> {
   const client = getClient()
   if (!client) return FALLBACK
   const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
@@ -85,7 +104,7 @@ export async function classifyDocumentImage(imageBase64: string): Promise<Docume
       messages: [{
         role: 'user',
         content: [
-          { type: 'text', text: PROMPT },
+          { type: 'text', text: buildPrompt(lang) },
           { type: 'image_url', image_url: { url: dataUrl } },
         ] as any,
       }],
@@ -97,7 +116,7 @@ export async function classifyDocumentImage(imageBase64: string): Promise<Docume
   }
 }
 
-async function classifyDocumentText(text: string): Promise<DocumentClassification> {
+async function classifyDocumentText(text: string, lang: 'ar' | 'en' = 'ar'): Promise<DocumentClassification> {
   const client = getClient()
   if (!client) return FALLBACK
   try {
@@ -105,7 +124,7 @@ async function classifyDocumentText(text: string): Promise<DocumentClassificatio
       model: 'anthropic/claude-sonnet-5',
       max_tokens: 300,
       response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: `${PROMPT}\n\nنص المستند:\n${text.slice(0, 4000)}` }],
+      messages: [{ role: 'user', content: `${buildPrompt(lang)}\n\nنص المستند:\n${text.slice(0, 4000)}` }],
     })
     return toResult(parse(res.choices[0]?.message?.content ?? ''))
   } catch (err) {
@@ -118,7 +137,7 @@ async function classifyDocumentText(text: string): Promise<DocumentClassificatio
 // (digitally-generated documents), falling back to rendering page 1 as an
 // image and running the same vision classifier used for photos (covers
 // scanned/image-only PDFs, same approach as receipt-ocr.ts).
-export async function classifyDocumentPdf(pdfBase64: string): Promise<DocumentClassification> {
+export async function classifyDocumentPdf(pdfBase64: string, lang: 'ar' | 'en' = 'ar'): Promise<DocumentClassification> {
   const buf = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64')
   try {
     const { PDFParse } = await import('pdf-parse')
@@ -126,7 +145,7 @@ export async function classifyDocumentPdf(pdfBase64: string): Promise<DocumentCl
     const { text } = await parser.getText()
     await parser.destroy()
     const meaningful = String(text ?? '').replace(/--\s*\d+\s*of\s*\d+\s*--/gi, '').replace(/\s+/g, ' ').trim()
-    if (meaningful.length >= 15) return await classifyDocumentText(meaningful)
+    if (meaningful.length >= 15) return await classifyDocumentText(meaningful, lang)
   } catch (err) {
     log.error('pdf text classification failed', err as Error)
   }
@@ -138,7 +157,7 @@ export async function classifyDocumentPdf(pdfBase64: string): Promise<DocumentCl
     const page = shot?.pages?.[0]
     const dataUrl: string | null = page?.dataUrl
       || (page?.data ? `data:image/png;base64,${Buffer.from(page.data).toString('base64')}` : null)
-    if (dataUrl) return await classifyDocumentImage(dataUrl)
+    if (dataUrl) return await classifyDocumentImage(dataUrl, lang)
   } catch (err) {
     log.error('pdf render classification failed', err as Error)
   }

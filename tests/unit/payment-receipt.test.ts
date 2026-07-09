@@ -229,3 +229,52 @@ describe('4) insurance IBAN matching still works correctly', () => {
     expect(paymentInsert?.payload.verification_status).toBe('pending_verification')
   })
 })
+
+describe('5) receipt-confirmation reply mirrors the conversation language — real incident, customer RAYMOND LASTRELLA BLANCAFLOR / 4a47f571, 2026-07-09', () => {
+  it('replies in English when the customer\'s real conversation is in English, even though this is a third code path separate from the main agent and the document-ack path', async () => {
+    // Exact production bug: this customer's entire conversation was in
+    // English, and a real 300 SAR payment came through — but this
+    // confirmation reply ('تم استلام إيصالك وتأكيد مبلغ 300 SAR...') was
+    // hardcoded Arabic regardless, same bug class already fixed in
+    // document-classifier.ts and the waha-webhook document-ack path.
+    tableData.debts = {
+      data: {
+        current_balance: 852.42, currency: 'SAR', status: 'overdue', reference_number: null,
+        account_number: null, creditor_name: 'Mobily', portfolio_id: 'p-mob', created_at: '2026-01-01',
+        metadata: { extra: { sadad_number: '1000135507940555' } },
+      }, error: null,
+    }
+    tableData.collection_accounts = { data: [], error: null }
+    tableData.messages = {
+      data: [
+        { content: 'Ok i will put money then I pay' },
+        { content: 'Account number?' },
+        { content: 'So i will pay 100 now?' },
+      ],
+      error: null, count: 0,
+    }
+    mockOcr = emptyOcr({ amount: 300, invoice_number: '1000135507940555', confidence: 90 })
+
+    await processInboundReceipt({ company_id: 'c', customer_id: 'u', debt_id: 'd1', phone: '+966500000000', source: 'pdf', data: 'b64' })
+
+    expect(lastReply).toMatch(/^Receipt received and confirmed/)
+    expect(lastReply).not.toMatch(/[؀-ۿ]/) // no Arabic script at all
+  })
+
+  it('stays in Arabic for a genuinely Arabic conversation (unaffected by the fix)', async () => {
+    tableData.debts = {
+      data: {
+        current_balance: 500, currency: 'SAR', status: 'overdue', reference_number: null,
+        account_number: null, creditor_name: 'STC', portfolio_id: 'p-stc', created_at: '2026-01-01',
+        metadata: { extra: { sadad_number: '900111222' } },
+      }, error: null,
+    }
+    tableData.collection_accounts = { data: [], error: null }
+    tableData.messages = { data: [{ content: 'وش الوضع' }, { content: 'ابغى اسدد' }], error: null, count: 0 }
+    mockOcr = emptyOcr({ amount: 500, invoice_number: '900111222', confidence: 90 })
+
+    await processInboundReceipt({ company_id: 'c', customer_id: 'u', debt_id: 'd1', phone: '+966500000000', source: 'image', data: 'b64' })
+
+    expect(lastReply).toMatch(/^تم استلام إيصالك/)
+  })
+})
