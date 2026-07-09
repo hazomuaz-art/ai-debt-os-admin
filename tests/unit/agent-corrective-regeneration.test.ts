@@ -455,3 +455,45 @@ describe('Root fix — all customer replies routed through Sonnet (not Haiku)', 
     expect(capturedModels).not.toContain('anthropic/claude-haiku-4.5')
   })
 })
+
+describe('Real incident — completion truncated mid-JSON leaks raw JSON to the customer (customer 4a47f571, 2026-07-09)', () => {
+  it('salvages the "message" field instead of sending the raw unclosed JSON blob', async () => {
+    // Exact production bug: the completion got cut off before the closing
+    // brace ever arrived, so extractJson() failed to parse it. The old code
+    // then treated the whole raw text as "plain prose" and sent it to the
+    // customer VERBATIM over WhatsApp:
+    //   '{\n  "shouldReply": true,\n  "action": "reply", ... "message":
+    //    "Ok, go ahead and check with the office tomorrow morning. I'll
+    //    follow up with you after your visit to see what they arranged.",
+    //    "promised_date": null, "promise_text": null,'
+    // — literally showing the customer internal field names and unclosed
+    // JSON syntax. The "message" field itself was complete (it comes early
+    // in the schema); only later fields got cut off.
+    mockContext = baseContext([])
+    mockModelContent = '{\n  "shouldReply": true,\n  "action": "reply",\n  "reason": "العميل أكد أنه رايح يمر على فرع موبايلي بكرة الصبح لترتيب السداد",\n  "message": "تمام، امر على الفرع بكرة الصبح وأتابع وياك بعدها.", "promised_date": null, "promise_text": null,'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'Ok' })
+
+    expect(d.message).toBe('تمام، امر على الفرع بكرة الصبح وأتابع وياك بعدها.')
+    expect(d.message).not.toMatch(/shouldReply|"action"|"reason"|promised_date/)
+  })
+
+  it('falls back to a safe canned line (never raw JSON) when the message field itself cannot be salvaged', async () => {
+    mockContext = baseContext([])
+    mockModelContent = '{\n  "shouldReply": true,\n  "action": "reply",\n  "reason": "some reasoning that got cut off before the message field ever star'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'Ok' })
+
+    expect(d.message).not.toMatch(/shouldReply|"action"|"reason"/)
+    expect(d.message).not.toContain('{')
+  })
+
+  it('genuine plain-prose (non-JSON-looking) model output still falls through to the prose fallback as before', async () => {
+    mockContext = baseContext([])
+    mockModelContent = 'تمام، خلنا نكمل بخصوص ملفك.'
+
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'Ok' })
+
+    expect(d.message).toBe('تمام، خلنا نكمل بخصوص ملفك.')
+  })
+})

@@ -1620,10 +1620,38 @@ ${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعل�
   if (obj && typeof obj === 'object' && 'message' in obj) {
     parsed = obj as CollectorDecision
   } else if (raw.trim().length > 1) {
-    // Model replied in plain prose instead of JSON → use the prose as the reply
-    // rather than dropping to a canned fallback.
-    parsed = { shouldReply: true, action: 'reply', reason: 'prose_fallback', message: raw.trim() }
-    log.warn('model returned non-JSON, using prose', { intent, raw_preview: raw.slice(0, 120) })
+    // Real production incident (customer 4a47f571, 2026-07-09): a completion
+    // cut off mid-JSON (max_tokens truncation, or any other reason the
+    // closing brace never arrived) made extractJson() fail — but this branch
+    // then blindly sent the RAW text, unclosed braces/field-names and all,
+    // straight to the customer as if it were a human reply:
+    //   '{\n  "shouldReply": true,\n  ... "message": "Ok, go ahead...", "promised_date": null, "promise_text": null,'
+    // The "plain prose" fallback below is only correct for a genuine
+    // non-JSON reply — it must never fire on a truncated JSON blob. Detect
+    // that case first: if the raw text still looks like our JSON schema
+    // (opens with '{' and contains a quoted decision field), salvage just
+    // the "message" string value via regex — it's written early in the
+    // schema, so it is very often still complete even when later fields
+    // (promised_date, promise_text, ...) got cut off. Only fall through to
+    // a safe canned line if even that salvage fails; never emit the raw
+    // JSON text itself.
+    const looksLikeTruncatedJson = /^\{/.test(raw.trim()) && /"(shouldReply|action|reason|message)"\s*:/.test(raw)
+    if (looksLikeTruncatedJson) {
+      const messageFieldMatch = raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+      if (messageFieldMatch) {
+        const salvaged = messageFieldMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n')
+        parsed = { shouldReply: true, action: 'reply', reason: 'truncated_json_salvaged', message: salvaged }
+        log.warn('model response was truncated mid-JSON — salvaged message field', { intent, raw_preview: raw.slice(0, 200) })
+      } else {
+        parsed = { shouldReply: true, action: 'reply', reason: 'truncated_json_unsalvageable', message: 'لحظة من فضلك، بأرجع لك بخصوص ملفك حالاً.' }
+        log.error('model response was truncated mid-JSON and message field could not be salvaged — using safe fallback instead of leaking raw JSON', { intent, raw_preview: raw.slice(0, 200) })
+      }
+    } else {
+      // Model replied in plain prose instead of JSON → use the prose as the reply
+      // rather than dropping to a canned fallback.
+      parsed = { shouldReply: true, action: 'reply', reason: 'prose_fallback', message: raw.trim() }
+      log.warn('model returned non-JSON, using prose', { intent, raw_preview: raw.slice(0, 120) })
+    }
   } else {
     parsed = { shouldReply: true, action: 'reply', reason: 'empty_response', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
     log.error('model returned empty response', { intent, model: modelId })
