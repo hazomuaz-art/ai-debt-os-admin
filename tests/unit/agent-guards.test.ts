@@ -649,7 +649,7 @@ describe('Insurance Engine (Phase 3)', () => {
 
     expect(d.action).toBe('human_review')
     expect(d.reason).toBe('legal_escalation_opened')
-    expect(d.message).toContain('إدارة الشؤون القانونية')
+    expect(d.message).toContain('المستشار القانوني')
     expect(mockOpenEscalationCall).toHaveBeenCalledWith(expect.objectContaining({ escalation_type: 'recourse_dispute', debt_id: 'd_ins' }))
     expect(OpenAIMock.mock.calls.length).toBe(0)
   })
@@ -687,7 +687,7 @@ describe('Insurance Engine (Phase 3)', () => {
 
     expect(d.action).toBe('human_review')
     expect(d.reason).toBe('legal_escalation_opened_by_model')
-    expect(d.message).toContain('إدارة الشؤون القانونية')
+    expect(d.message).toContain('المستشار القانوني')
     expect(mockOpenEscalationCall).toHaveBeenCalledWith(expect.objectContaining({ escalation_type: 'lawyer_mention' }))
   })
 
@@ -727,7 +727,7 @@ describe('Insurance Engine (Phase 3)', () => {
 
     expect(d.action).toBe('human_review')
     expect(d.reason).toBe('legal_escalation_locked')
-    expect(d.message).toContain('إدارة الشؤون القانونية')
+    expect(d.message).toContain('المستشار القانوني')
     expect(d.message).not.toMatch(/خصم|تقسيط|بسدد/)
     expect(OpenAIMock.mock.calls.length).toBe(0)
     // the lock check never tries to re-open a new escalation

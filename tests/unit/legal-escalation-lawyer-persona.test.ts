@@ -104,7 +104,7 @@ describe('Repeated-refusal -> lawyer persona escalation', () => {
 
     expect(d.reason).toBe('legal_escalation_locked_lawyer_persona')
     expect(d.message).toBe(lawyerReplyContent)
-    expect(d.message).not.toMatch(/معك إدارة الشؤون القانونية/) // not the OLD fixed line
+    expect(d.message).not.toMatch(/معاك المستشار القانوني للشركة/) // not the fixed line used by other escalation types
   })
 
   it('STC portfolio is excluded — refusal is never tracked for the lawyer-persona escalation', async () => {
@@ -125,6 +125,6 @@ describe('Repeated-refusal -> lawyer persona escalation', () => {
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'أي شيء' })
 
     expect(d.reason).toBe('legal_escalation_locked')
-    expect(d.message).toMatch(/معك إدارة الشؤون القانونية/)
+    expect(d.message).toMatch(/معاك المستشار القانوني للشركة/)
   })
 })

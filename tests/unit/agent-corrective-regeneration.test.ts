@@ -168,7 +168,7 @@ describe('Customer invokes a lawyer/court themselves -> legal escalation from th
 
     expect(d.reason).toBe('legal_escalation_opened_by_model')
     expect(d.action).toBe('human_review')
-    expect(d.message).toContain('إدارة الشؤون القانونية')
+    expect(d.message).toContain('المستشار القانوني')
   })
 
   it('does NOT escalate when the model correctly reads that the customer is only quoting our own SMS notice, not threatening us personally', async () => {
@@ -185,7 +185,7 @@ describe('Customer invokes a lawyer/court themselves -> legal escalation from th
     })
 
     expect(d.reason).not.toBe('legal_escalation_opened_by_model')
-    expect(d.message).not.toContain('إدارة الشؤون القانونية')
+    expect(d.message).not.toContain('المستشار القانوني')
   })
 })
 

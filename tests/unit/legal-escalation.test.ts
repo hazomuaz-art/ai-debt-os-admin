@@ -99,9 +99,9 @@ describe('detectStcReviewSignal — non-freezing complaint signal', () => {
 })
 
 describe('renderLegalPersonaReply', () => {
-  it('always identifies as "إدارة الشؤون القانونية" and never offers negotiation', () => {
+  it('always identifies as "المستشار القانوني" (Saudi-dialect consultant persona) and never offers negotiation', () => {
     const msg = renderLegalPersonaReply('lawyer_mention')
-    expect(msg).toContain('إدارة الشؤون القانونية')
+    expect(msg).toContain('المستشار القانوني')
     expect(msg).not.toMatch(/خصم|تقسيط|وعد|سدد|بكرة/)
   })
 })
