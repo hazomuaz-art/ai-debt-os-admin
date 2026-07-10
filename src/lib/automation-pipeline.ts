@@ -24,6 +24,7 @@ import { calculateDaysOverdue } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
 import { detectCustomerIntent } from '@/lib/negotiation-intent'
 import { insertTimelineEvent } from '@/lib/timeline'
+import type { TimelineEventType } from '@/types/index'
 import { insertApproval } from '@/lib/approvals'
 import { insertSystemAlert } from '@/lib/system-alerts'
 import { recordDispute } from '@/lib/dispute'
@@ -786,12 +787,12 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   const sb = createServiceClient()
   let changed = 0
 
-  async function addTimeline(event_type: string, summary: string, detail?: Record<string, unknown>) {
+  async function addTimeline(event_type: TimelineEventType, summary: string, detail?: Record<string, unknown>) {
     await insertTimelineEvent({
       company_id: ctx.debt.company_id,
       customer_id: ctx.debt.customer_id,
       debt_id: ctx.debt.id,
-      event_type: event_type as any,
+      event_type,
       channel: String(event?.source ?? '').includes('webhook') ? 'whatsapp' : 'system',
       summary,
       detail: JSON.stringify({ intent, text, ...(detail ?? {}) }).slice(0, 1000),
@@ -803,7 +804,7 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
   }
 
   if (intent === 'promise') {
-    await addTimeline('promise_detected', `وعد سداد من العميل: ${ctx.customer.full_name}`)
+    await addTimeline('promise_to_pay', `وعد سداد من العميل: ${ctx.customer.full_name}`)
   }
 
   if (intent === 'refusal') {
@@ -822,7 +823,7 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
       metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, intent, source: event?.source ?? 'unknown' },
     })
 
-    await addTimeline('refusal_detected', `رفض سداد من العميل: ${ctx.customer.full_name}`)
+    await addTimeline('status_change', `رفض سداد من العميل: ${ctx.customer.full_name}`)
     changed++
   }
 
@@ -853,7 +854,7 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
       customer_message: text,
     })
 
-    await addTimeline('dispute_detected', `اعتراض يحتاج مراجعة: ${ctx.customer.full_name}`)
+    await addTimeline('status_change', `اعتراض يحتاج مراجعة: ${ctx.customer.full_name}`)
     changed++
   }
 
@@ -872,7 +873,7 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
       customer_message: text,
     })
 
-    await addTimeline('payment_claim_detected', `العميل أفاد بالسداد/التحويل: ${ctx.customer.full_name}`)
+    await addTimeline('payment', `العميل أفاد بالسداد/التحويل: ${ctx.customer.full_name}`)
     changed++
   }
 
@@ -886,7 +887,7 @@ async function stepLiveReactor(ctx: Ctx, event?: PipelineEvent): Promise<number>
       metadata: { debt_id: ctx.debt.id, customer_id: ctx.customer.id, intent, source: event?.source ?? 'unknown' },
     })
 
-    await addTimeline(intent === 'legal_threat' ? 'legal_escalation_detected' : 'angry_customer_detected', text.slice(0, 120))
+    await addTimeline(intent === 'legal_threat' ? 'escalation' : 'status_change', text.slice(0, 120))
     changed++
   }
 
