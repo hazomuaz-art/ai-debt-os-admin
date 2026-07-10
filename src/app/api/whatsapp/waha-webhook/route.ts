@@ -475,23 +475,27 @@ export async function POST(request: NextRequest) {
     // just a deliberate manual restart) can replay recent chat history as
     // fresh "message" webhook events carrying a DIFFERENT internal message
     // id for content already processed — the msgId check above can't catch
-    // that since the id genuinely differs. A resync can happen at any time
-    // in a long-running production system, so this is intentionally NOT a
-    // short time-boxed window (a narrow window only protects against a
-    // replay that happens to land within it — a real production incident
-    // showed a replay landing 3+ minutes after the original). Instead: does
-    // this EXACT text from this SAME customer already exist anywhere among
-    // their last 5 inbound messages, regardless of age? A customer
-    // genuinely retyping the identical text days apart is rare enough that
-    // silently dropping it is the safer failure mode vs. the bot replying
-    // twice to a stale replayed message.
-    if (text) {
+    // that since the id genuinely differs. Confirmed production incident
+    // (2026-07-10): this guard was matching on content ALONE, with no time
+    // bound — a customer casually repeating a short common phrase ("مساء
+    // الخير") minutes or hours apart, each send a genuinely fresh WhatsApp
+    // message with its own current timestamp, got silently swallowed every
+    // time after the first because the text matched something already in
+    // their last-5-inbound window. A real resync replay carries WhatsApp's
+    // OWN original send timestamp for content already processed, which will
+    // be stale (minutes+ old) by the time the replay webhook fires — a
+    // genuine new message's own timestamp is always current. Gating on that
+    // (not on content match alone) keeps the resync protection while never
+    // dropping a message that WhatsApp itself timestamps as just sent.
+    const REPLAY_STALENESS_MS = 5 * 60 * 1000
+    const messageAgeMs = Date.now() - new Date(messageTimestamp).getTime()
+    if (text && messageAgeMs > REPLAY_STALENESS_MS) {
       const { data: recentInbound } = await supabase
         .from('messages').select('content').eq('customer_id', c.id).eq('direction', 'inbound')
         .order('sent_at', { ascending: false }).limit(5)
       const isReplay = (recentInbound ?? []).some((m: { content: string | null }) => m.content === text)
       if (isReplay) {
-        log.info('duplicate inbound content ignored (likely session resync replay)', { customer_id: c.id })
+        log.info('duplicate inbound content ignored (likely session resync replay)', { customer_id: c.id, messageAgeMs })
         return NextResponse.json({ status: 'ok' })
       }
     }
