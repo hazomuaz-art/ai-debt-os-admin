@@ -1,3 +1,5 @@
+BEGIN;
+
 create table if not exists customer_documents (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references companies(id) on delete cascade,
@@ -28,3 +30,5 @@ create policy "company_scoped_select_customer_documents" on customer_documents
 
 create policy "service_role_all_customer_documents" on customer_documents
   for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+
+COMMIT;

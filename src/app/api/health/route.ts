@@ -40,19 +40,30 @@ export async function GET() {
   }
 
   // 3. Job queue health
+  // 🔴 Real production-readiness audit finding (2026-07-09): the query
+  // error was never checked — Supabase-js returns `{data, error}` on a
+  // failed query (e.g. the table not existing), it does not throw, so this
+  // silently fell through to `stuckJobs ?? 0` = 0 = "ok" on every failure,
+  // never actually verifying anything. Confirmed live: `job_queue` does not
+  // exist in this project at all, yet this check has been reporting
+  // healthy the entire time.
   try {
     const supabase = createServiceClient()
-    const { count: stuckJobs } = await supabase
+    const { count: stuckJobs, error: jobQueueErr } = await supabase
       .from('job_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'processing')
       .lt('started_at', new Date(Date.now() - 15 * 60_000).toISOString())
 
-    checks.job_queue = (stuckJobs ?? 0) > 5
-      ? { status: 'warn', message: `${stuckJobs} stuck jobs` }
-      : { status: 'ok' }
-  } catch {
-    checks.job_queue = { status: 'warn', message: 'Could not check job queue' }
+    if (jobQueueErr) {
+      checks.job_queue = { status: 'warn', message: `Could not check job queue: ${jobQueueErr.message}` }
+    } else {
+      checks.job_queue = (stuckJobs ?? 0) > 5
+        ? { status: 'warn', message: `${stuckJobs} stuck jobs` }
+        : { status: 'ok' }
+    }
+  } catch (err) {
+    checks.job_queue = { status: 'warn', message: `Could not check job queue: ${err instanceof Error ? err.message : 'unknown error'}` }
   }
 
   // 4. External integrations

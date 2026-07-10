@@ -18,12 +18,18 @@ const ALERT_PHONE  = process.env.BALANCE_ALERT_PHONE
  * contact before the credit runs out and the AI agent starts failing.
  */
 export async function GET(req: NextRequest) {
+  // Root-cause production-readiness audit finding (2026-07-09): this used
+  // to "fail open" - if NEITHER APP_SECRET nor CRON_SECRET was configured
+  // (a real, plausible env misconfiguration), the auth check below was
+  // skipped entirely and this route ran fully unauthenticated for anyone
+  // with the URL. A missing secret is now treated as a server
+  // misconfiguration (500), never as "allow everyone".
+  if (!process.env.APP_SECRET && !process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Server misconfigured: no cron secret set' }, { status: 500 })
+  }
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.APP_SECRET}` && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    // Enforced whenever a secret is actually configured, regardless of
-    // NODE_ENV — the old check only enforced in NODE_ENV==='production',
-    // leaving every cron route open with zero auth on any other deploy target.
-    if (process.env.APP_SECRET || process.env.CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const balance = await getOpenRouterBalance()

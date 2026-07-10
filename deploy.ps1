@@ -51,6 +51,23 @@ Step "Guard: no unchecked Supabase writes"
 & node scripts/check-unchecked-writes.js
 if ($LASTEXITCODE -ne 0) { throw "unchecked Supabase write(s) found - see above. Fix before deploying (or add a documented, justified exclusion in scripts/check-unchecked-writes.js if truly out of scope)." }
 
+# 0b) Guard against shipping a build that doesn't even typecheck, or a real
+# logic regression the 526-test suite would have caught. Root-cause
+# production-readiness audit finding (2026-07-09): `deploy:full` in
+# package.json already composes typecheck+lint+test+build, but nothing in
+# THIS script (the actual path every real deploy takes) ever ran it — the
+# only gate was the unchecked-writes guard above, so a logic regression
+# that still compiles cleanly shipped straight to production with zero
+# automated verification. Mirrors the same throw-on-failure pattern already
+# proven above; typecheck+test only (not lint/build — build already gates
+# on the VPS itself in step 3, and lint failures are style, not
+# correctness).
+Step "Guard: typecheck + full test suite"
+& npm run typecheck
+if ($LASTEXITCODE -ne 0) { throw "typecheck failed - see above. Fix before deploying." }
+& npm run test
+if ($LASTEXITCODE -ne 0) { throw "test suite failed - see above. Fix before deploying." }
+
 # 1) Commit + push to GitHub (history/backup; best-effort — never blocks deploy)
 Step "Commit & push to GitHub (origin) [best-effort]"
 git add -A | Out-Null
@@ -121,18 +138,38 @@ if (-not (Test-Path $tar)) { throw "tar produced no tarball" }
 if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)" }
 
 # 3) Extract + build + restart on the VPS (single-line remote command, && chained)
+# Root-cause production-readiness audit finding (2026-07-09): `rm -rf src`
+# destroyed the previous working code BEFORE the new build was verified to
+# even succeed — if the build failed, `src` was already gone, and manual
+# recovery was the only path back. Renaming instead of deleting means a
+# fast rollback (`rm -rf src && mv src.bak src && pm2 restart`) is always
+# possible; the extra `rm -rf src.bak` right before the rename is so a
+# stale backup from an even older deploy never accumulates.
 Step "Extract, build & restart on VPS"
 $install = if ($SkipInstall) { "echo 'skip install'" } else { "npm install --no-audit --no-fund" }
-$remote  = "cd $DIR && rm -rf src && tar -xf /tmp/deploy.tar && rm -f /tmp/deploy.tar && $install && npm run build && pm2 restart $APP --update-env && pm2 save"
+$remote  = "cd $DIR && rm -rf src.bak && mv src src.bak && tar -xf /tmp/deploy.tar && rm -f /tmp/deploy.tar && $install && npm run build && pm2 restart $APP --update-env && pm2 save"
 & ssh -o BatchMode=yes $VPS $remote
-if ($LASTEXITCODE -ne 0) { throw "remote build/restart failed (exit $LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { throw "remote build/restart failed (exit $LASTEXITCODE) - previous code is intact at ${DIR}/src.bak, restore with: ssh $VPS `"cd $DIR && rm -rf src && mv src.bak src && pm2 restart $APP`"" }
 
 # 4) Health check
+# Root-cause production-readiness audit finding (2026-07-09): this used to
+# hit the bare root URL, which Next.js serves as a 200 page shell even when
+# the database, WhatsApp integration, or env config is fully broken — a
+# deploy that silently broke DB/WhatsApp connectivity still printed a green
+# "DONE". /api/health actually checks DB connectivity, stuck-job counts, and
+# OpenAI/WhatsApp config presence, and returns 503 on any real failure. A
+# failure here is now a loud, unmissable red block (not a quiet yellow
+# warning) — the deploy already happened and can't un-happen from here, but
+# the operator must not walk away thinking it succeeded.
 Step "Health check"
 try {
-    $code = (Invoke-WebRequest -Uri $URL -UseBasicParsing -TimeoutSec 15).StatusCode
-    Write-Host "   $URL -> HTTP $code" -ForegroundColor Green
+    $resp = Invoke-WebRequest -Uri "$URL/api/health" -UseBasicParsing -TimeoutSec 15
+    Write-Host "   $URL/api/health -> HTTP $($resp.StatusCode)" -ForegroundColor Green
 } catch {
-    Write-Host "   WARNING: health check failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "`n   ============================================================" -ForegroundColor Red
+    Write-Host "   HEALTH CHECK FAILED: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "   The deploy has ALREADY shipped and pm2 has already restarted." -ForegroundColor Red
+    Write-Host "   Investigate immediately - rollback: ssh $VPS `"cd $DIR && rm -rf src && mv src.bak src && pm2 restart $APP`"" -ForegroundColor Red
+    Write-Host "   ============================================================`n" -ForegroundColor Red
 }
 Write-Host "`nDONE." -ForegroundColor Green

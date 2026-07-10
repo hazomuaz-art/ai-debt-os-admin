@@ -18,9 +18,18 @@ const log = createLogger('cron/whatsapp-health')
  * matching unresolved alert already open.
  */
 export async function GET(req: NextRequest) {
+  // Root-cause production-readiness audit finding (2026-07-09): this used
+  // to "fail open" - if NEITHER APP_SECRET nor CRON_SECRET was configured
+  // (a real, plausible env misconfiguration), the auth check below was
+  // skipped entirely and this route ran fully unauthenticated for anyone
+  // with the URL. A missing secret is now treated as a server
+  // misconfiguration (500), never as "allow everyone".
+  if (!process.env.APP_SECRET && !process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Server misconfigured: no cron secret set' }, { status: 500 })
+  }
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.APP_SECRET}` && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    if (process.env.APP_SECRET || process.env.CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const supabase = createServiceClient()
@@ -146,6 +155,43 @@ export async function GET(req: NextRequest) {
       `من أصل ${total} رسالة أرسلها الوكيل في آخر 3 ساعات، لم يصل سوى ${delivered}. هذا يدل على حظر صامت من واتساب — الرسائل تُقبل لكنها لا تُسلَّم. يُنصح بإيقاف الإرسال ومراجعة الرقم.`,
       { total, delivered, ratio: result.ratio },
     )
+  }
+
+  // 3) Message-freshness watchdog — independent of what WAHA's own session
+  // state claims. 🔴 P0 PRODUCTION INCIDENT (2026-07-09/10): the session
+  // state check above (#1) reported "open"/connected throughout a real ~25-
+  // hour total inbound blackout, because "connected" only reflects WAHA's
+  // own link to WhatsApp — a broken WEBHOOK from WAHA to this app (wrong/
+  // stale secret, wrong URL, a WAHA-side config reset on reconnect) is a
+  // completely different failure mode that check #1 structurally cannot
+  // see. Root cause was a webhook-secret mismatch causing every event to be
+  // silently discarded with a fabricated `{status:'ok'}` (now alerted on
+  // separately — see waha-webhook/route.ts's webhook_auth_mismatch alert),
+  // but ANY cause of "WAHA isn't calling us" (network issue, WAHA crash,
+  // reverse-proxy misconfiguration) would look identical from here: zero
+  // inbound messages arriving for hours, dashboard showing everything green.
+  // This check doesn't care WHY — it only asks the one question that
+  // actually matters: is real customer traffic still reaching our database?
+  const FRESHNESS_THRESHOLD_HOURS = 4
+  const { data: lastInbound } = await supabase
+    .from('messages').select('created_at')
+    .eq('direction', 'inbound').eq('channel', 'whatsapp')
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  const lastInboundAt = (lastInbound as { created_at?: string } | null)?.created_at
+  const hoursSinceLastInbound = lastInboundAt
+    ? (Date.now() - new Date(lastInboundAt).getTime()) / 3_600_000
+    : null
+  result.hoursSinceLastInbound = hoursSinceLastInbound !== null ? Number(hoursSinceLastInbound.toFixed(1)) : null
+
+  if (hoursSinceLastInbound !== null && hoursSinceLastInbound > FRESHNESS_THRESHOLD_HOURS) {
+    result.freshnessAlert = await raise(
+      'whatsapp_no_inbound_traffic', 'critical',
+      'انقطاع كامل — لا رسائل واردة من العملاء',
+      `آخر رسالة واردة من عميل كانت قبل ${hoursSinceLastInbound.toFixed(1)} ساعة، رغم أن حالة الجلسة قد تظهر "متصلة". هذا يعني على الأغلب أن webhook واتساب لا يصل لنظامنا فعلياً — كل رسالة عميل خلال هذه الفترة قد تكون رُفضت بصمت. راجع إعداد الـ webhook بلوحة WAHA فوراً (الرابط ورأس التحقق X-Webhook-Secret).`,
+      { hours_since_last_inbound: result.hoursSinceLastInbound, last_inbound_at: lastInboundAt ?? null },
+    )
+  } else {
+    await resolveOpen('whatsapp_no_inbound_traffic', company_id)
   }
 
   log.info('whatsapp-health run', result)

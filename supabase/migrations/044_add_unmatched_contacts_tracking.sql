@@ -1,3 +1,5 @@
+BEGIN;
+
 create table if not exists unmatched_contacts (
   id uuid primary key default gen_random_uuid(),
   phone text not null unique,
@@ -11,3 +13,5 @@ create table if not exists unmatched_contacts (
 );
 
 alter table unmatched_contacts enable row level security;
+
+COMMIT;

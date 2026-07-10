@@ -90,6 +90,18 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { runCollectorAgent } from '@/lib/ai-collector-agent'
 
+// Real bug this fixes: every test in this file called runCollectorAgent
+// without messageTimestamp, so `todayStr` inside the agent defaulted to the
+// REAL wall-clock date (see ai-collector-agent.ts's own comment: "e.g. a
+// test fixing 'today' for determinism" — messageTimestamp exists precisely
+// for this). Once real time passed the mocked resolved_date used in one
+// test ('2026-07-05'), isSaneDate() started rejecting it as "in the past"
+// and silently fell through to the generic +3-day fallback, making the test
+// fail with an ever-growing date drift depending on which day it happened
+// to run. Pinning a fixed reference "now" makes every test's notion of
+// "today" deterministic regardless of when the suite actually runs.
+const FIXED_NOW = '2026-06-29T09:00:00Z'
+
 function baseContext(): any {
   return {
     verified_customer_data: { customer_name: 'محمد العتيبي' },
@@ -128,7 +140,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
     mockEngineResolution = defaultEngineResolution({ resolved_date: '2026-07-05' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر', messageTimestamp: FIXED_NOW })
 
     expect(d.action).toBe('record_promise')
     expect(d.promised_date).toBe('2026-07-05')
@@ -138,7 +150,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
     mockEngineResolution = defaultEngineResolution({ resolved_date: '2026-08-15' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'record_promise', reason: 'x', message: 'تمام', promised_date: '2026-07-20', promise_text: 'بداية الشهر' })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر', messageTimestamp: FIXED_NOW })
 
     expect(d.promised_date).toBe('2026-08-15') // engine wins, not the model's 2026-07-20
   })
@@ -147,7 +159,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
     mockEngineResolution = defaultEngineResolution({ reference_type: 'holiday', resolved_date: '2026-12-24', confidence: 'medium' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد العيد' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد العيد', messageTimestamp: FIXED_NOW })
 
     expect(d.action).toBe('record_promise')
     expect(d.promised_date).toBe('2026-12-24')
@@ -157,7 +169,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
     mockEngineShouldThrow = true
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر', messageTimestamp: FIXED_NOW })
 
     expect(d.action).toBe('record_promise')
     expect(d.promised_date).toBeTruthy() // still got a date, just not the engine's
@@ -168,7 +180,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
     mockEngineResolution = defaultEngineResolution({ resolved: false, resolved_date: null, confidence: null, needs_clarification: true, clarification_reason: 'ambiguous_or_reference' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بداية الشهر', messageTimestamp: FIXED_NOW })
 
     expect(d.action).toBe('record_promise')
     expect(d.promised_date).toBeTruthy()
@@ -176,7 +188,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
 
   it('a plain non-temporal, non-commitment message never calls the engine at all', async () => {
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'تمام', promised_date: null })
-    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش الشركة؟' })
+    await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'وش الشركة؟', messageTimestamp: FIXED_NOW })
 
     expect(logCalls.some(c => c.message.includes('Temporal Engine'))).toBe(false)
   })
@@ -185,7 +197,7 @@ describe('Temporal Engine — LIVE, authoritative date resolution', () => {
     mockEngineResolution = defaultEngineResolution({ reference_type: 'gov_program', resolved_date: '2026-07-10', confidence: 'medium' })
     mockModelContent = JSON.stringify({ shouldReply: true, action: 'negotiate', reason: 'x', message: 'متى تسدد؟', promised_date: null })
 
-    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد حساب المواطن' })
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd1', message: 'بسدد بعد حساب المواطن', messageTimestamp: FIXED_NOW })
 
     expect(d.action).toBe('record_promise')
     expect(d.promised_date).toBe('2026-07-10')

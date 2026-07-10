@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Security hardening (audit 2026-07-03): these SECURITY DEFINER functions
 -- perform privileged operations with NO internal caller verification, and
 -- were executable by any signed-in user (and some by anon) directly via
@@ -15,3 +17,5 @@ revoke execute on function public.activate_company(uuid, uuid) from anon, authen
 revoke execute on function public.get_company_limits(uuid) from anon, authenticated;
 revoke execute on function public.handle_new_user() from anon, authenticated;
 revoke execute on function public.reset_daily_message_counters() from anon, authenticated;
+
+COMMIT;

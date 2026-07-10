@@ -105,6 +105,27 @@ const BURST_DEBOUNCE_MS = 9000
 const processingCustomers = new Set<string>()
 const LOCK_RECHECK_MS = 1500
 
+// P0 incident guard (2026-07-09/10) — see the secret-mismatch branch below.
+// A malicious/broken repeated prober would otherwise spam an alert on every
+// single rejected request; this caps it to at most one alert per window
+// regardless of request volume, while still guaranteeing the FIRST
+// occurrence (the one that actually matters for catching a real
+// misconfiguration fast) always fires immediately.
+let lastWebhookAuthAlertAt = 0
+const WEBHOOK_AUTH_ALERT_COOLDOWN_MS = 15 * 60 * 1000
+
+async function maybeAlertWebhookAuthMismatch(): Promise<void> {
+  const now = Date.now()
+  if (now - lastWebhookAuthAlertAt < WEBHOOK_AUTH_ALERT_COOLDOWN_MS) return
+  lastWebhookAuthAlertAt = now
+  await insertSystemAlert({
+    company_id: null, severity: 'critical', alert_type: 'webhook_auth_mismatch',
+    title: 'رسائل واتساب مرفوضة — سر التحقق غير مطابق',
+    message: 'وصل طلب لمسار استقبال واتساب برمز تحقق غير مطابق للمُعرَّف بالسيرفر. إذا هذا مصدره جلسة WAHA الحقيقية (لا محاولة مشبوهة)، فكل رسائل العملاء تُرفض بصمت منذ هذا التوقيت — راجع إعداد الـ webhook بلوحة WAHA فوراً.',
+    metadata: { first_seen_at: new Date(now).toISOString() },
+  }).catch(err => log.error('failed to raise webhook_auth_mismatch alert', err as Error))
+}
+
 // Test-only: this Set is module-level (correct for the real single-process
 // server, where it must outlive any one request), but that means it isn't
 // naturally reset between test cases the way pendingBursts is (that one
@@ -113,6 +134,7 @@ const LOCK_RECHECK_MS = 1500
 export function __resetWahaWebhookStateForTests(): void {
   processingCustomers.clear()
   pendingBursts.clear()
+  lastWebhookAuthAlertAt = 0
 }
 
 function fireWhenFree(customerId: string, run: (mergedText: string, latestTimestamp: string) => Promise<void>): void {
@@ -185,7 +207,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'service not configured' }, { status: 503 })
     }
     if (request.headers.get('x-webhook-secret') !== expectedSecret) {
-      log.warn('WAHA webhook rejected — missing/invalid secret')
+      // 🔴 P0 PRODUCTION INCIDENT (2026-07-09/10): this used to return
+      // `{status:'ok'}` with only a server-only `log.warn` — a fabricated
+      // success WAHA had zero reason to distrust or retry, while the event
+      // was silently discarded. Confirmed live: every real customer message
+      // for ~25 hours vanished with this exact signature (WAHA session
+      // showed "connected" — that only reflects its link to WhatsApp, not
+      // whether ITS webhook calls to us are even being accepted — while the
+      // app itself was healthy and reachable). No system_alert, no trace
+      // anywhere, discovered only by a customer complaint a full day later.
+      // Still returns 200 (a real auth error code here would just leak
+      // "this endpoint validates a secret" to anyone probing the URL, with
+      // no benefit — WAHA has no code path that would ever `fix itself` off
+      // a 401), but a genuine secret mismatch is no longer invisible: the
+      // first occurrence in any 15-minute window raises a critical alert
+      // immediately, rather than only being caught, hours or days later, by
+      // the separate freshness watchdog below.
+      log.error('WAHA webhook rejected — missing/invalid secret', new Error('webhook secret mismatch'))
+      await maybeAlertWebhookAuthMismatch()
       return NextResponse.json({ status: 'ok' })
     }
 

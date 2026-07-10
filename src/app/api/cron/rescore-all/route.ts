@@ -10,9 +10,18 @@ const MAX = 100
 // Re-scores all open debts (so stored strategies/factors become Arabic).
 // Auth: Bearer APP_SECRET / CRON_SECRET. Does NOT send any messages.
 export async function GET(req: NextRequest) {
+  // Root-cause production-readiness audit finding (2026-07-09): this used
+  // to "fail open" - if NEITHER APP_SECRET nor CRON_SECRET was configured
+  // (a real, plausible env misconfiguration), the auth check below was
+  // skipped entirely and this route ran fully unauthenticated for anyone
+  // with the URL. A missing secret is now treated as a server
+  // misconfiguration (500), never as "allow everyone".
+  if (!process.env.APP_SECRET && !process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Server misconfigured: no cron secret set' }, { status: 500 })
+  }
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.APP_SECRET}` && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    if (process.env.APP_SECRET || process.env.CRON_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const supabase = createServiceClient()

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Compliance hardening (2026-07-05): a separate SECURITY audit trail,
 -- distinct from timeline_events (which logs business/collection events like
 -- status changes and messages). NCA ECC and PDPL both expect visibility
@@ -32,3 +34,5 @@ alter table security_audit_log enable row level security;
 create policy "security_audit_log_admin_read" on security_audit_log
   for select
   using (company_id = get_user_company_id() and get_user_role() = 'admin');
+
+COMMIT;

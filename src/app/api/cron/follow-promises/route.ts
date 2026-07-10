@@ -10,11 +10,18 @@ const log = createLogger('cron/follow-promises')
 
 export async function GET(req: NextRequest) {
   // Simple basic security: verify authorization header
+  // Root-cause production-readiness audit finding (2026-07-09): this used
+  // to "fail open" - if NEITHER APP_SECRET nor CRON_SECRET was configured
+  // (a real, plausible env misconfiguration), the auth check below was
+  // skipped entirely and this route ran fully unauthenticated for anyone
+  // with the URL. A missing secret is now treated as a server
+  // misconfiguration (500), never as "allow everyone".
+  if (!process.env.APP_SECRET && !process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Server misconfigured: no cron secret set' }, { status: 500 })
+  }
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.APP_SECRET}` && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    if (process.env.APP_SECRET || process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   // Circuit breaker — same production incident as send-campaign-queue: don't

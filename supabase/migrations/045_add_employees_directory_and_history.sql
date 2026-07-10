@@ -1,3 +1,5 @@
+BEGIN;
+
 create table if not exists employees (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references companies(id) on delete cascade,
@@ -49,3 +51,5 @@ create policy "View employee_history in company" on employee_history
   for select using (exists (
     select 1 from employees e where e.id = employee_history.employee_id and e.company_id = get_user_company_id()
   ));
+
+COMMIT;

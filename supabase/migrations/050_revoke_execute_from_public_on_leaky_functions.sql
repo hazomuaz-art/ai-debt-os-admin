@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Root cause of 046/049 not taking effect: `pg_proc.proacl` showed
 -- get_company_limits and handle_new_user each carry an explicit PUBLIC grant
 -- (the bare "=X/postgres" ACL entry) left over from their original CREATE
@@ -19,3 +21,5 @@ revoke execute on function public.handle_new_user() from public;
 -- Explicit re-grant to the only roles that should ever call these directly.
 grant execute on function public.get_company_limits(uuid) to service_role;
 grant execute on function public.handle_new_user() to service_role;
+
+COMMIT;

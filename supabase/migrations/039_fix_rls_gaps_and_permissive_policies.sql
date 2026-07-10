@@ -1,3 +1,5 @@
+BEGIN;
+
 -- ═══════════════════════════════════════════════════════════════
 -- 1) Tables with RLS fully disabled — enable + scope by company_id
 -- ═══════════════════════════════════════════════════════════════
@@ -87,3 +89,5 @@ REVOKE EXECUTE ON FUNCTION public.delete_customer_fully FROM anon;
 REVOKE EXECUTE ON FUNCTION public.suspend_company FROM anon;
 REVOKE EXECUTE ON FUNCTION public.activate_company FROM anon;
 REVOKE EXECUTE ON FUNCTION public.reset_daily_message_counters FROM anon;
+
+COMMIT;

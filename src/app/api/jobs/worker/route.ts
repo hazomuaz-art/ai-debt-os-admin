@@ -12,21 +12,34 @@ const MAX_JOBS_PER_RUN = 10
 const JOB_TIMEOUT_MS   = 25_000  // 25s — stay under Vercel's 30s timeout
 
 // Verify this request is from Vercel Cron or an internal caller
+//
+// Root-cause production-readiness audit finding (2026-07-09): this was the
+// one route in the whole codebase still using the OLD, weaker pattern every
+// /api/cron/* route was hardened away from — falling open based on
+// NODE_ENV rather than "any secret configured". If APP_SECRET was unset,
+// this fell open to `process.env.NODE_ENV !== 'production'`, meaning any
+// non-strictly-'production' deploy target (a preview deployment, staging,
+// or NODE_ENV simply unset by a misconfiguration) let this route — which
+// processes send_whatsapp jobs directly — run fully unauthenticated with
+// zero warning. Never consult NODE_ENV: a missing secret is a server
+// misconfiguration (deny), never an implicit "allow everyone" escape hatch.
 function verifyCallerSecret(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
-  
-  // Accept Vercel's auto-injected CRON_SECRET (set in Vercel dashboard)
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true
-  
-  // Accept manual APP_SECRET for ad-hoc invocations
   const appSecret = process.env.APP_SECRET
-  if (!appSecret) {
-    log.warn('APP_SECRET not configured — skipping auth (dev mode)')
-    return process.env.NODE_ENV !== 'production'
+
+  if (!cronSecret && !appSecret) {
+    log.error('neither CRON_SECRET nor APP_SECRET configured — refusing to run unauthenticated')
+    return false
   }
-  
-  return authHeader === `Bearer ${appSecret}`
+
+  // Accept Vercel's auto-injected CRON_SECRET (set in Vercel dashboard)
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true
+
+  // Accept manual APP_SECRET for ad-hoc invocations
+  if (appSecret && authHeader === `Bearer ${appSecret}`) return true
+
+  return false
 }
 
 // POST: Manual trigger (ad-hoc invocation with APP_SECRET)
