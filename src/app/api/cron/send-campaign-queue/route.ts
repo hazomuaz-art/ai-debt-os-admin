@@ -32,10 +32,19 @@ const log = createLogger('cron/send-campaign-queue')
 // both independent of how the cron scheduler itself behaves.
 const BATCH_SIZE = 5
 
+// Root-cause fix (2026-07-11, owner): campaign send windows (e.g.
+// "09:00:00"-"18:00:00") are configured as Saudi business hours, but this
+// compared against `now.getHours()` — the VPS runs in UTC, so a
+// "09:00-18:00" window was actually enforced as 12pm-9pm Saudi time
+// (UTC+3), three hours later than intended, for as long as this cron has
+// existed. Convert to Saudi local time first, matching the same
+// UTC+3 pattern already used by the CST/SAMA contact-hours gate in
+// lib/whatsapp.ts (isWithinAllowedContactHours).
 function withinSendWindow(start: string | null, end: string | null): boolean {
   if (!start || !end) return true
   const now = new Date()
-  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
+  const saudiHour = (now.getUTCHours() + 3) % 24
+  const hhmm = `${String(saudiHour).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:00`
   return hhmm >= start && hhmm <= end
 }
 
