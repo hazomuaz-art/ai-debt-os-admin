@@ -341,16 +341,27 @@ export async function resetRefusalTracking(debt_id: string): Promise<void> {
 // legal detail) and without ever threatening unprofessionally. Falls back
 // to the fixed renderLegalPersonaReply() line on any API failure.
 //
-// Real production complaint (2026-07-10, owner): every turn was generated
-// from ONLY the latest customer message — no conversation history was ever
-// sent to the model — so it had no memory of anything it already said and
-// re-explained the full case/debt details from scratch on every single
-// reply. That is what actually produced the "long, repetitive, doesn't
-// listen, sounds like a scripted bot" behavior; it wasn't a tone problem.
-// `recentMessages` (oldest→newest, already-sent turns) is now threaded
-// into the model as real prior turns so it can see what it already told
-// this customer and respond to what they just said instead of restarting
-// the case pitch every time.
+// Root-cause history (2026-07-10/11, owner, two separate real production
+// complaints): the FIRST fix here threaded real conversation history into
+// the model but did NOT stop the actual defect — the debt amount and
+// reference number were re-stated in every single reply anyway, even a
+// reply to a bare "السلام عليكم" greeting. Verified live: the model had
+// full history (confirmed via direct query — 11 prior turns, all present)
+// and still repeated the case file every time. Root cause was never
+// "missing memory" — it was that `ملف القضية: ${caseSummary}` was
+// unconditionally re-injected as a standing, clearly-labeled "case file"
+// reference block on EVERY call, regardless of history, which reliably
+// overpowers a soft "don't repeat if already explained" instruction (a
+// clearly-labeled reference block sitting right in front of the model is
+// far stronger than a prose instruction telling it not to use it). Fixed
+// by making this mechanical instead of advisory: the amount/reference are
+// only ever placed in the prompt on a genuinely first turn (no prior
+// history at all). On every later turn they are OMITTED from the prompt
+// entirely — the model physically cannot restate a number it was never
+// given this call — replaced by an explicit, unconditional instruction not
+// to state them again unless the customer's own latest message asks for
+// them outright. max_tokens is also capped low as a hard structural limit
+// on reply length, not just a style request.
 export async function generateLawyerPersonaReply(args: {
   customerMessage: string
   recentMessages?: { direction: 'inbound' | 'outbound'; content: string }[]
@@ -361,18 +372,22 @@ export async function generateLawyerPersonaReply(args: {
   try {
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' })
+    const isFirstTurn = !args.recentMessages || args.recentMessages.length === 0
+
+    const caseFileBlock = isFirstTurn
+      ? `\n\nملف القضية (اذكره الآن لأول مرة بشكل طبيعي، مرة واحدة فقط): ${args.caseSummary}`
+      : `\n\nتنبيه إلزامي: المبلغ والرقم المرجعي لهذا الملف مذكورين مسبقاً في الرسائل السابقة أدناه — ممنوع عليك منعاً باتاً أن تذكر المبلغ أو الرقم المرجعي مرة أخرى في ردك الحالي، مهما كان موضوع رسالة العميل. الاستثناء الوحيد: لو العميل صراحة سأل في آخر رسالة له عن المبلغ أو الرقم المرجعي بالتحديد (مثلاً "كم المبلغ؟" أو "وش رقم الملف؟")، عندها فقط اذكره.`
+
     const systemPrompt = `أنت "المستشار القانوني" — مستشار قانوني سعودي محترف وملم فعلياً بالأنظمة السعودية ذات العلاقة (نظام التنفيذ، الأنظمة التجارية والاستهلاكية، إجراءات التحصيل النظامية، وحقوق الدائن والمدين بشكل عام)، تتابع ملف دين متأخر بعد تكرار رفض العميل السداد أو مماطلته المستمرة (السبب: ${args.reason}).
 
-هذه محادثة حقيقية مستمرة، مو رسالة منفصلة كل مرة. الرسائل السابقة اللي بينك وبين العميل في نفس الملف موجودة معك في هذه المحادثة قبل آخر رسالة منه — اقرأها فعلياً قبل ما ترد:
-- لا تكرر شرح تفاصيل الدين أو الملف إذا كنت already شرحتها قبل — اذكرها فقط أول مرة، أو لو العميل نفسه سأل عنها مرة ثانية بشكل صريح.
-- رد على اللي قاله العميل بالضبط في آخر رسالة له، مو رد عام جاهز. افهم كلامه وحلله — هل يعترض؟ يسأل سؤال؟ يعطيك عذر؟ يماطل؟ رد على هذا التحديد.
-- تكلم بلهجة سعودية طبيعية، وكأنك شخص حقيقي يتابع الملف مو نظام آلي عنده جمل محفوظة — تجنب الصياغات المكررة والقوالب الجاهزة.
+هذه محادثة حقيقية مستمرة، مو رسالة منفصلة كل مرة. الرسائل السابقة اللي بينك وبين العميل موجودة معك في هذه المحادثة قبل آخر رسالة منه — اقرأها فعلياً قبل ما ترد:
+- رد على اللي قاله العميل بالضبط في آخر رسالة له، مو رد عام جاهز. افهم كلامه وحلله — هل يعترض؟ يسأل سؤال؟ يعطيك عذر؟ يماطل؟ رد على هذا التحديد فقط.
+- لو رسالة العميل مجرد تحية أو كلمة قصيرة بدون مضمون حقيقي (مثل "السلام عليكم"، "مرحبا"، "؟؟")، ردك يكون بنفس القدر تحية بسيطة ومختصرة جداً — سطر واحد، بدون أي ذكر لتفاصيل الملف أو المبلغ أو الرقم المرجعي إطلاقاً، إلا لو هو نفسه سأل عن شي محدد.
+- تكلم بلهجة سعودية طبيعية، وكأنك شخص حقيقي يتابع الملف مو نظام آلي عنده جمل محفوظة — تجنب الصياغات المكررة والقوالب الجاهزة، ولا تبدأ كل رد بنفس الطريقة.
 - أنت ملم بالقانون فعلاً وواثق من كلامك، لكن لا تختلق أرقام مواد أو أنظمة محددة أنت مو متأكد منها بالضبط — تقدر تتكلم بثقة عن الأنظمة والحقوق بشكل عام (زي حق الدائن بالتنفيذ عبر الجهات المختصة) بدون ما تخترع رقم مادة.
 - هدفك الحقيقي: تسمع من العميل وتناقشه، وتقنعه يتعاون ويوصلون لتسوية أو موعد سداد فعلي — أنت ما تبغى توصل للتصعيد الكامل، وتفضّل الحل الودي إذا تجاوب.
 - إذا العميل عطاك تاريخ أو مبلغ فعلي جديد، تعامل وياه بشكل بنّاء واعترف بجهده، لكن وضّح إن الملف يبقى تحت المراجعة القانونية إلى أن يصير السداد الفعلي.
-- طول ردك طبيعي مثل أي محادثة حقيقية — عادة قصير، وما فيه داعي تطوّله بمعلومات مكررة، لكن لو العميل سأل سؤال حقيقي يحتاج توضيح فجاوبه بشكل كافٍ.
-
-ملف القضية: ${args.caseSummary}`
+- ردك قصير دائماً، سطر إلى سطرين بالعادة — النظام سيقطع أي رد أطول من هذا فعلياً، فلا تحاول تطوّله.${caseFileBlock}`
 
     const history = (args.recentMessages ?? []).map(m => ({
       role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -382,7 +397,7 @@ export async function generateLawyerPersonaReply(args: {
     const completion = await client.chat.completions.create({
       model: 'anthropic/claude-sonnet-5',
       temperature: 0.6,
-      max_tokens: 300,
+      max_tokens: 160,
       messages: [
         { role: 'system', content: systemPrompt },
         ...history,
