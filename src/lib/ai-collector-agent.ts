@@ -959,17 +959,34 @@ export async function runCollectorAgent(args: {
       if (openEsc.escalation_type === 'repeated_refusal') {
         log.info('legal escalation lock active — lawyer persona reply', { debt_id: forcedDebtId })
         let caseSummary = 'لا تفاصيل إضافية متاحة.'
+        let recentMessages: { direction: 'inbound' | 'outbound'; content: string }[] = []
         try {
-          const { data: debtRow } = await createServiceClient()
-            .from('debts').select('current_balance, currency, reference_number, portfolio:portfolios(name_ar, name)')
-            .eq('id', forcedDebtId).maybeSingle()
+          const svc = createServiceClient()
+          const [{ data: debtRow }, { data: msgRows }] = await Promise.all([
+            svc.from('debts').select('current_balance, currency, reference_number, portfolio:portfolios(name_ar, name)')
+              .eq('id', forcedDebtId).maybeSingle(),
+            svc.from('messages').select('direction, content').eq('customer_id', args.customer_id)
+              .eq('channel', 'whatsapp').order('sent_at', { ascending: false }).limit(11),
+          ])
           if (debtRow) {
             const d = debtRow as any
             caseSummary = `الجهة: ${d.portfolio?.name_ar ?? d.portfolio?.name ?? 'غير محدد'} | المبلغ المتأخر: ${d.current_balance ?? '—'} ${d.currency ?? 'SAR'} | الرقم المرجعي: ${d.reference_number ?? '—'}`
           }
-        } catch { /* keep default summary */ }
+          // DB returns newest-first; the model needs oldest→newest turn order.
+          // The just-received inbound message is already persisted by the
+          // time this runs (webhook route inserts before calling the agent)
+          // — drop it here since it's passed separately as the final turn
+          // below, or it would appear twice in the same conversation.
+          recentMessages = ((msgRows ?? []) as { direction: 'inbound' | 'outbound'; content: string | null }[])
+            .filter(m => m.content)
+            .reverse()
+            .map(m => ({ direction: m.direction, content: m.content as string }))
+          if (recentMessages.length && recentMessages[recentMessages.length - 1].content === text) {
+            recentMessages = recentMessages.slice(0, -1)
+          }
+        } catch { /* keep default summary / empty history */ }
         const lawyerReply = await generateLawyerPersonaReply({
-          customerMessage: text, caseSummary, reason: openEsc.reason,
+          customerMessage: text, recentMessages, caseSummary, reason: openEsc.reason,
         })
         return {
           shouldReply: true, action: 'human_review',

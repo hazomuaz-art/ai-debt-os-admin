@@ -332,16 +332,28 @@ export async function resetRefusalTracking(debt_id: string): Promise<void> {
 
 // ── Dynamic "lawyer persona" reply for the 'repeated_refusal' lock ──
 // Unlike every other escalation type (fixed, zero-LLM-call reply), this
-// type is meant to actually converse: a professional, formal Saudi legal
-// advisor persona explaining the GENERAL legal consequences of unpaid debt
+// type is meant to actually converse: a professional Saudi legal advisor
+// persona explaining the GENERAL legal consequences of unpaid debt
 // (commercial/consumer collection, enforcement law, the right to pursue the
 // matter through the competent judicial/execution authorities) and trying
 // to persuade the customer to settle or commit to a real payment date —
 // without citing specific article/law numbers (to avoid stating inaccurate
 // legal detail) and without ever threatening unprofessionally. Falls back
 // to the fixed renderLegalPersonaReply() line on any API failure.
+//
+// Real production complaint (2026-07-10, owner): every turn was generated
+// from ONLY the latest customer message — no conversation history was ever
+// sent to the model — so it had no memory of anything it already said and
+// re-explained the full case/debt details from scratch on every single
+// reply. That is what actually produced the "long, repetitive, doesn't
+// listen, sounds like a scripted bot" behavior; it wasn't a tone problem.
+// `recentMessages` (oldest→newest, already-sent turns) is now threaded
+// into the model as real prior turns so it can see what it already told
+// this customer and respond to what they just said instead of restarting
+// the case pitch every time.
 export async function generateLawyerPersonaReply(args: {
   customerMessage: string
+  recentMessages?: { direction: 'inbound' | 'outbound'; content: string }[]
   caseSummary: string
   reason: string
 }): Promise<string> {
@@ -349,23 +361,31 @@ export async function generateLawyerPersonaReply(args: {
   try {
     const OpenAI = (await import('openai')).default
     const client = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' })
-    const systemPrompt = `أنت "المستشار القانوني" — مستشار قانوني سعودي محترف وملم بالأنظمة السعودية ذات العلاقة (نظام التنفيذ، الأنظمة التجارية والاستهلاكية، وإجراءات التحصيل النظامية بشكل عام)، تتابع ملفات الديون المتأخرة بعد تكرار رفض العميل السداد أو مماطلته المستمرة (السبب: ${args.reason}).
+    const systemPrompt = `أنت "المستشار القانوني" — مستشار قانوني سعودي محترف وملم فعلياً بالأنظمة السعودية ذات العلاقة (نظام التنفيذ، الأنظمة التجارية والاستهلاكية، إجراءات التحصيل النظامية، وحقوق الدائن والمدين بشكل عام)، تتابع ملف دين متأخر بعد تكرار رفض العميل السداد أو مماطلته المستمرة (السبب: ${args.reason}).
 
-أسلوبك:
-- تتكلم بلهجة سعودية طبيعية وواضحة، مو فصحى جامدة — لكن مهني وهادئ وحازم في نفس الوقت، لا تستجدي ولا تهدد بأسلوب غير لائق.
-- تشرح للعميل بشكل عام (بدون ذكر أرقام مواد أو أنظمة معينة بالضبط لأنك ما تبي تعطيه معلومة قانونية غير دقيقة) إن الدين المتأخر يبقى حق واجب السداد، وإن الجهة الدائنة عندها الحق تاخذ الإجراءات النظامية اللازمة عبر الجهات المختصة (زي جهات التنفيذ أو القضاء) إذا ما انسوّى الملف ودياً.
-- هدفك الحقيقي: تقنع العميل يتعاون ويوصلون لتسوية أو يحدد موعد سداد فعلي الحين، قبل ما تتصعّد الإجراءات أكثر — أنت ما تبغى توصل للتصعيد القانوني الكامل، وتفضّل الحل الودي إذا تجاوب.
+هذه محادثة حقيقية مستمرة، مو رسالة منفصلة كل مرة. الرسائل السابقة اللي بينك وبين العميل في نفس الملف موجودة معك في هذه المحادثة قبل آخر رسالة منه — اقرأها فعلياً قبل ما ترد:
+- لا تكرر شرح تفاصيل الدين أو الملف إذا كنت already شرحتها قبل — اذكرها فقط أول مرة، أو لو العميل نفسه سأل عنها مرة ثانية بشكل صريح.
+- رد على اللي قاله العميل بالضبط في آخر رسالة له، مو رد عام جاهز. افهم كلامه وحلله — هل يعترض؟ يسأل سؤال؟ يعطيك عذر؟ يماطل؟ رد على هذا التحديد.
+- تكلم بلهجة سعودية طبيعية، وكأنك شخص حقيقي يتابع الملف مو نظام آلي عنده جمل محفوظة — تجنب الصياغات المكررة والقوالب الجاهزة.
+- أنت ملم بالقانون فعلاً وواثق من كلامك، لكن لا تختلق أرقام مواد أو أنظمة محددة أنت مو متأكد منها بالضبط — تقدر تتكلم بثقة عن الأنظمة والحقوق بشكل عام (زي حق الدائن بالتنفيذ عبر الجهات المختصة) بدون ما تخترع رقم مادة.
+- هدفك الحقيقي: تسمع من العميل وتناقشه، وتقنعه يتعاون ويوصلون لتسوية أو موعد سداد فعلي — أنت ما تبغى توصل للتصعيد الكامل، وتفضّل الحل الودي إذا تجاوب.
 - إذا العميل عطاك تاريخ أو مبلغ فعلي جديد، تعامل وياه بشكل بنّاء واعترف بجهده، لكن وضّح إن الملف يبقى تحت المراجعة القانونية إلى أن يصير السداد الفعلي.
-- ردك جملتين إلى ثلاث جمل بالكثير، واضحة ومباشرة.
+- طول ردك طبيعي مثل أي محادثة حقيقية — عادة قصير، وما فيه داعي تطوّله بمعلومات مكررة، لكن لو العميل سأل سؤال حقيقي يحتاج توضيح فجاوبه بشكل كافٍ.
 
 ملف القضية: ${args.caseSummary}`
 
+    const history = (args.recentMessages ?? []).map(m => ({
+      role: (m.direction === 'inbound' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: m.content,
+    }))
+
     const completion = await client.chat.completions.create({
       model: 'anthropic/claude-sonnet-5',
-      temperature: 0.5,
-      max_tokens: 220,
+      temperature: 0.6,
+      max_tokens: 300,
       messages: [
         { role: 'system', content: systemPrompt },
+        ...history,
         { role: 'user', content: args.customerMessage },
       ],
     })
