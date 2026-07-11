@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // "ABDUR RASHID") gets written to in English instead of Saudi dialect.
 
 let mockCtx: any
+let mockAiContent = 'رد تجريبي.'
 let capturedCreateCalls: any[] = []
 
 vi.mock('@/lib/customer-debt-context', () => ({
@@ -42,7 +43,7 @@ vi.mock('openai', () => ({
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
           capturedCreateCalls.push(params)
-          return { choices: [{ message: { content: 'رد تجريبي.' } }] }
+          return { choices: [{ message: { content: mockAiContent } }] }
         }),
       },
     },
@@ -57,13 +58,18 @@ function baseCtx(customerName: string) {
     verified_debt_data: {
       creditor_name: 'موبايلي',
       reference_number: 'DEB-TEST-1234',
+      product_type: 'فاتورة موبايل مسبق الدفع',
       current_balance: 789.47,
       currency: 'SAR',
       due_date: '2026-06-01',
     },
     strict_rules: [],
     negotiation_profile: {},
-    debt: { metadata: {} },
+    // No portfolio_id — the Mobily-specific per-service-status lookup is
+    // skipped, and resolvePaymentReference falls through to this generic
+    // metadata.extra SADAD number, the same real fallback path used for
+    // every non-Mobily portfolio.
+    debt: { metadata: { extra: { sadad_number: 'SADAD-TEST-9999' } } },
   }
 }
 
@@ -74,6 +80,7 @@ function systemPromptOf(call: any): string {
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'sk-test'
   capturedCreateCalls = []
+  mockAiContent = 'رد تجريبي.'
 })
 
 describe('generateCampaignMessage — no invented names', () => {
@@ -119,7 +126,12 @@ describe('generateCampaignMessage — first message states full claim details', 
       campaign_type: 'reminder', message_template: null,
     })
     const prompt = systemPromptOf(capturedCreateCalls[0])
-    expect(prompt).toContain('DEB-TEST-1234')
+    // Owner requirement (2026-07-11): the real payment/SADAD number, not
+    // the internal file reference number, must be what's given out.
+    expect(prompt).toContain('SADAD-TEST-9999')
+    expect(prompt).toContain('رقم السداد الفعلي')
+    expect(prompt).not.toContain('الرقم المرجعي للملف: DEB-TEST-1234')
+    expect(prompt).toContain('فاتورة موبايل مسبق الدفع')
     // Owner requirement (2026-07-11): the customer's real name must be a
     // MANDATORY part of the first message, not merely available in the data.
     expect(prompt).toMatch(/اسم العميل الحقيقي.*إلزامي/)
@@ -137,5 +149,34 @@ describe('generateCampaignMessage — first message states full claim details', 
     const prompt = systemPromptOf(capturedCreateCalls[0])
     expect(prompt).not.toMatch(/أول رسالة/)
     expect(prompt).toContain('رسالة متابعة قصيرة')
+  })
+})
+
+describe('generateCampaignMessage — no emoji (anti-ban precaution)', () => {
+  it('the prompt bans emoji outright, for both languages', async () => {
+    mockCtx = baseCtx('خالد الدويحي')
+    await generateCampaignMessage({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      campaign_type: 'reminder', message_template: null,
+    })
+    expect(systemPromptOf(capturedCreateCalls[0])).toMatch(/ممنوع استخدام أي إيموجي إطلاقاً/)
+
+    mockCtx = baseCtx('ABDUR RASHID')
+    await generateCampaignMessage({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      campaign_type: 'reminder', message_template: null,
+    })
+    expect(systemPromptOf(capturedCreateCalls[1])).toMatch(/Never use any emoji/)
+  })
+
+  it('strips any emoji the model returns anyway, as a hard mechanical fallback', async () => {
+    mockCtx = baseCtx('خالد الدويحي')
+    mockAiContent = 'هلا خالد، عندك رصيد باقي 789.47 ريال 🙂 خبرني متى تسدده 📱'
+    const result = await generateCampaignMessage({
+      company_id: 'c', customer_id: 'u', debt_id: 'd1',
+      campaign_type: 'reminder', message_template: null,
+    })
+    expect(result).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+    expect(result).toContain('789.47')
   })
 })

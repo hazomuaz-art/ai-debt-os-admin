@@ -571,7 +571,7 @@ function isSaneDate(iso: string, todayISO: string): boolean {
 // SADAD number, then the portfolio's collection account) — so the
 // post-model guard below can verify the model's reply actually contains
 // this real number instead of leaving it to memory/chance.
-function resolvePaymentReference(ctx: any, mobilyRow: Record<string, any> | null | undefined): string | null {
+export function resolvePaymentReference(ctx: any, mobilyRow: Record<string, any> | null | undefined): string | null {
   if (mobilyRow) {
     const pay = resolveMobilyPaymentNumber(mobilyRow)
     if (pay) return pay.value
