@@ -120,6 +120,9 @@ describe('generateCampaignMessage — first message states full claim details', 
     })
     const prompt = systemPromptOf(capturedCreateCalls[0])
     expect(prompt).toContain('DEB-TEST-1234')
+    // Owner requirement (2026-07-11): the customer's real name must be a
+    // MANDATORY part of the first message, not merely available in the data.
+    expect(prompt).toMatch(/اسم العميل الحقيقي.*إلزامي/)
     expect(prompt).toContain('789.47')
     expect(prompt).toMatch(/أول رسالة/)
   })

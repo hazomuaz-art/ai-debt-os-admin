@@ -127,11 +127,12 @@ export async function generateCampaignMessage(args: {
     const noInventedNameRuleAr = '🔴 ممنوع تماماً اختراع أي كنية أو لقب غير موجود في "اسم العميل" أعلاه (مثل "أبو فلان" أو أي تخمين) — استخدم الاسم الحقيقي المذكور فقط إن وُجد، أو خاطبه مباشرة بدون اسم إطلاقاً إن كان الاسم غير متوفر.'
     const noInventedNameRuleEn = '🔴 Never invent a nickname, title, or honorific not present in "Customer name" above — use the real name given, or address them directly with no name at all if none is available.'
 
+    const hasName = !!(c as any).customer_name
     const firstMessageRuleAr = isFirstMessage
-      ? '🔴 هذه أول رسالة لهذا العميل بخصوص هذا الملف — يجب أن تذكر بوضوح: الجهة الدائنة، المبلغ بالضبط، الرقم المرجعي (إن وُجد)، ومنذ متى الدين متأخر. لا تكتفِ بسطر عام؛ العميل يحتاج يعرف تفاصيل المطالبة كاملة ليقدر يتحقق منها ويتصرف. يمكن أن تكون الرسالة 3-4 أسطر إن احتاج الأمر لذكر كل هذا بوضوح، بنفس الأسلوب السعودي الطبيعي.'
+      ? `🔴 هذه أول رسالة لهذا العميل بخصوص هذا الملف — يجب أن تذكر بوضوح: ${hasName ? 'اسم العميل الحقيقي (خاطبه به في التحية مباشرة، إلزامي وليس اختيارياً)، ' : ''}الجهة الدائنة، المبلغ بالضبط، الرقم المرجعي (إن وُجد)، ومنذ متى الدين متأخر. لا تكتفِ بسطر عام؛ العميل يحتاج يعرف تفاصيل المطالبة كاملة ليقدر يتحقق منها ويتصرف. يمكن أن تكون الرسالة 3-4 أسطر إن احتاج الأمر لذكر كل هذا بوضوح، بنفس الأسلوب السعودي الطبيعي.`
       : 'رسالة متابعة قصيرة (سطر إلى سطرين) — العميل already عنده تفاصيل الملف من رسالة سابقة، لا داعي تعيدها كاملة.'
     const firstMessageRuleEn = isFirstMessage
-      ? "This is the FIRST message to this customer about this claim — it must clearly state: the creditor, the exact amount, the reference number (if available), and how long it has been overdue. Do not send a vague one-liner; the customer needs the full claim details to verify and act on it. The message can run 3-4 short sentences if needed to cover this clearly, in a natural, professional, human tone."
+      ? `This is the FIRST message to this customer about this claim — it must clearly state: ${hasName ? "the customer's real name (address them by it directly in the greeting, mandatory, not optional), " : ''}the creditor, the exact amount, the reference number (if available), and how long it has been overdue. Do not send a vague one-liner; the customer needs the full claim details to verify and act on it. The message can run 3-4 short sentences if needed to cover this clearly, in a natural, professional, human tone.`
       : "Short follow-up message (1-2 lines) — the customer already has the claim details from a prior message, no need to restate them in full."
 
     const arabic = isArabicName((c as any).customer_name)
