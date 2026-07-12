@@ -120,8 +120,12 @@ import { createServiceClient } from '@/lib/supabase/server'
 // this codebase does not currently have a library for; NOT implemented
 // here — flagged as a known gap requiring either a Hijri calendar
 // dependency or manual seasonal configuration, not silently approximated.
-const CONTACT_HOURS_BLOCKED_START = 22 // 10pm Saudi time
-const CONTACT_HOURS_BLOCKED_END   = 9  // 9am Saudi time
+// Window tightened to the owner's specified business hours (2026-07-12):
+// 8am-9pm Saudi time — still comfortably inside the CST-compliant range
+// above (in fact stricter, ending an hour earlier than the 10pm regulatory
+// ceiling), not a relaxation of it.
+const CONTACT_HOURS_BLOCKED_START = 21 // 9pm Saudi time
+const CONTACT_HOURS_BLOCKED_END   = 8  // 8am Saudi time
 const SAUDI_UTC_OFFSET_HOURS = 3
 
 export function isWithinAllowedContactHours(now: Date = new Date()): boolean {
