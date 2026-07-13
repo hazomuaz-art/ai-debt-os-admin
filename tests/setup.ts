@@ -8,10 +8,9 @@ process.env.SUPABASE_SERVICE_ROLE_KEY    = 'test-service-role-key-xxxxxxxxxxxxxx
 process.env.OPENROUTER_API_KEY           = 'sk-or-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 process.env.APP_SECRET                   = 'test-app-secret-32-characters-long!!'
 process.env.NEXT_PUBLIC_APP_URL          = 'http://localhost:3000'
-process.env.WHATSAPP_PHONE_NUMBER_ID     = '123456789'
-process.env.WHATSAPP_ACCESS_TOKEN        = 'test-wa-token'
-process.env.WHATSAPP_VERIFY_TOKEN        = 'test-verify-token'
-process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = '987654321'
+process.env.WAHA_API_URL                 = 'http://localhost:3001'
+process.env.WAHA_API_KEY                 = 'test-waha-key'
+process.env.WAHA_SESSION                 = 'default'
 process.env.NODE_ENV                     = 'test'
 
 // ── Supabase mock ──────────────────────────────────────────────────────────

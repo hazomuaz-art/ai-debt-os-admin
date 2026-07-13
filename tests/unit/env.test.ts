@@ -50,19 +50,19 @@ describe('validateEnv', () => {
   })
 
   it('warns about missing optional vars', () => {
-    delete process.env.WHATSAPP_PHONE_NUMBER_ID
-    delete process.env.WHATSAPP_ACCESS_TOKEN
-    delete process.env.WHATSAPP_VERIFY_TOKEN
+    delete process.env.WAHA_API_URL
+    delete process.env.WAHA_API_KEY
+    delete process.env.WAHA_SESSION
     const result = validateEnv()
     // Optional — should still be valid
     expect(result.valid).toBe(true)
     expect(result.warnings.length).toBeGreaterThan(0)
   })
 
-  it('warns when WhatsApp is partially configured', () => {
-    process.env.WHATSAPP_PHONE_NUMBER_ID = '123'
-    delete process.env.WHATSAPP_ACCESS_TOKEN
-    delete process.env.WHATSAPP_VERIFY_TOKEN
+  it('warns when WAHA is partially configured', () => {
+    process.env.WAHA_API_URL = 'http://localhost:3001'
+    delete process.env.WAHA_API_KEY
+    delete process.env.WAHA_SESSION
     const result = validateEnv()
     const hasPartialWarning = result.warnings.some(w => w.includes('partially'))
     expect(hasPartialWarning).toBe(true)
@@ -72,12 +72,12 @@ describe('validateEnv', () => {
 describe('isWhatsAppConfigured', () => {
   afterEach(() => Object.assign(process.env, originalEnv))
 
-  it('returns true when all WhatsApp vars set', () => {
+  it('returns true when all WAHA vars set', () => {
     expect(isWhatsAppConfigured()).toBe(true)
   })
 
   it('returns false when any var missing', () => {
-    delete process.env.WHATSAPP_ACCESS_TOKEN
+    delete process.env.WAHA_API_KEY
     expect(isWhatsAppConfigured()).toBe(false)
   })
 })

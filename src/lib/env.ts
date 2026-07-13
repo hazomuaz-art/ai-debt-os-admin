@@ -48,11 +48,16 @@ const ENV_VARS: EnvVar[] = [
     validate: v => v.startsWith('http') ? null : 'Must be a valid URL',
   },
 
-  // WhatsApp — optional (app works without it)
-  { key: 'WHATSAPP_PHONE_NUMBER_ID',     required: false },
-  { key: 'WHATSAPP_ACCESS_TOKEN',        required: false },
-  { key: 'WHATSAPP_VERIFY_TOKEN',        required: false },
-  { key: 'WHATSAPP_BUSINESS_ACCOUNT_ID', required: false },
+  // WhatsApp — optional (app works without it). The actual gateway this
+  // app talks to is WAHA (src/lib/whatsapp.ts), not the official WhatsApp
+  // Business Cloud API — the WHATSAPP_PHONE_NUMBER_ID/ACCESS_TOKEN/
+  // VERIFY_TOKEN/BUSINESS_ACCOUNT_ID vars this used to check are legacy
+  // and unset in every real environment, which made this check (and the
+  // /api/health route it feeds) report "not configured" unconditionally
+  // in production even with a fully healthy WAHA session.
+  { key: 'WAHA_API_URL',     required: false },
+  { key: 'WAHA_API_KEY',     required: false },
+  { key: 'WAHA_SESSION',     required: false },
 ]
 
 export interface EnvValidationResult {
@@ -87,8 +92,8 @@ export function validateEnv(): EnvValidationResult {
     }
   }
 
-  // Warn if WhatsApp is partially configured
-  const waVars = ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_VERIFY_TOKEN']
+  // Warn if WAHA (WhatsApp gateway) is partially configured
+  const waVars = ['WAHA_API_URL', 'WAHA_API_KEY', 'WAHA_SESSION']
   const waSet  = waVars.filter(k => process.env[k])
   if (waSet.length > 0 && waSet.length < waVars.length) {
     warnings.push(`WhatsApp is partially configured (${waSet.length}/${waVars.length} vars set)`)
@@ -127,9 +132,9 @@ export function assertEnv(): void {
 // Safe check (doesn't throw) for use in API routes
 export function isWhatsAppConfigured(): boolean {
   return !!(
-    process.env.WHATSAPP_PHONE_NUMBER_ID &&
-    process.env.WHATSAPP_ACCESS_TOKEN &&
-    process.env.WHATSAPP_VERIFY_TOKEN
+    process.env.WAHA_API_URL &&
+    process.env.WAHA_API_KEY &&
+    process.env.WAHA_SESSION
   )
 }
 
