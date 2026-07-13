@@ -113,15 +113,26 @@ const LOCK_RECHECK_MS = 1500
 // misconfiguration fast) always fires immediately.
 const WEBHOOK_AUTH_ALERT_COOLDOWN_MS = 15 * 60 * 1000
 
-async function maybeAlertWebhookAuthMismatch(): Promise<void> {
+async function maybeAlertWebhookAuthMismatch(request: NextRequest): Promise<void> {
   const now = Date.now()
   if (now - authAlertState.lastAt < WEBHOOK_AUTH_ALERT_COOLDOWN_MS) return
   authAlertState.lastAt = now
+  // This app has no reverse proxy in front of it (confirmed 2026-07-13 —
+  // next-server binds :80 directly), so x-forwarded-for is never set by
+  // anything trustworthy and is omitted here to avoid implying a signal
+  // that doesn't exist. User-Agent IS always present regardless of proxying
+  // and is the one signal that can distinguish a real WAHA call (which
+  // sends a consistent, predictable UA) from internet background noise
+  // hitting this public, guessable URL with no/garbage auth — this app had
+  // zero way to tell those apart before, which matters because this alert
+  // fired several times in July 2026 whose cause was never actually
+  // confirmed as a real WAHA misconfiguration vs. scanner traffic.
+  const userAgent = request.headers.get('user-agent') ?? null
   await insertSystemAlert({
     company_id: null, severity: 'critical', alert_type: 'webhook_auth_mismatch',
     title: 'رسائل واتساب مرفوضة — سر التحقق غير مطابق',
     message: 'وصل طلب لمسار استقبال واتساب برمز تحقق غير مطابق للمُعرَّف بالسيرفر. إذا هذا مصدره جلسة WAHA الحقيقية (لا محاولة مشبوهة)، فكل رسائل العملاء تُرفض بصمت منذ هذا التوقيت — راجع إعداد الـ webhook بلوحة WAHA فوراً.',
-    metadata: { first_seen_at: new Date(now).toISOString() },
+    metadata: { first_seen_at: new Date(now).toISOString(), user_agent: userAgent },
   }).catch(err => log.error('failed to raise webhook_auth_mismatch alert', err as Error))
 }
 
@@ -212,7 +223,7 @@ export async function POST(request: NextRequest) {
       // immediately, rather than only being caught, hours or days later, by
       // the separate freshness watchdog below.
       log.error('WAHA webhook rejected — missing/invalid secret', new Error('webhook secret mismatch'))
-      await maybeAlertWebhookAuthMismatch()
+      await maybeAlertWebhookAuthMismatch(request)
       return NextResponse.json({ status: 'ok' })
     }
 
