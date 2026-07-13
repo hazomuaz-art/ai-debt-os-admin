@@ -6,10 +6,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 //      question onto a GREETING or INFO_REQUEST turn.
 //   ب) a model reply drifting into Egyptian/Sudanese dialect is caught and
 //      replaced — the prompt now also explicitly forbids it.
-//   ج) a pure greeting mid-conversation gets a short ack, never jumps to the
-//      debt/payment.
+//   ج) a pure greeting mid-conversation is handled by genuine reasoning (the
+//      model reads the message and follows the prompt's instruction to keep
+//      it short and not jump to the debt), NOT by a pre-model regex
+//      short-circuit — root-cause fix 2026-07-13, see ai-collector-agent.ts.
 
 let mockModelContent = ''
+// Corrective-regeneration reply (see regenerateWithCorrection in
+// ai-collector-agent.ts) — must be distinct from mockModelContent so a test
+// can prove the guard actually asked the model for a real corrected reply,
+// not just echoed the same (possibly still-bad) draft back. Mirrors the mock
+// in agent-guards.test.ts, which already does this correctly.
+let mockRegeneratedMessage = 'تمام، وش أقدر أساعدك فيه؟'
 let lastCreateCallMessages: any[] = []
 let mockContext: any = {}
 
@@ -23,6 +31,10 @@ vi.mock('openai', () => ({
           // regenerateWithCorrection / isSaudiDialectLLM in ai-collector-agent.ts)
           // are single-user-message calls and must not overwrite this.
           if (params.messages?.[0]?.role === 'system') lastCreateCallMessages = params.messages
+          const lastUserContent = params.messages?.[params.messages.length - 1]?.content ?? ''
+          if (typeof lastUserContent === 'string' && lastUserContent.includes('ردك السابق على هذه الرسالة كان فيه مشكلة محددة')) {
+            return { choices: [{ message: { content: JSON.stringify({ message: mockRegeneratedMessage }) } }] }
+          }
           return { choices: [{ message: { content: mockModelContent } }] }
         }),
       },
@@ -160,12 +172,12 @@ describe('ب) non-Saudi dialect / heavy formal Arabic in a reply gets caught and
 })
 
 describe('ج) a pure greeting mid-conversation never jumps to the debt', () => {
-  it('"السلام عليكم" alone mid-conversation gets a short ack, with zero LLM call', async () => {
+  it('"السلام عليكم" alone mid-conversation now goes through the model (no pre-model regex short-circuit) and the model, following the prompt instruction, keeps it short without jumping to the debt', async () => {
+    mockModelContent = JSON.stringify({ shouldReply: true, action: 'reply', reason: 'x', message: 'وعليكم السلام، تفضل.' })
     const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'السلام عليكم' })
 
-    expect(d.reason).toBe('greeting_mid_conversation')
+    expect(lastCreateCallMessages.length).toBeGreaterThan(0) // reasoning pipeline actually ran, not a regex bypass
     expect(d.message).not.toMatch(/800|ريال|مديونية|تسدد/)
-    expect(lastCreateCallMessages.length).toBe(0) // never reached the LLM at all
   })
 
   it('a greeting RIDING ALONG with real content (e.g. a promise) still falls through to the normal pipeline', async () => {

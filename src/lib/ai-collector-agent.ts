@@ -233,19 +233,18 @@ function hasTemporalRef(raw: string): boolean {
 // clear holiday reference, just outside hasTemporalRef's word list).
 const COMMITMENT_VERBS = ['أسدد', 'اسدد', 'بسدد', 'أحول', 'احول', 'بحول', 'بدفع', 'ادفع', 'أدفع']
 
-// Only unambiguous farewell/thanks phrases — short acks like "طيب" or "تمام"
-// are often mid-negotiation responses expecting a follow-up push, not an
-// end of conversation, so they're deliberately NOT treated as closers here.
-function isCloser(text: string) {
-  return /^(يعطيك العافية|شكرا|شكراً|thanks|thank you)$/i.test(text.trim())
-}
-
-function isGreeting(text: string) {
-  const normalized = text.trim().toLowerCase()
-  const greetingRegex = /^(السلام|سلام|هلا|مرحبا|هاي|hi|hello|مساء|صباح|يسعد|يا هلا|أهلين|اهلين|كيف|شلونك|اخبارك|كيفك).*/i
-  const businessRegex = /(سدد|رقم|مبلغ|ريال|فاتورة|اقساط|قسط|راتب|تحويل|خصم|بنك|رسالة|شركة|مديونية|دين|حساب|أدفع|ادفع|فلوس|صعب|ظروف)/i
-  return greetingRegex.test(normalized) && normalized.length <= 40 && !businessRegex.test(normalized)
-}
+// Root-cause fix (2026-07-13): whether the customer is "just saying bye" or
+// "just saying hi" used to be decided by regex (isCloser/isGreeting) BEFORE
+// the model ever ran, returning a fixed canned line with zero LLM call and
+// zero reading of context — the clearest case of keyword-matching
+// substituting for genuine understanding in this file. The model already has
+// an explicit instruction (checklist rule 9 in the system prompt below) for
+// exactly this judgment call — "is this message a plain farewell/greeting
+// with no question, complaint, or new information?" — and it has the full
+// conversation in front of it, so it can tell a real close/greeting apart
+// from one riding along with substantive content far better than two
+// regexes ever could. Removed entirely; every message now goes through the
+// same reasoning pipeline, including short ones.
 
 function cleanReply(reply: string, customerFirstName?: string, isFirstMessage?: boolean) {
   let r = String(reply ?? '')
@@ -877,11 +876,6 @@ export async function runCollectorAgent(args: {
   // introduction flow), and the pipeline proceeds normally without an ID
   // challenge. (Deliberate trade-off accepted by the owner.)
 
-  // Fast path: customer ended the chat → stay silent, no cost.
-  if (isCloser(text)) {
-    return { shouldReply: false, action: 'close_conversation', reason: 'customer_closed_chat', message: '' }
-  }
-
   // ── Customer 360 — see every debt this customer has before picking one.
   // The webhook may pass a single `debt_id` hint (its own "latest debt"
   // guess), but that guess must never override real multi-portfolio
@@ -1216,37 +1210,21 @@ export async function runCollectorAgent(args: {
   })()
   let prevOutbound = chronological.filter(m => m.direction === 'outbound').map(m => m.content)
   const lastAgentMessage = prevOutbound[prevOutbound.length - 1] ?? ''
-  const hasHistory = chronological.length > 0
 
-  // Pure greeting with NO prior history → light canned reply (true first contact).
-  // If there IS history, fall through to the AI so it uses what was discussed.
-  if (isGreeting(text) && !hasHistory) {
-    let msg = 'يا هلا بك، تفضل؟'
-    if (text.includes('سلام')) msg = 'وعليكم السلام، حياك الله تفضل؟'
-    else if (text.includes('مساء')) msg = 'مساء النور، تفضل؟'
-    else if (text.includes('صباح')) msg = 'صباح النور، تفضل؟'
-    return { shouldReply: true, action: 'reply', reason: 'greeting_first_contact', message: msg }
-  }
-
-  // A PURE greeting mid-conversation (e.g. the customer opens a new day with
-  // "السلام عليكم" and nothing else) must never be answered by jumping
-  // straight to the debt/payment — only ever fall through to GENERAL/
-  // NEGOTIATION's payment-pushing templates when this message carries other
-  // content. Deliberately narrow: short message, no other detected signal at
-  // all, so a real question or commitment riding along with the greeting
-  // still falls through to the normal AI pipeline below untouched.
-  if (
-    isGreeting(text) && hasHistory && text.trim().length <= 25 &&
-    !signals.dispute && !signals.angry && !signals.promise && !signals.installment &&
-    !signals.hardship && !signals.asksWhoAreYou && !signals.asksCompany &&
-    !signals.asksDetails && !signals.paymentClaim && !signals.deniesDebt && !signals.wrongNumber
-  ) {
-    let msg = 'هلا فيك، تفضل.'
-    if (text.includes('سلام')) msg = 'وعليكم السلام، تفضل.'
-    else if (text.includes('مساء')) msg = 'مساء النور، تفضل.'
-    else if (text.includes('صباح')) msg = 'صباح النور، تفضل.'
-    return { shouldReply: true, action: 'reply', reason: 'greeting_mid_conversation', message: msg }
-  }
+  // Root-cause fix (2026-07-13): a "pure greeting" used to be decided by
+  // regex (isGreeting) BEFORE the model ever ran, short-circuiting straight
+  // to one of a handful of fixed lines picked by three substring checks
+  // ("سلام"/"مساء"/"صباح") — the clearest literal instance of "select a
+  // pre-written reply by keyword instead of understanding the message" in
+  // this file. It could also never tell "hi" apart from "hi, by the way..."
+  // reliably — it tried, with an ever-growing exclusion list of signals,
+  // exactly the pattern that keeps lagging behind real phrasing everywhere
+  // else in this file. The GREETING/SELF_INTRO intent stages below already
+  // instruct the model to keep a bare greeting/identity-confirmation short
+  // and not jump to the debt — that instruction now does the actual work,
+  // with the model reading the real message instead of a regex guessing at
+  // it. Removed; every message, including short ones, goes through the same
+  // reasoning pipeline below.
 
   if (!process.env.OPENROUTER_API_KEY) {
     return { shouldReply: true, action: 'reply', reason: 'fallback_no_api_key', message: 'وصلت ملاحظتك، بنراجعها على الملف ونمشي بالإجراء المناسب.' }
@@ -1332,11 +1310,26 @@ export async function runCollectorAgent(args: {
     intent = 'INFO_REQUEST'
   } else if (signals.deniesDebt) {
     intent = 'DISPUTE'
-  } else if (!hasMentionedDebt && isFirstEverContact && !signals.angry && !signals.dispute) {
+  // Root-cause fix (2026-07-13): these three staged-opening branches used to
+  // gate ONLY on turn-count + a narrow keyword exclusion list (angry/dispute).
+  // Any real content in the customer's message that wasn't one of that
+  // specific handful of signals — a genuine question, a statement, a concern
+  // — was invisible to the router and the customer got shoved into a script
+  // instruction that flatly forbids discussing anything but identity/name/
+  // company. `customerAskedSomething` (already used elsewhere in this file
+  // as the general "does this message actually ask/say something" check,
+  // not a narrow keyword list) now also gates these three stages: any
+  // message that reads as more than a bare greeting/confirmation routes to
+  // GENERAL/DISPUTE/NEGOTIATION below instead, where the model reasons about
+  // it properly. The intentPrompts text for these three stages (below) is
+  // also no longer an absolute prohibition — it's a default the model is
+  // told to override whenever the message carries real content — so even a
+  // message this check doesn't catch is never suppressed at the prompt level.
+  } else if (!hasMentionedDebt && isFirstEverContact && !signals.angry && !signals.dispute && !customerAskedSomething(text, signals)) {
     intent = 'GREETING'
-  } else if (!hasMentionedDebt && !hasIntroducedSelf && chronological.length <= 3 && !signals.angry && !signals.dispute) {
+  } else if (!hasMentionedDebt && !hasIntroducedSelf && chronological.length <= 3 && !signals.angry && !signals.dispute && !customerAskedSomething(text, signals)) {
     intent = 'SELF_INTRO'
-  } else if (!hasMentionedDebt && chronological.length <= 5 && !signals.angry && !signals.dispute) {
+  } else if (!hasMentionedDebt && chronological.length <= 5 && !signals.angry && !signals.dispute && !customerAskedSomething(text, signals)) {
     intent = 'INTRODUCTION'
   } else if (signals.angry || signals.dispute) {
     intent = 'DISPUTE'
@@ -1371,21 +1364,14 @@ export async function runCollectorAgent(args: {
 
   const intentPrompts: Record<AgentIntent, string> = {
     GREETING: `【 مهمتك الآن: تأكيد الهوية فقط — لا تعريف بنفسك ولا بالدين 】
-- هذه أول رسالة من العميل ولم تتحدثا من قبل. ابدأ بتحية طبيعية (السلام عليكم).
-- 🔴 لا تذكر اسمك ولا أنك خالد ولا أي شركة في هذه الرسالة إطلاقاً.
-- اسأله سؤال تأكيد هوية: "معي الأخ [اسمه]؟" أو "معي الأخت [اسمها]؟" حسب اسمه في ملف القضية، وانتظر تأكيده.
-- 🔴 ممنوع تماماً ذكر أي شيء عن الدين أو المبلغ أو الجهة الدائنة أو اسمك في هذه الرسالة بالذات.
-- سطر واحد قصير فقط.`,
+- هذه أول رسالة من العميل ولم تتحدثا من قبل. **إذا كانت رسالته تحية بسيطة فقط بلا أي مضمون آخر** (مثل "السلام عليكم" وحدها): ابدأ بتحية طبيعية، ولا تذكر اسمك ولا أنك خالد ولا أي شركة، واسأله سؤال تأكيد هوية فقط: "معي الأخ [اسمه]؟" أو "معي الأخت [اسمها]؟" حسب اسمه في ملف القضية، وانتظر تأكيده — سطر واحد قصير.
+- 🔴 لكن إن كانت رسالته تحمل أي مضمون حقيقي غير التحية (سؤال، ملاحظة، شكوى، حالة انفعالية، أي معلومة) — هذا التسلسل هو الافتراضي فقط عند رسالة تحية صرفة، وليس قيداً مطلقاً: اقرأ رسالته واستجب لمضمونها الفعلي أولاً وبالكامل، حتى لو اضطررت لذكر اسمك أو الجهة قبل الأوان المعتاد — لا تتجاهل ما قاله لمجرد أنك "لسه في مرحلة التحية".`,
     SELF_INTRO: `【 مهمتك الآن: التعريف بنفسك وبالجهة فقط — لا تذكر الدين بعد 】
-- العميل أكّد أنه الشخص المطلوب (أو رد بشكل عام يفهم منه ذلك). الآن، وفقط الآن، عرّف نفسك: "معك خالد الدويحي من شركة مصدر الرؤية، وكيل [اسم الجهة الدائنة من ملف القضية]".
-- استخدم اسم الجهة الدائنة الحقيقي من "ملف القضية" بالضبط — لا تخترع اسماً ولا تتركه عاماً.
-- 🔴 ممنوع ذكر المبلغ أو أي تفصيل عن المديونية في هذه الرسالة — فقط التعريف بنفسك وبالجهة. اسأله سؤالاً عاماً يفتح الحوار (مثل: كيف حالك معهم / تعرف سبب تواصلي معك؟) أو فقط انتظر رده.
-- سطر أو سطرين قصيرين فقط.
-- ⚠️ إذا أنكر العميل أنه الشخص المطلوب ("مين فلان"، "غلط الرقم"، إلخ) في رده الحالي: لا تكمل التعريف بالجهة، تعامل مع هذا كرقم خطأ بدلاً من ذلك.`,
+- العميل أكّد أنه الشخص المطلوب (أو رد بشكل عام يفهم منه ذلك). **إذا كان ردّه مجرد تأكيد/رد عام بلا مضمون إضافي**: عرّف نفسك الآن: "معك خالد الدويحي من شركة مصدر الرؤية، وكيل [اسم الجهة الدائنة من ملف القضية]" (استخدم الاسم الحقيقي من ملف القضية، لا تخترعه ولا تتركه عاماً)، ولا تذكر المبلغ أو أي تفصيل عن المديونية بعد — فقط التعريف، ثم سؤال عام يفتح الحوار أو انتظار رده. سطر أو سطرين قصيرين.
+- 🔴 لكن إن كان رده يحمل مضموناً حقيقياً (سؤال، اعتراض، إنكار أنه الشخص المطلوب، أي شيء غير مجرد التأكيد) — هذا التسلسل افتراضي فقط عند رد بسيط، وليس قيداً مطلقاً: تعامل مع مضمون رده أولاً وبالكامل. مثال: إن أنكر أنه الشخص المطلوب ("مين فلان"، "غلط الرقم") لا تكمل التعريف بالجهة، تعامل مع هذا كرقم خطأ بدلاً من ذلك.`,
     INTRODUCTION: `【 مهمتك الآن: ذكر تفاصيل الدين 】
-- العميل سبق وأكّد هويته وعرفت نفسك له. الآن وفقط الآن عرّفه بتفاصيل المديونية القائمة.
-- اذكر اسم الجهة (إن لم تكن ذكرتها قبل) ونوع المنتج/الخدمة (إن وُجد في ملف القضية، مثل "خط Postpaid 200 Enhanced") والمبلغ مرة واحدة فقط، ثم اسأله مباشرة: متى يقدر يسدد؟ 🔴 ذكر نوع المنتج هنا مهم — يوضّح للعميل عن أي شيء بالضبط هذا الدين بدل ما يبقى سؤالاً غامضاً عنده لاحقاً.
-- سؤال واحد فقط، لا أكثر.`,
+- العميل سبق وأكّد هويته وعرفت نفسك له. **إذا لم يكن قد سأل أو ذكر شيئاً محدداً بعد**: عرّفه الآن بتفاصيل المديونية القائمة — اذكر اسم الجهة (إن لم تكن ذكرتها قبل) ونوع المنتج/الخدمة (إن وُجد في ملف القضية) والمبلغ مرة واحدة فقط، ثم اسأله مباشرة: متى يقدر يسدد؟ سؤال واحد فقط. 🔴 ذكر نوع المنتج مهم — يوضّح للعميل عن أي شيء بالضبط هذا الدين.
+- 🔴 لكن إن كانت رسالته الحالية تحمل مضموناً يحتاج رداً مباشراً (سؤال، اعتراض، عذر، وعد) — عالج ذلك أولاً وبالكامل قبل أو بدل الانتقال لكشف تفاصيل الدين كخطوة منفصلة؛ لا تتجاهل مضمون رسالته لمجرد أنك تنوي كشف الدين الآن.`,
     INFO_REQUEST: `【 مهمتك الآن: الرد المباشر على سؤال العميل من بيانات النظام 】
 - العميل سأل سؤالاً مباشراً: من أنت، أو وش الشركة/الجهة، أو طلب تفاصيل أكثر عن ملفه.
 - 🔴 إذا سأل "من أنت؟" أو ما يشابهها: يجب أن تتضمن إجابتك هذي الحقائق الثلاثة فعلاً (اسمك خالد الدويحي، أنك من شركة مصدر الرؤية، أنك وكيل متابعة مطالبات شركة [الجهة] — استبدل [الجهة] باسم الجهة/المحفظة من "ملف القضية" إن وُجد) لكن بصياغتك الطبيعية الخاصة المتماشية مع سياق الحوار، لا نصاً مكرراً حرفياً كل مرة.
