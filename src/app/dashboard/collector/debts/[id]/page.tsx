@@ -88,7 +88,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
 
   const { data: approvals } = await supabase
     .from('approvals')
-    .select('id, approval_type, status, priority, reason, created_at')
+    .select('id, approval_type, status, priority, description, created_at')
     .eq('entity_id', debt.id)
     .order('created_at', { ascending: false })
     .limit(5)
@@ -549,7 +549,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                       <span className="text-sm font-bold text-white">{ap.approval_type}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${ap.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : ap.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>{ap.status}</span>
                     </div>
-                    <p className="text-xs text-[#8b95a7] leading-relaxed mb-1">{ap.reason}</p>
+                    <p className="text-xs text-[#8b95a7] leading-relaxed mb-1">{ap.description}</p>
                     <p className="text-[10px] text-[#5f6b7e] font-bold">{formatDate(ap.created_at)}</p>
                   </div>
                 ))}

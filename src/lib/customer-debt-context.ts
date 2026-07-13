@@ -97,14 +97,14 @@ export async function buildCustomerDebtContext(params: {
     debtId
       ? supabase
           .from('approvals')
-          .select('approval_type, status, priority, reason, created_at')
+          .select('approval_type, status, priority, title, description, created_at')
           .eq('company_id', params.company_id)
           .eq('entity_id', debtId)
           .order('created_at', { ascending: false })
           .limit(5)
       : supabase
           .from('approvals')
-          .select('approval_type, status, priority, reason, created_at')
+          .select('approval_type, status, priority, title, description, created_at')
           .eq('company_id', params.company_id)
           .order('created_at', { ascending: false })
           .limit(5),

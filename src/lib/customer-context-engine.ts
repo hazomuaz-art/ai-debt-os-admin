@@ -64,6 +64,17 @@ export async function buildCustomer360Context(params: {
     .eq('customer_id', params.customer_id)
     .order('created_at', { ascending: false })
 
+  // approvals has no customer_id/debt_id columns — only company_id +
+  // entity_type/entity_id (see src/lib/approvals.ts) — so this customer's
+  // approvals must be looked up via their debt IDs, not a direct filter.
+  // Root-cause fix (2026-07-13): this queried nonexistent `approvals.debt_id`
+  // and `approvals.reason` columns and filtered on a nonexistent
+  // `approvals.customer_id` column, so the query failed on every single call
+  // (confirmed via repeated "column approvals.reason/debt_id does not exist"
+  // errors in production Postgres logs) — allApprovals was silently always
+  // empty for the AI agent's customer-360 context.
+  const debtIds = (debts ?? []).map(d => d.id)
+
   const [
     { data: payments },
     { data: messages },
@@ -90,8 +101,10 @@ export async function buildCustomer360Context(params: {
     supabase.from('timeline_events').select('event_type, channel, summary, detail, actor_type, ai_used, occurred_at')
       .eq('company_id', params.company_id).eq('customer_id', params.customer_id).order('occurred_at', { ascending: false }),
 
-    supabase.from('approvals').select('debt_id, entity_id, approval_type, status, priority, reason, created_at')
-      .eq('company_id', params.company_id).eq('customer_id', params.customer_id).order('created_at', { ascending: false }),
+    debtIds.length
+      ? supabase.from('approvals').select('entity_id, approval_type, status, priority, description, created_at')
+          .eq('company_id', params.company_id).eq('entity_type', 'debt').in('entity_id', debtIds).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as any[] }),
 
     // `disputes` is a dedicated table the agent never read before Phase 1 —
     // dispute status was only inferred from `approvals`. Both are now read.
