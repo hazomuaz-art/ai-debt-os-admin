@@ -47,14 +47,29 @@ export async function GET() {
       // hmac/customHeaders VALUES deliberately never included in the response.
     }))
 
+    // Root-cause fix (2026-07-13 full-system audit): this endpoint's own
+    // stated purpose is to catch the exact misconfiguration behind the
+    // 2026-07-09/10 P0 incident (WAHA's webhook silently not calling this
+    // app), yet it always returned status:'ok' as long as the WAHA API
+    // itself responded — even with zero webhooks configured at all. The two
+    // unambiguous failure signals available without guessing the "correct"
+    // URL (which legitimately varies — WAHA calls back via a Docker bridge
+    // IP, not the public one, so a plain string match isn't meaningful) are:
+    // no webhook registered, or a webhook registered with no auth header.
+    const noWebhookConfigured = webhooks.length === 0
+    const noAuthenticatedWebhook = webhooks.length > 0 && !safeWebhooks.some(w => w.has_custom_secret_header)
+    const status = noWebhookConfigured ? 'error' : noAuthenticatedWebhook ? 'warn' : 'ok'
+
     return NextResponse.json({
-      status: 'ok',
+      status,
       session_name: json?.name ?? session,
       session_status: json?.status ?? 'unknown',
       webhook_count: webhooks.length,
       webhooks: safeWebhooks,
       expected_webhook_url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://72.62.30.109'}/api/whatsapp/waha-webhook`,
       raw_config_keys: json?.config ? Object.keys(json.config) : [],
+      ...(noWebhookConfigured ? { message: 'No webhook is registered on this WAHA session — inbound customer messages cannot reach this app at all.' } : {}),
+      ...(noAuthenticatedWebhook ? { message: 'A webhook is registered but none carry the X-Webhook-Secret header — requests will be rejected as unauthenticated.' } : {}),
     })
   } catch (err) {
     return NextResponse.json({
