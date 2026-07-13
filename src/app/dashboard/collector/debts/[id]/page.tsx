@@ -16,7 +16,8 @@ import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
 import { resolveCompanyProfile, findCompanyProfile } from '@/lib/company-import-profiles'
 import CustomerDocumentsPanel from '@/components/debt/CustomerDocumentsPanel'
 
-export default async function DebtDetailPage({ params }: { params: { id: string } }) {
+export default async function DebtDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createClient()
 
   // Defense-in-depth: the debts RLS policy already enforces

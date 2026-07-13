@@ -4,10 +4,8 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('api/platform/users/delete')
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(
     async (ctx) => {
       const targetUserId = params.id

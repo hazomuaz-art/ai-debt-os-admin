@@ -2,7 +2,7 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { headers, type UnsafeUnwrappedHeaders } from 'next/headers';
 import { z } from 'zod'
 import { createLogger } from '@/lib/logger'
 import { logSecurityEvent } from '@/lib/security-audit'
@@ -11,7 +11,7 @@ const log = createLogger('auth')
 
 function requestMeta(): { ip: string | null; userAgent: string | null } {
   try {
-    const h = headers()
+    const h = (headers() as unknown as UnsafeUnwrappedHeaders)
     const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || null
     return { ip, userAgent: h.get('user-agent') }
   } catch {
@@ -68,7 +68,7 @@ export async function loginAction(formData: FormData) {
   const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
   if (isDummyUrl) {
     const { cookies } = await import('next/headers')
-    cookies().set('mock-auth-logged-in', 'true', { path: '/' })
+    ;(await cookies()).set('mock-auth-logged-in', 'true', { path: '/' })
     redirect('/dashboard/admin')
   }
 
@@ -229,7 +229,7 @@ export async function registerAction(formData: FormData) {
   const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
   if (isDummyUrl) {
     const { cookies } = await import('next/headers')
-    cookies().set('mock-auth-logged-in', 'true', { path: '/' })
+    ;(await cookies()).set('mock-auth-logged-in', 'true', { path: '/' })
     redirect('/dashboard/admin')
   }
 
@@ -325,7 +325,7 @@ export async function logoutAction() {
   const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
   if (isDummyUrl) {
     const { cookies } = await import('next/headers')
-    cookies().delete('mock-auth-logged-in')
+    ;(await cookies()).delete('mock-auth-logged-in')
     redirect('/login')
   }
 

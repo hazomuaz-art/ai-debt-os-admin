@@ -16,7 +16,8 @@ function Card({ title, value, sub }: { title: string; value: string | number; su
   )
 }
 
-export default async function CompanyDetailsPage({ params }: { params: { id: string } }) {
+export default async function CompanyDetailsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createClient()
   const service = createServiceClient()
 

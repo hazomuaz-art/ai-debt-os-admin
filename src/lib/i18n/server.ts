@@ -1,11 +1,11 @@
 // Server-side translation helper.
 // Reads the `locale` cookie (set by the client LanguageProvider) so that
 // async Server Components can render in the correct language.
-import { cookies } from 'next/headers'
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 import { translations, type Locale, type TranslationKeys } from './translations'
 
 export function getServerLocale(): Locale {
-  const value = cookies().get('locale')?.value
+  const value = (cookies() as unknown as UnsafeUnwrappedCookies).get('locale')?.value
   return value === 'en' ? 'en' : 'ar'
 }
 

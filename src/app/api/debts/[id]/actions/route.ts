@@ -39,10 +39,8 @@ async function logTimeline(
   })
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const supabase = createClient()
     const { action, amount, date, reason, note, follow_up_date } = await request.json()

@@ -30,7 +30,8 @@ const playbookSchema = z.object({
   portfolio_specific_rules: z.string().max(5000).optional().nullable(),
 })
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(async (ctx) => {
     const { data: portfolio, error: pErr } = await ctx.supabase
       .from('portfolios')
@@ -50,7 +51,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   })
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(
     async (ctx) => {
       let body: unknown

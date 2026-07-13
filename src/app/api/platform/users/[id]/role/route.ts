@@ -2,10 +2,8 @@
 import { withAuth, errors } from '@/lib/api'
 import { logSecurityEvent, extractRequestMeta } from '@/lib/security-audit'
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(
     async (ctx) => {
       const body = await request.json().catch(() => null)

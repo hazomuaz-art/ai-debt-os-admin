@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type JSX } from 'react'
 import type { SystemAlert, AlertSeverity } from '@/types'
 import { BellRing, Check, Info, AlertTriangle, XCircle, AlertOctagon, RefreshCw, Trash2 } from 'lucide-react'
 

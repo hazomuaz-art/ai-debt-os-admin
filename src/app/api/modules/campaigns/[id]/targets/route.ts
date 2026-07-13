@@ -8,7 +8,8 @@ import { withAuth, errors } from '@/lib/api'
 // to jump to a targeted debt's full history. The send/message pipeline
 // already records debt_id per queue row (see cron/send-campaign-queue), this
 // endpoint just exposes it.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(async (ctx) => {
     const { data: campaign } = await ctx.supabase
       .from('campaigns')

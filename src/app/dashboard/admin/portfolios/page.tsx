@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Portfolio, PortfolioCategory } from '@/types'
 import { FolderKanban, Search, Plus, CheckCircle2, XCircle, Power, Box, Settings, Smartphone, ShieldCheck, Zap, Briefcase, Building2, Landmark, MoreHorizontal, Activity } from 'lucide-react'

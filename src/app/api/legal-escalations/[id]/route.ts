@@ -11,7 +11,8 @@ const closeSchema = z.object({
 
 // The ONLY way the negotiation lock is lifted: an admin/manager explicitly
 // closes the escalation. خالد itself never reopens negotiation on its own.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(
     async (ctx) => {
       let body: unknown

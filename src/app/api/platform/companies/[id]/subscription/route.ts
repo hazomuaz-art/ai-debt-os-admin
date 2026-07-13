@@ -6,10 +6,8 @@ import { withAuth, errors } from '@/lib/api'
 // (added in migration 017, never had an API route or UI until now).
 // Cross-tenant by design (manages ANY company's subscription) — restricted
 // to the platform owner, same gate as the platform/companies pages.
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(async (ctx) => {
     if (ctx.profile.company_id !== process.env.PLATFORM_OWNER_COMPANY_ID) {
       return errors.forbidden()

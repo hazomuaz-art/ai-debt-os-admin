@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation'
 import { ArrowRight, ShieldCheck, Landmark, Plus, Power, AlertTriangle, FileText, Bot, Ban, Scale, ListChecks } from 'lucide-react'
 
@@ -60,7 +60,8 @@ const DISPUTE_OPTIONS_BY_CATEGORY: Record<string, string[]> = {
   utility: ['wrong_number', 'not_mine', 'wrong_amount', 'already_settled', 'invoice_dispute'],
 }
 
-export default function PortfolioPlaybookPage({ params }: { params: { id: string } }) {
+export default function PortfolioPlaybookPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const router = useRouter()
   const [portfolio, setPortfolio] = useState<{ id: string; name_ar?: string; name: string; category: string } | null>(null)
   const [playbook, setPlaybook] = useState<Playbook | null>(null)

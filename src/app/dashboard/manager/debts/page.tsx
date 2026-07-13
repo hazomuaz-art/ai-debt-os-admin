@@ -4,7 +4,8 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { FileText, Filter } from 'lucide-react'
 
-export default async function ManagerDebtsPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function ManagerDebtsPage(props: { searchParams: Promise<{ status?: string }> }) {
+  const searchParams = await props.searchParams;
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -53,7 +54,7 @@ export default async function ManagerDebtsPage({ searchParams }: { searchParams:
 
   const getStatusLabel = (s: string) => {
     const st = statuses.find(x => x.id === s)
-    return st?.label ?? s.replace(/_/g, ' ')
+    return st?.label ?? s.replace(/_/g, ' ');
   }
 
   return (

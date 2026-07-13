@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { Wallet, Search, Filter, ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, ShieldAlert } from 'lucide-react'
 import DebtFilters from '@/components/debt/DebtFilters'
 
-export default async function CollectorDebtsPage({
-  searchParams,
-}: {
-  searchParams: { status?: string; page?: string; q?: string; product?: string; creditor?: string }
-}) {
+export default async function CollectorDebtsPage(
+  props: {
+    searchParams: Promise<{ status?: string; page?: string; q?: string; product?: string; creditor?: string }>
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -24,7 +25,7 @@ export default async function CollectorDebtsPage({
   if (searchParams.status) query = query.eq('status', searchParams.status)
   if (searchParams.product) query = query.eq('product_type', searchParams.product)
   if (searchParams.creditor) query = query.eq('creditor_name', searchParams.creditor)
-  
+
   if (searchParams.q) {
     query = query.or(`reference_number.ilike.%${searchParams.q}%,account_number.ilike.%${searchParams.q}%`)
   }

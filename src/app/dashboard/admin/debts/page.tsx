@@ -26,11 +26,12 @@ function getStatusColor(status: string) {
   }
 }
 
-export default async function AdminDebtsPage({
-  searchParams,
-}: {
-  searchParams: { status?: string; page?: string; product?: string; creditor?: string; collector?: string; q?: string }
-}) {
+export default async function AdminDebtsPage(
+  props: {
+    searchParams: Promise<{ status?: string; page?: string; product?: string; creditor?: string; collector?: string; q?: string }>
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

@@ -5,7 +5,8 @@ import { withAuth, errors } from '@/lib/api'
 // the original receipt file. The 'payment-receipts' bucket is private, so
 // every download goes through this auth-checked route rather than a stored
 // public link.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(async (ctx) => {
     const { data: payment, error } = await ctx.supabase
       .from('payments')

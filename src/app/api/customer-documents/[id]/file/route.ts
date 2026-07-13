@@ -7,7 +7,8 @@ import { withAuth, errors } from '@/lib/api'
 // stored public link. Collector role included (unlike the receipt route)
 // since collectors are the ones actually working these files day-to-day on
 // the debt detail page.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return withAuth(async (ctx) => {
     const { data: doc, error } = await ctx.supabase
       .from('customer_documents')

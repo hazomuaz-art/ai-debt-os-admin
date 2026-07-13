@@ -1,6 +1,6 @@
 import { createServerClient as _createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient as _createServiceClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 import { getMockSupabaseClient } from './mock'
 
 const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
@@ -15,7 +15,7 @@ export function createClient() {
     return getMockSupabaseClient()
   }
 
-  const cookieStore = cookies()
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies)
 
   return _createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

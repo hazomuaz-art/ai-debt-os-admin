@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, use } from 'react';
 import { enrollMfaAction, cancelMfaEnrollmentAction, verifyMfaEnrollmentAction, logoutAction } from '@/lib/actions/auth'
 import { ShieldCheck } from 'lucide-react'
 
-export default function MfaSetupPage({ searchParams }: { searchParams: { required?: string } }) {
+export default function MfaSetupPage(props: { searchParams: Promise<{ required?: string }> }) {
+  const searchParams = use(props.searchParams);
   const required = searchParams?.required === 'true'
   const [factorId, setFactorId] = useState('')
   const [qrCode, setQrCode] = useState('')
@@ -120,5 +121,5 @@ export default function MfaSetupPage({ searchParams }: { searchParams: { require
         </form>
       </div>
     </div>
-  )
+  );
 }
