@@ -67,7 +67,23 @@
       "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@72.62.30.109 \"pm2 restart ai-debt-os-admin && sleep 2 && curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' http://localhost\")",
       "Skill(update-config)",
       "Skill(update-config:*)",
-      "Bash(ssh *)"
+      "Bash(ssh *)",
+      "Bash(npm run *)",
+      "Bash(node scripts/check-unchecked-writes.js)",
+      "mcp__claude_ai_Supabase__get_advisors",
+      "Bash(python3 *)",
+      "Bash(node *)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(npm audit *)",
+      "Skill(artifact-design)",
+      "Bash(xargs grep -l \"ai-collector\\\\|collectorAgent\\\\|CollectorAgent\")",
+      "Bash(git stash *)",
+      "Bash(npx next *)",
+      "Read(//tmp/**)",
+      "Bash(echo \"deploy_log.txt\")",
+      "Bash(git push *)",
+      "Bash(git apply *)",
+      "Bash(rm -f /tmp/partial_stash.patch)"
     ]
   }
 }

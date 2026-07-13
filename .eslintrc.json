@@ -1,5 +1,5 @@
 {
-  "extends": ["next/core-web-vitals"],
+  "extends": ["next/core-web-vitals", "next/typescript"],
   "rules": {
     "no-console": ["error", { "allow": ["warn", "error"] }],
     "@next/next/no-img-element": "error",

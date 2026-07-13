@@ -1196,7 +1196,8 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
     // ── Timeline (always) ───────────────────────────────────────────
     try {
       const ok = await stepTimeline(ctx, event.source, score, event.data)
-      ok ? R.steps_completed.push('timeline') : R.steps_failed.push('timeline')
+      if (ok) R.steps_completed.push('timeline')
+      else R.steps_failed.push('timeline')
     } catch { R.steps_failed.push('timeline') }
 
     // ── Unified Live Event Reactor (always) ──────────────────────────
@@ -1294,7 +1295,8 @@ export async function processEventBatch(
         R.total_alerts  += v.alerts_count
         R.total_actions += v.ai_actions_count
         if (v.success) {
-          v.steps_skipped.some(s => s.startsWith('terminal')) ? R.skipped++ : R.succeeded++
+          if (v.steps_skipped.some(s => s.startsWith('terminal'))) R.skipped++
+          else R.succeeded++
         } else {
           R.failed++
         }

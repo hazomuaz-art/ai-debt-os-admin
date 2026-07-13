@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { processEvent } from '@/lib/automation-pipeline'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('n8n-webhook')
 
 /**
  * POST /api/n8n/webhook
@@ -201,7 +204,7 @@ export async function POST(request: NextRequest) {
         const { customer_id, message_content, action_type, instance_name, phone_number, debt_id } = data as Record<string, string>
         const company_id = metadata?.company_id
 
-        console.log('[ai_reply_generated] Received:', { customer_id, company_id, phone_number, action_type, message_content: message_content?.substring(0, 50) })
+        log.info('ai_reply_generated received', { customer_id, company_id, phone_number, action_type, message_content: message_content?.substring(0, 50) })
 
         if (!company_id || !customer_id || !message_content) {
           return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -227,7 +230,7 @@ export async function POST(request: NextRequest) {
             .eq('id', customer_id)
             .single()
 
-          console.log('[ai_reply_generated] Customer lookup:', customerData)
+          log.info('ai_reply_generated customer lookup', { customerData })
             
           phone = phone || customerData?.whatsapp || customerData?.phone
 
@@ -251,14 +254,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Send WhatsApp message directly via the WAHA gateway.
-        console.log('[ai_reply_generated] Sending via WAHA:', { phone, messageLength: message_content.length })
+        log.info('ai_reply_generated sending via WAHA', { phone, messageLength: message_content.length })
         const waResult = await sendWhatsAppMessage({
           to: phone,
           message: message_content,
           company_id,
           customer_id,
         })
-        console.log('[ai_reply_generated] WAHA send result:', JSON.stringify(waResult))
+        log.info('ai_reply_generated WAHA send result', { waResult })
 
         // Save outbound AI message
         const { error: aiReplyMsgErr } = await supabase.from('messages').insert({
@@ -277,7 +280,7 @@ export async function POST(request: NextRequest) {
 
         // Check if AI requested installment approval
         if (message_content.includes('موافقة') || message_content.includes('مراجعة') || message_content.includes('رفع طلب')) {
-          console.log('[ai_reply_generated] Intercepted installment request from AI output')
+          log.info('ai_reply_generated intercepted installment request from AI output')
           
           const { data: existingApproval } = await supabase
             .from('approvals')
@@ -334,7 +337,7 @@ export async function POST(request: NextRequest) {
               if (statusHistErr) console.error('[ai_reply_generated] collection_status_history insert failed:', statusHistErr.message)
             }
           } else {
-            console.log('[ai_reply_generated] Pending approval already exists for this debt, skipping duplicate creation.')
+            log.info('ai_reply_generated pending approval already exists for this debt, skipping duplicate creation')
           }
         }
 
@@ -347,7 +350,7 @@ export async function POST(request: NextRequest) {
           data: { action: action_type, message: message_content }
         }).catch(() => {})
 
-        console.log('[ai_reply_generated] Pipeline complete. WA status:', waResult.status)
+        log.info('ai_reply_generated pipeline complete', { waStatus: waResult.status })
         result = { action: 'ai_reply_processed', customer_id, status: waResult.status }
         break
       }
