@@ -83,7 +83,14 @@
       "Bash(echo \"deploy_log.txt\")",
       "Bash(git push *)",
       "Bash(git apply *)",
-      "Bash(rm -f /tmp/partial_stash.patch)"
+      "Bash(rm -f /tmp/partial_stash.patch)",
+      "Bash(curl -s http://72.62.30.109/api/health)",
+      "Bash(rm -f \"/c/Users/X13/AppData/Local/Temp/deploy_nextjs16_v2.log\")",
+      "Bash(npm ls *)",
+      "Bash(npx eslint *)",
+      "Bash(xargs grep -l \"waha\\\\|WAHA\\\\|sessions\")",
+      "Bash(curl -s https://aidebtos.com/api/health)",
+      "mcp__claude_ai_Supabase__get_logs"
     ]
   }
 }
