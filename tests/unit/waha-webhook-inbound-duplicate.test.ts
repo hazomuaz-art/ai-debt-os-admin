@@ -92,7 +92,8 @@ vi.mock('@/lib/ai-collector-agent', () => ({
 
 process.env.WAHA_WEBHOOK_SECRET = 'test-secret'
 
-import { POST, __resetWahaWebhookStateForTests } from '@/app/api/whatsapp/waha-webhook/route'
+import { POST } from '@/app/api/whatsapp/waha-webhook/route'
+import { __resetWahaWebhookStateForTests } from '@/lib/waha-webhook-state'
 
 function makeRequest(body: any): any {
   return {

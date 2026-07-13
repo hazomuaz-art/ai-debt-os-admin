@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 vi.mock('@/lib/api', () => ({ withAuth: vi.fn(), errors: {} }))
 vi.mock('@/lib/company-import-profiles', () => ({ resolveCompanyProfile: vi.fn(() => null) }))
 
-import { parseSheet } from '@/app/api/employees/import/route'
+import { parseSheet } from '@/lib/employees-import-parser'
 
 // Verifies the swap from the vulnerable `xlsx` npm package to this
 // codebase's own dependency-free excel-parser.ts (2026-07-05 security fix)

@@ -91,7 +91,8 @@ process.env.WAHA_WEBHOOK_SECRET = 'test-secret'
 process.env.WAHA_API_URL = 'http://waha.test'
 process.env.WAHA_API_KEY = 'waha-key'
 
-import { POST, __resetWahaWebhookStateForTests } from '@/app/api/whatsapp/waha-webhook/route'
+import { POST } from '@/app/api/whatsapp/waha-webhook/route'
+import { __resetWahaWebhookStateForTests } from '@/lib/waha-webhook-state'
 
 function makeRequest(body: any): any {
   return {

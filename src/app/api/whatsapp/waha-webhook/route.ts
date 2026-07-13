@@ -6,6 +6,7 @@ import { insertSystemAlert } from '@/lib/system-alerts'
 import { insertTimelineEvent } from '@/lib/timeline'
 import { transcribeAudioMessage } from '@/lib/audio-transcription'
 import { createLogger } from '@/lib/logger'
+import { pendingBursts, processingCustomers, authAlertState } from '@/lib/waha-webhook-state'
 
 const log = createLogger('webhook/waha')
 
@@ -79,7 +80,7 @@ const ackToStatus: Record<number, string> = { 1: 'sent', 2: 'delivered', 3: 'rea
 // debounce, then run the agent ONCE on the merged text.
 // Single PM2 fork-mode process (confirmed in deploy.ps1 — no horizontal
 // scaling), so an in-process Map is sufficient; no cross-instance store needed.
-const pendingBursts = new Map<string, { texts: string[]; timer: ReturnType<typeof setTimeout>; latestTimestamp: string }>()
+// (state itself lives in @/lib/waha-webhook-state — see import above)
 // Raised from 6s to 9s — a real customer typing several short WhatsApp
 // bubbles in a row (thinking between them) commonly spans more than 6
 // seconds, and a message arriving just after the old window closed still
@@ -102,7 +103,6 @@ const BURST_DEBOUNCE_MS = 9000
 // occasionally an inconsistent/formal-register reply alongside the normal
 // Saudi-dialect one). Never processes two turns for the same customer
 // concurrently, regardless of how long a turn takes.
-const processingCustomers = new Set<string>()
 const LOCK_RECHECK_MS = 1500
 
 // P0 incident guard (2026-07-09/10) — see the secret-mismatch branch below.
@@ -111,30 +111,18 @@ const LOCK_RECHECK_MS = 1500
 // regardless of request volume, while still guaranteeing the FIRST
 // occurrence (the one that actually matters for catching a real
 // misconfiguration fast) always fires immediately.
-let lastWebhookAuthAlertAt = 0
 const WEBHOOK_AUTH_ALERT_COOLDOWN_MS = 15 * 60 * 1000
 
 async function maybeAlertWebhookAuthMismatch(): Promise<void> {
   const now = Date.now()
-  if (now - lastWebhookAuthAlertAt < WEBHOOK_AUTH_ALERT_COOLDOWN_MS) return
-  lastWebhookAuthAlertAt = now
+  if (now - authAlertState.lastAt < WEBHOOK_AUTH_ALERT_COOLDOWN_MS) return
+  authAlertState.lastAt = now
   await insertSystemAlert({
     company_id: null, severity: 'critical', alert_type: 'webhook_auth_mismatch',
     title: 'رسائل واتساب مرفوضة — سر التحقق غير مطابق',
     message: 'وصل طلب لمسار استقبال واتساب برمز تحقق غير مطابق للمُعرَّف بالسيرفر. إذا هذا مصدره جلسة WAHA الحقيقية (لا محاولة مشبوهة)، فكل رسائل العملاء تُرفض بصمت منذ هذا التوقيت — راجع إعداد الـ webhook بلوحة WAHA فوراً.',
     metadata: { first_seen_at: new Date(now).toISOString() },
   }).catch(err => log.error('failed to raise webhook_auth_mismatch alert', err as Error))
-}
-
-// Test-only: this Set is module-level (correct for the real single-process
-// server, where it must outlive any one request), but that means it isn't
-// naturally reset between test cases the way pendingBursts is (that one
-// self-clears synchronously inside the timer callback, before run() even
-// starts) — exported so test setup can clear it between cases.
-export function __resetWahaWebhookStateForTests(): void {
-  processingCustomers.clear()
-  pendingBursts.clear()
-  lastWebhookAuthAlertAt = 0
 }
 
 function fireWhenFree(customerId: string, run: (mergedText: string, latestTimestamp: string) => Promise<void>): void {
