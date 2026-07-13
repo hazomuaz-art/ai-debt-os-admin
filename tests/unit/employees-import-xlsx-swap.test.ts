@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import * as XLSX from 'xlsx'
+import { buildXlsx } from '../helpers/xlsx-writer'
 
 vi.mock('@/lib/api', () => ({ withAuth: vi.fn(), errors: {} }))
 vi.mock('@/lib/company-import-profiles', () => ({ resolveCompanyProfile: vi.fn(() => null) }))
@@ -9,15 +9,14 @@ import { parseSheet } from '@/lib/employees-import-parser'
 // Verifies the swap from the vulnerable `xlsx` npm package to this
 // codebase's own dependency-free excel-parser.ts (2026-07-05 security fix)
 // produces IDENTICAL extraction results to what the old xlsx-based reader
-// did - built with a real .xlsx file (generated via `xlsx` itself, which
-// remains installed for the low-risk template-write path), not a mock.
+// did - built with a real .xlsx file. Root-cause fix (2026-07-13): the fixture
+// itself used to be generated with the `xlsx` package too (its only other
+// call site, kept installed just for this) - now generated with this
+// codebase's own dependency-free xlsx-writer test helper instead, so the
+// vulnerable package has zero remaining reason to be in package.json at all.
 describe('employees import - xlsx library swap parity', () => {
   function buildFixture(rows: (string | number)[][]): ArrayBuffer {
-    const ws = XLSX.utils.aoa_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
-    const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
-    return out as ArrayBuffer
+    return buildXlsx(rows)
   }
 
   it('extracts full_name and email correctly from a realistic file', () => {

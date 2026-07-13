@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, Loader2, Download, CheckCircle2, XCircle } from 'lucide-react'
-import * as XLSX from 'xlsx'
 
 type ImportResults = {
   created: number
@@ -41,18 +40,40 @@ export default function EmployeeImportPanel() {
     }
   }
 
+  // Root-cause fix (2026-07-13): this used to build a real .xlsx via the
+  // `xlsx` npm package (two vulnerabilities with no fix ever available from
+  // the maintainer). This data is a small, simple table (name/email/
+  // generated password/portfolio) with no need for spreadsheet formatting —
+  // a plain CSV download needs zero external dependencies and opens
+  // natively in Excel/Sheets/any spreadsheet app, so the dependency is
+  // removed entirely rather than just accepted as a lower risk.
+  function csvField(value: string): string {
+    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+  }
+
   function exportAccounts() {
     if (!results?.accounts_created.length) return
-    const rows = results.accounts_created.map(a => ({
-      'الاسم': a.name,
-      'البريد الإلكتروني (اليوزر)': a.email,
-      'كلمة المرور': a.password,
-      'المحفظة': a.portfolio ?? '',
-    }))
-    const sheet = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, sheet, 'حسابات المحصلين')
-    XLSX.writeFile(wb, `حسابات-محصلين-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    const header = ['الاسم', 'البريد الإلكتروني (اليوزر)', 'كلمة المرور', 'المحفظة']
+    const lines = [
+      header.map(csvField).join(','),
+      ...results.accounts_created.map(a => [
+        csvField(a.name),
+        csvField(a.email),
+        csvField(a.password),
+        csvField(a.portfolio ?? ''),
+      ].join(',')),
+    ]
+    // Leading BOM so Excel detects UTF-8 and renders the Arabic text
+    // correctly instead of mangling it as the system's legacy codepage.
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `حسابات-محصلين-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (

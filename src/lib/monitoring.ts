@@ -75,9 +75,15 @@ function checkOpenAI(): HealthResult {
   }
 }
 
-/** Check if WhatsApp env vars are configured */
+/** Check if the WhatsApp gateway (WAHA — this app's actual send channel, not
+ * the official WhatsApp Business Cloud API) is configured. Root-cause fix
+ * (2026-07-13): this checked WHATSAPP_PHONE_NUMBER_ID/ACCESS_TOKEN, which
+ * every real environment leaves unset since WAHA is what's actually
+ * configured and used — this reported "degraded" unconditionally regardless
+ * of the real gateway's health, same bug already fixed in src/lib/env.ts's
+ * isWhatsAppConfigured (which feeds /api/health). */
 function checkWhatsApp(): HealthResult {
-  const configured = !!(process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN)
+  const configured = !!(process.env.WAHA_API_URL && process.env.WAHA_API_KEY)
   return {
     check_type: 'whatsapp',
     status:     configured ? 'ok' : 'degraded',

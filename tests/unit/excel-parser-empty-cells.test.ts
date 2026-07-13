@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import * as XLSX from 'xlsx'
+import { buildXlsx } from '../helpers/xlsx-writer'
 import { parseXLSX } from '@/lib/excel-parser'
 
 // Regression test for a real production data-loss bug (2026-07): the
@@ -13,13 +13,10 @@ import { parseXLSX } from '@/lib/excel-parser'
 // this class of bug corrupts real imported customer data.
 describe('excel-parser — empty cells must not swallow following cells', () => {
   function toArrayBuffer(rows: (string | number | null)[][]): ArrayBuffer {
-    // Passing null (not '') makes the `xlsx` writer emit a genuinely absent /
+    // Passing null (not '') makes the writer emit a genuinely absent /
     // self-closing cell, which is exactly the shape that triggered the bug —
     // an empty-string cell would be written with an explicit (harmless) value.
-    const ws = XLSX.utils.aoa_to_sheet(rows as any[][])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
-    return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+    return buildXlsx(rows)
   }
 
   it('reads every row name even when preceded by blank cells', () => {

@@ -36,7 +36,6 @@
     "react-dom": "^19.2.7",
     "recharts": "^2.14.1",
     "tailwind-merge": "^2.5.5",
-    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

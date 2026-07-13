@@ -426,10 +426,19 @@ export async function runAudit(companyId: string, safeFix = false): Promise<Audi
   }
 
   // ── 6. Integrations ───────────────────────────────────────────────────────
+  // Root-cause fix (2026-07-13): the WhatsApp entries here checked
+  // WHATSAPP_PHONE_NUMBER_ID/ACCESS_TOKEN — the official WhatsApp Business
+  // Cloud API's variables. This app's actual send channel is the WAHA
+  // gateway (src/lib/whatsapp.ts); those Cloud API vars are unset in every
+  // real environment, so this always reported "needs_credentials" regardless
+  // of WAHA's real health — the same bug already fixed in src/lib/env.ts's
+  // isWhatsAppConfigured and src/lib/monitoring.ts's checkWhatsApp. Also
+  // fixed the fix-suggestion text below: this app deploys to a Hostinger
+  // VPS via deploy.ps1, never to Vercel.
   const integrationChecks = [
     { key: 'OPENROUTER_API_KEY',          name: 'OpenRouter (All AI Models)' },
-    { key: 'WHATSAPP_PHONE_NUMBER_ID',   name: 'WhatsApp Business (Phone ID)' },
-    { key: 'WHATSAPP_ACCESS_TOKEN',      name: 'WhatsApp Business (Token)' },
+    { key: 'WAHA_API_URL',               name: 'WhatsApp (WAHA Gateway URL)' },
+    { key: 'WAHA_API_KEY',               name: 'WhatsApp (WAHA Gateway Key)' },
     { key: 'NEXT_PUBLIC_SUPABASE_URL',   name: 'Supabase (Database)' },
     { key: 'SUPABASE_SERVICE_ROLE_KEY',  name: 'Supabase (Service Role)' },
   ]
@@ -443,7 +452,7 @@ export async function runAudit(companyId: string, safeFix = false): Promise<Audi
       detail:   configured
         ? `${check.key} is configured`
         : `${check.key} environment variable is missing`,
-      fix: configured ? undefined : `Set ${check.key} in Vercel environment variables`,
+      fix: configured ? undefined : `Set ${check.key} in .env.local on the VPS`,
     })
   }
 
