@@ -90,7 +90,8 @@
       "Bash(npx eslint *)",
       "Bash(xargs grep -l \"waha\\\\|WAHA\\\\|sessions\")",
       "Bash(curl -s https://aidebtos.com/api/health)",
-      "mcp__claude_ai_Supabase__get_logs"
+      "mcp__claude_ai_Supabase__get_logs",
+      "Bash(curl -s http://72.62.30.109/api/health/waha-session)"
     ]
   }
 }
