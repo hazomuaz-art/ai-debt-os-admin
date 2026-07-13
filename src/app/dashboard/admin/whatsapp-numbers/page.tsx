@@ -10,7 +10,7 @@ import WhatsAppNumberCard from '@/components/whatsapp-numbers/WhatsAppNumberCard
 // and uses this table) had a complete backend (list/create/connect via QR/
 // disconnect) but no page anywhere in the app ever rendered it.
 export default async function WhatsAppNumbersPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

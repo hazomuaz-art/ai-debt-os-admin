@@ -4,7 +4,7 @@ import { formatDate } from '@/lib/utils'
 import { MessageSquare, MessageCircle, Mail, Smartphone, ArrowDownRight, ArrowUpRight } from 'lucide-react'
 
 export default async function CollectorMessagesPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

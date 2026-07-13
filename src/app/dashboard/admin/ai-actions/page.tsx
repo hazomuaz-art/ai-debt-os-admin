@@ -8,7 +8,7 @@ import { BrainCircuit, CheckCircle2, Clock, MessageSquare, PhoneCall, Mail, User
 import { getServerTranslation } from '@/lib/i18n/server'
 
 export default async function AIActionsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -41,7 +41,7 @@ export default async function AIActionsPage() {
 
   const completedCount = (actions ?? []).filter(a => a.status === 'completed').length
 
-  const { t, dir, locale } = getServerTranslation()
+  const { t, dir, locale } = await getServerTranslation()
   const a = t.pages.ai_actions
 
   const PRIORITY_LABEL: Record<string, string> = {

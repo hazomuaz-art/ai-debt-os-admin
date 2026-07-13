@@ -18,7 +18,7 @@ function Card({ title, value, sub }: { title: string; value: string | number; su
 
 export default async function CompanyDetailsPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const supabase = createClient()
+  const supabase = await createClient()
   const service = createServiceClient()
 
   const { data: { user } } = await supabase.auth.getUser()

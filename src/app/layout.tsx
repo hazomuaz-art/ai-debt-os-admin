@@ -34,12 +34,12 @@ export const metadata: Metadata = {
   description: 'AI-powered debt collection and management platform for modern financial institutions',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const locale = getServerLocale()
+  const locale = await getServerLocale()
   const dir = locale === 'ar' ? 'rtl' : 'ltr'
   return (
     <html lang={locale} dir={dir}>

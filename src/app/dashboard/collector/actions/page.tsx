@@ -6,7 +6,7 @@ import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import { CheckCircle2, Clock, MapPin, Phone, ShieldAlert, Mail, Handshake, AlertTriangle, MessageCircle, MoreHorizontal } from 'lucide-react'
 
 export default async function CollectorActionsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

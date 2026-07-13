@@ -4,7 +4,7 @@ import { ChatInterface } from '@/components/dashboard/ChatInterface'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 export default async function MessagesPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -36,7 +36,7 @@ export default async function MessagesPage() {
     supabase.from('messages').select('*', { count: 'exact', head: true })
       .eq('company_id', profile.company_id).eq('channel', 'whatsapp'),
   ])
-  const { t, dir } = getServerTranslation()
+  const { t, dir } = await getServerTranslation()
   const m = t.pages.messages
 
   return (

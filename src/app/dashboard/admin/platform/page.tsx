@@ -182,7 +182,7 @@ function PlanCard({
 // ── Page (pure Server Component) ─────────────────────────────────────────
 
 export default async function PlatformPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

@@ -6,7 +6,7 @@ import { FileText, Filter } from 'lucide-react'
 
 export default async function ManagerDebtsPage(props: { searchParams: Promise<{ status?: string }> }) {
   const searchParams = await props.searchParams;
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

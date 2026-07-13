@@ -4,7 +4,7 @@ import { Users } from 'lucide-react'
 import EmployeeImportPanel from '@/components/employees/EmployeeImportPanel'
 
 export default async function EmployeesPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

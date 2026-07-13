@@ -22,7 +22,7 @@ const log = createLogger('api/debts/actions')
 // is typed against the real constraint — passing an invalid value here
 // again would be a compile error, not a silent failure.
 async function logTimeline(
-  _supabase: ReturnType<typeof createClient>,
+  _supabase: Awaited<ReturnType<typeof createClient>>,
   row: { company_id: string; debt_id: string; customer_id: string; event_type: TimelineEventType; summary: string; detail?: string; actor_name: string },
 ) {
   // Real gap found during a live-traffic audit (2026-07-01): every call site
@@ -42,7 +42,7 @@ async function logTimeline(
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { action, amount, date, reason, note, follow_up_date } = await request.json()
     const debtId = params.id
 

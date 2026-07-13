@@ -13,7 +13,7 @@ const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }>
 }
 
 export default async function PromisesPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', user.id).single()

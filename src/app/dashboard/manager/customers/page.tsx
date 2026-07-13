@@ -3,7 +3,7 @@ import { formatDate } from '@/lib/utils'
 import CreateCustomerModal from '@/components/debt/CreateCustomerModal'
 
 export default async function ManagerCustomersPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: customers } = await supabase
     .from('customers')

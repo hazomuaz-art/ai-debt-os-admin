@@ -1,21 +1,22 @@
 import { createServerClient as _createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient as _createServiceClient } from '@supabase/supabase-js'
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers'
 import { getMockSupabaseClient } from './mock'
 
 const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
 
 /**
- * Server-side Supabase client for Next.js 14 (App Router).
- * Uses cookies() synchronously — correct for Next.js 14.
+ * Server-side Supabase client for the App Router.
+ * Next.js 15+: cookies() is async, so this is now async too — every caller
+ * must `await createClient()`.
  * Call this in Server Components, Route Handlers, and Server Actions.
  */
-export function createClient() {
+export async function createClient() {
   if (isDummyUrl) {
     return getMockSupabaseClient()
   }
 
-  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies)
+  const cookieStore = await cookies()
 
   return _createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

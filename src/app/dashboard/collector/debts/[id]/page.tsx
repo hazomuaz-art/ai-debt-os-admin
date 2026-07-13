@@ -18,7 +18,7 @@ import CustomerDocumentsPanel from '@/components/debt/CustomerDocumentsPanel'
 
 export default async function DebtDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Defense-in-depth: the debts RLS policy already enforces
   // company_id = get_user_company_id() at the database level (verified

@@ -106,7 +106,7 @@ function Section({ title, items, emoji }: { title: string; items: AuditItem[]; e
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function SystemHealthPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

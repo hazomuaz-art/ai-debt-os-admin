@@ -4,7 +4,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Users, Mail, TrendingUp, Briefcase } from 'lucide-react'
 
 export default async function ManagerTeamPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

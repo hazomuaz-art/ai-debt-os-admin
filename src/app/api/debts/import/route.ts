@@ -34,7 +34,7 @@ function mapStatus(raw: string | undefined): string {
 // ── Portfolio lookup cache ─────────────────────────────────────────────────
 
 async function lookupPortfolio(
-  supabase: ReturnType<typeof createClient>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   companyId: string,
   portfolioName: string | undefined,
   _portfolioCache: Map<string, string>,
@@ -58,7 +58,7 @@ async function lookupPortfolio(
 }
 
 async function ensureCompanyPortfolio(
-  supabase: ReturnType<typeof createClient>,
+  supabase: Awaited<ReturnType<typeof createClient>>,
   companyId: string,
   profile: CompanyImportProfile,
 ): Promise<string> {
@@ -104,7 +104,7 @@ async function ensureCompanyPortfolio(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -4,7 +4,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Wallet, Users, CheckCircle, Trophy, BarChart2 } from 'lucide-react'
 
 export default async function ManagerDashboard() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

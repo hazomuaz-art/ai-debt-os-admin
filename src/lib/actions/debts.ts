@@ -53,7 +53,7 @@ const createDebtSchema = z.object({
 // ============================================================
 
 async function requireAuth() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
@@ -697,7 +697,7 @@ export async function getDebtsWithFilters(filters: {
   limit?:       number
   offset?:      number
 }) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', data: [] }
 

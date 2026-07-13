@@ -28,7 +28,7 @@ export async function createCompanyAction(args: {
   admin_full_name: string
   plan_name: 'starter' | 'business' | 'growth' | 'enterprise'
 }): Promise<{ error: string } | { success: true; temp_password: string; company_id: string }> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 

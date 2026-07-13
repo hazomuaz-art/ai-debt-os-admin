@@ -2,16 +2,16 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { headers, type UnsafeUnwrappedHeaders } from 'next/headers';
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { createLogger } from '@/lib/logger'
 import { logSecurityEvent } from '@/lib/security-audit'
 
 const log = createLogger('auth')
 
-function requestMeta(): { ip: string | null; userAgent: string | null } {
+async function requestMeta(): Promise<{ ip: string | null; userAgent: string | null }> {
   try {
-    const h = (headers() as unknown as UnsafeUnwrappedHeaders)
+    const h = await headers()
     const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || null
     return { ip, userAgent: h.get('user-agent') }
   } catch {
@@ -72,7 +72,7 @@ export async function loginAction(formData: FormData) {
     redirect('/dashboard/admin')
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const parsed = loginSchema.safeParse({
     email:    formData.get('email'),
@@ -89,7 +89,7 @@ export async function loginAction(formData: FormData) {
   }
 
   const { data: authData, error } = await supabase.auth.signInWithPassword(parsed.data)
-  const { ip, userAgent } = requestMeta()
+  const { ip, userAgent } = await requestMeta()
 
   if (error) {
     // Generic message to prevent email enumeration
@@ -151,7 +151,7 @@ export async function loginAction(formData: FormData) {
 export async function enrollMfaAction(): Promise<
   { factorId: string; qrCode: string; secret: string } | { error: string }
 > {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
   if (error) {
     log.error('MFA enroll failed', error)
@@ -164,11 +164,11 @@ export async function enrollMfaAction(): Promise<
 // fresh QR code if the first attempt's code doesn't match, without leaving
 // an abandoned "unverified" factor behind.
 export async function cancelMfaEnrollmentAction(factorId: string): Promise<void> {
-  const supabase = createClient()
+  const supabase = await createClient()
   await supabase.auth.mfa.unenroll({ factorId }).catch(() => {})
 }
 
-async function redirectToOwnDashboard(supabase: ReturnType<typeof createClient>): Promise<never> {
+async function redirectToOwnDashboard(supabase: Awaited<ReturnType<typeof createClient>>): Promise<never> {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user
     ? await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -177,7 +177,7 @@ async function redirectToOwnDashboard(supabase: ReturnType<typeof createClient>)
 }
 
 export async function verifyMfaEnrollmentAction(factorId: string, code: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
   if (challengeError) return { error: challengeError.message }
 
@@ -196,7 +196,7 @@ export async function verifyMfaEnrollmentAction(factorId: string, code: string) 
 }
 
 export async function verifyMfaChallengeAction(code: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors()
   if (factorsError) return { error: factorsError.message }
 
@@ -234,7 +234,7 @@ export async function registerAction(formData: FormData) {
   }
 
   const serviceClient = createServiceClient()
-  const supabase      = createClient()
+  const supabase      = await createClient()
 
   const parsed = registerSchema.safeParse({
     email:        formData.get('email'),
@@ -329,7 +329,7 @@ export async function logoutAction() {
     redirect('/login')
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const { data: p } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
@@ -340,7 +340,7 @@ export async function logoutAction() {
 }
 
 export async function getCurrentUser() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 

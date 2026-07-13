@@ -6,7 +6,7 @@ import { BarChart3, Wallet, Target, Activity } from 'lucide-react'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 export default async function AnalyticsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -136,7 +136,7 @@ export default async function AnalyticsPage() {
   const priorityChartData = Object.entries(priorityCounts).map(([name, value]) => ({ name, value }))
   const riskChartData = Object.entries(riskCounts).map(([name, value]) => ({ name, value }))
 
-  const { t, dir } = getServerTranslation()
+  const { t, dir } = await getServerTranslation()
   const an = t.pages.analytics
 
   return (

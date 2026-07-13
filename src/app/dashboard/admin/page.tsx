@@ -11,7 +11,7 @@ import {
 // ── Stats fetch ──────────────────────────────────────────────────────────
 
 async function getStats(companyId: string) {
-  const supabase   = createClient()
+  const supabase   = await createClient()
   const now        = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
@@ -99,7 +99,7 @@ async function getStats(companyId: string) {
 // ── Page ─────────────────────────────────────────────────────────────────
 
 export default async function AdminDashboard() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -108,7 +108,7 @@ export default async function AdminDashboard() {
   if (!profile?.company_id || profile.role !== 'admin') redirect('/dashboard/collector')
 
   const s = await getStats(profile.company_id)
-  const { t, dir } = getServerTranslation()
+  const { t, dir } = await getServerTranslation()
   const h = t.pages.home
 
   // Real collection rate from available figures (no hardcoded number)

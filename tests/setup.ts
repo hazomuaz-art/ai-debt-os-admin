@@ -52,6 +52,24 @@ vi.mock('next/headers', () => ({
 }))
 
 // ── Shared mock builder ────────────────────────────────────────────────────
+// Root-cause fix (2026-07-13, Next.js 15/16 upgrade): createClient() is now
+// async everywhere in real app code (cookies() became async), so every
+// caller does `await createClient()`. This builder is deliberately
+// thenable at the query-chain level (`then` below) so a bare
+// `await supabase.from(...).select(...)` — with no .single()/.maybeSingle()
+// terminal — still resolves to { data, error, count }, matching real
+// Supabase's PostgrestFilterBuilder behavior. But `builder.from()` returns
+// the SAME object as the client itself (mockReturnThis() chaining), so
+// `await createClient()` (which returns this same thenable object) got
+// silently swallowed by the native Promise-resolution algorithm recursively
+// unwrapping it via that same `then` — which (before this fix) never called
+// its resolve/reject callbacks, so the await just hung forever. Confirmed
+// live: every test awaiting `createClient()` timed out at 10s.
+// Fixed by wrapping the returned value in a Proxy that hides `then` ONLY at
+// the top level (so awaiting the client itself resolves immediately, not
+// through query-result resolution) while every other property — including
+// from(), which still returns the real underlying (thenable) builder for
+// proper query-chain awaiting — passes through unchanged.
 export function mockSupabaseClient(overrides: Record<string, any> = {}) {
   const builder: any = {
     select:   vi.fn().mockReturnThis(),
@@ -73,7 +91,12 @@ export function mockSupabaseClient(overrides: Record<string, any> = {}) {
     single:   vi.fn().mockResolvedValue({ data: null, error: null }),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     textSearch: vi.fn().mockReturnThis(),
-    then:     vi.fn().mockResolvedValue({ data: [], error: null, count: 0 }),
+    // A real thenable now (delegates to a genuine Promise) instead of
+    // vi.fn().mockResolvedValue(...), which never invoked the
+    // (resolve, reject) callbacks the native `await` mechanism passes it —
+    // that was the direct cause of the hang described above.
+    then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
+      Promise.resolve({ data: [], error: null, count: 0 }).then(resolve, reject),
     rpc:      vi.fn().mockResolvedValue({ data: true, error: null }),
     auth: {
       getUser:  vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
@@ -90,7 +113,12 @@ export function mockSupabaseClient(overrides: Record<string, any> = {}) {
   // Make from() return the builder (enables chaining)
   builder.from.mockReturnValue(builder)
 
-  return builder
+  return new Proxy(builder, {
+    get(target, prop, receiver) {
+      if (prop === 'then') return undefined
+      return Reflect.get(target, prop, receiver)
+    },
+  })
 }
 
 // ── Test fixtures ──────────────────────────────────────────────────────────

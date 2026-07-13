@@ -6,7 +6,7 @@ import { MemberActions } from '@/components/dashboard/MemberActions'
 import { Users, Activity, CheckCircle, Wallet } from 'lucide-react'
 
 export default async function AdminTeamPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

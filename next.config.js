@@ -1,8 +1,9 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next.js 16: the `eslint` config option was removed entirely (next build
+  // no longer runs lint at all, next-lint-to-eslint-cli codemod already
+  // migrated `npm run lint` to the standalone ESLint CLI) — nothing to
+  // replace this with, ignoreDuringBuilds is simply a no-op now.
   typescript: {
     ignoreBuildErrors: true,
   },

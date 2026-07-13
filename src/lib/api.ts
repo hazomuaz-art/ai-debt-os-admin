@@ -74,7 +74,7 @@ export interface AuthContext {
     full_name:  string | null
     is_active:  boolean
   }
-  supabase:      ReturnType<typeof createClient>
+  supabase:      Awaited<ReturnType<typeof createClient>>
   serviceClient: ReturnType<typeof createServiceClient>
 }
 
@@ -88,7 +88,7 @@ export async function withAuth(
   handler: AuthedHandler,
   options?: { requiredRoles?: Array<'admin' | 'manager' | 'collector'> }
 ): Promise<NextResponse> {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return errors.unauthorized()

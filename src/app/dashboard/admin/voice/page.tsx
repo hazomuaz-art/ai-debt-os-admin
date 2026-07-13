@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import type { SystemConfig } from '@/types'
 
 export default async function VoicePage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

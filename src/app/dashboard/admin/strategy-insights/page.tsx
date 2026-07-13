@@ -15,7 +15,7 @@ function Card({ title, value, sub }: { title: string; value: string | number; su
 }
 
 export default async function StrategyInsightsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

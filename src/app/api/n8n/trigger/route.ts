@@ -9,7 +9,7 @@ import { getN8nClient } from '@/lib/n8n/client'
  * Allows client-side pages to trigger n8n workflows without exposing baseUrl/apiKey.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -4,7 +4,7 @@ import GenerateActionsButton from '@/components/ai/GenerateActionsButton'
 import { Zap, Clock, CheckCircle, Bot, MessageCircle, Phone, Mail } from 'lucide-react'
 
 export default async function ManagerAIActionsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

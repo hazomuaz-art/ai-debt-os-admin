@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Wallet, MessageCircle, AlertTriangle, FileText, CheckCircle, Clock, Phone, Mail, ArrowLeft } from 'lucide-react'
 
 export default async function CollectorDashboard() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

@@ -32,7 +32,7 @@ export default async function AdminDebtsPage(
   }
 ) {
   const searchParams = await props.searchParams;
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -44,7 +44,7 @@ export default async function AdminDebtsPage(
 
   if (!profile?.company_id) redirect('/login')
 
-  const { t, dir } = getServerTranslation()
+  const { t, dir } = await getServerTranslation()
   const p = t.pages.debts
   const isAr = dir === 'rtl'
 
