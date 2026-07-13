@@ -67,7 +67,7 @@ function makeQueryChain(table: string, mode: 'select' | 'update', patch?: Record
       return Promise.resolve({
         data: matches(queueRow) ? [{
           ...queueRow,
-          campaign: { id: queueRow.campaign_id, campaign_type: 'reminder', message_template: null, sent_count: 0, send_window_start: null, send_window_end: null },
+          campaign: { id: queueRow.campaign_id, status: 'running', campaign_type: 'reminder', message_template: null, sent_count: 0, send_window_start: null, send_window_end: null },
           customer: { phone: '966500000001', whatsapp: '966500000001' },
           whatsapp_number: { id: 'num-1', instance_name: 'default', api_url: 'http://waha', daily_limit: 200, sent_today: 0, last_sent_at: null, is_active: true },
         }] : [],

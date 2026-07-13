@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
     .from('campaign_send_queue')
     .select(`
       id, company_id, campaign_id, recipient_id, customer_id, debt_id, message_text, attempts, max_attempts,
-      campaign:campaigns(id, campaign_type, message_template, sent_count, send_window_start, send_window_end),
+      campaign:campaigns(id, status, campaign_type, message_template, sent_count, send_window_start, send_window_end),
       customer:customers(phone, whatsapp),
       whatsapp_number:portfolio_whatsapp_numbers(id, instance_name, api_url, daily_limit, sent_today, last_sent_at, is_active)
     `)
@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch queue' }, { status: 500 })
   }
 
-  const results = { sent: 0, failed: 0, skipped_limit: 0, skipped_inactive: 0, skipped_window: 0, skipped_gate: 0 }
+  const results = { sent: 0, failed: 0, skipped_limit: 0, skipped_inactive: 0, skipped_window: 0, skipped_gate: 0, skipped_paused: 0 }
   const sentCountDelta: Record<string, number> = {}
   // Real bug this fixes: `num.sent_today` is read ONCE per row from the
   // initial batch select — if two queue rows in the same BATCH_SIZE=20
@@ -158,6 +158,30 @@ export async function GET(req: NextRequest) {
     const r = row as any
     const num = r.whatsapp_number
     const campaign = r.campaign
+
+    // 🔴 ROOT-CAUSE FIX (2026-07-13, real production incident): this route
+    // never checked the parent campaign's own `status` before draining a
+    // queue row — the auto-pause circuit breaker above (and any manual pause
+    // from the dashboard) only ever set `campaigns.status = 'paused'`, but
+    // nothing stopped THIS loop from still sending a row whose campaign was
+    // paused, as long as the INLINE quality gate for that particular run
+    // happened to read healthy (e.g. a quiet 60-minute window with too few
+    // recent campaign sends to even evaluate — trivially "healthy"). Confirmed
+    // live: a campaign auto-paused on 2026-07-12 11:25 for degrading delivery
+    // (a likely WhatsApp silent block) kept leaking real sends for the next
+    // ~20 hours, right up to 2026-07-13 07:40, because its still-pending queue
+    // rows were never tied to the campaign's own status. A pause must be a
+    // hard stop regardless of what the rolling quality window looks like at
+    // any given moment. `campaign?.status` is checked leniently (only blocks
+    // on an explicit non-'running' value) so a row whose join is somehow
+    // missing status data is not silently dropped — matches the DB's own FK
+    // guarantee that a queue row's campaign always exists.
+    if (campaign?.status && campaign.status !== 'running') {
+      results.skipped_paused++
+      const { error: pausedErr } = await supabase.from('campaign_send_queue').update({ status: 'skipped', error: 'campaign_not_running', processed_at: new Date().toISOString() }).eq('id', r.id)
+      if (pausedErr) log.error('failed to mark queue row skipped (campaign not running)', new Error(pausedErr.message), { queue_id: r.id })
+      continue
+    }
 
     if (!num || !num.is_active) {
       results.skipped_inactive++
