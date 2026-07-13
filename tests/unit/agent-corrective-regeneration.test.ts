@@ -27,7 +27,7 @@ let capturedModels: string[] = []
 let mockContext: any = {}
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: {
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
@@ -41,7 +41,7 @@ vi.mock('openai', () => ({
         }),
       },
     },
-  })),
+  } }),
 }))
 
 vi.mock('@/lib/customer-debt-context', () => ({

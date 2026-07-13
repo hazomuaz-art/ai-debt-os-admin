@@ -13,9 +13,9 @@ let mockTrackCalls: any[] = []
 let lawyerReplyContent = 'تمام، فهمت — لكن هذا الملف الآن قيد المراجعة القانونية. هل تريد تسوية الآن قبل تصعيد الإجراءات؟'
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: { completions: { create: vi.fn().mockImplementation(async () => ({ choices: [{ message: { content: lawyerReplyContent } }] })) } },
-  })),
+  } }),
 }))
 
 vi.mock('@/lib/customer-debt-context', () => ({

@@ -38,7 +38,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: {
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
@@ -47,7 +47,7 @@ vi.mock('openai', () => ({
         }),
       },
     },
-  })),
+  } }),
 }))
 
 import { generateCampaignMessage } from '@/lib/campaign-message'

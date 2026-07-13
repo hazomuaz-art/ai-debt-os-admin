@@ -4,7 +4,7 @@ import { fixtures } from '../setup'
 // Mock OpenAI before importing ai-engine
 vi.mock('openai', () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
+    default: vi.fn().mockImplementation(function () { return {
       chat: {
         completions: {
           create: vi.fn().mockResolvedValue({
@@ -25,7 +25,7 @@ vi.mock('openai', () => {
           }),
         },
       },
-    })),
+    } }),
   }
 })
 
@@ -53,7 +53,7 @@ describe('scoreDebt', () => {
 
   it('clamps score to 0-100', async () => {
     const openai = (await import('openai')).default as any
-    openai.mockImplementation(() => ({
+    openai.mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockResolvedValue({
         choices: [{ message: { content: JSON.stringify({
           score: 150,  // out of bounds
@@ -63,7 +63,7 @@ describe('scoreDebt', () => {
           factors: [],
         }) } }],
       }) } },
-    }))
+    } })
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
     const result = await scoreDebtFresh(validInput)
@@ -73,7 +73,7 @@ describe('scoreDebt', () => {
 
   it('handles missing factors gracefully', async () => {
     const openai = (await import('openai')).default as any
-    openai.mockImplementation(() => ({
+    openai.mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockResolvedValue({
         choices: [{ message: { content: JSON.stringify({
           score: 50,
@@ -83,7 +83,7 @@ describe('scoreDebt', () => {
           // factors missing
         }) } }],
       }) } },
-    }))
+    } })
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
     const result = await scoreDebtFresh(validInput)
@@ -98,11 +98,11 @@ describe('scoreDebt', () => {
   // intentional, safer fallback behavior.
   it('falls back to rule-based scoring on an empty OpenAI response (never throws)', async () => {
     const openai = (await import('openai')).default as any
-    openai.mockImplementation(() => ({
+    openai.mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockResolvedValue({
         choices: [{ message: { content: null } }],
       }) } },
-    }))
+    } })
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
     const result = await scoreDebtFresh(validInput)
@@ -112,11 +112,11 @@ describe('scoreDebt', () => {
 
   it('falls back to rule-based scoring on an invalid JSON response (never throws)', async () => {
     const openai = (await import('openai')).default as any
-    openai.mockImplementation(() => ({
+    openai.mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockResolvedValue({
         choices: [{ message: { content: 'not valid json {{' } }],
       }) } },
-    }))
+    } })
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
     const result = await scoreDebtFresh(validInput)
@@ -126,7 +126,7 @@ describe('scoreDebt', () => {
 
   it('defaults unknown risk_classification to medium', async () => {
     const openai = (await import('openai')).default as any
-    openai.mockImplementation(() => ({
+    openai.mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockResolvedValue({
         choices: [{ message: { content: JSON.stringify({
           score: 60,
@@ -136,7 +136,7 @@ describe('scoreDebt', () => {
           factors: [],
         }) } }],
       }) } },
-    }))
+    } })
 
     const { scoreDebt: scoreDebtFresh } = await import('@/lib/ai-engine')
     const result = await scoreDebtFresh(validInput)

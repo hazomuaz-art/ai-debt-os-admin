@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 let mockModelContent = ''
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: { completions: { create: vi.fn().mockImplementation(async () => ({
       choices: [{ message: { content: mockModelContent } }],
     })) } },
-  })),
+  } }),
 }))
 
 describe('document-classifier', () => {

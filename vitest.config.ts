@@ -30,9 +30,14 @@ export default defineConfig({
     exclude: ['node_modules', '.next'],
     testTimeout: 10000,
     pool: 'forks',           // isolate each test file
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    // Vitest 4 migration: poolOptions.forks.singleFork was removed in favor
+    // of the top-level maxWorkers. Deliberately NOT setting isolate: false
+    // (which the migration guide bundles with this) — that changes whether
+    // module state resets between test FILES, not just workers, and several
+    // test files in this suite rely on fresh module state per file (see the
+    // repeated vi.resetModules() calls). Kept at its default (true) to
+    // preserve the exact same per-file isolation this suite already depends on.
+    maxWorkers: 1,
   },
   resolve: {
     alias: {

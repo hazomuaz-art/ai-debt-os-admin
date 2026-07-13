@@ -5,11 +5,11 @@ let mockHistory: any[] = []
 let mockCaseNote: string | null = null
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: { completions: { create: vi.fn().mockImplementation(async () => ({
       choices: [{ message: { content: mockModelContent } }],
     })) } },
-  })),
+  } }),
 }))
 
 // Distinguishes by table name — 'debts' resolves via .maybeSingle() (the
@@ -67,12 +67,12 @@ describe('classifyDebtOutcome — conversation context', () => {
     let capturedPrompt = ''
     mockModelContent = JSON.stringify({ category: null })
     const openaiModule = await import('openai')
-    ;(openaiModule.default as any).mockImplementation(() => ({
+    ;(openaiModule.default as any).mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockImplementation(async (params: any) => {
         capturedPrompt = params.messages[1].content
         return { choices: [{ message: { content: mockModelContent } }] }
       }) } },
-    }))
+    } })
 
     const result = await classifyDebtOutcome({ portfolio_name: 'موبايلي', customer_message: 'لا', debt_id: 'd1' })
 
@@ -95,12 +95,12 @@ describe('classifyDebtOutcome — conversation context', () => {
     let capturedPrompt = ''
     mockModelContent = JSON.stringify({ category: null })
     const openaiModule = await import('openai')
-    ;(openaiModule.default as any).mockImplementation(() => ({
+    ;(openaiModule.default as any).mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockImplementation(async (params: any) => {
         capturedPrompt = params.messages[1].content
         return { choices: [{ message: { content: mockModelContent } }] }
       }) } },
-    }))
+    } })
 
     const result = await classifyDebtOutcome({
       portfolio_name: 'موبايلي', customer_message: 'لا', debt_id: 'd1', customer_id: 'cust1',
@@ -121,12 +121,12 @@ describe('classifyDebtOutcome — conversation context', () => {
     let capturedPrompt = ''
     mockModelContent = JSON.stringify({ category: null })
     const openaiModule = await import('openai')
-    ;(openaiModule.default as any).mockImplementation(() => ({
+    ;(openaiModule.default as any).mockImplementation(function () { return {
       chat: { completions: { create: vi.fn().mockImplementation(async (params: any) => {
         capturedPrompt = params.messages[1].content
         return { choices: [{ message: { content: mockModelContent } }] }
       }) } },
-    }))
+    } })
 
     await classifyDebtOutcome({ portfolio_name: 'موبايلي', customer_message: 'وش صار بطلبي', debt_id: 'd1' })
 

@@ -12,7 +12,7 @@ let mockRegeneratedMessage = 'تمام، خلنا نمشي بخطوة فعلية
 let mockContext: any = {}
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
+  default: vi.fn().mockImplementation(function () { return {
     chat: {
       completions: {
         create: vi.fn().mockImplementation(async (params: any) => {
@@ -27,7 +27,7 @@ vi.mock('openai', () => ({
         }),
       },
     },
-  })),
+  } }),
 }))
 
 // Phase 1 Shadow Mode now calls the real Temporal Intelligence Engine
