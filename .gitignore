@@ -43,6 +43,12 @@ Thumbs.db
 # Misc
 *.pem
 *.key
+tmp/
+.agents/
+ai-debt-os/
+*qr*.png
+*qr*.txt
+*cookie*.txt
 
 automation-pipeline.backup.ts
 _handover/

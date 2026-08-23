@@ -61,7 +61,12 @@ vi.mock('@/lib/supabase/server', () => ({
       select: vi.fn().mockImplementation(() => ({
         eq: vi.fn().mockImplementation(() => ({
           maybeSingle: vi.fn().mockImplementation(async () => ({
-            data: table === 'debts' ? { current_balance: 1000, currency: 'SAR', reference_number: 'REF-1', portfolio: { name_ar: 'موبايلي', name: 'Mobily' }, metadata: {} } : null,
+            data: table === 'customers'
+              ? { verification_status: 'verified', verification_attempts_count: 0, contact_opt_out: false, pending_clarification: null, national_id: null }
+              : table === 'debts'
+                ? { current_balance: 1000, currency: 'SAR', reference_number: 'REF-1', portfolio: { name_ar: 'موبايلي', name: 'Mobily' }, metadata: {} }
+                : null,
+            error: null,
           })),
         })),
       })),

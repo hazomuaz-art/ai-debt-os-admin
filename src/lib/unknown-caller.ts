@@ -13,10 +13,9 @@ const MAX_ATTEMPTS = 3
 // the agent ask for something identifying (national ID / account number /
 // invoice-reference number — same fields a real human collector would ask
 // for), search for an EXACT match, and only ever disclose debt details once
-// exactly one customer matches. Deliberately does NOT reintroduce the old
-// last-4-digit verification lock (removed earlier as too much friction) —
-// an exact match on one of these fields is the bar, consistent with how
-// this product already treats a known customer as sufficiently identified.
+// exactly one customer matches inside the WAHA session's company. Linking a
+// new number does not bypass the collector agent's separate last-four-digit
+// disclosure gate; that gate still runs before any customer-specific reply.
 function extractCandidates(text: string): string[] {
   const ascii = String(text ?? '').replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
   const matches = ascii.match(/\d{6,15}/g) ?? []
@@ -31,6 +30,7 @@ type MatchResult = {
 
 async function findUniqueMatch(
   supabase: ReturnType<typeof createServiceClient>,
+  companyId: string,
   candidates: string[],
 ): Promise<MatchResult | 'ambiguous' | null> {
   if (!candidates.length) return null
@@ -39,11 +39,11 @@ async function findUniqueMatch(
   let matchedCustomerId: string | null = null
 
   const { data: byNationalId } = await supabase
-    .from('customers').select('id').in('national_id', candidates)
+    .from('customers').select('id').eq('company_id', companyId).in('national_id', candidates)
   for (const row of (byNationalId ?? []) as { id: string }[]) foundCustomerIds.add(row.id)
 
   const { data: byAccountOrRef } = await supabase
-    .from('debts').select('customer_id')
+    .from('debts').select('customer_id').eq('company_id', companyId)
     .or(candidates.map(c => `account_number.eq.${c},reference_number.eq.${c}`).join(','))
   for (const row of (byAccountOrRef ?? []) as { customer_id: string }[]) foundCustomerIds.add(row.customer_id)
 
@@ -52,11 +52,11 @@ async function findUniqueMatch(
   matchedCustomerId = Array.from(foundCustomerIds)[0]
 
   const { data: customer } = await supabase
-    .from('customers').select('id, company_id').eq('id', matchedCustomerId).maybeSingle()
+    .from('customers').select('id, company_id').eq('company_id', companyId).eq('id', matchedCustomerId).maybeSingle()
   if (!customer) return null
 
   const { data: debt } = await supabase
-    .from('debts').select('id').eq('customer_id', matchedCustomerId)
+    .from('debts').select('id').eq('company_id', companyId).eq('customer_id', matchedCustomerId)
     .not('status', 'in', '("settled","written_off")')
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
@@ -68,20 +68,21 @@ async function findUniqueMatch(
 }
 
 export async function handleUnknownCaller(args: {
+  company_id: string
   phone: string
   message: string
 }): Promise<{ reply: string | null; matched: MatchResult | null }> {
   const supabase = createServiceClient()
 
   const { data: existing } = await supabase
-    .from('unmatched_contacts').select('*').eq('phone', args.phone).maybeSingle()
+    .from('unmatched_contacts').select('*').eq('company_id', args.company_id).eq('phone', args.phone).maybeSingle()
 
   const candidates = extractCandidates(args.message)
   const isFirstContact = !existing
 
   if (isFirstContact) {
     const { error: insertErr } = await supabase.from('unmatched_contacts').insert({
-      phone: args.phone, attempts_count: candidates.length ? 1 : 0,
+      company_id: args.company_id, phone: args.phone, attempts_count: candidates.length ? 1 : 0,
       last_message: args.message, status: 'pending',
     })
     if (insertErr) log.error('failed to create unmatched_contacts row', new Error(insertErr.message), { phone: args.phone })
@@ -97,7 +98,7 @@ export async function handleUnknownCaller(args: {
     return { matched: null, reply: null }
   }
 
-  const match = await findUniqueMatch(supabase, candidates)
+  const match = await findUniqueMatch(supabase, args.company_id, candidates)
 
   if (match === null || match === 'ambiguous') {
     const attempts = (existing?.attempts_count ?? 0) + 1
@@ -105,12 +106,12 @@ export async function handleUnknownCaller(args: {
     const { error: updErr } = await supabase.from('unmatched_contacts').update({
       attempts_count: attempts, last_message: args.message,
       status: gaveUp ? 'given_up' : 'pending', updated_at: new Date().toISOString(),
-    }).eq('phone', args.phone)
+    }).eq('company_id', args.company_id).eq('phone', args.phone)
     if (updErr) log.error('failed to update unmatched_contacts attempt count', new Error(updErr.message), { phone: args.phone })
 
     if (gaveUp) {
       await insertSystemAlert({
-        company_id: null, severity: 'warning', alert_type: 'unmatched_contact_gave_up',
+        company_id: args.company_id, severity: 'warning', alert_type: 'unmatched_contact_gave_up',
         title: 'عميل لم يُتعرّف عليه بعد عدة محاولات',
         message: `الرقم ${args.phone} حاول عدة مرات إثبات هويته (${candidates.join(', ')}) بدون تطابق مؤكد في النظام — راجعه يدوياً.`,
         metadata: { phone: args.phone, candidates },
@@ -140,7 +141,7 @@ export async function handleUnknownCaller(args: {
   const { error: resolveErr } = await supabase.from('unmatched_contacts').update({
     status: 'resolved', matched_customer_id: match.customer_id, matched_debt_id: match.debt_id,
     updated_at: new Date().toISOString(),
-  }).eq('phone', args.phone)
+  }).eq('company_id', args.company_id).eq('phone', args.phone)
   if (resolveErr) log.error('failed to mark unmatched_contacts resolved', new Error(resolveErr.message), { phone: args.phone })
 
   return { matched: match, reply: null }

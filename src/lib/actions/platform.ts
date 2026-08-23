@@ -7,17 +7,13 @@ import crypto from 'crypto'
 const log = createLogger('platform-actions')
 
 /**
- * Creates a brand-new company + its first admin user together — owner-
- * triggered version of the same atomic create-company-and-admin logic as
- * registerAction() in src/lib/actions/auth.ts (that one is for public
- * self-signup and is intentionally NOT used anywhere yet; this one is for
- * the platform owner creating an account on behalf of a paying subscriber
- * after receiving payment manually, since no payment gateway is wired up).
+ * Creates a brand-new company + its first admin user together. Public
+ * self-registration is intentionally unavailable; this is the platform
+ * owner's controlled provisioning path after receiving payment manually.
  *
  * Differences from registerAction(): does not log the caller in as the new
  * user, generates a temporary password instead of accepting one, and also
- * creates the company_subscriptions row (trial, on the chosen plan) that
- * registerAction() never created.
+ * It also creates the company_subscriptions row (trial, chosen plan).
  *
  * Restricted to the platform owner — callers must check isPlatformOwner
  * themselves (mirrors the page-level check in platform/companies pages).
@@ -87,9 +83,7 @@ export async function createCompanyAction(args: {
     return { error: 'Account setup failed. Please try again.' }
   }
 
-  // The gap confirmed during the SaaS audit — registerAction() never created
-  // this row at all, so subscriptions only ever existed for the manually
-  // seeded demo company.
+  // Keep subscription lifecycle explicit and tenant-bound at provisioning.
   const { error: subError } = await serviceClient
     .from('company_subscriptions')
     .insert({ company_id: company.id, plan_name: args.plan_name, status: 'trial', billing_email: email })

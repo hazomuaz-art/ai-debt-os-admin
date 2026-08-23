@@ -12,7 +12,6 @@
 const { execSync } = require('child_process')
 const fs           = require('fs')
 const path         = require('path')
-const https        = require('https')
 
 const PASS = '✅ PASS'
 const FAIL = '❌ FAIL'
@@ -76,10 +75,10 @@ check('Environment: SUPABASE_SERVICE_ROLE_KEY', () => {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY.length < 20) throw new Error('Appears invalid')
 })
 
-check('Environment: OPENAI_API_KEY', () => {
-  const key = process.env.OPENAI_API_KEY
-  if (!key) throw new Error('Missing OPENAI_API_KEY')
-  if (!key.startsWith('sk-')) throw new Error('Must start with sk-')
+check('Environment: AI provider key', () => {
+  const key = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY
+  if (!key) throw new Error('Missing OPENAI_API_KEY or OPENROUTER_API_KEY')
+  if (!key.startsWith('sk-')) throw new Error('AI provider key has an unexpected format')
 })
 
 check('Environment: APP_SECRET', () => {
@@ -98,22 +97,31 @@ check('Environment: NEXT_PUBLIC_APP_URL', () => {
   if (!url.startsWith('https://')) throw new Error('Must use HTTPS in production')
 })
 
-check('WhatsApp: configuration present', () => {
-  const vars = ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_VERIFY_TOKEN']
+check('WAHA: configuration present', () => {
+  const vars = ['WAHA_API_URL', 'WAHA_API_KEY', 'WAHA_WEBHOOK_SECRET', 'WAHA_SESSION']
   const missing = vars.filter(k => !process.env[k])
-  if (missing.length === vars.length) return 'WARN: WhatsApp not configured — messaging disabled'
+  if (missing.length === vars.length) return 'WARN: WAHA not configured — WhatsApp messaging disabled'
   if (missing.length > 0) throw new Error(`Partially configured — missing: ${missing.join(', ')}`)
 })
 
-check('Migrations: all files present', () => {
-  const dir = path.join(__dirname, '../supabase/migrations')
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
-  if (files.length < 7) throw new Error(`Only ${files.length} migrations found, expected >= 7`)
-  // Check sequential numbering
-  for (let i = 0; i < files.length; i++) {
-    const num = parseInt(files[i].split('_')[0])
-    if (num !== i + 1) throw new Error(`Gap in migration sequence at position ${i + 1}`)
+check('Security: WAHA session tenant map', () => {
+  if (!process.env.WAHA_SESSION_COMPANY_MAP) return 'WARN: database session mapping must resolve every WAHA session uniquely'
+  const parsed = JSON.parse(process.env.WAHA_SESSION_COMPANY_MAP)
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+    throw new Error('WAHA_SESSION_COMPANY_MAP must be a non-empty JSON object')
   }
+  if (Object.values(parsed).some(value => typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value))) {
+    throw new Error('Every WAHA session must map to a company UUID')
+  }
+})
+
+check('Security: integration outbound allowlist', () => {
+  const hosts = String(process.env.INTEGRATION_ALLOWED_HOSTS || '').split(',').map(v => v.trim()).filter(Boolean)
+  if (hosts.length === 0) throw new Error('INTEGRATION_ALLOWED_HOSTS is required in production')
+})
+
+check('Migrations: sequence and transaction validation', () => {
+  execSync('node scripts/validate-migrations.js', { cwd: path.join(__dirname, '..'), stdio: 'pipe' })
 })
 
 check('Migrations: all wrapped in transactions', () => {
@@ -132,44 +140,21 @@ check('Migrations: all wrapped in transactions', () => {
   }
 })
 
-check('Build: no hardcoded secrets in source', () => {
-  const srcDir = path.join(__dirname, '../src')
-  const dangerous = [
-    /sk-[a-zA-Z0-9]{20,}/,   // OpenAI key
-    /eyJhbGciOiJIUzI1NiJ9/,   // Supabase JWT prefix
-  ]
-  
-  function scanDir(dir) {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name)
-      if (entry.isDirectory() && entry.name !== 'node_modules') {
-        scanDir(full)
-      } else if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))) {
-        const content = fs.readFileSync(full, 'utf-8')
-        for (const pattern of dangerous) {
-          if (pattern.test(content)) {
-            throw new Error(`Potential secret found in ${full}`)
-          }
-        }
-      }
-    }
-  }
-  scanDir(srcDir)
+check('Security: no secrets in tracked repository', () => {
+  execSync('node scripts/check-secrets.js', { cwd: path.join(__dirname, '..'), stdio: 'pipe' })
 })
 
-check('Package: no known critical vulnerabilities pattern', () => {
+check('Package: Next.js 16 production baseline', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'))
-  // Check Next.js version is 14.x (stable, not 15 beta)
   const nextVersion = pkg.dependencies?.next ?? ''
-  if (nextVersion.startsWith('15')) {
-    return 'WARN: Next.js 15 may have breaking changes'
-  }
+  if (!/^\^?16\./.test(nextVersion)) throw new Error(`Expected Next.js 16, found ${nextVersion || 'missing'}`)
 })
 
-check('Vercel: cron job configured', () => {
-  const vcfg = JSON.parse(fs.readFileSync(path.join(__dirname, '../vercel.json'), 'utf-8'))
-  const hasCron = vcfg.crons?.some(c => c.path === '/api/jobs/worker')
-  if (!hasCron) throw new Error('Job worker cron not configured in vercel.json')
+check('Hostinger/PM2: deployment script configured', () => {
+  const deploy = fs.readFileSync(path.join(__dirname, '../deploy.ps1'), 'utf-8')
+  if (!deploy.includes('pm2 restart') || !deploy.includes('/api/health')) {
+    throw new Error('deploy.ps1 must restart PM2 and verify /api/health')
+  }
 })
 
 check('Test files: all test suites present', () => {

@@ -20,7 +20,11 @@
 # ============================================================
 param(
     [string]$Message = "deploy: update $(Get-Date -Format 'yyyy-MM-dd HH:mm')",
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [string]$VpsTarget = $env:AI_DEBT_VPS_TARGET,
+    [string]$PublicUrl = $env:AI_DEBT_PUBLIC_URL,
+    [string]$RemoteDir = "/root/ai-debt-os-admin",
+    [string]$Pm2App = "ai-debt-os-admin-3000"
 )
 
 # NOTE: 'Continue' (not 'Stop') on purpose. Under 'Stop', PowerShell 5.1 turns
@@ -29,10 +33,13 @@ param(
 # Critical steps below check $LASTEXITCODE explicitly and `throw` on failure.
 $ErrorActionPreference = "Continue"
 $D   = "D:\ai-debt-os-admin"
-$VPS = "root@72.62.30.109"
-$APP = "ai-debt-os-admin"
-$DIR = "/root/ai-debt-os-admin"
-$URL = "http://72.62.30.109"
+$VPS = $VpsTarget
+$APP = $Pm2App
+$DIR = $RemoteDir
+
+if ([string]::IsNullOrWhiteSpace($VPS)) { throw "Set AI_DEBT_VPS_TARGET (for example user@server) or pass -VpsTarget." }
+if ([string]::IsNullOrWhiteSpace($PublicUrl) -or -not $PublicUrl.StartsWith('https://')) { throw "Set AI_DEBT_PUBLIC_URL to the active HTTPS origin or pass -PublicUrl." }
+$URL = $PublicUrl.TrimEnd('/')
 
 function Step($m){ Write-Host "`n==> $m" -ForegroundColor Cyan }
 
@@ -50,6 +57,14 @@ Set-Location $D
 Step "Guard: no unchecked Supabase writes"
 & node scripts/check-unchecked-writes.js
 if ($LASTEXITCODE -ne 0) { throw "unchecked Supabase write(s) found - see above. Fix before deploying (or add a documented, justified exclusion in scripts/check-unchecked-writes.js if truly out of scope)." }
+
+Step "Guard: migrations + tracked-secret scan + dependency audit"
+& npm run db:validate
+if ($LASTEXITCODE -ne 0) { throw "migration validation failed - see above." }
+& npm run security:secrets
+if ($LASTEXITCODE -ne 0) { throw "tracked secret scan failed - rotate/remove the credential before deploying." }
+& npm audit --omit=dev --audit-level=high
+if ($LASTEXITCODE -ne 0) { throw "high-severity production dependency vulnerability found." }
 
 # 0b) Guard against shipping a build that doesn't even typecheck, or a real
 # logic regression the 526-test suite would have caught. Root-cause

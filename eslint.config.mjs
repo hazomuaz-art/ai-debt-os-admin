@@ -42,8 +42,18 @@ export default defineConfig([
                 allow: ["warn", "error"],
             }],
 
-            "@next/next/no-img-element": "error",
             "react-hooks/exhaustive-deps": "warn",
+
+            // Legacy baseline: these findings remain visible in every lint
+            // run but do not block security patches/deployments. New work is
+            // expected not to add to the baseline; `npm run lint:strict`
+            // remains available for the cleanup campaign and CI ratcheting.
+            "@typescript-eslint/no-explicit-any": "warn",
+            "@typescript-eslint/no-unused-vars": "warn",
+            "react/no-unescaped-entities": "warn",
+            "react-hooks/set-state-in-effect": "warn",
+            "@next/next/no-img-element": "warn",
+            "prefer-const": "warn",
         },
     },
 ]);

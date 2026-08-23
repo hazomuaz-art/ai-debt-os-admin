@@ -6,7 +6,7 @@ import {
   Activity, Users, MessageCircle, AlertTriangle,
   Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
   Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Package,
-  FlaskConical, TrendingUp, Phone, Brain, Scale, HeartPulse, Building2, LineChart
+  FlaskConical, TrendingUp, Brain, Scale, HeartPulse, Building2, LineChart
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { cn } from '@/lib/utils'
@@ -57,7 +57,6 @@ export function Sidebar({ profile, isPlatformOwner }: { profile: any; isPlatform
       items: [
         { href: `/dashboard/${role}/ai-reply-test`, label: isRTL ? 'اختبار الوكيل' : 'Agent Test', icon: FlaskConical, roles: ['admin'] },
         { href: `/dashboard/${role}/ai-revenue`,    label: isRTL ? 'عائدات الذكاء الاصطناعي' : 'AI Revenue', icon: TrendingUp, roles: ['admin'] },
-        { href: `/dashboard/${role}/voice`,         label: isRTL ? 'المحصّل الصوتي' : 'Voice Collector', icon: Phone, roles: ['admin'] },
       ],
     },
     {

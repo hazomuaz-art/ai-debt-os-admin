@@ -58,19 +58,23 @@ export async function GET() {
     // no webhook registered, or a webhook registered with no auth header.
     const noWebhookConfigured = webhooks.length === 0
     const noAuthenticatedWebhook = webhooks.length > 0 && !safeWebhooks.some(w => w.has_custom_secret_header)
-    const status = noWebhookConfigured ? 'error' : noAuthenticatedWebhook ? 'warn' : 'ok'
+    const sessionStatus = json?.status ?? 'unknown'
+    const status = sessionStatus !== 'WORKING' || noWebhookConfigured
+      ? 'error'
+      : noAuthenticatedWebhook ? 'warn' : 'ok'
 
     return NextResponse.json({
       status,
       session_name: json?.name ?? session,
-      session_status: json?.status ?? 'unknown',
+      session_status: sessionStatus,
       webhook_count: webhooks.length,
       webhooks: safeWebhooks,
-      expected_webhook_url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://72.62.30.109'}/api/whatsapp/waha-webhook`,
+      expected_webhook_url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://srv1740935.hstgr.cloud'}/api/whatsapp/waha-webhook`,
       raw_config_keys: json?.config ? Object.keys(json.config) : [],
       ...(noWebhookConfigured ? { message: 'No webhook is registered on this WAHA session — inbound customer messages cannot reach this app at all.' } : {}),
       ...(noAuthenticatedWebhook ? { message: 'A webhook is registered but none carry the X-Webhook-Secret header — requests will be rejected as unauthenticated.' } : {}),
-    })
+      ...(sessionStatus !== 'WORKING' ? { message: `WAHA session is ${sessionStatus}; expected WORKING` } : {}),
+    }, { status: status === 'error' ? 503 : 200 })
   } catch (err) {
     return NextResponse.json({
       status: 'error',

@@ -11,6 +11,7 @@ process.env.NEXT_PUBLIC_APP_URL          = 'http://localhost:3000'
 process.env.WAHA_API_URL                 = 'http://localhost:3001'
 process.env.WAHA_API_KEY                 = 'test-waha-key'
 process.env.WAHA_SESSION                 = 'default'
+process.env.WAHA_SESSION_COMPANY_MAP     = JSON.stringify({ default: '00000000-0000-0000-0000-000000000001' })
 process.env.NODE_ENV                     = 'test'
 
 // ── Supabase mock ──────────────────────────────────────────────────────────

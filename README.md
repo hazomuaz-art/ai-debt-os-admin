@@ -1,14 +1,14 @@
 # AI Debt Operating System
 
-Production-ready SaaS debt collection platform with AI-powered scoring, WhatsApp integration, and multi-role dashboards.
+Multi-tenant debt collection platform with AI-assisted workflows, WAHA WhatsApp integration, and role-based dashboards.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS
 - **Backend**: Supabase (Auth + PostgreSQL + RLS), Next.js API Routes
-- **AI**: OpenAI GPT-4o-mini (debt scoring, action planning, message generation)
-- **Messaging**: Meta WhatsApp Cloud API
-- **Deployment**: Vercel
+- **AI**: OpenRouter/OpenAI-compatible API
+- **Messaging**: WAHA; n8n is used for external automation where configured
+- **Deployment**: Hostinger Ubuntu VPS, Nginx, PM2 (not Vercel)
 
 ---
 
@@ -44,13 +44,18 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-OPENAI_API_KEY=sk-...
+OPENROUTER_API_KEY=sk-or-...
 
-# WhatsApp (optional — app works without it)
-WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
-WHATSAPP_ACCESS_TOKEN=your-permanent-token
-WHATSAPP_VERIFY_TOKEN=any-random-string-you-choose
-WHATSAPP_BUSINESS_ACCOUNT_ID=your-business-account-id
+# WAHA (required for WhatsApp)
+WAHA_API_URL=http://127.0.0.1:3001
+WAHA_API_KEY=replace-me
+WAHA_WEBHOOK_SECRET=replace-with-a-long-random-secret
+WAHA_SESSION=default
+# Every inbound session must map to exactly one company UUID.
+WAHA_SESSION_COMPANY_MAP={"default":"company-uuid"}
+
+# Comma-separated public hosts allowed for admin-configured outbound integrations.
+INTEGRATION_ALLOWED_HOSTS=api.example.com
 
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 APP_SECRET=any-random-secret-32-chars
@@ -62,32 +67,15 @@ APP_SECRET=any-random-secret-32-chars
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — you'll be redirected to `/register` to create your company and admin account.
+Open [http://localhost:3000](http://localhost:3000). Public self-registration is disabled; administrators create/invite users through the protected admin flow.
 
 ---
 
-## Deploy to Vercel
+## Deploy to Hostinger/PM2
 
-### One-click
+The supported production topology is documented in `DEPLOYMENT.md`. The deployment gate validates migrations, tracked secrets, production dependency vulnerabilities, type safety, tests, build output, PM2 restart, and `/api/health`. `vercel.json` is not a production deployment source of truth.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=YOUR_REPO_URL)
-
-### Manual
-
-```bash
-npm i -g vercel
-vercel
-```
-
-Set the environment variables in the Vercel dashboard under **Settings → Environment Variables**.
-
-### WhatsApp Webhook
-
-After deploying, configure the webhook in your Meta App Dashboard:
-
-- **Callback URL**: `https://your-app.vercel.app/api/whatsapp/webhook`
-- **Verify Token**: Same as `WHATSAPP_VERIFY_TOKEN` in your env
-- **Subscribe to**: `messages`, `message_status_updates`
+WAHA must send message events to `https://YOUR_DOMAIN/api/whatsapp/waha-webhook` with the `X-Webhook-Secret` header matching `WAHA_WEBHOOK_SECRET`.
 
 ---
 

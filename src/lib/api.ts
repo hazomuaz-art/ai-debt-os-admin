@@ -86,7 +86,11 @@ type AuthedHandler = (ctx: AuthContext) => Promise<NextResponse>
 
 export async function withAuth(
   handler: AuthedHandler,
-  options?: { requiredRoles?: Array<'admin' | 'manager' | 'collector'> }
+  options?: {
+    requiredRoles?: Array<'admin' | 'manager' | 'collector'>
+    /** Override the default: admin/manager API calls require an AAL2 session. */
+    requireMfa?: boolean
+  }
 ): Promise<NextResponse> {
   const supabase = await createClient()
 
@@ -105,6 +109,16 @@ export async function withAuth(
 
   if (options?.requiredRoles && !options.requiredRoles.includes(profile.role as 'admin' | 'manager' | 'collector')) {
     return errors.forbidden()
+  }
+
+  const requireMfa = options?.requireMfa ?? (profile.role === 'admin' || profile.role === 'manager')
+  if (requireMfa) {
+    const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    // Fail closed: an MFA service/read error must never silently downgrade a
+    // privileged API request to password-only authentication.
+    if (assuranceError || assurance?.currentLevel !== 'aal2') {
+      return apiError('Multi-factor authentication is required', 'FORBIDDEN', 403)
+    }
   }
 
   const ctx: AuthContext = {

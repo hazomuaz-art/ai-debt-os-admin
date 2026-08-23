@@ -2,6 +2,7 @@
 import { withAuth, errors } from '@/lib/api'
 import { z } from 'zod'
 import { rasfWhatsApp, tameezCalls, collectionApi } from '@/lib/integrations'
+import { safeIntegrationFetch } from '@/lib/safe-fetch'
 
 const testSchema = z.object({
   integration_name: z.string().min(1),
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
             )
           }
 
-          const res = await fetch(`${baseUrl}/api/sessions/${session}`, {
+          const res = await safeIntegrationFetch(`${baseUrl}/api/sessions/${encodeURIComponent(session)}`, {
             headers: { 'X-Api-Key': apiKey },
             cache: 'no-store',
           })

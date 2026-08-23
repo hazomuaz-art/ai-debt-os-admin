@@ -1,212 +1,72 @@
-# Production Deployment Runbook
+# Production deployment: Hostinger + PM2 + WAHA + n8n
 
-## Pre-Deploy Checklist
+This repository does not deploy to Vercel. Production runs as a Next.js 16 Node process behind Nginx on an Ubuntu VPS, managed by PM2. WAHA and n8n are separate services and must not be exposed without authentication.
 
-### 1. Environment Variables
-```bash
-node scripts/validate-env.js
+## Required controls
+
+- Nginx terminates TLS and proxies only required public routes.
+- The Next.js process binds privately; PM2 restarts and persists the named process.
+- Supabase service-role credentials exist only in the server environment.
+- Public signup remains disabled. Admin and manager sessions require MFA/AAL2 for privileged APIs.
+- Every WAHA session resolves to exactly one company through `WAHA_SESSION_COMPANY_MAP` or one unambiguous database mapping.
+- WAHA sends `X-Webhook-Secret` matching `WAHA_WEBHOOK_SECRET`.
+- `INTEGRATION_ALLOWED_HOSTS` lists public hostnames allowed for administrator-configured outbound integrations.
+- n8n uses authentication, encrypted credentials, and webhook secrets; its editor is not public.
+
+## Environment
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+OPENROUTER_API_KEY=sk-or-...
+APP_SECRET=at-least-32-random-characters
+NEXT_PUBLIC_APP_URL=https://YOUR_DOMAIN
+
+WAHA_API_URL=http://127.0.0.1:3001
+WAHA_API_KEY=...
+WAHA_WEBHOOK_SECRET=...
+WAHA_SESSION=default
+WAHA_SESSION_COMPANY_MAP={"default":"COMPANY_UUID"}
+
+INTEGRATION_ALLOWED_HOSTS=api.partner.example
+
+# Required only when the inbound email channel is enabled.
+EMAIL_INBOUND_SECRET=...
+EMAIL_INBOUND_COMPANY_MAP={"collections+tenant@example.com":"COMPANY_UUID"}
 ```
-All required vars must pass. See `.env.example` for the full list.
 
-### 2. Run Tests
-```bash
-npm run test          # all tests
-npm run typecheck     # TypeScript
-npm run lint          # ESLint
-```
+Administrator-configured integration URLs are HTTPS-only in production and must resolve to public, allowlisted addresses.
 
-### 3. Verify Build
+## Pre-deploy gate
+
 ```bash
+npm ci
+npm run db:validate
+npm run security:secrets
+npm audit --omit=dev --audit-level=high
+npm run typecheck
+npm run test
 npm run build
 ```
-Must complete without errors. Type errors and lint errors fail the build.
 
----
+Apply migrations in numeric order before enabling dependent code. Migration `057_security_audit_remediation.sql` is required for tenant-scoped unmatched contacts and integration RLS hardening.
 
-## Supabase Setup
+## Deploy and verify
 
-### First Deploy (new project)
+`deploy.ps1` is the supported deployment script. Set `AI_DEBT_VPS_TARGET` and `AI_DEBT_PUBLIC_URL` (or pass `-VpsTarget` and `-PublicUrl`); the script refuses to deploy without an explicit active target.
 
-1. Create project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** and run migrations **in order**:
-   ```
-   001_initial_schema.sql    — tables, triggers, helper functions
-   002_fix_debt_status.sql   — status enum fix
-   003_rls_hardening.sql     — all RLS policies (replaces 001 policies)
-   004_jobs_ratelimits_audit.sql — job queue, rate limits, audit triggers
-   005_auth_hardening.sql    — sessions, API keys, brute-force protection
-   006_schema_fixes.sql      — column consistency
-   007_pg_cron_jobs.sql      — scheduled cleanup (requires pg_cron extension)
-   008_performance_optimization.sql — indexes, stats, optimized functions
-   ```
-
-3. Enable extensions (Dashboard → Database → Extensions):
-   - `pg_cron` (for scheduled jobs)
-   - `pg_stat_statements` (for query monitoring)
-   - `uuid-ossp` (auto-enabled)
-
-4. Configure Auth settings (Dashboard → Authentication → Settings):
-   - **Site URL**: your production URL (e.g. `https://app.yourcompany.com`)
-   - **Redirect URLs**: `https://app.yourcompany.com/**`
-   - **JWT expiry**: 3600 (1 hour)
-   - **Enable email confirmations**: Off (users are invited, not self-registering)
-   - **Minimum password length**: 8
-
-5. Set Auth Rate Limits (Dashboard → Authentication → Rate Limits):
-   - Sign in: 10/hour per email
-   - Sign up: 3/hour per IP
-
-### Subsequent Deploys (migrations only)
 ```bash
-# Via script (uses Supabase Management API):
-SUPABASE_ACCESS_TOKEN=xxx SUPABASE_PROJECT_REF=yyy node scripts/migrate.js
-
-# Via CLI:
-supabase db push --db-url postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres
+pm2 status
+pm2 logs ai-debt-os-admin-3000 --lines 100
+curl --fail https://YOUR_DOMAIN/api/health
+curl --fail https://YOUR_DOMAIN/api/health/waha-session
 ```
 
-### Verify RLS is Working
-Run these in SQL Editor to confirm policies work correctly:
+Send a controlled WAHA message for a test company and confirm it cannot resolve a customer belonging to another company.
 
-```sql
--- Should return 0 rows (no authenticated user)
-SET request.jwt.claims TO '{}';
-SELECT * FROM public.debts LIMIT 1;
+## Rollback and secret rotation
 
--- Should return company-scoped rows only
--- (test with a real user JWT from your app)
-```
+The deployment script retains prior source as `src.bak` until the next deployment. Restore it and restart PM2 if health checks fail. Use a reviewed compensating migration for database rollback; never edit applied migrations.
 
----
-
-## Vercel Setup
-
-### First Deploy
-
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link project: `vercel link`
-3. Set environment variables:
-   ```bash
-   vercel env add NEXT_PUBLIC_SUPABASE_URL production
-   vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
-   vercel env add SUPABASE_SERVICE_ROLE_KEY production
-   vercel env add OPENAI_API_KEY production
-   vercel env add APP_SECRET production
-   vercel env add NEXT_PUBLIC_APP_URL production
-   vercel env add WHATSAPP_PHONE_NUMBER_ID production
-   vercel env add WHATSAPP_ACCESS_TOKEN production
-   vercel env add WHATSAPP_VERIFY_TOKEN production
-   vercel env add WHATSAPP_BUSINESS_ACCOUNT_ID production
-   ```
-4. Deploy: `vercel --prod`
-
-### Cron Jobs
-`vercel.json` schedules `/api/jobs/worker` every 2 minutes.
-- Requires **Vercel Pro** or higher for cron jobs
-- The worker is also callable manually via `POST /api/jobs/worker` with `Authorization: Bearer {APP_SECRET}`
-
-### Regions
-Default region is `iad1` (US East). Change in `vercel.json` if your users are in the Middle East:
-```json
-"regions": ["fra1"]   // Frankfurt
-```
-
----
-
-## WhatsApp Cloud API Setup
-
-### Prerequisites
-- Meta Business account
-- WhatsApp Business App created in Meta Developer Dashboard
-
-### Steps
-
-1. **Get credentials** (Meta Developer Dashboard → Your App → WhatsApp → API Setup):
-   - `WHATSAPP_PHONE_NUMBER_ID` — from "Phone Number ID" field
-   - `WHATSAPP_ACCESS_TOKEN` — generate a **Permanent Token** (not the temporary one)
-   - `WHATSAPP_BUSINESS_ACCOUNT_ID` — from "WhatsApp Business Account ID"
-
-2. **Set verify token**: pick any random string for `WHATSAPP_VERIFY_TOKEN`
-
-3. **Register webhook** (Meta Developer Dashboard → Your App → WhatsApp → Configuration):
-   - Callback URL: `https://your-app.vercel.app/api/whatsapp/webhook`
-   - Verify token: your `WHATSAPP_VERIFY_TOKEN` value
-   - Subscribe to: `messages`, `message_status_updates`
-
-4. **Test webhook**:
-   ```bash
-   curl "https://your-app.vercel.app/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test123"
-   # Should return: test123
-   ```
-
-5. **Test message send**:
-   ```bash
-   curl -X POST https://your-app.vercel.app/api/whatsapp/send \
-     -H "Content-Type: application/json" \
-     -H "Cookie: [your session cookie]" \
-     -d '{"phone":"+966501234567","message":"Test message","debt_id":"[uuid]"}'
-   ```
-
-### Production Phone Number
-Test numbers only allow messaging pre-approved numbers. To message any number:
-- Submit your **Business Verification** in Meta Business Manager
-- Get your number **approved** for production
-
----
-
-## Monitoring
-
-### Health Check
-```bash
-curl https://your-app.vercel.app/api/health
-```
-Returns 200 (healthy) or 503 (unhealthy) with check breakdown.
-
-### Job Queue
-```bash
-curl -H "Authorization: Bearer $APP_SECRET" \
-  https://your-app.vercel.app/api/jobs/worker
-```
-
-### Database Monitoring (Supabase Dashboard)
-- **Slow queries**: Dashboard → Database → Query Performance
-- **Table sizes**: Dashboard → Database → Database Size
-- **RLS policy performance**: Run `EXPLAIN ANALYZE` on slow queries in SQL Editor
-
-### Logs
-- **Vercel**: Dashboard → Project → Logs (filterable by function/route)
-- **Supabase**: Dashboard → Database → Logs
-- Application logs are JSON-structured in production for log aggregator ingestion
-
----
-
-## Rollback Procedure
-
-### Vercel (instant)
-```bash
-vercel rollback [deployment-url]
-```
-Or via Dashboard → Project → Deployments → promote previous deployment.
-
-### Database
-Migrations are additive (no DROP TABLE). To roll back:
-1. Identify which migration caused the issue
-2. Write a compensating migration (e.g., drop the new column, restore old policy)
-3. Apply it as the next migration number
-
-There is no automated rollback — this is intentional to protect data integrity.
-
----
-
-## Performance Baselines (post-deploy validation)
-
-| Query | Expected P95 |
-|-------|-------------|
-| Admin dashboard load | < 800ms |
-| Debt list (20 items) | < 200ms |
-| AI score (OpenAI call) | < 5s |
-| WhatsApp send | < 3s |
-| Health check | < 500ms |
-| Job worker run (10 jobs) | < 25s |
-
-Run `EXPLAIN ANALYZE` in Supabase SQL Editor if any query exceeds these thresholds.
+If a credential was ever committed, deletion is insufficient. Rotate it first, update the server environment, restart affected services, verify health, then clean Git history during a coordinated maintenance window.

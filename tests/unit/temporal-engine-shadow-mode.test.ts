@@ -80,10 +80,16 @@ vi.mock('@/lib/legal-escalation', async () => {
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn().mockImplementation(() => ({
-    from: vi.fn().mockImplementation(() => ({
+    from: vi.fn().mockImplementation((table: string) => ({
       insert: vi.fn().mockResolvedValue({ data: null, error: null }),
       update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
-      select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) }) }),
+      select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({
+        data: table === 'customers' ? {
+          verification_status: 'verified', verification_attempts_count: 0,
+          contact_opt_out: false, pending_clarification: null, national_id: null,
+        } : null,
+        error: null,
+      }) }) }),
     })),
   })),
 }))

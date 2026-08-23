@@ -7,6 +7,7 @@ import { insertTimelineEvent } from '@/lib/timeline'
 import { transcribeAudioMessage } from '@/lib/audio-transcription'
 import { createLogger } from '@/lib/logger'
 import { pendingBursts, processingCustomers, authAlertState } from '@/lib/waha-webhook-state'
+import { buildTenantPhoneFilter, resolveWahaSessionCompany } from '@/lib/waha-tenant'
 
 const log = createLogger('webhook/waha')
 
@@ -234,6 +235,21 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient()
 
+    const tenantScopedEvent = event === 'message.ack' || event === 'message' || event === 'message.any'
+    const inboundCompanyId = tenantScopedEvent ? await resolveWahaSessionCompany(session) : null
+    if (tenantScopedEvent && !inboundCompanyId) {
+      log.error('WAHA event rejected — session is unmapped or ambiguous', new Error('tenant resolution failed'), { session, event })
+      await insertSystemAlert({
+        company_id: null,
+        severity: 'critical',
+        alert_type: 'waha_session_tenant_unresolved',
+        title: 'تم رفض حدث واتساب لعدم تحديد الشركة',
+        message: `جلسة WAHA (${session}) غير مرتبطة بشركة واحدة بشكل مؤكد. لم تتم قراءة أو تعديل أي بيانات عميل.`,
+        metadata: { session, event },
+      })
+      return NextResponse.json({ status: 'accepted' }, { status: 202 })
+    }
+
     // ── Delivery acknowledgements ──
     if (event === 'message.ack') {
       // Outbound sends store the FULL serialized id (e.g.
@@ -246,7 +262,7 @@ export async function POST(request: NextRequest) {
         const match = `whatsapp_message_id.eq.${msgId},whatsapp_message_id.eq.${ref}`
         const rank: Record<string, number> = { sent: 1, delivered: 2, read: 3 }
         const { data: row } = await supabase
-          .from('messages').select('id, status').or(match)
+          .from('messages').select('id, status').eq('company_id', inboundCompanyId!).or(match)
           .eq('direction', 'outbound').limit(1).maybeSingle()
         if (row && (rank[newStatus] ?? 0) > (rank[(row as { status: string }).status] ?? 0)) {
           const { error: ackErr } = await supabase.from('messages').update({ status: newStatus }).eq('id', (row as { id: string }).id)
@@ -257,6 +273,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (event !== 'message' && event !== 'message.any') return NextResponse.json({ status: 'ok' })
+    // The tenantScopedEvent guard above already returned for null; this
+    // explicit check preserves TypeScript narrowing for all message paths.
+    if (!inboundCompanyId) return NextResponse.json({ status: 'tenant unresolved' }, { status: 503 })
 
     // 🔴 A message sent manually from the PHONE itself (the linked device),
     // not through this system's dashboard/API, also arrives here as
@@ -291,7 +310,7 @@ export async function POST(request: NextRequest) {
 
       const { data: manualCustomer } = await supabase
         .from('customers').select('id, company_id')
-        .or([`whatsapp.eq.${manualPhone}`, `phone.eq.${manualPhone}`].join(','))
+        .or(buildTenantPhoneFilter(inboundCompanyId, manualPhone))
         .limit(1).maybeSingle()
       if (manualCustomer) {
         const mc = manualCustomer as { id: string; company_id: string }
@@ -361,7 +380,7 @@ export async function POST(request: NextRequest) {
       } else {
         log.warn('voice note transcription failed — no reply sent', { from, mimetype })
         await insertSystemAlert({
-          company_id: null, severity: 'warning', alert_type: 'voice_transcription_failed',
+          company_id: inboundCompanyId, severity: 'warning', alert_type: 'voice_transcription_failed',
           title: 'تعذّر تحويل رسالة صوتية من عميل',
           message: `أرسل الرقم ${from} رسالة صوتية لم يتمكن النظام من تحويلها لنص — راجعها يدوياً إذا لزم.`,
           metadata: { from, mimetype },
@@ -385,7 +404,7 @@ export async function POST(request: NextRequest) {
       if (mediaUrl && !isSticker) {
         log.warn('unsupported inbound attachment type — not stored, no reply sent', { from, mimetype })
         await insertSystemAlert({
-          company_id: null, severity: 'warning', alert_type: 'unsupported_attachment_type',
+          company_id: inboundCompanyId, severity: 'warning', alert_type: 'unsupported_attachment_type',
           title: 'مرفق بصيغة غير مدعومة من عميل',
           message: `أرسل الرقم ${from} مرفقاً بصيغة (${mimetype || 'غير معروفة'}) لا يدعمها النظام حالياً للتصنيف — راجعه يدوياً إذا لزم.`,
           metadata: { from, mimetype },
@@ -402,7 +421,7 @@ export async function POST(request: NextRequest) {
     let { data: customer } = await supabase
       .from('customers')
       .select('id, company_id, full_name, ai_paused')
-      .or([`whatsapp.eq.${phone}`, `whatsapp.eq.+${phone}`, `phone.eq.${phone}`, `phone.eq.+${phone}`].join(','))
+      .or(buildTenantPhoneFilter(inboundCompanyId, phone))
       .limit(1).maybeSingle()
 
     // Real gap found during a full-system audit: a phone already linked as a
@@ -413,11 +432,11 @@ export async function POST(request: NextRequest) {
     // on every single message forever, never actually resolving.
     if (!customer) {
       const { data: contactRow } = await supabase
-        .from('customer_contacts').select('customer_id').eq('phone', phone).limit(1).maybeSingle()
+        .from('customer_contacts').select('customer_id').eq('company_id', inboundCompanyId).eq('phone', phone).limit(1).maybeSingle()
       if (contactRow) {
         const { data: viaContact } = await supabase
           .from('customers').select('id, company_id, full_name, ai_paused')
-          .eq('id', (contactRow as { customer_id: string }).customer_id).maybeSingle()
+          .eq('company_id', inboundCompanyId).eq('id', (contactRow as { customer_id: string }).customer_id).maybeSingle()
         customer = viaContact
       }
     }
@@ -430,14 +449,10 @@ export async function POST(request: NextRequest) {
       // number / invoice-reference number) and searches for an EXACT match
       // before ever disclosing anything — see unknown-caller.ts.
       const { handleUnknownCaller } = await import('@/lib/unknown-caller')
-      const result = await handleUnknownCaller({ phone, message: text || '' })
+      const result = await handleUnknownCaller({ company_id: inboundCompanyId, phone, message: text || '' })
 
       if (result.reply) {
-        // company_id genuinely isn't known yet at this point — omitted on
-        // purpose, sendWhatsAppMessage falls back to the shared default WAHA
-        // session (this platform runs one shared gateway for inbound; only
-        // outbound CAMPAIGNS use a per-portfolio override).
-        await sendWhatsAppMessage({ to: phone, message: result.reply })
+        await sendWhatsAppMessage({ company_id: inboundCompanyId, to: phone, message: result.reply })
         return NextResponse.json({ status: 'ok' })
       }
 
@@ -450,7 +465,7 @@ export async function POST(request: NextRequest) {
 
       const { data: viaMatch } = await supabase
         .from('customers').select('id, company_id, full_name, ai_paused')
-        .eq('id', result.matched.customer_id).maybeSingle()
+        .eq('company_id', inboundCompanyId).eq('id', result.matched.customer_id).maybeSingle()
       customer = viaMatch
       if (!customer) return NextResponse.json({ status: 'ok' })
       log.info('unknown caller resolved to existing customer', { phone, customer_id: result.matched.customer_id })
@@ -464,7 +479,7 @@ export async function POST(request: NextRequest) {
     // run and reply twice for the exact same inbound message.
     if (msgId) {
       const { data: dup } = await supabase
-        .from('messages').select('id').eq('whatsapp_message_id', msgId).eq('direction', 'inbound')
+        .from('messages').select('id').eq('company_id', inboundCompanyId).eq('whatsapp_message_id', msgId).eq('direction', 'inbound')
         .limit(1).maybeSingle()
       if (dup) { log.info('duplicate inbound webhook ignored', { msgId }); return NextResponse.json({ status: 'ok' }) }
     }

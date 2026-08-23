@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { z } from 'zod'
@@ -55,13 +55,6 @@ function clearFailedLogins(email: string): void {
 const loginSchema = z.object({
   email:    z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
-})
-
-const registerSchema = z.object({
-  email:        z.string().email('Invalid email address'),
-  password:     z.string().min(8, 'Password must be at least 8 characters'),
-  full_name:    z.string().min(2, 'Name must be at least 2 characters').max(200),
-  company_name: z.string().min(2, 'Company name must be at least 2 characters').max(200),
 })
 
 export async function loginAction(formData: FormData) {
@@ -133,7 +126,12 @@ export async function loginAction(formData: FormData) {
   // optional for collector. The middleware re-checks this on every
   // /dashboard/* request too, so this redirect can't be bypassed by
   // navigating straight to a dashboard URL after password login.
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aalError || !aal) {
+    await supabase.auth.signOut()
+    log.error('MFA assurance-level check failed', aalError ?? new Error('MFA assurance level was empty'))
+    return { error: 'Security verification is temporarily unavailable. Please try again.' }
+  }
   if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
     redirect('/mfa-challenge')
   }
@@ -225,6 +223,12 @@ export async function verifyMfaChallengeAction(code: string) {
   await redirectToOwnDashboard(supabase)
 }
 
+/*
+ * Public self-registration is intentionally removed. User provisioning is
+ * performed only through the authenticated platform administration flow.
+ * The former implementation is retained temporarily in this comment solely
+ * to keep this security change reviewable, and should be deleted after the
+ * deployment is verified.
 export async function registerAction(formData: FormData) {
   const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')
   if (isDummyUrl) {
@@ -320,6 +324,7 @@ export async function registerAction(formData: FormData) {
   log.info('New company registered', { company_id: company.id, email: parsed.data.email })
   redirect('/dashboard/admin')
 }
+*/
 
 export async function logoutAction() {
   const isDummyUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('dummy')

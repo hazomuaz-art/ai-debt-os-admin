@@ -73,6 +73,15 @@ export function isSafePreVerificationIntent(args: { isGreeting: boolean; asksWho
   return args.isGreeting || args.asksWhoAreYou
 }
 
+export function isPlainGreeting(text: string): boolean {
+  const value = String(text ?? '').trim().toLowerCase().replace(/[؟?!.,،]/g, '').replace(/\s+/g, ' ')
+  return [
+    'السلام عليكم', 'السلام عليكم ورحمة الله', 'السلام عليكم ورحمة الله وبركاته',
+    'وعليكم السلام', 'مرحبا', 'مرحباً', 'هلا', 'اهلا', 'أهلا', 'صباح الخير', 'مساء الخير',
+    'hello', 'hi',
+  ].includes(value)
+}
+
 export type CustomerGateState = {
   verification_status: VerificationStatus
   verification_attempts_count: number
@@ -83,12 +92,13 @@ export type CustomerGateState = {
 
 export async function getCustomerGateState(customer_id: string): Promise<CustomerGateState> {
   const supabase = createServiceClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('customers')
     .select('verification_status, verification_attempts_count, contact_opt_out, pending_clarification, national_id')
     .eq('id', customer_id)
     .maybeSingle()
-  const d = (data ?? {}) as any
+  if (error || !data) throw new Error(`Unable to load customer verification state: ${error?.message ?? 'customer not found'}`)
+  const d = data as any
   return {
     verification_status: (d.verification_status ?? 'unverified') as VerificationStatus,
     verification_attempts_count: d.verification_attempts_count ?? 0,
@@ -111,16 +121,23 @@ export async function recordVerificationAttempt(args: {
     field_challenged: args.field_challenged,
     success: args.success,
   })
-  if (error) log.error('failed to record verification attempt', { error: error.message })
+  if (error) {
+    log.error('failed to record verification attempt', { error: error.message })
+    throw new Error('Unable to record verification attempt')
+  }
 }
 
 export async function markVerified(customer_id: string): Promise<void> {
   const supabase = createServiceClient()
   const { error } = await supabase.from('customers').update({
     verification_status: 'verified',
+    verification_attempts_count: 0,
     verified_at: new Date().toISOString(),
   }).eq('id', customer_id)
-  if (error) log.error('failed to mark customer verified', { error: error.message, customer_id })
+  if (error) {
+    log.error('failed to mark customer verified', { error: error.message, customer_id })
+    throw new Error('Unable to persist verified identity')
+  }
 }
 
 export async function incrementFailedVerification(customer_id: string, newCount: number): Promise<void> {
@@ -130,7 +147,10 @@ export async function incrementFailedVerification(customer_id: string, newCount:
     verification_attempts_count: newCount,
     verification_status: locked ? 'locked' : 'unverified',
   }).eq('id', customer_id)
-  if (error) log.error('failed to update verification attempt count', { error: error.message, customer_id })
+  if (error) {
+    log.error('failed to update verification attempt count', { error: error.message, customer_id })
+    throw new Error('Unable to persist verification failure')
+  }
 }
 
 // Real gap found during a full-system audit: not checked — a customer
@@ -144,7 +164,10 @@ export async function setContactOptOut(customer_id: string): Promise<void> {
     contact_opt_out: true,
     contact_opt_out_at: new Date().toISOString(),
   }).eq('id', customer_id)
-  if (error) log.error('failed to set contact opt-out', { error: error.message, customer_id })
+  if (error) {
+    log.error('failed to set contact opt-out', { error: error.message, customer_id })
+    throw new Error('Unable to persist contact opt-out')
+  }
 }
 
 export async function raiseUrgentHumanAlert(args: {

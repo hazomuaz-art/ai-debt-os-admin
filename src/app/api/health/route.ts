@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { validateEnv, isWhatsAppConfigured, isOpenAIConfigured } from '@/lib/env'
+import { validateEnv, isOpenAIConfigured } from '@/lib/env'
+import { checkWahaHealth } from '@/lib/waha-health'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,8 +68,12 @@ export async function GET() {
   }
 
   // 4. External integrations
-  checks.openai    = isOpenAIConfigured()    ? { status: 'ok' } : { status: 'warn', message: 'Not configured' }
-  checks.whatsapp  = isWhatsAppConfigured()  ? { status: 'ok' } : { status: 'warn', message: 'Not configured' }
+  checks.openai = isOpenAIConfigured() ? { status: 'ok' } : { status: 'warn', message: 'Not configured' }
+  const whatsapp = await checkWahaHealth()
+  checks.whatsapp = {
+    status: whatsapp.status,
+    ...(whatsapp.message ? { message: whatsapp.message } : {}),
+  }
 
   const allOk = Object.values(checks).every(c => c.status !== 'error')
   const httpStatus = allOk ? 200 : 503

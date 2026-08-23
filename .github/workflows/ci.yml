@@ -2,9 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [main, staging]
+    branches: [master, main, staging]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -44,12 +44,14 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL:      https://test.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-xxxxxxxxxxxxxxxxxxxx
       SUPABASE_SERVICE_ROLE_KEY:     test-service-role-key-xxxxxxxxxxxxxxxxx
-      OPENAI_API_KEY:                sk-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      OPENROUTER_API_KEY:            sk-or-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       APP_SECRET:                    test-app-secret-32-characters-long!!
       NEXT_PUBLIC_APP_URL:           http://localhost:3000
-      WHATSAPP_PHONE_NUMBER_ID:      "123456789"
-      WHATSAPP_ACCESS_TOKEN:         test-wa-token
-      WHATSAPP_VERIFY_TOKEN:         test-verify-token
+      WAHA_API_URL:                  http://localhost:3001
+      WAHA_API_KEY:                  test-waha-key
+      WAHA_WEBHOOK_SECRET:           test-webhook-secret
+      WAHA_SESSION:                  default
+      WAHA_SESSION_COMPANY_MAP:      '{"default":"00000000-0000-0000-0000-000000000001"}'
     steps:
       - uses: actions/checkout@v4
 
@@ -84,12 +86,14 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL:      https://test.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-xxxxxxxxxxxxxxxxxxxx
       SUPABASE_SERVICE_ROLE_KEY:     test-service-role-key-xxxxxxxxxxxxxxxxx
-      OPENAI_API_KEY:                sk-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      OPENROUTER_API_KEY:            sk-or-test-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       APP_SECRET:                    test-app-secret-32-characters-long!!
       NEXT_PUBLIC_APP_URL:           https://example.com
-      WHATSAPP_PHONE_NUMBER_ID:      "123456789"
-      WHATSAPP_ACCESS_TOKEN:         test-wa-token
-      WHATSAPP_VERIFY_TOKEN:         test-verify-token
+      WAHA_API_URL:                  http://localhost:3001
+      WAHA_API_KEY:                  test-waha-key
+      WAHA_WEBHOOK_SECRET:           test-webhook-secret
+      WAHA_SESSION:                  default
+      WAHA_SESSION_COMPANY_MAP:      '{"default":"00000000-0000-0000-0000-000000000001"}'
     steps:
       - uses: actions/checkout@v4
 
@@ -134,7 +138,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.STAGING_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.STAGING_SERVICE_ROLE_KEY }}
-      OPENAI_API_KEY:                ${{ secrets.OPENAI_API_KEY }}
+      OPENROUTER_API_KEY:            ${{ secrets.OPENROUTER_API_KEY }}
       APP_SECRET:                    ${{ secrets.APP_SECRET }}
       NEXT_PUBLIC_APP_URL:           ${{ secrets.STAGING_APP_URL }}
     steps:
@@ -146,43 +150,6 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Validate environment
         run: node scripts/validate-env.js
-
-  # ── Deploy to Vercel (Production) ──────────────────────────────────────
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [build, validate-staging]
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Deploy to Vercel
-        run: |
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Run health check
-        run: |
-          sleep 15  # wait for deployment to propagate
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PROD_APP_URL }}/api/health)
-          echo "Health check status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Health check failed with status $STATUS"
-            exit 1
-          fi
 
   # ── Security Audit ────────────────────────────────────────────────────
   security:
@@ -197,16 +164,9 @@ jobs:
       - run: npm ci
       - name: Audit dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true  # report but don't block
 
       - name: Check for secrets in code
-        run: |
-          # Fail if any real secret patterns found in source
-          if grep -r "sk-[a-zA-Z0-9]\{40\}" src/ --include="*.ts" --include="*.tsx"; then
-            echo "::error::Hardcoded API key found in source!"
-            exit 1
-          fi
-          if grep -r "eyJhbGciOiJ" src/ --include="*.ts" --include="*.tsx"; then
-            echo "::error::Potential JWT token hardcoded in source!"
-            exit 1
-          fi
+        run: npm run security:secrets
+
+      - name: Scan Git history for leaked secrets
+        uses: gitleaks/gitleaks-action@v2

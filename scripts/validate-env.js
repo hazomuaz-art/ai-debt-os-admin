@@ -40,10 +40,12 @@ const REQUIRED = [
 ]
 
 const OPTIONAL = [
-  'WHATSAPP_PHONE_NUMBER_ID',
-  'WHATSAPP_ACCESS_TOKEN',
-  'WHATSAPP_VERIFY_TOKEN',
-  'WHATSAPP_BUSINESS_ACCOUNT_ID',
+  'WAHA_API_URL',
+  'WAHA_API_KEY',
+  'WAHA_WEBHOOK_SECRET',
+  'WAHA_SESSION',
+  'WAHA_SESSION_COMPANY_MAP',
+  'INTEGRATION_ALLOWED_HOSTS',
 ]
 
 const errors   = []
@@ -61,9 +63,9 @@ for (const { key, validate } of REQUIRED) {
 }
 
 // Check optional
-const waSet = OPTIONAL.filter(k => process.env[k])
-if (waSet.length > 0 && waSet.length < OPTIONAL.length) {
-  warnings.push(`WhatsApp partially configured (${waSet.length}/${OPTIONAL.length} vars set)`)
+const configuredOptional = OPTIONAL.filter(k => process.env[k])
+if (configuredOptional.length > 0 && configuredOptional.length < OPTIONAL.length) {
+  warnings.push(`WAHA/security integration configuration is partial (${configuredOptional.length}/${OPTIONAL.length} vars set)`)
 }
 for (const key of OPTIONAL) {
   if (!process.env[key]) warnings.push(`Optional ${key} not set`)

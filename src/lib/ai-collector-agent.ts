@@ -18,7 +18,7 @@ import {
   detectOptOutIntent, renderOptOutConfirmation, setContactOptOut,
   getCustomerGateState, extractLast4Candidate, nationalIdLast4,
   recordVerificationAttempt, markVerified, incrementFailedVerification,
-  raiseUrgentHumanAlert, isSafePreVerificationIntent, MAX_VERIFICATION_ATTEMPTS,
+  raiseUrgentHumanAlert, isSafePreVerificationIntent, isPlainGreeting, MAX_VERIFICATION_ATTEMPTS,
   setPendingClarification, clearPendingClarification,
 } from '@/lib/conversation-gates'
 import { createServiceClient } from '@/lib/supabase/server'
@@ -853,7 +853,18 @@ export async function runCollectorAgent(args: {
   // subsequent automated message is suppressed — no exceptions, regardless
   // of what the message says. The opt-out itself gets exactly one fixed
   // confirmation reply, never repeated.
-  const gateState = await getCustomerGateState(args.customer_id)
+  let gateState
+  try {
+    gateState = await getCustomerGateState(args.customer_id)
+  } catch (err) {
+    log.error('customer security gate state unavailable — failing closed', err as Error, { customer_id: args.customer_id })
+    return {
+      shouldReply: true,
+      action: 'human_review',
+      reason: 'security_gate_unavailable',
+      message: 'تعذّر التحقق من بياناتك الآن، وتم تحويل المحادثة لموظف مختص بدون عرض أي تفاصيل.',
+    }
+  }
   if (gateState.contact_opt_out) {
     return { shouldReply: false, action: 'silent', reason: 'contact_opt_out_active', message: '' }
   }
@@ -869,12 +880,103 @@ export async function runCollectorAgent(args: {
     return { shouldReply: true, action: 'human_review', reason: 'contact_opt_out', message: renderOptOutConfirmation() }
   }
 
-  // §1 — Identity verification gate REMOVED entirely per the owner's explicit,
-  // repeated business decision: the agent must NEVER ask the customer for ID
-  // last-4 ("قبل أي تفاصيل، أحتاج تأكيد هويتك ...") on any portfolio. First
-  // contact confirms the recipient by name instead (handled in the prompt /
-  // introduction flow), and the pipeline proceeds normally without an ID
-  // challenge. (Deliberate trade-off accepted by the owner.)
+  // §1 — Identity verification gate. No customer/debt-specific data may reach
+  // the model or the reply path until the last four digits match. Greetings
+  // and "who are you" are answered with fixed, non-disclosing text only.
+  if (gateState.verification_status !== 'verified') {
+    if (gateState.verification_status === 'locked') {
+      return {
+        shouldReply: true,
+        action: 'human_review',
+        reason: 'identity_verification_locked',
+        message: 'تعذّر تأكيد الهوية بعد عدة محاولات. تم تحويل المحادثة لموظف مختص بدون عرض أي تفاصيل.',
+      }
+    }
+
+    const safeIntent = isSafePreVerificationIntent({
+      isGreeting: isPlainGreeting(text),
+      asksWhoAreYou: signals.asksWhoAreYou,
+    })
+    if (safeIntent) {
+      return {
+        shouldReply: true,
+        action: 'reply',
+        reason: 'safe_pre_verification_reply',
+        message: signals.asksWhoAreYou
+          ? 'معك المساعد الآلي لخدمة متابعة المطالبات. قبل عرض أي بيانات خاصة أحتاج تأكيد الهوية.'
+          : 'وعليكم السلام، حياك الله. قبل عرض أي بيانات خاصة أحتاج تأكيد الهوية.',
+      }
+    }
+
+    const expectedLast4 = nationalIdLast4(gateState.national_id)
+    if (!expectedLast4) {
+      await raiseUrgentHumanAlert({
+        company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+        alert_type: 'identity_verification_data_missing',
+        title: 'تعذّر التحقق الآلي من هوية عميل',
+        message: 'لا يوجد رقم هوية صالح لإتمام التحقق؛ تم إيقاف الإفصاح الآلي وتحويل الحالة للمراجعة.',
+      })
+      return {
+        shouldReply: true,
+        action: 'human_review',
+        reason: 'identity_verification_data_missing',
+        message: 'لا أقدر أعرض أي تفاصيل قبل التحقق من الهوية. تم تحويل المحادثة لموظف مختص للمساعدة.',
+      }
+    }
+
+    const candidate = extractLast4Candidate(text)
+    if (!candidate) {
+      return {
+        shouldReply: true,
+        action: 'request_clarification',
+        reason: 'identity_verification_required',
+        message: 'قبل عرض أي تفاصيل خاصة، فضلاً أرسل آخر أربعة أرقام من رقم الهوية أو الإقامة.',
+      }
+    }
+
+    const success = candidate === expectedLast4
+    try {
+      await recordVerificationAttempt({
+        company_id: args.company_id,
+        customer_id: args.customer_id,
+        field_challenged: 'national_id_last4',
+        success,
+      })
+      if (success) {
+        await markVerified(args.customer_id)
+      } else {
+        await incrementFailedVerification(args.customer_id, gateState.verification_attempts_count + 1)
+      }
+    } catch (err) {
+      log.error('identity verification persistence failed — failing closed', err as Error, { customer_id: args.customer_id })
+      return {
+        shouldReply: true,
+        action: 'human_review',
+        reason: 'identity_verification_persistence_failed',
+        message: 'تعذّر حفظ نتيجة التحقق الآن. تم إيقاف عرض التفاصيل وتحويل المحادثة لموظف مختص.',
+      }
+    }
+
+    if (!success) {
+      const locked = gateState.verification_attempts_count + 1 >= MAX_VERIFICATION_ATTEMPTS
+      if (locked) {
+        await raiseUrgentHumanAlert({
+          company_id: args.company_id, customer_id: args.customer_id, debt_id: args.debt_id,
+          alert_type: 'identity_verification_locked',
+          title: 'تم قفل التحقق من هوية عميل',
+          message: 'فشلت محاولات التحقق المسموح بها؛ لم تُعرض أي بيانات وتم تحويل الحالة للمراجعة.',
+        })
+      }
+      return {
+        shouldReply: true,
+        action: locked ? 'human_review' : 'request_clarification',
+        reason: locked ? 'identity_verification_locked' : 'identity_verification_failed',
+        message: locked
+          ? 'تعذّر تأكيد الهوية بعد عدة محاولات. تم تحويل المحادثة لموظف مختص بدون عرض أي تفاصيل.'
+          : 'الأرقام غير مطابقة. تأكد وأرسل آخر أربعة أرقام من رقم الهوية أو الإقامة مرة أخرى.',
+      }
+    }
+  }
 
   // ── Customer 360 — see every debt this customer has before picking one.
   // The webhook may pass a single `debt_id` hint (its own "latest debt"

@@ -160,6 +160,44 @@ beforeEach(() => {
   mockAlertInsert.mockClear()
   mockOpenEscalation = null
   mockOpenEscalationCall.mockClear()
+  mockCustomerGateRow = {
+    verification_status: 'verified', verification_attempts_count: 0,
+    contact_opt_out: false, pending_clarification: null, national_id: null,
+    used_reply_variants: {},
+  }
+})
+
+describe('collector agent — identity disclosure gate', () => {
+  it('does not disclose debt details before identity verification', async () => {
+    mockCustomerGateRow = {
+      verification_status: 'unverified', verification_attempts_count: 0,
+      contact_opt_out: false, pending_clarification: null, national_id: '1020301234',
+    }
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'كم المبلغ المطلوب؟' })
+    expect(d.reason).toBe('identity_verification_required')
+    expect(d.message).toContain('آخر أربعة')
+    expect(d.message).not.toContain('2344')
+  })
+
+  it('answers who-are-you safely without exposing the case', async () => {
+    mockCustomerGateRow = {
+      verification_status: 'unverified', verification_attempts_count: 0,
+      contact_opt_out: false, pending_clarification: null, national_id: '1020301234',
+    }
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'من أنت؟' })
+    expect(d.reason).toBe('safe_pre_verification_reply')
+    expect(d.message).not.toContain('بنك الإنماء')
+  })
+
+  it('locks after the configured number of wrong attempts', async () => {
+    mockCustomerGateRow = {
+      verification_status: 'unverified', verification_attempts_count: 1,
+      contact_opt_out: false, pending_clarification: null, national_id: '1020301234',
+    }
+    const d = await runCollectorAgent({ company_id: 'c', customer_id: 'u', debt_id: 'd', message: 'آخر أربعة 9999' })
+    expect(d.reason).toBe('identity_verification_locked')
+    expect(d.action).toBe('human_review')
+  })
 })
 
 describe('collector agent — deterministic anti-redundancy guards', () => {

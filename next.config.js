@@ -4,9 +4,6 @@ const nextConfig = {
   // no longer runs lint at all, next-lint-to-eslint-cli codemod already
   // migrated `npm run lint` to the standalone ESLint CLI) — nothing to
   // replace this with, ignoreDuringBuilds is simply a no-op now.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   // pdf-parse (and its pdfjs + native canvas renderer) breaks when webpack
   // bundles it into the server build — the pdfjs worker / native binding
   // fail at runtime. Keep these external so they're require()'d from

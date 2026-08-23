@@ -1,0 +1,13 @@
+[Unit]
+Description=AI Debt OS Docker exposure guard
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ai-debt-firewall.sh eth0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

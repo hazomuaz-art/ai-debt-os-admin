@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, use } from 'react';
 import { enrollMfaAction, cancelMfaEnrollmentAction, verifyMfaEnrollmentAction, logoutAction } from '@/lib/actions/auth'
 import { ShieldCheck } from 'lucide-react'
+import Image from 'next/image'
 
 export default function MfaSetupPage(props: { searchParams: Promise<{ required?: string }> }) {
   const searchParams = use(props.searchParams);
@@ -78,7 +79,7 @@ export default function MfaSetupPage(props: { searchParams: Promise<{ required?:
 
             {qrCode && (
               <div className="flex justify-center mb-4 bg-white rounded-2xl p-4">
-                <div dangerouslySetInnerHTML={{ __html: qrCode }} />
+                <Image src={qrCode} alt="رمز إعداد المصادقة الثنائية" width={220} height={220} unoptimized />
               </div>
             )}
 

@@ -10,6 +10,7 @@
  */
 
 import { createLogger } from '@/lib/logger'
+import { safeIntegrationFetch } from '@/lib/safe-fetch'
 
 const log = createLogger('integrations')
 
@@ -20,13 +21,7 @@ async function fetchWithTimeout(
   options:    RequestInit,
   timeoutMs = 8000,
 ): Promise<Response> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(url, { ...options, signal: controller.signal })
-  } finally {
-    clearTimeout(timer)
-  }
+  return safeIntegrationFetch(url, options, timeoutMs)
 }
 
 export interface TestResult {

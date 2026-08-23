@@ -12,11 +12,16 @@ const SECURITY_HEADERS = {
   'X-Frame-Options':         'DENY',
   'X-XSS-Protection':        '1; mode=block',
   'Referrer-Policy':         'strict-origin-when-cross-origin',
+  'Permissions-Policy':      'camera=(), microphone=(), geolocation=(), payment=()',
+  'Content-Security-Policy': "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
 }
 
 function applySecurityHeaders(response: NextResponse): NextResponse {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(key, value)
+  }
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
   }
   return response
 }
@@ -164,7 +169,12 @@ export async function proxy(request: NextRequest) {
           return applySecurityHeaders(NextResponse.redirect(loginUrl))
         }
       } catch (e) {
-        // Fallback
+        // Account-state checks protect every dashboard route. If this check
+        // cannot complete, fail closed instead of trusting unknown state.
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        loginUrl.searchParams.set('security_check_failed', 'true')
+        return applySecurityHeaders(NextResponse.redirect(loginUrl))
       }
 
       // MFA enforcement, checked on every dashboard request (not just at
@@ -192,7 +202,12 @@ export async function proxy(request: NextRequest) {
           }
         }
       } catch (e) {
-        // Fallback - never block dashboard access due to an MFA-check error
+        // Never silently downgrade a privileged session to password-only
+        // access when the MFA service cannot be checked.
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        loginUrl.searchParams.set('security_check_failed', 'true')
+        return applySecurityHeaders(NextResponse.redirect(loginUrl))
       }
     }
   }
