@@ -110,15 +110,6 @@ jobs:
             echo "::warning::Bundle size ${SIZE}MB exceeds 100MB threshold"
           fi
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: nextjs-build
-          path: |
-            .next/
-            !.next/cache
-          retention-days: 3
-
   # ── Environment Validation ─────────────────────────────────────────────
   validate-staging:
     name: Validate Staging Env
