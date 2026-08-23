@@ -161,4 +161,4 @@ jobs:
         run: npm run security:secrets
 
       - name: Scan Git history for leaked secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
