@@ -11,6 +11,7 @@
 
 import { createLogger } from '@/lib/logger'
 import { safeIntegrationFetch } from '@/lib/safe-fetch'
+import type { IntegrationName } from '@/lib/integration-catalog'
 
 const log = createLogger('integrations')
 
@@ -28,6 +29,61 @@ export interface TestResult {
   success:     boolean
   message:     string
   latency_ms?: number
+}
+
+// ── WAHA ─────────────────────────────────────────────────────────────────
+
+export const waha = {
+  async testConnection(config: Record<string, string>): Promise<TestResult> {
+    const baseUrl = config.api_url?.replace(/\/$/, '')
+    const apiKey = config.api_key
+    const session = config.session || 'default'
+
+    if (!baseUrl || !apiKey) {
+      return { success: false, message: 'WAHA URL and API Key are required' }
+    }
+
+    const start = Date.now()
+    const response = await fetchWithTimeout(
+      `${baseUrl}/api/sessions/${encodeURIComponent(session)}`,
+      { headers: { 'X-Api-Key': apiKey }, cache: 'no-store' },
+    )
+    const latency_ms = Date.now() - start
+
+    if (!response.ok) {
+      return { success: false, message: `WAHA API returned HTTP ${response.status}`, latency_ms }
+    }
+
+    const data = await response.json().catch(() => ({})) as { status?: string }
+    const success = data.status === 'WORKING'
+    return {
+      success,
+      message: success ? 'WAHA WhatsApp connected' : `WAHA session status: ${data.status ?? 'unknown'}`,
+      latency_ms,
+    }
+  },
+}
+
+// ── n8n ──────────────────────────────────────────────────────────────────
+
+export const n8nAutomation = {
+  async testConnection(config: Record<string, string>): Promise<TestResult> {
+    const webhookUrl = config.webhook_url
+    if (!webhookUrl) return { success: false, message: 'n8n Webhook URL is required' }
+
+    const healthUrl = new URL('/healthz', new URL(webhookUrl).origin)
+    const start = Date.now()
+    const response = await fetchWithTimeout(healthUrl.toString(), {
+      method: 'GET',
+      headers: config.auth_token ? { Authorization: `Bearer ${config.auth_token}` } : undefined,
+      cache: 'no-store',
+    })
+    const latency_ms = Date.now() - start
+
+    return response.ok
+      ? { success: true, message: `n8n connected (${response.status})`, latency_ms }
+      : { success: false, message: `n8n health check returned HTTP ${response.status}`, latency_ms }
+  },
 }
 
 // ── Rasf WhatsApp ─────────────────────────────────────────────────────────
@@ -384,4 +440,18 @@ export const collectionApi = {
       return { success: false, customers: [], total: 0, error: err instanceof Error ? err.message : 'Sync failed' }
     }
   },
+}
+
+/** Single dispatch point for every integration connectivity check. */
+export function testIntegrationConnection(
+  integrationName: IntegrationName,
+  config: Record<string, string>,
+): Promise<TestResult> {
+  switch (integrationName) {
+    case 'waha': return waha.testConnection(config)
+    case 'n8n_automation': return n8nAutomation.testConnection(config)
+    case 'collection_api': return collectionApi.testConnection(config)
+    case 'tameez_calls': return tameezCalls.testConnection(config)
+    case 'rasf_whatsapp': return rasfWhatsApp.testConnection(config)
+  }
 }

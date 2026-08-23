@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { createServiceClient } from '@/lib/supabase/server'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 import { calculateDaysOverdue } from '@/lib/utils'
@@ -11,7 +12,6 @@ import { createLogger } from '@/lib/logger'
 // rule already failed once for a different requirement in this exact file
 // (the invented-nickname defect), so this is enforced mechanically here
 // too rather than trusted to the model alone.
-// eslint-disable-next-line no-misleading-character-class
 const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu
 function stripEmoji(text: string): string {
   return text.replace(EMOJI_RE, '').replace(/[ \t]{2,}/g, ' ').trim()
@@ -221,7 +221,7 @@ ${firstMessageRuleEn}
 Return only the message text, no explanation or quotation marks.`
 
     const ai = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       // Raised from 0.4 for more lexical variety across recipients/campaigns
       // — same reasoning as generateProactiveReminder's temperature bump.
       temperature: 0.6,

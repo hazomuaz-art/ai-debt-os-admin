@@ -1,14 +1,15 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { z } from 'zod'
+import { INTEGRATION_NAMES } from '@/lib/integration-catalog'
 
 const saveSchema = z.object({
-  integration_name: z.string().min(1),
+  integration_name: z.enum(INTEGRATION_NAMES),
   enabled:          z.boolean(),
-  config: z.record(z.any()),
+  config: z.record(z.string()),
 })
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return withAuth(
     async (ctx) => {
       const { data, error } = await ctx.supabase

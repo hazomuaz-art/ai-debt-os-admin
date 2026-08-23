@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
-import { Wallet, Users, CheckCircle, Trophy, BarChart2 } from 'lucide-react'
+import { Wallet, Users, Trophy } from 'lucide-react'
 
 export default async function ManagerDashboard() {
   const supabase = await createClient()

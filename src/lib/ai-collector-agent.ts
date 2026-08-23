@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 import {
   buildCustomer360Context,
@@ -1356,7 +1357,6 @@ export async function runCollectorAgent(args: {
   ).length
 
   const balance = ctx.verified_debt_data?.current_balance != null ? String(ctx.verified_debt_data.current_balance) : null
-  const creditor = ctx.verified_debt_data?.creditor_name ?? null
   const isTelecom = String(ctx.verified_debt_data?.portfolio_category ?? '').toLowerCase() === 'telecom'
   const historyText = chronological.map(h => h.content).join(' ')
   // Deliberately the AMOUNT only, not the creditor name — the SELF_INTRO
@@ -1679,8 +1679,7 @@ ${intentPrompts[intent]}
   // its own earlier statement about partial-payment eligibility within the
   // same conversation, confusing the customer — exactly the grounding/
   // consistency failure a stronger model is expected to reduce.
-  const selectModel = (_i: AgentIntent): string => 'anthropic/claude-sonnet-5'
-  const modelId = selectModel(intent)
+  const modelId = AI_MODELS.reasoning
   log.info('model routing', { intent, modelId })
   let ai
   try {
@@ -2014,7 +2013,6 @@ ${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعل�
     parsed.promise_text = null
   } else if (parsed.action === 'record_promise') {
     const promiseText = String(parsed.promise_text ?? '').trim()
-    const validDate = !!parsed.promised_date && isSaneDate(String(parsed.promised_date), todayStr)
     // 🔴 The GATE is the CUSTOMER'S OWN CURRENT MESSAGE, never the model's
     // claim alone. Previously `promiseText.length > 0 || validDate` let the
     // model record a promise purely on its own say-so — a vague conditional
@@ -2028,7 +2026,7 @@ ${text.includes('\n') ? '- 🔴 "رسالة العميل الحالية" أعل�
     // isRealPromise reuses the SAME engineResolution computed earlier
     // (alongside the forcing check above) — the engine is the authoritative
     // source for both "is this a promise" and "what date", computed once.
-    let isRealPromise = (hasTemporalRef(text) || !!engineResolution?.resolved) && parsed.customer_commits_to_pay !== false
+    const isRealPromise = (hasTemporalRef(text) || !!engineResolution?.resolved) && parsed.customer_commits_to_pay !== false
     if (isRealPromise) {
       parsed.promise_text = promiseText || null
       // `promised_date` is NOT NULL in the DB → always store one.

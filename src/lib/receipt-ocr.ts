@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('receipt-ocr')
@@ -34,8 +35,8 @@ function getClient(): OpenAI | null {
   })
 }
 
-const visionModel = () => 'anthropic/claude-sonnet-4'
-const textModel = () => 'anthropic/claude-sonnet-4'
+const visionModel = () => AI_MODELS.balanced
+const textModel = () => AI_MODELS.balanced
 
 const PROMPT_INSTRUCTIONS = `هل هذا إيصال/سند تحويل بنكي أو سداد فاتورة أو دفع؟ استخرج كل البيانات الممكنة وأعد JSON فقط بهذا الشكل بدون أي نص آخر:
 {"is_receipt": true|false, "amount": <رقم أو null>, "currency": "SAR|USD|...", "date": "YYYY-MM-DD أو null", "sender_name": "اسم المُحوِّل/الدافع أو null", "bank": "اسم البنك أو null", "reference": "الرقم المرجعي للعملية أو null", "iban_last4": "آخر 4 أرقام من آيبان المستلِم أو null", "beneficiary_name": "اسم المستفيد/المستلِم للمبلغ أو null", "invoice_number": "رقم الفاتورة أو رقم السداد/المفوتر أو null", "confidence": <0-100>}

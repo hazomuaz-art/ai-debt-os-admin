@@ -9,6 +9,7 @@ This repository does not deploy to Vercel. Production runs as a Next.js 16 Node 
 - Supabase service-role credentials exist only in the server environment.
 - Public signup remains disabled. Admin and manager sessions require MFA/AAL2 for privileged APIs.
 - Every WAHA session resolves to exactly one company through `WAHA_SESSION_COMPANY_MAP` or one unambiguous database mapping.
+- Every Rasf/InSync inbound routing key resolves to exactly one company through `RASF_WEBHOOK_COMPANY_MAP`; the route is disabled when the map or secret is absent.
 - WAHA sends `X-Webhook-Secret` matching `WAHA_WEBHOOK_SECRET`.
 - `INTEGRATION_ALLOWED_HOSTS` lists public hostnames allowed for administrator-configured outbound integrations.
 - n8n uses authentication, encrypted credentials, and webhook secrets; its editor is not public.
@@ -30,6 +31,10 @@ WAHA_SESSION=default
 WAHA_SESSION_COMPANY_MAP={"default":"COMPANY_UUID"}
 
 INTEGRATION_ALLOWED_HOSTS=api.partner.example
+
+# Required only when the Rasf/InSync inbound channel is enabled.
+RASF_WEBHOOK_SECRET=...
+RASF_WEBHOOK_COMPANY_MAP={"rasf-instance":"COMPANY_UUID"}
 
 # Required only when the inbound email channel is enabled.
 EMAIL_INBOUND_SECRET=...
@@ -63,7 +68,7 @@ curl --fail https://YOUR_DOMAIN/api/health
 curl --fail https://YOUR_DOMAIN/api/health/waha-session
 ```
 
-Send a controlled WAHA message for a test company and confirm it cannot resolve a customer belonging to another company.
+Send controlled WAHA and enabled Rasf/InSync messages for a test company and confirm neither can resolve a customer belonging to another company.
 
 ## Rollback and secret rotation
 

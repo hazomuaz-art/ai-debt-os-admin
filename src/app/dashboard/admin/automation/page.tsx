@@ -68,8 +68,6 @@ export default function AutomationPage() {
   }
 
   const mode = (config.automation_mode ?? 'off') as 'off' | 'test' | 'live'
-  const mc   = MODE_CONFIG[mode]
-
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100" >
       

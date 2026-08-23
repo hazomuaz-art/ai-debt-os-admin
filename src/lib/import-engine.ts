@@ -146,11 +146,6 @@ function uniquenessRatio(values: string[]): number {
   return new Set(nonEmpty.map(v => v.trim())).size / nonEmpty.length
 }
 
-function fillRatio(values: string[]): number {
-  if (values.length === 0) return 0
-  return values.filter(v => v && v.trim()).length / values.length
-}
-
 function looksLikeName(v: string): boolean {
   const t = v.trim()
   if (!t || /\d/.test(t)) return false

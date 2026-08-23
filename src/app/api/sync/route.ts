@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 }
 
 // GET: list recent sync logs
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return withAuth(
     async (ctx) => {
       const { data, error } = await ctx.supabase

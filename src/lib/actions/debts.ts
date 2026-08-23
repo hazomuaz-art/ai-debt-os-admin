@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import type { DebtStatus, DebtPriority } from '@/types'
 import { createLogger } from '@/lib/logger'
-import { trackDebtCreated, trackCustomerCreated } from '@/lib/usage-tracker'
+import { trackDebtCreated } from '@/lib/usage-tracker'
 import { processEvent } from '@/lib/automation-pipeline'
 import { recordAttribution } from '@/lib/revenue-attribution'
 import { upsertPortfolioCustomerData } from '@/lib/portfolio-customer-data'
@@ -568,7 +568,7 @@ export async function updateDebtCompanyCategoryAction(debtId: string, category: 
 
 export async function assignDebtAction(debtId: string, collectorId: string) {
   try {
-    const { supabase, user, profile } = await requireAuth()
+    const { supabase, profile } = await requireAuth()
 
     if (!['admin', 'manager'].includes(profile.role)) {
       return { error: 'Insufficient permissions' }
@@ -721,5 +721,3 @@ export async function getDebtsWithFilters(filters: {
   if (error) return { error: error.message, data: [] }
   return { data: data ?? [], count }
 }
-
-

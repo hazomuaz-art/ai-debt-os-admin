@@ -326,7 +326,7 @@ async function stepTimeline(
 // ai_memory is disabled — confirmed unused in the actual agent reply path.
 // Read/write disabled at the source rather than dropping the table, so it
 // remains a safe rollback if ever needed.
-async function stepMemory(_ctx: Ctx): Promise<number> {
+async function stepMemory(): Promise<number> {
   return 0
 }
 
@@ -1161,7 +1161,7 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
 
     // ── AI Memory (always) ──────────────────────────────────────────
     try {
-      R.memory_count = await stepMemory(ctx)
+      R.memory_count = await stepMemory()
       R.steps_completed.push(`memory:${R.memory_count}`)
     } catch { R.steps_failed.push('memory') }
 
@@ -1172,7 +1172,7 @@ export async function processEvent(event: PipelineEvent): Promise<PipelineResult
       R.ai_score = score.score
       R.ai_risk  = score.risk_classification
       R.steps_completed.push(`score:${score.score}:${score.risk_classification}`)
-    } catch (err) {
+    } catch {
       score = scoringFallback({
         debt:                ctx.debt as unknown as Parameters<typeof scoringFallback>[0]['debt'],
         customer:            ctx.customer as unknown as Parameters<typeof scoringFallback>[0]['customer'],

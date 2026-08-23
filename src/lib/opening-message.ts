@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 import { createLogger } from '@/lib/logger'
 
@@ -65,7 +66,7 @@ ${facts || 'لا توجد بيانات كافية'}
 
   try {
     const ai = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       temperature: 0.4,
       max_tokens: 180,
       messages: [

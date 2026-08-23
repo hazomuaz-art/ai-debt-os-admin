@@ -130,7 +130,7 @@ export default function CampaignsPage() {
         } else {
           setConnectionStates(prev => ({ ...prev, [num.id]: 'close' }))
         }
-      } catch (e) {
+      } catch {
         setConnectionStates(prev => ({ ...prev, [num.id]: 'close' }))
       }
     }
@@ -204,7 +204,7 @@ export default function CampaignsPage() {
         alert('فشل في إنشاء رمز الاستجابة السريعة (QR Code). يرجى التحقق من إعدادات WAHA.')
         setActiveQr(null)
       }
-    } catch (e) {
+    } catch {
       alert('فشل في الاتصال')
       setActiveQr(null)
     } finally {
@@ -226,7 +226,7 @@ export default function CampaignsPage() {
         alert('فشل في قطع الاتصال')
         void fetchConnectionStatuses(numbers)
       }
-    } catch (e) {
+    } catch {
       alert('فشل في قطع الاتصال')
       void fetchConnectionStatuses(numbers)
     }

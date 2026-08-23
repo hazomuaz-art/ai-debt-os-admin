@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 import { generateDailyActionPlan } from '@/lib/ai-engine'
 import { createLogger } from '@/lib/logger'
@@ -7,7 +7,7 @@ const log = createLogger('api/ai/recommend')
 const RATE_LIMIT_KEY = 'ai_recommend'
 const HOURLY_LIMIT   = 500  // Raised — pipeline generates per-debt, not bulk
 
-export async function POST(_request: NextRequest) {
+export async function POST() {
   return withAuth(
     async (ctx) => {
       // Rate limit (best-effort — skip if function not deployed)
@@ -50,7 +50,7 @@ export async function POST(_request: NextRequest) {
       const today = new Date().toISOString().split('T')[0]
 
       // Generate action plan — AI or rule-based fallback, never throws
-      let actions = await generateDailyActionPlan({
+      const actions = await generateDailyActionPlan({
         debts:        debtsWithScore as Parameters<typeof generateDailyActionPlan>[0]['debts'],
         date:         today,
         company_name: (company?.name as string) ?? 'Unknown',

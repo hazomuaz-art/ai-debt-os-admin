@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('document-classifier')
@@ -98,7 +99,7 @@ export async function classifyDocumentImage(imageBase64: string, lang: 'ar' | 'e
   const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
   try {
     const res = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       max_tokens: 400,
       response_format: { type: 'json_object' },
       messages: [{
@@ -121,7 +122,7 @@ async function classifyDocumentText(text: string, lang: 'ar' | 'en' = 'ar'): Pro
   if (!client) return FALLBACK
   try {
     const res = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       max_tokens: 300,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: `${buildPrompt(lang)}\n\nنص المستند:\n${text.slice(0, 4000)}` }],

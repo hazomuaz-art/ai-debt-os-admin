@@ -44,7 +44,7 @@ export function GenerateActionsButton() {
 
       setStatus({ text: label, ok: true })
       router.refresh()
-    } catch (e) {
+    } catch {
       setStatus({ text: 'Network error — please try again', ok: false })
     } finally {
       setLoading(false)

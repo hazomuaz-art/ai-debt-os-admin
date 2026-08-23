@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageCirclePlus, Loader2, Send, X } from 'lucide-react'
+import { MessageCirclePlus, Loader2, Send } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 
 export function StartConversationButton({
@@ -46,7 +46,7 @@ export function StartConversationButton({
       const d = await r.json()
       const rawErr = typeof d.error === 'string' ? d.error : ''
       if (!r.ok || rawErr) {
-        // Friendly mapping instead of raw Evolution JSON
+        // Friendly mapping instead of raw WhatsApp gateway JSON
         if (/exists"?\s*:\s*false|not.*whatsapp|غير مسجّل/i.test(rawErr)) throw new Error(s.not_registered)
         throw new Error(s.send_failed)
       }

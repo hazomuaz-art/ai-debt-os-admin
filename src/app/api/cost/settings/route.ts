@@ -12,7 +12,7 @@ const settingsSchema = z.object({
   external_api_per_call:  z.coerce.number().min(0).max(10),
 })
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return withAuth(
     async (ctx) => {
       const { data, error } = await ctx.supabase

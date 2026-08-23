@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { Wallet, MessageCircle, AlertTriangle, FileText, CheckCircle, Clock, Phone, Mail, ArrowLeft } from 'lucide-react'
 

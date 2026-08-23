@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizePhone, sendWhatsAppMessage } from '@/lib/whatsapp'
-import { processInboundReceipt } from '@/lib/payment-receipt'
 import { insertSystemAlert } from '@/lib/system-alerts'
 import { insertTimelineEvent } from '@/lib/timeline'
 import { transcribeAudioMessage } from '@/lib/audio-transcription'
@@ -13,14 +12,6 @@ const log = createLogger('webhook/waha')
 
 const WAHA_URL = process.env.WAHA_API_URL
 const WAHA_KEY = process.env.WAHA_API_KEY
-
-// Customer typed a payment claim directly (no attachment) — e.g. pasted a
-// bank confirmation text. Requires a payment keyword AND a number to avoid
-// matching casual chat like "بدفع لك بكرة".
-const PAYMENT_TEXT_RE = /سددت|دفعت|حولت|ايصال|إيصال|paid|receipt|transfer/i
-function looksLikeTextReceipt(text: string): boolean {
-  return PAYMENT_TEXT_RE.test(text) && /\d{2,}/.test(text)
-}
 
 // WAHA returns media URLs with its INTERNAL base (e.g. http://localhost:3000)
 // which is NOT reachable from this app process — every receipt download was

@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Activity, Users, MessageCircle, AlertTriangle,
-  Wallet, BrainCircuit, CheckCircle, Clock, Search, Bell, Settings, LogOut,
-  Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon, Package,
+  Activity, Users, MessageCircle,
+  Wallet, BrainCircuit, CheckCircle, Clock, Bell, Settings, LogOut,
+  Layers, Briefcase, DollarSign, BarChart2, ShieldCheck, Megaphone, Link as LinkIcon,
   FlaskConical, TrendingUp, Brain, Scale, HeartPulse, Building2, LineChart
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'

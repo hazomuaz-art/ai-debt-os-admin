@@ -1,7 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { isCompanyUuid, resolveCompanyFromEnvMap } from '@/lib/tenant-map'
 
 export function buildTenantPhoneFilter(companyId: string, phone: string): string {
-  if (!/^[0-9a-f-]{36}$/i.test(companyId)) throw new Error('Invalid company id for WAHA tenant filter')
+  if (!isCompanyUuid(companyId)) throw new Error('Invalid company id for WAHA tenant filter')
   if (!/^\d{7,20}$/.test(phone)) throw new Error('Invalid normalized phone for WAHA tenant filter')
   return [
     `and(company_id.eq.${companyId},whatsapp.eq.${phone})`,
@@ -11,25 +12,9 @@ export function buildTenantPhoneFilter(companyId: string, phone: string): string
   ].join(',')
 }
 
-function configuredSessionCompany(session: string): string | null {
-  const raw = process.env.WAHA_SESSION_COMPANY_MAP
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    const value = parsed[session]
-    if (value === undefined) return null
-    if (typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value)) {
-      throw new Error(`WAHA session ${session} must map to a company UUID`)
-    }
-    return value
-  } catch {
-    throw new Error('WAHA_SESSION_COMPANY_MAP must be a JSON object')
-  }
-}
-
 /** Resolve a WAHA session to exactly one tenant, otherwise fail closed. */
 export async function resolveWahaSessionCompany(session: string): Promise<string | null> {
-  const configured = configuredSessionCompany(session)
+  const configured = resolveCompanyFromEnvMap('WAHA_SESSION_COMPANY_MAP', session)
   if (configured) return configured
 
   const supabase = createServiceClient()

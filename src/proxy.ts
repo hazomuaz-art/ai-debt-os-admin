@@ -113,7 +113,7 @@ export async function proxy(request: NextRequest) {
     try {
       const { data } = await supabase.auth.getUser()
       user = data.user
-    } catch (e) {
+    } catch {
       user = null
     }
   }
@@ -139,7 +139,7 @@ export async function proxy(request: NextRequest) {
           .eq('id', user.id)
           .single()
         role = profile?.role ?? 'collector'
-      } catch (e) {
+      } catch {
         role = 'collector'
       }
     }
@@ -168,7 +168,7 @@ export async function proxy(request: NextRequest) {
           loginUrl.searchParams.set('inactive', 'true')
           return applySecurityHeaders(NextResponse.redirect(loginUrl))
         }
-      } catch (e) {
+      } catch {
         // Account-state checks protect every dashboard route. If this check
         // cannot complete, fail closed instead of trusting unknown state.
         const loginUrl = request.nextUrl.clone()
@@ -201,7 +201,7 @@ export async function proxy(request: NextRequest) {
             return applySecurityHeaders(NextResponse.redirect(dest))
           }
         }
-      } catch (e) {
+      } catch {
         // Never silently downgrade a privileged session to password-only
         // access when the MFA service cannot be checked.
         const loginUrl = request.nextUrl.clone()

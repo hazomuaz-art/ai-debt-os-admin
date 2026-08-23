@@ -13,7 +13,7 @@ const createSchema = z.object({
   notes:      z.string().max(500).optional(),
 })
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return withAuth(async (ctx) => {
     const { data, error } = await ctx.supabase
       .from('portfolios')

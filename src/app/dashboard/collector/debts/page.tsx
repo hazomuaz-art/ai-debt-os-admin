@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
-import { Wallet, Search, Filter, ArrowLeft, ArrowUpRight, ArrowDownRight, Clock, ShieldAlert } from 'lucide-react'
+import { Wallet, ArrowLeft, Clock } from 'lucide-react'
 import DebtFilters from '@/components/debt/DebtFilters'
 
 export default async function CollectorDebtsPage(

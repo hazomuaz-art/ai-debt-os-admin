@@ -18,17 +18,14 @@ Multi-tenant debt collection platform with AI-assisted workflows, WAHA WhatsApp 
 
 ```bash
 git clone <repo>
-cd ai-debt-os
+cd ai-debt-os-admin
 npm install
 ```
 
 ### 2. Set Up Supabase
 
 1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** and run the migration:
-   ```
-   supabase/migrations/001_initial_schema.sql
-   ```
+2. Apply every file under `supabase/migrations/` in numeric order. Never apply only `001`; current features and security controls depend on later migrations.
 3. Copy your project URL and keys from **Settings → API**
 
 ### 3. Configure Environment
@@ -74,6 +71,17 @@ Open [http://localhost:3000](http://localhost:3000). Public self-registration is
 ## Deploy to Hostinger/PM2
 
 The supported production topology is documented in `DEPLOYMENT.md`. The deployment gate validates migrations, tracked secrets, production dependency vulnerabilities, type safety, tests, build output, PM2 restart, and `/api/health`. `vercel.json` is not a production deployment source of truth.
+
+`DEPLOYMENT.md` is the single deployment runbook. Integration names, fields, and UI metadata have one code source in `src/lib/integration-catalog.ts`.
+
+## Authoritative Code Sources
+
+- Integration names, fields, and UI metadata: `src/lib/integration-catalog.ts`
+- AI model identifiers by workload tier: `src/lib/ai-models.ts`
+- Environment tenant-map parsing and UUID validation: `src/lib/tenant-map.ts`
+- CSV escaping and download generation: `src/lib/csv.ts`
+- Manager/collector debt detail implementation: `src/components/debt/RoleDebtDetailPage.tsx`
+- Production deployment runbook: `DEPLOYMENT.md`
 
 WAHA must send message events to `https://YOUR_DOMAIN/api/whatsapp/waha-webhook` with the `X-Webhook-Secret` header matching `WAHA_WEBHOOK_SECRET`.
 
@@ -152,5 +160,5 @@ All tables have `company_id` with Row Level Security — tenants are fully isola
 | POST | `/api/debts/import` | Import debts from CSV |
 | GET | `/api/customers` | Search customers |
 | POST | `/api/whatsapp/send` | Send WhatsApp message |
-| GET/POST | `/api/whatsapp/webhook` | Meta webhook handler |
+| POST | `/api/whatsapp/waha-webhook` | WAHA inbound webhook handler |
 | POST | `/api/auth/invite` | Invite team member |

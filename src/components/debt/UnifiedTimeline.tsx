@@ -1,5 +1,5 @@
 import {
-  MessageSquare, Wallet, ShieldAlert, Target, FileText, History, BellRing, CheckCircle,
+  MessageSquare, Wallet, ShieldAlert, Target, FileText, History,
 } from 'lucide-react'
 
 // A single chronological log that merges every event tied to a customer's

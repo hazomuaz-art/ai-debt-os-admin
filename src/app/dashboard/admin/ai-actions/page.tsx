@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { formatCurrency, getStatusColor } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { GenerateActionsButton } from '@/components/ai/GenerateActionsButton'
 import { CompleteActionButton } from '@/components/ai/CompleteActionButton'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'

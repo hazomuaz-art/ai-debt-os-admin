@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
 import { resolveCompanyProfile, type OutcomeMeta } from '@/lib/company-import-profiles'
@@ -145,7 +146,7 @@ export async function classifyDebtOutcome(args: {
 
   try {
     const completion = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       temperature: 0,
       max_tokens: 60,
       messages: [

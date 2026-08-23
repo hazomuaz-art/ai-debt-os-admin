@@ -113,7 +113,7 @@ export function assertEnv(): void {
 
   if (result.warnings.length) {
     for (const w of result.warnings) {
-      console.warn(`[ENV] Warning: ${w}`) // eslint-disable-line no-console
+      console.warn(`[ENV] Warning: ${w}`)
     }
   }
 

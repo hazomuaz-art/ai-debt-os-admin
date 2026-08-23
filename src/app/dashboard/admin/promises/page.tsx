@@ -28,7 +28,6 @@ export default async function PromisesPage() {
   const all     = promises ?? []
   const pending = all.filter(p => p.status === 'pending')
   const kept    = all.filter(p => p.status === 'kept')
-  const broken  = all.filter(p => p.status === 'broken')
   const rate    = all.length ? Math.round((kept.length / all.length) * 100) : 0
 
   return (

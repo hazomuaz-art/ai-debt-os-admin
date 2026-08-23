@@ -3,6 +3,7 @@ import { insertSystemAlert } from '@/lib/system-alerts'
 import { createLogger } from '@/lib/logger'
 import type { InsuranceObjectionSignals, InsuranceCaseFile } from '@/lib/insurance-engine'
 import type { EscalationRule } from '@/lib/company-playbook'
+import { AI_MODELS } from '@/lib/ai-models'
 
 const log = createLogger('legal-escalation')
 
@@ -395,7 +396,7 @@ export async function generateLawyerPersonaReply(args: {
     }))
 
     const completion = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       temperature: 0.6,
       max_tokens: 160,
       messages: [

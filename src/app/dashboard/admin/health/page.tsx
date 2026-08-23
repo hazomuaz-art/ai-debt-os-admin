@@ -123,10 +123,6 @@ export default async function SystemHealthPage() {
     getRunStats(cid),
   ])
 
-  const scoreColor =
-    report.health_score >= 80 ? '#34d399' :
-    report.health_score >= 55 ? '#fbbf24' : '#f87171'
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -268,7 +264,6 @@ export default async function SystemHealthPage() {
     </div>
   )
 }
-
 
 
 

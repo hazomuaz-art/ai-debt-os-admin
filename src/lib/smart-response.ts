@@ -230,7 +230,6 @@ export async function findTemplateMatch(
 export async function findMemoryMatch(
   companyId: string,
   message:   string,
-  intent:    Intent,
 ): Promise<{ text: string; id: string; confidence: number } | null> {
   try {
     const supabase = createServiceClient()
@@ -411,7 +410,7 @@ export async function resolveResponse(opts: {
   }
 
   // Step 2: AI memory (approved learned responses)
-  const memoryMatch = await findMemoryMatch(companyId, message, intent)
+  const memoryMatch = await findMemoryMatch(companyId, message)
   if (memoryMatch) {
     log.info('Memory hit', { memory_id: memoryMatch.id, intent })
     return {

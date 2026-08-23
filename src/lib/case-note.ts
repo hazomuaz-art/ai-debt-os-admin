@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
 
@@ -131,7 +132,7 @@ export async function updateCaseNote(args: {
     ].filter(Boolean).join('\n')
 
     const completion = await client.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       temperature: 0,
       // Was 260 — root cause of the case note silently freezing forever on
       // any sufficiently long/active conversation: a 3-5 sentence Arabic

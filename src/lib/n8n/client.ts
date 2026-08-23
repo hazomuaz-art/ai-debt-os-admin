@@ -1,6 +1,11 @@
 // AI Debt OS — n8n Integration Client
 // Communicates with n8n workflows via HTTP webhooks
 
+import { createLogger } from '@/lib/logger'
+import { safeIntegrationFetch } from '@/lib/safe-fetch'
+
+const log = createLogger('n8n')
+
 type N8nWebhookPayload = {
   event: string
   data: Record<string, unknown>
@@ -30,32 +35,28 @@ class N8nClient {
     this.apiKey = process.env.N8N_API_KEY || ''
   }
 
-  private get headers() {
-    return {
-      'Content-Type': 'application/json',
-      ...(this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}),
-    }
-  }
-
   /**
    * Trigger an n8n workflow via webhook
    */
   async triggerWebhook(webhookPath: string, payload: N8nWebhookPayload): Promise<N8nResponse> {
     let url = this.baseUrl
     let key = this.apiKey
-    let authHeader = ''
-
     // If company_id is provided, try to fetch custom n8n config from DB
     if (payload.metadata?.company_id) {
       const { createServiceClient } = await import('@/lib/supabase/server')
       const supabase = createServiceClient()
-      const { data: settings } = await supabase
+      const { data: settings, error: settingsError } = await supabase
         .from('integration_settings')
         .select('config')
         .eq('company_id', payload.metadata.company_id)
         .eq('integration_name', 'n8n_automation')
         .eq('enabled', true)
         .maybeSingle()
+
+      if (settingsError) {
+        log.error('Failed to resolve tenant n8n settings', settingsError, { company_id: payload.metadata.company_id })
+        return { success: false, error: 'Unable to resolve tenant n8n configuration' }
+      }
 
       if (settings?.config) {
         const config = settings.config as Record<string, string>
@@ -71,11 +72,14 @@ class N8nClient {
     }
 
     if (!url) {
-      console.warn('[n8n] N8N_BASE_URL not configured and no company config found, skipping webhook trigger')
+      log.warn('N8N_BASE_URL not configured and no company config found; skipping trigger')
       return { success: false, error: 'n8n not configured' }
     }
 
-    const fullUrl = `${url}/webhook/${webhookPath}`
+    const normalizedPath = normalizeN8nWebhookPath(webhookPath)
+    if (!normalizedPath) return { success: false, error: 'Invalid n8n webhook path' }
+
+    const fullUrl = `${url}/webhook/${normalizedPath}`
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (key) {
       // If it's a JWT key or standard Bearer
@@ -84,7 +88,7 @@ class N8nClient {
     }
 
     try {
-      const response = await fetch(fullUrl, {
+      const response = await safeIntegrationFetch(fullUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -98,7 +102,7 @@ class N8nClient {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(`[n8n] Webhook ${webhookPath} failed: ${response.status} — ${errorText}`)
+        log.error('n8n webhook failed', new Error(`HTTP ${response.status}: ${errorText}`), { webhookPath: normalizedPath })
         return { success: false, error: `HTTP ${response.status}: ${errorText}` }
       }
 
@@ -106,7 +110,7 @@ class N8nClient {
       return { success: true, data }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`[n8n] Webhook ${webhookPath} error: ${message}`)
+      log.error('n8n webhook request failed', error, { webhookPath: normalizedPath })
       return { success: false, error: message }
     }
   }
@@ -236,6 +240,12 @@ export function getN8nClient(): N8nClient {
     _n8nClient = new N8nClient()
   }
   return _n8nClient
+}
+
+export function normalizeN8nWebhookPath(value: string): string | null {
+  const normalized = value.trim().replace(/^\/+|\/+$/g, '')
+  if (!normalized || normalized.includes('..') || !/^[a-zA-Z0-9/_-]+$/.test(normalized)) return null
+  return normalized
 }
 
 export type { N8nWebhookPayload, N8nResponse }

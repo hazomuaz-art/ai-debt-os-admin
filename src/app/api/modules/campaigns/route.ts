@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, errors } from '@/lib/api'
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return withAuth(async (ctx) => {
     const { data, error } = await ctx.supabase
       .from('campaigns')

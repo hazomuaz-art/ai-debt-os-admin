@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { formatDate, getStatusColor, formatCurrency } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { InviteUserModal } from '@/components/dashboard/InviteUserModal'
 import { MemberActions } from '@/components/dashboard/MemberActions'
 import { Users, Activity, CheckCircle, Wallet } from 'lucide-react'

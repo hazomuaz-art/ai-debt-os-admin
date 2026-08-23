@@ -7,7 +7,7 @@ This document describes the required n8n workflows for the **AI Debt OS** platfo
 ## 1. Outbound WhatsApp Message (`whatsapp-outbound`)
 * **Webhook Path**: `/webhook/whatsapp-outbound`
 * **Trigger Event**: `send_message`
-* **Purpose**: Relays outbound messages from the Next.js admin dashboard to the Evolution API.
+* **Purpose**: Relays outbound messages from the Next.js admin dashboard to WAHA.
 
 ### Webhook Payload
 ```json
@@ -19,7 +19,10 @@ This document describes the required n8n workflows for the **AI Debt OS** platfo
     "phone_number": "966501234567",
     "message": "السلام عليكم أحمد، نود تذكيرك بالدفعة المستحقة بقيمة 12,000 ر.س.",
     "instance_name": "ai-debt-main",
-    "message_type": "text"
+    "message_type": "text",
+    "api_url": "https://waha.yourdomain.com",
+    "api_key": "injected-server-side",
+    "session": "ai-debt-main"
   },
   "metadata": {
     "company_id": "aaaaaaaa-0000-4000-8000-000000000001",
@@ -30,13 +33,14 @@ This document describes the required n8n workflows for the **AI Debt OS** platfo
 
 ### Flow Steps in n8n:
 1. **Webhook Node**: Receives the POST request.
-2. **HTTP Request Node**: Invokes the **Evolution API** to send the message:
-   * **URL**: `{{$env.EVOLUTION_API_URL}}/message/sendText/{{$json.data.instance_name}}`
-   * **Headers**: `apikey: {{$env.EVOLUTION_API_KEY}}`
+2. **HTTP Request Node**: Invokes **WAHA** to send the message:
+   * **URL**: `{{$json.data.api_url}}/api/sendText`
+   * **Headers**: `X-Api-Key: {{$json.data.api_key}}`
    * **Body**:
      ```json
      {
-       "number": "{{$json.data.phone_number}}",
+       "session": "{{$json.data.session}}",
+       "chatId": "{{$json.data.phone_number}}@c.us",
        "text": "{{$json.data.message}}"
      }
      ```
@@ -104,7 +108,7 @@ This document describes the required n8n workflows for the **AI Debt OS** platfo
 2. **Supabase Node**: Retrieves campaign target lists.
 3. **Loop Node**: Iterates targets, applying a randomized delay (e.g., 30–90 seconds) between each message.
 4. **Logic Check**: Evaluates "Stop Rules" (e.g., skips customers who already settled or promised in the last 24 hours).
-5. **HTTP Outbound WhatsApp Node**: Calls Evolution API to send message.
+5. **HTTP Outbound WhatsApp Node**: Calls WAHA to send the message.
 6. **Next.js Webhook Node**: Updates campaign progress (`campaign_progress` event).
 
 ---
@@ -120,4 +124,4 @@ This document describes the required n8n workflows for the **AI Debt OS** platfo
 3. **Split Node**:
    * **Due Today**: Generates a friendly reminder message.
    * **Overdue**: Generates a firmer objection/escalation message.
-4. **HTTP Outbound WhatsApp Node**: Calls Evolution API to send the follow-up reminder.
+4. **HTTP Outbound WhatsApp Node**: Calls WAHA to send the follow-up reminder.

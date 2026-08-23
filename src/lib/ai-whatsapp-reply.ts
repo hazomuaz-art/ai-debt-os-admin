@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { AI_MODELS } from '@/lib/ai-models'
 import { buildCustomerDebtContext } from '@/lib/customer-debt-context'
 import insuranceReasons from './insurance_reasons.json'
 
@@ -275,7 +276,7 @@ export async function generateWhatsappAutoReply(args: {
   })
 
   const ai = await client.chat.completions.create({
-    model: 'anthropic/claude-sonnet-4',
+    model: AI_MODELS.balanced,
     max_completion_tokens: 420,
     tools: [
       {
@@ -374,7 +375,7 @@ export async function generateWhatsappAutoReply(args: {
     ],
   })
 
-  let decision: Decision = { shouldReply: true, reply: '', nextAction: 'reply', confidence: 0.9 }
+  const decision: Decision = { shouldReply: true, reply: '', nextAction: 'reply', confidence: 0.9 }
   
   const aiMessage = ai.choices[0]?.message
   
@@ -468,8 +469,8 @@ export async function generateWhatsappOperationalDecision(args: {
     text.includes('حوالة') || text.includes('ايصال') || text.includes('إيصال')
 
   let nextAction = 'reply'
-  let risk_impact: WhatsappSystemImpact['risk_impact'] = 'neutral'
-  let summary = 'Inbound WhatsApp message requires system-wide update.'
+  const risk_impact: WhatsappSystemImpact['risk_impact'] = 'neutral'
+  const summary = 'Inbound WhatsApp message requires system-wide update.'
 
   const systemImpact: WhatsappSystemImpact = {
     timeline: true,
@@ -576,7 +577,7 @@ export async function generateProactiveReminder(args: {
 
   try {
     const res = await ai.chat.completions.create({
-      model: 'anthropic/claude-sonnet-5',
+      model: AI_MODELS.reasoning,
       // Raised from 0.4 — this is a low-stakes reminder (no numbers/dates
       // being negotiated, just a factual follow-up), so more lexical variety
       // carries little real risk, while low temperature was a direct

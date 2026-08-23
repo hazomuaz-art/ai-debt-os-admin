@@ -1,5 +1,7 @@
 ﻿import OpenAI from 'openai'
 
+import { AI_MODELS } from '@/lib/ai-models'
+
 export type AutoSchemaDetectionInput = {
   source_name?: string
   columns: string[]
@@ -112,7 +114,7 @@ Return exactly:
 `
 
   const res = await client.chat.completions.create({
-    model: 'openai/gpt-4o-mini',
+    model: AI_MODELS.fast,
     temperature: 0.1,
     max_tokens: 2500,
     response_format: { type: 'json_object' },

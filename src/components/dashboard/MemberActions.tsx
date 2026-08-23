@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Power, Settings2, Shield, XCircle, Trash2 } from 'lucide-react'
+import { Power, Settings2, XCircle, Trash2 } from 'lucide-react'
 
 export function MemberActions({ 
   memberId, 

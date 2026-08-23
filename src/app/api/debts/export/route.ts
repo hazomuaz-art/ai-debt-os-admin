@@ -1,41 +1,55 @@
-import { createLogger } from '@/lib/logger'
-const logger = createLogger('api/debts/export')
+import { NextRequest } from 'next/server'
+import { errors, withAuth } from '@/lib/api'
+import { csvDownloadResponse } from '@/lib/csv'
 
-import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
-import { createClient } from '@/lib/supabase/server'
 
-function escapeCSV(val: any): string {
-  if (val == null) return ''
-  const str = String(val)
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`
-  }
-  return str
+interface DebtExportRow {
+  reference_number: string | null
+  original_amount: number | null
+  current_balance: number | null
+  currency: string | null
+  status: string | null
+  priority: string | null
+  due_date: string | null
+  product_type: string | null
+  account_number: string | null
+  notes: string | null
+  created_at: string | null
+  last_payment_date: string | null
+  customer: {
+    full_name: string | null
+    phone: string | null
+    whatsapp: string | null
+    national_id: string | null
+    city: string | null
+    employer: string | null
+    monthly_income: number | null
+  } | null
+  assigned_to_profile: { full_name: string | null; email: string | null } | null
+  ai_scores: Array<{
+    score: number | null
+    risk_classification: string | null
+    collection_probability: number | null
+    created_at: string | null
+  }>
 }
 
+const HEADERS = [
+  'Reference', 'Customer Name', 'Phone', 'WhatsApp', 'National ID',
+  'City', 'Employer', 'Monthly Income', 'Original Amount', 'Current Balance',
+  'Currency', 'Status', 'Priority', 'Due Date', 'Product Type', 'Account Number',
+  'AI Score', 'Risk Classification', 'Collection Probability %',
+  'Assigned To', 'Last Payment Date', 'Created At', 'Notes',
+] as const
+
 export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return new NextResponse('Unauthorized', { status: 401 })
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.company_id) return new NextResponse('No company', { status: 400 })
-    if (!['admin', 'manager'].includes(profile.role)) {
-      return new NextResponse('Forbidden', { status: 403 })
-    }
-
-    const { searchParams } = new URL(request.url)
+  return withAuth(async (ctx) => {
+    const { searchParams } = request.nextUrl
     const status = searchParams.get('status')
     const priority = searchParams.get('priority')
 
-    let query = supabase
+    let query = ctx.supabase
       .from('debts')
       .select(`
         reference_number,
@@ -52,68 +66,52 @@ export async function GET(request: NextRequest) {
         last_payment_date,
         customer:customers(full_name, phone, whatsapp, national_id, city, employer, monthly_income),
         assigned_to_profile:profiles!debts_assigned_to_fkey(full_name, email),
-        ai_scores(score, risk_classification, collection_probability)
+        ai_scores(score, risk_classification, collection_probability, created_at)
       `)
-      .eq('company_id', profile.company_id)
+      .eq('company_id', ctx.profile.company_id)
       .order('created_at', { ascending: false })
 
-    if (status) query = (query as any).eq('status', status)
-    if (priority) query = (query as any).eq('priority', priority)
+    if (status) query = query.eq('status', status)
+    if (priority) query = query.eq('priority', priority)
 
-    const { data: debts, error } = await query
-    if (error) return new NextResponse(error.message, { status: 500 })
+    const { data, error } = await query
+    if (error) return errors.internal(error.message)
 
-    const headers = [
-      'Reference', 'Customer Name', 'Phone', 'WhatsApp', 'National ID',
-      'City', 'Employer', 'Monthly Income', 'Original Amount', 'Current Balance',
-      'Currency', 'Status', 'Priority', 'Due Date', 'Product Type', 'Account Number',
-      'AI Score', 'Risk Classification', 'Collection Probability %',
-      'Assigned To', 'Last Payment Date', 'Created At', 'Notes',
-    ]
-
-    const rows = (debts ?? []).map((d: any) => {
-      const latestScore = d.ai_scores?.sort((a: any, b: any) =>
+    const rows = ((data ?? []) as unknown as DebtExportRow[]).map(debt => {
+      const latestScore = [...debt.ai_scores].sort((a, b) =>
         new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
       )[0]
 
       return [
-        d.reference_number,
-        d.customer?.full_name,
-        d.customer?.phone,
-        d.customer?.whatsapp,
-        d.customer?.national_id,
-        d.customer?.city,
-        d.customer?.employer,
-        d.customer?.monthly_income,
-        d.original_amount,
-        d.current_balance,
-        d.currency,
-        d.status,
-        d.priority,
-        d.due_date,
-        d.product_type,
-        d.account_number,
-        latestScore?.score ?? '',
-        latestScore?.risk_classification ?? '',
-        latestScore ? Math.round(latestScore.collection_probability * 100) : '',
-        d.assigned_to_profile?.full_name ?? '',
-        d.last_payment_date ?? '',
-        d.created_at ? new Date(d.created_at).toLocaleDateString() : '',
-        d.notes,
-      ].map(escapeCSV)
+        debt.reference_number,
+        debt.customer?.full_name,
+        debt.customer?.phone,
+        debt.customer?.whatsapp,
+        debt.customer?.national_id,
+        debt.customer?.city,
+        debt.customer?.employer,
+        debt.customer?.monthly_income,
+        debt.original_amount,
+        debt.current_balance,
+        debt.currency,
+        debt.status,
+        debt.priority,
+        debt.due_date,
+        debt.product_type,
+        debt.account_number,
+        latestScore?.score,
+        latestScore?.risk_classification,
+        latestScore?.collection_probability == null
+          ? null
+          : Math.round(latestScore.collection_probability * 100),
+        debt.assigned_to_profile?.full_name,
+        debt.last_payment_date,
+        debt.created_at ? new Date(debt.created_at).toLocaleDateString() : null,
+        debt.notes,
+      ]
     })
 
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="debts_export_${new Date().toISOString().split('T')[0]}.csv"`,
-      },
-    })
-  } catch (error) {
-    logger.error('Export failed', error)
-    return new NextResponse('Export failed', { status: 500 })
-  }
+    const date = new Date().toISOString().slice(0, 10)
+    return csvDownloadResponse(`debts_export_${date}.csv`, HEADERS, rows)
+  }, { requiredRoles: ['admin', 'manager'] })
 }

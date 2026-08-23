@@ -110,8 +110,23 @@ check('Security: WAHA session tenant map', () => {
   if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
     throw new Error('WAHA_SESSION_COMPANY_MAP must be a non-empty JSON object')
   }
-  if (Object.values(parsed).some(value => typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value))) {
+  if (Object.values(parsed).some(value => typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) {
     throw new Error('Every WAHA session must map to a company UUID')
+  }
+})
+
+check('Security: Rasf inbound tenant map', () => {
+  const secret = process.env.RASF_WEBHOOK_SECRET
+  const rawMap = process.env.RASF_WEBHOOK_COMPANY_MAP
+  if (!secret && !rawMap) return 'INFO: Rasf inbound webhook disabled'
+  if (!secret || !rawMap) throw new Error('RASF_WEBHOOK_SECRET and RASF_WEBHOOK_COMPANY_MAP must be configured together')
+
+  const parsed = JSON.parse(rawMap)
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+    throw new Error('RASF_WEBHOOK_COMPANY_MAP must be a non-empty JSON object')
+  }
+  if (Object.values(parsed).some(value => typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))) {
+    throw new Error('Every Rasf routing key must map to a company UUID')
   }
 })
 

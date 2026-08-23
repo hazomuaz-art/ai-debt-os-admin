@@ -14,7 +14,7 @@ const createSchema = z.object({
   metadata: z.record(z.any()).default({}),
 })
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return withAuth(async (ctx) => {
     const { data, error } = await ctx.supabase
       .from('portfolio_whatsapp_numbers')

@@ -1,57 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { getN8nClient } from '@/lib/n8n/client'
+import { z } from 'zod'
+import { errors, parseBody, withAuth } from '@/lib/api'
+import { getN8nClient, normalizeN8nWebhookPath } from '@/lib/n8n/client'
 
-/**
- * POST /api/n8n/trigger
- * 
- * Secure proxy/trigger route for n8n webhooks.
- * Allows client-side pages to trigger n8n workflows without exposing baseUrl/apiKey.
- */
+const triggerSchema = z.object({
+  webhookPath: z.string().min(1).max(200),
+  event: z.string().min(1).max(100),
+  data: z.record(z.unknown()),
+})
+
+/** Secure tenant-scoped proxy; n8n credentials never reach the browser. */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  return withAuth(async (ctx) => {
+    const parsed = await parseBody(request, triggerSchema)
+    if (parsed.error) return parsed.error
 
-  // Get user profile to verify company association
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('company_id, role')
-    .eq('id', user.id)
-    .single()
+    const webhookPath = normalizeN8nWebhookPath(parsed.data.webhookPath)
+    if (!webhookPath) return errors.badRequest('Invalid n8n webhook path')
 
-  if (!profile?.company_id) {
-    return NextResponse.json({ error: 'Unauthorized: No company profile found' }, { status: 403 })
-  }
-
-  try {
-    const body = await request.json()
-    const { webhookPath, event, data } = body
-
-    if (!webhookPath || !event || !data) {
-      return NextResponse.json({ error: 'Missing required fields: webhookPath, event, data' }, { status: 400 })
-    }
-
-    const n8nClient = getN8nClient()
-    const result = await n8nClient.triggerWebhook(webhookPath, {
-      event,
-      data,
+    const result = await getN8nClient().triggerWebhook(webhookPath, {
+      event: parsed.data.event,
+      data: parsed.data.data,
       metadata: {
-        company_id: profile.company_id,
+        company_id: ctx.profile.company_id,
         source: 'next-api-trigger',
-      }
+      },
     })
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error || 'Failed to trigger n8n' }, { status: 500 })
-    }
-
+    if (!result.success) return errors.internal('Failed to trigger n8n')
     return NextResponse.json({ success: true, data: result.data })
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Internal server error'
-    }, { status: 500 })
-  }
+  }, { requiredRoles: ['admin', 'manager'] })
 }

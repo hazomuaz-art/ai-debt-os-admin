@@ -38,7 +38,6 @@ function parseZip(buf: Uint8Array): ZipEntry[] {
 
     const compression = readUint16LE(buf, pos + 8)
     const compSize    = readUint32LE(buf, pos + 18)
-    const uncompSize  = readUint32LE(buf, pos + 22)
     const nameLen     = readUint16LE(buf, pos + 26)
     const extraLen    = readUint16LE(buf, pos + 28)
     const nameBytes   = buf.slice(pos + 30, pos + 30 + nameLen)
@@ -47,14 +46,13 @@ function parseZip(buf: Uint8Array): ZipEntry[] {
     const compData    = buf.slice(dataStart, dataStart + compSize)
 
     const capturedComp     = compression
-    const capturedUncomp   = uncompSize
     const capturedCompData = compData
 
     entries.push({
       name,
       getData() {
         if (capturedComp === 0) return capturedCompData // stored uncompressed
-        if (capturedComp === 8) return inflateRaw(capturedCompData, capturedUncomp)
+        if (capturedComp === 8) return inflateRaw(capturedCompData)
         throw new Error(`Unsupported compression: ${capturedComp}`)
       },
     })
@@ -71,7 +69,7 @@ declare const Buffer: any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare function require(module: string): any
 
-function inflateRaw(compressed: Uint8Array, _uncompressedSize: number): Uint8Array {
+function inflateRaw(compressed: Uint8Array): Uint8Array {
   // Use Node.js zlib for server-side
   try {
     const zlib = require('zlib') as { inflateRawSync: (buf: unknown) => { buffer: ArrayBuffer; byteOffset: number; byteLength: number } }

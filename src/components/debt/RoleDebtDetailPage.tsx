@@ -8,68 +8,19 @@ import EditDebtModal from '@/components/debt/EditDebtModal'
 import { SendWhatsAppButton } from '@/components/ai/SendWhatsAppButton'
 import AssignDebtSelect from '@/components/debt/AssignDebtSelect'
 import Link from 'next/link'
-import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldAlert, BrainCircuit, Wallet, Calendar, AlertTriangle, FileText, BellRing, Target } from 'lucide-react'
+import { ArrowRight, User, CreditCard, Activity, MessageSquare, History, ShieldAlert, BrainCircuit, Wallet, Calendar, FileText, BellRing, Target } from 'lucide-react'
 import QuickActionsPanel from '@/components/debt/QuickActionsPanel'
 import CollectorNotePanel from '@/components/debt/CollectorNotePanel'
 import PrintConversationButton from '@/components/debt/PrintConversationButton'
 import EditWhatsAppButton from '@/components/debt/EditWhatsAppButton'
-import { DeleteCustomerButton } from '@/components/debt/DeleteCustomerButton'
-import { ExportCustomerDataButton } from '@/components/debt/ExportCustomerDataButton'
-import { AiToggleButton } from '@/components/debt/AiToggleButton'
-import { StartConversationButton } from '@/components/debt/StartConversationButton'
-import UnifiedTimeline from '@/components/debt/UnifiedTimeline'
-import CustomerDocumentsPanel from '@/components/debt/CustomerDocumentsPanel'
-import { getPortfolioTableConfig } from '@/lib/portfolio-data-fields'
 import { resolveCompanyProfile, findCompanyProfile } from '@/lib/company-import-profiles'
+import CustomerDocumentsPanel from '@/components/debt/CustomerDocumentsPanel'
 
-// Translate AI-generated score factor names (free-form English) to Arabic by keyword.
-function factorAr(name: string): string {
-  const n = String(name ?? '').toLowerCase()
-  if (/overdue|past due|days? late|تأخر/.test(n)) return 'أيام التأخر'
-  if (/payment history|سداد.*سابق|history/.test(n)) return 'سجل السداد'
-  if (/dti|debt[- ]?to[- ]?income|نسبة الدخل/.test(n)) return 'نسبة الدين إلى الدخل'
-  if (/disput|نزاع|اعتراض/.test(n)) return 'حالة النزاع'
-  if (/income|salary|راتب|دخل/.test(n)) return 'الدخل الشهري'
-  if (/balance|amount|outstanding|رصيد|مبلغ/.test(n)) return 'حجم المديونية'
-  if (/risk|خطورة|مخاطر/.test(n)) return 'مستوى الخطورة'
-  if (/promise|وعد/.test(n)) return 'الوعود السابقة'
-  if (/contact|response|تواصل|استجاب/.test(n)) return 'مدى التجاوب'
-  if (/employ|وظيف|عمل/.test(n)) return 'الوضع الوظيفي'
-  if (/credit|ائتمان/.test(n)) return 'السجل الائتماني'
-  return name
-}
-
-const DISPUTE_TYPE_LABELS: Record<string, string> = {
-  amount_wrong:  'اعتراض على المبلغ',
-  already_paid:  'يدّعي السداد المسبق',
-  not_my_debt:   'ينكر الدين',
-  service_issue: 'مشكلة بالخدمة',
-  other:         'أخرى',
-}
-
-const LEGAL_ESCALATION_LABELS: Record<string, string> = {
-  legal_threat:        'تهديد/إجراء قانوني',
-  lawyer_mention:      'ذكر محامٍ',
-  complaint:           'شكوى رسمية',
-  fault_dispute:       'اعتراض نسبة خطأ',
-  recourse_dispute:    'اعتراض حق رجوع',
-  third_party_dispute: 'نزاع طرف ثالث',
-  recovered_deduction: 'مراجعة حذف مسترد',
-  playbook_mandated:   'تصعيد إلزامي بالسياسة',
-}
-
-function riskAr(r: string): string {
-  switch (String(r ?? '').toLowerCase()) {
-    case 'low': return 'خطورة منخفضة'
-    case 'medium': return 'خطورة متوسطة'
-    case 'high': return 'خطورة عالية'
-    case 'critical': return 'خطورة حرجة'
-    default: return r
-  }
-}
-
-export default async function DebtDetailPage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+export async function RoleDebtDetailPage(props: {
+  params: Promise<{ id: string }>
+  dashboardRole: 'manager' | 'collector'
+}) {
+  const params = await props.params
   const supabase = await createClient()
 
   // Defense-in-depth: the debts RLS policy already enforces
@@ -80,8 +31,9 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
   // one place that didn't. Hardens against a future RLS policy regression.
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
-  const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', user.id).single()
   if (!profile?.company_id) notFound()
+  if (props.dashboardRole === 'manager' && !['admin', 'manager'].includes(profile.role)) notFound()
 
   const { data: debt } = await supabase
     .from('debts')
@@ -102,6 +54,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
   const { data: collectors } = await supabase
     .from('profiles')
     .select('id, full_name, email')
+    .eq('company_id', profile.company_id)
     .in('role', ['collector', 'manager'])
     .order('full_name')
 
@@ -145,43 +98,6 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
     .order('created_at', { ascending: false })
     .limit(5)
 
-  // Disputes and legal escalations were previously tracked in separate
-  // tables/pages with zero visibility on the debt detail page itself — an
-  // admin could open a debt with an active dispute or an open legal
-  // escalation and have no idea, since the negotiation-lock/dispute state
-  // lives entirely outside what this page queried. Surfaced here so every
-  // piece of information about this debt is visible in one place.
-  const { data: debtDisputes } = await supabase
-    .from('disputes')
-    .select('id, dispute_type, description, status, priority, resolution, created_at')
-    .eq('debt_id', debt.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  const { data: debtLegalEscalations } = await supabase
-    .from('legal_escalations')
-    .select('id, escalation_type, reason, status, opened_at, closed_at, admin_notes')
-    .eq('debt_id', debt.id)
-    .order('opened_at', { ascending: false })
-    .limit(5)
-
-  const openDispute = (debtDisputes ?? []).find(d => d.status === 'open' || d.status === 'under_review')
-  const openEscalation = (debtLegalEscalations ?? []).find(e => e.status === 'open')
-
-  const { data: collectionFollowups } = await supabase
-    .from('collection_followups')
-    .select('id, original_status, original_sub_status, normalized_status, collector_name, customer_statement, collector_note, result_summary, occurred_at')
-    .eq('debt_id', debt.id)
-    .order('occurred_at', { ascending: false })
-    .limit(8)
-
-  const { data: collectionStatusHistory } = await supabase
-    .from('collection_status_history')
-    .select('id, old_status, old_sub_status, new_status, new_sub_status, normalized_status, changed_by_name, changed_at')
-    .eq('debt_id', debt.id)
-    .order('changed_at', { ascending: false })
-    .limit(8)
-
   const { data: customerDocuments } = await supabase
     .from('customer_documents')
     .select('id, doc_type, ai_summary, needs_admin_review, storage_path, source, created_at')
@@ -190,75 +106,30 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
 
   const totalPaid = debt.payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) ?? 0
 
-  // Other debts for the SAME real person (matched by national_id) under any
-  // other portfolio within this same company (الكهرباء/المياه/موبايلي/...) —
-  // never crosses company_id, so this never reveals anything between
-  // different client companies on the platform, only within one company's
-  // own portfolios. PostgREST can't filter a top-level select by a joined
-  // table's column directly, so this is an explicit two-step lookup:
-  // customers sharing the same national_id, then debts for those customers.
-  const { data: sameNationalIdCustomers } = debt.customer?.national_id
-    ? await supabase.from('customers').select('id')
-        .eq('company_id', debt.company_id).eq('national_id', debt.customer.national_id)
-    : { data: null }
-  // Always include the current customer record itself — covers the common
-  // case where the SAME customer row already has multiple debts across
-  // portfolios (the import route reuses one customer record when it
-  // recognizes a returning national_id/phone). The national_id cross-match
-  // above only adds value when import matching missed a duplicate and
-  // created two separate customer rows for the same real person.
-  const relatedCustomerIds = Array.from(new Set([
-    debt.customer_id,
-    ...((sameNationalIdCustomers ?? []).map((c: any) => c.id)),
-  ]))
-  const { data: relatedDebts } = await supabase
-    .from('debts')
-    .select('id, reference_number, current_balance, currency, status, portfolio:portfolios(name)')
-    .eq('company_id', debt.company_id)
-    .in('customer_id', relatedCustomerIds)
-    .neq('id', debt.id)
-
-  // Portfolio-specific fields (Mobily, STC, التعاونية, ...) — same data
-  // the importer routes into customer_data_<table>, also editable manually.
-  let portfolioData: Record<string, unknown> | null = null
-  let portfolioConfig: ReturnType<typeof getPortfolioTableConfig> = null
   let outcomeCategories: string[] | null = null
   if (debt.portfolio_id) {
     const { data: portfolioRow } = await supabase
       .from('portfolios').select('name, metadata').eq('id', debt.portfolio_id).maybeSingle()
     const meta = (portfolioRow?.metadata as Record<string, unknown> | null) ?? {}
     const companyKey = meta.company_key as string | undefined
-    portfolioConfig = getPortfolioTableConfig(companyKey)
-    // Resolve the company's outcome-category list directly from
-    // company-import-profiles.ts (the single source of truth, confirmed
-    // matching the company's own reference file) by name/alias — not just
-    // whatever got cached into portfolio.metadata at import time, which may
-    // be missing for portfolios created before this field existed or via a
-    // path that never set it.
     const companyProfile = (companyKey && findCompanyProfile(companyKey)) || resolveCompanyProfile(portfolioRow?.name ?? '')
     if (companyProfile?.outcomeCategories?.length) {
       outcomeCategories = companyProfile.outcomeCategories
     } else if (Array.isArray(meta.outcome_categories) && meta.outcome_categories.length > 0) {
       outcomeCategories = meta.outcome_categories as string[]
     }
-    if (portfolioConfig) {
-      const { data: row } = await supabase
-        .from(portfolioConfig.table).select('*')
-        .eq('customer_id', debt.customer_id).maybeSingle()
-      portfolioData = row
-    }
   }
 
   return (
     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6 bg-[#0b0e14] font-sans text-slate-100">
-      
+
       {/* Header */}
       <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36] flex items-center justify-between mt-6">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/admin/debts" className="w-10 h-10 rounded-full bg-[#222a36] flex items-center justify-center text-[#8b95a7] hover:bg-[#222a36] hover:text-white transition-colors">
+          <Link href={`/dashboard/${props.dashboardRole}/debts`} className="w-10 h-10 rounded-full bg-[#222a36] flex items-center justify-center text-[#8b95a7] hover:bg-[#222a36] hover:text-white transition-colors">
             <ArrowRight size={20} />
           </Link>
-          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
             <User size={24} />
           </div>
           <div>
@@ -268,48 +139,14 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
         </div>
         <div className="flex gap-3">
           <EditDebtModal debt={debt} customer={debt.customer} />
-          {debt.customer?.id && (
-            <StartConversationButton customerId={debt.customer.id} phone={debt.customer.whatsapp ?? debt.customer.phone ?? null} />
-          )}
           <ScoreDebtButton debtId={debt.id} />
           <SendWhatsAppButton
             debtId={debt.id}
             phone={debt.customer?.whatsapp || debt.customer?.phone}
             customerName={debt.customer?.full_name}
           />
-          {debt.customer?.id && (
-            <AiToggleButton customerId={debt.customer.id} paused={!!debt.customer.ai_paused} />
-          )}
-          {debt.customer?.id && (
-            <ExportCustomerDataButton customerId={debt.customer.id} customerName={debt.customer.full_name ?? ''} />
-          )}
-          {debt.customer?.id && (
-            <DeleteCustomerButton customerId={debt.customer.id} customerName={debt.customer.full_name ?? ''} />
-          )}
         </div>
       </div>
-
-      {/* Open dispute / legal escalation — highest-priority state for this
-          debt, shown before anything else so it can never be missed. */}
-      {(openDispute || openEscalation) && (
-        <div className="bg-rose-500/10 rounded-2xl p-5 shadow-sm border border-rose-500/30 flex items-start gap-3">
-          <ShieldAlert className="text-rose-400 shrink-0 mt-0.5" size={22} />
-          <div className="space-y-2">
-            {openEscalation && (
-              <p className="text-rose-300 font-bold text-sm">
-                تصعيد قانوني مفتوح ({LEGAL_ESCALATION_LABELS[openEscalation.escalation_type] ?? openEscalation.escalation_type}) — الوكيل الآلي متوقف عن التفاوض على هذه المديونية حتى يتم إغلاق التصعيد من صفحة "التصعيدات القانونية".
-                {openEscalation.reason && <span className="block text-rose-400/80 font-normal mt-1">{openEscalation.reason}</span>}
-              </p>
-            )}
-            {openDispute && (
-              <p className="text-rose-300 font-bold text-sm">
-                نزاع مفتوح ({DISPUTE_TYPE_LABELS[openDispute.dispute_type] ?? openDispute.dispute_type})
-                {openDispute.description && <span className="block text-rose-400/80 font-normal mt-1">{openDispute.description}</span>}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info (Right Column in RTL) */}
@@ -317,17 +154,6 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
 
           {/* Quick Actions Panel */}
           <QuickActionsPanel debtId={debt.id} currentStatus={debt.status} />
-
-          {/* Unified customer history — everything in one chronological log */}
-          <UnifiedTimeline
-            messages={debt.messages}
-            payments={debt.payments}
-            promises={promises ?? []}
-            approvals={approvals ?? []}
-            followups={collectionFollowups ?? []}
-            statusHistory={collectionStatusHistory ?? []}
-            currency={debt.currency}
-          />
 
           {/* Documents sent by the customer (receipts + everything else) */}
           <CustomerDocumentsPanel documents={customerDocuments ?? []} />
@@ -338,23 +164,23 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
               <CreditCard className="text-white" size={20} />
               <h2 className="text-lg font-bold text-white">نظرة عامة على المديونية</h2>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="bg-[#222a36] p-4 rounded-xl border border-[#222a36]">
                 <p className="text-[#8b95a7] text-xs font-bold mb-1">المبلغ الأساسي</p>
                 <p className="text-xl font-bold text-white">{formatCurrency(debt.original_amount, debt.currency)}</p>
               </div>
-              <div className="bg-indigo-500/10 p-4 rounded-xl border border-indigo-500/20">
-                <p className="text-indigo-400 text-xs font-bold mb-1">الرصيد المتبقي</p>
-                <p className="text-xl font-bold text-indigo-400">{formatCurrency(debt.current_balance, debt.currency)}</p>
+              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <p className="text-indigo-600 text-xs font-bold mb-1">الرصيد المتبقي</p>
+                <p className="text-xl font-bold text-indigo-700">{formatCurrency(debt.current_balance, debt.currency)}</p>
               </div>
-              <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20">
-                <p className="text-emerald-400 text-xs font-bold mb-1">إجمالي المسدد</p>
-                <p className="text-xl font-bold text-emerald-400">{formatCurrency(totalPaid, debt.currency)}</p>
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                <p className="text-emerald-600 text-xs font-bold mb-1">إجمالي المسدد</p>
+                <p className="text-xl font-bold text-emerald-700">{formatCurrency(totalPaid, debt.currency)}</p>
               </div>
-              <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/20">
-                <p className="text-rose-400 text-xs font-bold mb-1">تاريخ الاستحقاق</p>
-                <p className="text-lg font-bold text-rose-400">{formatDate(debt.due_date)}</p>
+              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100">
+                <p className="text-rose-600 text-xs font-bold mb-1">تاريخ الاستحقاق</p>
+                <p className="text-lg font-bold text-rose-700">{formatDate(debt.due_date)}</p>
               </div>
             </div>
 
@@ -366,8 +192,8 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
               <div>
                 <p className="text-[#8b95a7] text-sm font-bold mb-2">الأولوية</p>
                 <span className={`inline-flex px-3 py-1.5 rounded-lg text-sm font-bold border ${
-                  debt.priority === 'critical' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                  debt.priority === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                  debt.priority === 'critical' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                  debt.priority === 'high' ? 'bg-orange-50 text-orange-600 border-orange-200' :
                   debt.priority === 'medium' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
                   'bg-[#222a36] text-slate-300 border-[#222a36]'
                 }`}>
@@ -385,31 +211,6 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
             )}
           </div>
 
-          {/* AI Case Note & Recommendation — auto-updated after every real
-              exchange (no "conversation ended" event exists in this system),
-              so a human can know "what happened" without reading the whole
-              thread. */}
-          {debt.metadata?.case_note && (
-            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-5">
-                <BrainCircuit className="text-indigo-400" size={20} />
-                <h2 className="text-lg font-bold text-white">ملخص الحالة (محدَّث تلقائياً)</h2>
-              </div>
-              <p className="text-slate-200 leading-relaxed bg-[#0d1117] p-4 rounded-xl border border-[#222a36]">{debt.metadata.case_note}</p>
-              {debt.metadata.recommended_approach && (
-                <div className="mt-4 flex items-start gap-2 bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-xl">
-                  <Target className="text-indigo-400 shrink-0 mt-0.5" size={18} />
-                  <p className="text-indigo-200 text-sm font-bold">{debt.metadata.recommended_approach}</p>
-                </div>
-              )}
-              {debt.metadata.case_note_updated_at && (
-                <p className="text-[#5f6b7e] text-xs mt-3">
-                  آخر تحديث: {new Date(debt.metadata.case_note_updated_at).toLocaleString('ar-SA')}
-                </p>
-              )}
-            </div>
-          )}
-
           {/* Collector Note & Follow-up */}
           <CollectorNotePanel
             debtId={debt.id}
@@ -421,7 +222,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <div className="flex items-center justify-between border-b border-[#222a36] pb-4 mb-5">
               <div className="flex items-center gap-2">
-                <Wallet className="text-emerald-400" size={20} />
+                <Wallet className="text-emerald-600" size={20} />
                 <h2 className="text-lg font-bold text-white">سجل المدفوعات</h2>
               </div>
               <RecordPaymentModal
@@ -447,7 +248,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                     {debt.payments.map((p: any) => (
                       <tr key={p.id} className="hover:bg-[#1a212c] transition-colors">
                         <td className="p-3 text-slate-300">{formatDate(p.payment_date)}</td>
-                        <td className="p-3 font-bold text-emerald-400">{formatCurrency(p.amount, debt.currency)}</td>
+                        <td className="p-3 font-bold text-emerald-600">{formatCurrency(p.amount, debt.currency)}</td>
                         <td className="p-3 text-slate-300">{p.payment_method || '—'}</td>
                         <td className="p-3 text-[#8b95a7] font-mono text-xs">{p.reference_number || '—'}</td>
                         <td className="p-3 text-[#8b95a7]">{p.notes || '—'}</td>
@@ -457,7 +258,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                               href={`/api/payments/${p.id}/receipt`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-bold text-xs"
+                              className="inline-flex items-center gap-1 text-emerald-500 hover:text-emerald-400 font-bold text-xs"
                             >
                               <FileText size={13} /> تحميل
                             </a>
@@ -501,9 +302,6 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                       <p>{msg.content}</p>
                       <p className={`text-[10px] mt-2 font-bold ${msg.direction === 'outbound' ? 'text-[#5f6b7e]' : 'text-[#5f6b7e]'}`}>
                         {formatDate(msg.sent_at || msg.created_at)} • {msg.channel}
-                        {msg.metadata?.action_type === 'campaign' && (
-                          <span className="ms-2 bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded">📢 حملة</span>
-                        )}
                       </p>
                     </div>
                   </div>
@@ -515,7 +313,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
               </div>
             )}
           </div>
-          
+
           {/* Timeline Events */}
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-5">
@@ -523,7 +321,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
               <h2 className="text-lg font-bold text-white">الخط الزمني المباشر (Timeline)</h2>
             </div>
             {timelineEvents?.length ? (
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ms-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[#222a36] before:to-transparent">
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ms-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
                 {timelineEvents.map((ev: any) => (
                   <div key={ev.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-[#222a36] text-[#8b95a7] shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
@@ -547,7 +345,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
 
         {/* Sidebar (Left Column in RTL) */}
         <div className="space-y-6">
-          
+
           {/* Customer Info */}
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
@@ -597,50 +395,11 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
               {debt.customer?.monthly_income && (
                 <div className="flex justify-between items-center">
                   <span className="text-[#8b95a7] font-bold">الدخل الشهري</span>
-                  <span className="font-bold text-emerald-400">{formatCurrency(debt.customer.monthly_income, debt.currency)}</span>
+                  <span className="font-bold text-emerald-600">{formatCurrency(debt.customer.monthly_income, debt.currency)}</span>
                 </div>
               )}
             </div>
           </div>
-
-          {relatedDebts && relatedDebts.length > 0 && (
-            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-              <div className="flex items-center gap-3 mb-4">
-                <AlertTriangle size={18} className="text-amber-400" />
-                <h2 className="font-bold text-white">مطالبات أخرى لهذا العميل ({relatedDebts.length})</h2>
-              </div>
-              <div className="space-y-2">
-                {(relatedDebts as any[]).map(rd => (
-                  <Link key={rd.id} href={`/dashboard/admin/debts/${rd.id}`}
-                    className="flex justify-between items-center p-3 rounded-xl bg-[#0b0e14] border border-[#222a36] hover:border-amber-400/50 transition-colors">
-                    <span className="text-[#8b95a7] text-sm">{rd.portfolio?.name ?? '—'} — {rd.reference_number ?? '—'}</span>
-                    <span className="font-bold text-white">{formatCurrency(rd.current_balance, rd.currency)}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {portfolioConfig && portfolioData && (
-            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-              <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
-                <FileText className="text-white" size={20} />
-                <h2 className="text-lg font-bold text-white">بيانات المحفظة</h2>
-              </div>
-              <div className="space-y-3 text-sm">
-                {portfolioConfig.fields.map(f => {
-                  const val = portfolioData?.[f.column]
-                  if (val === null || val === undefined || val === '') return null
-                  return (
-                    <div key={f.column} className="flex justify-between items-center pb-3 border-b border-slate-50">
-                      <span className="text-[#8b95a7] font-bold">{f.label}</span>
-                      <span className="font-bold text-white">{String(val)}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
 
           <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
             <h2 className="text-sm font-bold text-[#8b95a7] mb-3">المحصّل المسؤول</h2>
@@ -652,22 +411,22 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
           </div>
 
           {/* AI Score */}
-          <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-            <div className="flex items-center gap-2 border-b border-[#222a36] pb-4 mb-4">
-              <BrainCircuit className="text-indigo-400" size={20} />
-              <h2 className="text-lg font-bold text-white">تقييم الذكاء الاصطناعي</h2>
+          <div className="bg-gradient-to-br from-indigo-50 to-white rounded-2xl p-6 shadow-sm border border-indigo-100">
+            <div className="flex items-center gap-2 border-b border-indigo-100/50 pb-4 mb-4">
+              <BrainCircuit className="text-indigo-600" size={20} />
+              <h2 className="text-lg font-bold text-indigo-900">تقييم الذكاء الاصطناعي</h2>
             </div>
             {latestScore ? (
               <div className="space-y-5">
                 <div className="flex items-center justify-center gap-4 py-2">
-                  <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 bg-[#0d1117] ${
-                    latestScore.score >= 70 ? 'border-emerald-400 text-emerald-400' :
-                    latestScore.score >= 40 ? 'border-amber-400 text-amber-400' : 'border-rose-400 text-rose-400'
+                  <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 shadow-sm bg-[#151a23] ${
+                    latestScore.score >= 70 ? 'border-emerald-400 text-emerald-600' :
+                    latestScore.score >= 40 ? 'border-amber-400 text-amber-600' : 'border-rose-400 text-rose-600'
                   }`}>
                     <span className="text-4xl font-bold font-mono">{latestScore.score}</span>
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white mb-1">{riskAr(latestScore.risk_classification)}</p>
+                    <p className="text-sm font-bold text-white mb-1">{latestScore.risk_classification}</p>
                     <p className="text-xs text-[#8b95a7] flex items-center gap-1">
                       <Target size={12} className="text-indigo-400" />
                       احتمالية التحصيل: <strong className="text-white">{Math.round(latestScore.collection_probability * 100)}%</strong>
@@ -675,9 +434,9 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                   </div>
                 </div>
 
-                <div className="bg-[#0d1117] rounded-xl p-4 border border-[#222a36]">
+                <div className="bg-[#151a23] rounded-xl p-4 border border-indigo-50 shadow-sm">
                   <p className="text-xs text-indigo-400 font-bold mb-1">الاستراتيجية المقترحة</p>
-                  <p className="text-sm font-bold text-slate-200 leading-relaxed">{latestScore.recommended_strategy}</p>
+                  <p className="text-sm font-bold text-indigo-900 leading-relaxed">{latestScore.recommended_strategy}</p>
                 </div>
 
                 {latestScore.factors && (
@@ -685,9 +444,9 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                     <p className="text-xs text-[#5f6b7e] font-bold mb-2">العوامل المؤثرة</p>
                     <div className="space-y-2">
                       {latestScore.factors.slice(0, 4).map((f: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between text-xs bg-[#0d1117] p-2 rounded-lg border border-[#222a36]">
-                          <span className="text-slate-300 font-bold">{factorAr(f.name)}</span>
-                          <span className={`font-bold px-2 py-0.5 rounded ${f.impact === 'positive' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                        <div key={i} className="flex items-center justify-between text-xs bg-[#151a23] p-2 rounded-lg border border-[#222a36] shadow-sm">
+                          <span className="text-slate-300 font-bold">{f.name}</span>
+                          <span className={`font-bold px-2 py-0.5 rounded ${f.impact === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                             {f.impact === 'positive' ? '+' : '−'}{f.weight}
                           </span>
                         </div>
@@ -714,7 +473,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                   <div key={a.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="text-sm font-bold text-white">{a.action_type}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${a.priority === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>{a.priority}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${a.priority === 'high' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>{a.priority}</span>
                     </div>
                     <p className="text-xs text-[#8b95a7] mb-2 leading-relaxed">{a.reason}</p>
                     {a.suggested_message && <p className="text-xs bg-[#151a23] border border-[#222a36] text-slate-200 p-2 rounded-lg leading-relaxed shadow-sm">"{a.suggested_message}"</p>}
@@ -737,8 +496,8 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                 {promises.map((pr: any) => (
                   <div key={pr.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-bold text-emerald-400">{formatCurrency(pr.promised_amount, debt.currency)}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${pr.status === 'kept' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : pr.status === 'broken' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}>{pr.status}</span>
+                      <span className="text-sm font-bold text-emerald-600">{formatCurrency(pr.promised_amount, debt.currency)}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${pr.status === 'kept' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : pr.status === 'broken' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}>{pr.status}</span>
                     </div>
                     <p className="text-xs text-[#8b95a7] font-bold flex justify-between">
                       <span>{formatDate(pr.promised_date)}</span>
@@ -764,7 +523,7 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
                   <div key={ap.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-sm font-bold text-white">{ap.approval_type}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${ap.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : ap.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>{ap.status}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${ap.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : ap.status === 'rejected' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>{ap.status}</span>
                     </div>
                     <p className="text-xs text-[#8b95a7] leading-relaxed mb-1">{ap.description}</p>
                     <p className="text-[10px] text-[#5f6b7e] font-bold">{formatDate(ap.created_at)}</p>
@@ -776,58 +535,21 @@ export default async function DebtDetailPage(props: { params: Promise<{ id: stri
             )}
           </div>
 
-          {/* Customer 360: Disputes & Legal Escalations */}
-          {((debtDisputes && debtDisputes.length > 0) || (debtLegalEscalations && debtLegalEscalations.length > 0)) && (
-            <div className="bg-[#151a23] rounded-2xl p-6 shadow-sm border border-[#222a36]">
-              <div className="flex items-center gap-2 border-b border-[#222a36] pb-3 mb-4">
-                <ShieldAlert className="text-rose-500" size={18} />
-                <h2 className="text-base font-bold text-white">النزاعات والتصعيدات القانونية</h2>
-              </div>
-              <div className="space-y-3">
-                {(debtLegalEscalations ?? []).map((e: any) => (
-                  <div key={e.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-bold text-white">{LEGAL_ESCALATION_LABELS[e.escalation_type] ?? e.escalation_type}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${e.status === 'open' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>
-                        {e.status === 'open' ? 'مفتوح' : 'مغلق'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#8b95a7] leading-relaxed">{e.reason}</p>
-                    <p className="text-[10px] text-[#5f6b7e] font-bold mt-1">{formatDate(e.opened_at)}</p>
-                  </div>
-                ))}
-                {(debtDisputes ?? []).map((d: any) => (
-                  <div key={d.id} className="border border-[#222a36] bg-[#222a36]/50 rounded-xl p-3">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-bold text-white">{DISPUTE_TYPE_LABELS[d.dispute_type] ?? d.dispute_type}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${d.status === 'open' || d.status === 'under_review' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-[#222a36] text-[#8b95a7] border-[#222a36]'}`}>
-                        {d.status === 'open' ? 'مفتوح' : d.status === 'under_review' ? 'قيد المراجعة' : d.status === 'resolved' ? 'محلول' : d.status === 'rejected' ? 'مرفوض' : d.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#8b95a7] leading-relaxed">{d.description}</p>
-                    {d.resolution && <p className="text-xs text-emerald-400 leading-relaxed mt-1">الحل: {d.resolution}</p>}
-                    <p className="text-[10px] text-[#5f6b7e] font-bold mt-1">{formatDate(d.created_at)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Active Alerts */}
           {debtAlerts?.length > 0 && (
-            <div className="bg-rose-500/10/50 rounded-2xl p-6 shadow-sm border border-rose-500/20">
-              <div className="flex items-center gap-2 border-b border-rose-500/20/50 pb-3 mb-4">
-                <BellRing className="text-rose-400" size={18} />
-                <h2 className="text-base font-bold text-rose-400">تنبيهات نشطة</h2>
+            <div className="bg-rose-50/50 rounded-2xl p-6 shadow-sm border border-rose-100">
+              <div className="flex items-center gap-2 border-b border-rose-200/50 pb-3 mb-4">
+                <BellRing className="text-rose-600" size={18} />
+                <h2 className="text-base font-bold text-rose-900">تنبيهات نشطة</h2>
               </div>
               <div className="space-y-3">
                 {debtAlerts.map((al: any) => (
-                  <div key={al.id} className="bg-[#151a23] border border-rose-500/20 rounded-xl p-3 shadow-sm">
+                  <div key={al.id} className="bg-[#151a23] border border-rose-200 rounded-xl p-3 shadow-sm">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-bold text-rose-400">{al.title}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-rose-500/15 text-rose-400">{al.severity}</span>
+                      <span className="text-sm font-bold text-rose-700">{al.title}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-rose-100 text-rose-600">{al.severity}</span>
                     </div>
-                    {al.message && <p className="text-xs text-rose-400/80 leading-relaxed">{al.message}</p>}
+                    {al.message && <p className="text-xs text-rose-600/80 leading-relaxed">{al.message}</p>}
                   </div>
                 ))}
               </div>

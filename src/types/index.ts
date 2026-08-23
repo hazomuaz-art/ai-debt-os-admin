@@ -1,3 +1,5 @@
+import type { IntegrationName } from '@/lib/integration-catalog'
+
 export type UserRole = 'admin' | 'manager' | 'collector'
 export type DebtStatus = 'active' | 'in_progress' | 'promised' | 'partial' | 'in_negotiation' | 'payment_plan' | 'settled' | 'written_off' | 'legal' | 'disputed'
 export type DebtPriority = 'low' | 'medium' | 'high' | 'critical'
@@ -216,7 +218,7 @@ export interface RecommendRequest {
 
 // ── Integration Settings ──────────────────────────────────────────────────
 
-export type IntegrationName = 'rasf_whatsapp' | 'tameez_calls' | 'collection_api' | 'waha'
+export type { IntegrationName } from '@/lib/integration-catalog'
 
 export interface IntegrationSetting {
   id:               string

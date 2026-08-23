@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     let result: Record<string, unknown> = {}
 
     switch (event) {
-      // ── WhatsApp message received via Evolution API ──
+      // ── WhatsApp message received through the n8n gateway ──
       case 'message_received': {
         const { phone_number, message_content, message_type, instance_name, whatsapp_message_id } = data as Record<string, string>
         const company_id = metadata?.company_id
@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
 
       // ── Campaign progress update ──
       case 'campaign_progress': {
-        const { campaign_id, sent_count, delivered_count, failed_count } = data as Record<string, string | number>
+        const { campaign_id, sent_count, delivered_count } = data as Record<string, string | number>
         const company_id = metadata?.company_id
 
         if (campaign_id && company_id) {

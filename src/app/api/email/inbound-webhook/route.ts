@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { createLogger } from '@/lib/logger'
+import { resolveCompanyFromEnvMap } from '@/lib/tenant-map'
 
 const log = createLogger('webhook/email')
 
@@ -41,14 +42,13 @@ export async function POST(req: NextRequest) {
   const text = String(payload?.text ?? '').trim()
   if (!from || !to || !text) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
 
-  let companyMap: Record<string, string>
+  let companyId: string | null
   try {
-    companyMap = JSON.parse(process.env.EMAIL_INBOUND_COMPANY_MAP ?? '{}') as Record<string, string>
+    companyId = resolveCompanyFromEnvMap('EMAIL_INBOUND_COMPANY_MAP', to)
   } catch {
     return NextResponse.json({ error: 'Email routing is misconfigured' }, { status: 503 })
   }
-  const companyId = companyMap[to]
-  if (!companyId || !/^[0-9a-f-]{36}$/i.test(companyId)) {
+  if (!companyId) {
     log.error('inbound email rejected — recipient is not mapped to one company', new Error('tenant resolution failed'), { to })
     return NextResponse.json({ error: 'Unknown inbound recipient' }, { status: 400 })
   }

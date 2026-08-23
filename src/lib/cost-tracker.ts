@@ -10,7 +10,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { createLogger } from '@/lib/logger'
-import type { CostProvider, CostSettings } from '@/types'
+import type { CostProvider } from '@/types'
 
 const log = createLogger('cost-tracker')
 

@@ -107,7 +107,7 @@ export function ChatInterface({ initialMessages }: ChatInterfaceProps) {
     if (!dateString) return ''
     try {
       return new Date(dateString).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
-    } catch (e) {
+    } catch {
       return ''
     }
   }

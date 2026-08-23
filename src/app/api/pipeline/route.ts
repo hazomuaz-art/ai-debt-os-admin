@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   )
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   return withAuth(
     async (ctx) => {
       // Return pipeline status: recent timeline events + automation config

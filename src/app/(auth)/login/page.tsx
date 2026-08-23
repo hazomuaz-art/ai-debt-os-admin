@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { loginAction } from '@/lib/actions/auth'
-import Link from 'next/link'
 import { ShieldCheck, Activity, Users } from 'lucide-react'
 
 export default function LoginPage() {

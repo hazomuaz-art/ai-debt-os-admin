@@ -3,41 +3,15 @@ import { redirect } from 'next/navigation'
 import { IntegrationCard } from '@/components/integrations/IntegrationCard'
 import { MessageCircle, Settings, Link as LinkIcon, PhoneCall, MessageSquare } from 'lucide-react'
 import type { IntegrationSetting } from '@/types'
+import { INTEGRATION_DEFINITIONS, type IntegrationIcon } from '@/lib/integration-catalog'
 
-// ── Integration catalogue ──
-
-const INTEGRATIONS = [
-  {
-    key:         'waha',
-    label:       'WAHA WhatsApp',
-    description: 'ربط واتساب عبر WAHA لاستقبال وإرسال الرسائل والمفاوضات.',
-    icon:        <MessageCircle size={24} className="text-white" />,
-  },
-  {
-    key:         'n8n_automation',
-    label:       'n8n Automation',
-    description: 'ربط خوادم الأتمتة n8n لبرمجة مسارات العمل المتكررة وتزامن البيانات.',
-    icon:        <Settings size={24} className="text-white" />,
-  },
-  {
-    key:         'collection_api',
-    label:       'أنظمة التحصيل والمحاسبة (ERP)',
-    description: 'ربط ثنائي الاتجاه لمزامنة الديون والعملاء وسجلات السداد.',
-    icon:        <LinkIcon size={24} className="text-white" />,
-  },
-  {
-    key:         'tameez_calls',
-    label:       'Tameez Calls',
-    description: 'ربط نظام تميز لتحليل وتسجيل المكالمات الصوتية مع العملاء.',
-    icon:        <PhoneCall size={24} className="text-white" />,
-  },
-  {
-    key:         'rasf_whatsapp',
-    label:       'InSync / Rasf WhatsApp',
-    description: 'ربط واتساب عبر بوابة رصف (InSync) كقناة بديلة لاستقبال وإرسال الرسائل.',
-    icon:        <MessageSquare size={24} className="text-white" />,
-  },
-]
+const ICONS = {
+  'message-circle': MessageCircle,
+  settings: Settings,
+  link: LinkIcon,
+  'phone-call': PhoneCall,
+  'message-square': MessageSquare,
+} satisfies Record<IntegrationIcon, typeof MessageCircle>
 
 // ── Page ──
 
@@ -55,10 +29,11 @@ export default async function IntegrationsPage() {
   if (!profile?.company_id || profile.role !== 'admin') redirect('/dashboard/admin')
 
   // Load existing integration settings
-  const { data: settings, error: settingsErr } = await supabase
+  const { data: settings, error: settingsError } = await supabase
     .from('integration_settings')
     .select('*')
     .eq('company_id', profile.company_id)
+  if (settingsError) throw new Error(`Failed to load integration settings: ${settingsError.message}`)
 
   const settingsMap = new Map<string, IntegrationSetting>(
     (settings ?? []).map(s => [s.integration_name, s as IntegrationSetting])
@@ -79,24 +54,25 @@ export default async function IntegrationsPage() {
         <div className="bg-[#0d1117] px-4 py-3 rounded-xl border border-blue-100 flex items-center gap-2">
           <div className="w-3 h-3 bg-[#0e7a54] rounded-full animate-pulse"></div>
           <span className="text-white font-bold text-sm">
-            {enabledCount} من {INTEGRATIONS.length} قيد التشغيل
+            {enabledCount} من {INTEGRATION_DEFINITIONS.length} قيد التشغيل
           </span>
         </div>
       </div>
 
       {/* Integration cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {INTEGRATIONS.map(integration => (
-          <IntegrationCard
-            key={integration.key}
-            name={integration.key}
-            label={integration.label}
-            description={integration.description}
-            icon={integration.icon}
-            integrationKey={integration.key}
-            initial={settingsMap.get(integration.key) ?? null}
-          />
-        ))}
+        {INTEGRATION_DEFINITIONS.map(integration => {
+          const Icon = ICONS[integration.icon]
+          return (
+            <IntegrationCard
+              key={integration.name}
+              name={integration.name}
+              definition={integration}
+              icon={<Icon size={24} className="text-white" />}
+              initial={settingsMap.get(integration.name) ?? null}
+            />
+          )
+        })}
       </div>
       
       {/* Docs footer */}
