@@ -19,9 +19,9 @@ jobs:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -53,9 +53,9 @@ jobs:
       WAHA_SESSION:                  default
       WAHA_SESSION_COMPANY_MAP:      '{"default":"00000000-0000-0000-0000-000000000001"}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -68,14 +68,6 @@ jobs:
 
       - name: Run integration tests (migration validation)
         run: npm run test:integration
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 7
 
   # ── Build Verification ─────────────────────────────────────────────────
   build:
@@ -95,9 +87,9 @@ jobs:
       WAHA_SESSION:                  default
       WAHA_SESSION_COMPANY_MAP:      '{"default":"00000000-0000-0000-0000-000000000001"}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -119,7 +111,7 @@ jobs:
           fi
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nextjs-build
           path: |
@@ -142,8 +134,8 @@ jobs:
       APP_SECRET:                    ${{ secrets.APP_SECRET }}
       NEXT_PUBLIC_APP_URL:           ${{ secrets.STAGING_APP_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -156,8 +148,8 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
